@@ -80,6 +80,12 @@ class ListRepository(
         return dao.aisleOrder().map { AisleCode.valueOf(it.aisleCode) }.filter { it.name !in hidden }
     }
 
+    /** Settings › Aisles: the store's walking order. */
+    suspend fun setAisleOrder(order: List<AisleCode>) =
+        db.withTransaction { dao.putAisleOrder(order.mapIndexed { i, a -> AisleOrderEntity(1, a.name, i) }) }
+
+    fun observeStaples(): Flow<Set<String>> = dao.observeStaples().map { rows -> rows.map { it.key }.toSet() }
+
     suspend fun staples(): Set<String> = dao.staples().map { it.key }.toSet()
 
     suspend fun overrides(): Map<String, AisleCode> = dao.overrides().associate { it.key to AisleCode.valueOf(it.aisleCode) }

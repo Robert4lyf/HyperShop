@@ -36,6 +36,14 @@ class Settings(
     /** The one-time "your key could not be read" notice is pending. */
     val keyLostNotice: Flow<Boolean> = store.data.map { it[KEY_LOST] ?: false }
 
+    /**
+     * A key was saved on this install's data. With no key in the store that
+     * means it didn't survive a restore (the key file is never backed up).
+     */
+    val keyWasSet: Flow<Boolean> = store.data.map { it[KEY_SET] ?: false }
+
+    suspend fun setKeyWasSet(on: Boolean) = store.edit { it[KEY_SET] = on }
+
     suspend fun setUnits(u: UnitsSetting) = store.edit { it[UNITS] = u.name }
 
     suspend fun setModel(m: ClaudeModel) = store.edit { it[MODEL] = m.id }
@@ -60,5 +68,6 @@ class Settings(
         val WATCH_VIBRATE = booleanPreferencesKey("watch_vibrate")
         val DEBUG_LOG = booleanPreferencesKey("debug_log")
         val KEY_LOST = booleanPreferencesKey("claude_key_lost_notice")
+        val KEY_SET = booleanPreferencesKey("claude_key_was_set")
     }
 }

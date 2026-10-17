@@ -105,6 +105,9 @@ interface ListDao {
     @Query("SELECT * FROM AisleOrder WHERE storeId = :storeId ORDER BY position")
     suspend fun aisleOrder(storeId: Long = 1): List<AisleOrderEntity>
 
+    @Upsert
+    suspend fun putAisleOrder(rows: List<AisleOrderEntity>)
+
     @Query("SELECT * FROM CategoryOverride")
     suspend fun overrides(): List<CategoryOverrideEntity>
 
