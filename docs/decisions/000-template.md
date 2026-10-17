@@ -36,3 +36,27 @@ targetSdk 36, `buildToolsVersion = "36.0.0"`, versionName from
 ## Consequences
 Version bumps follow BangGym's practice: deliberate and reviewed. Versions are
 frozen after Step 0.4.
+
+## Step 0.4 addendum — HyperShop libraries, frozen
+Chosen as the newest that build with AGP 9.4.0 / Kotlin 2.2.10, each proven by a
+hello test, then frozen:
+
+| Library | Version | Hello test |
+|---|---|---|
+| OkHttp + mockwebserver | 4.12.0 | `:extract` HelloMockWebServerTest |
+| Jsoup | 1.23.2 | (used from Step 5.1) |
+| kotlinx-serialization-json | 1.9.0 (1.10+ targets Kotlin 2.3) | compiled in every JVM module |
+| WorkManager (+ work-testing) | 2.11.2 | (worker tests in 5.3) |
+| DataStore | 1.1.1 (BangGym's) | — |
+| JUnit Jupiter | 5.13.4 | `:core` HelloTest |
+| kotest-property | 6.0.7 | `:core` HelloTest |
+| Roborazzi (+ compose, junit-rule, plugin) | 1.76.0 | `:app` HelloComposeTest (`@GraphicsMode(NATIVE)`, `roborazzi.test.record=true`) |
+| Compose ui-test-junit4 | from BOM | `:app` HelloComposeTest (semantics) |
+| Timber | 5.0.1 | — |
+
+One BangGym version changed: **Robolectric 4.14.1 → 4.16.1**, because 4.14 has
+no SDK 36 runtime and the plan's worker tests run `@Config(sdk = [34, 36])`
+(`AppContainerTest` proves both).
+
+The BangGym stack itself built in the container, so the §2 fallback was not
+needed.
