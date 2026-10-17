@@ -5,7 +5,7 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 
 ## Step 0 — Toolchain and scaffolding
 - [x] 0.1 Repo files (.gitignore, README, PROGRESS, HANDOFF, KNOWN_ISSUES) — check: `ls README.md PROGRESS.md docs/HANDOFF.md docs/KNOWN_ISSUES.md`
-- [ ] 0.2 Android SDK + SessionStart hook
+- [x] 0.2 Android SDK + SessionStart hook — check: `java -version; echo $ANDROID_HOME; sdkmanager --list_installed` (36 platform, build-tools 36.0.0, platform-tools installed). Note: `ANTHROPIC_API_KEY` is absent in this container (see KNOWN_ISSUES #1)
 - [ ] 0.3 BangGym build setup copied; modules, minSdk 34, keystore, watch UUID, ADR 000
 - [ ] 0.4 HyperShop libraries + hello tests; versions frozen
 - [ ] 0.5 tools/verify.sh + CI workflows
