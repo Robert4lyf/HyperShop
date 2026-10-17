@@ -4,6 +4,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -76,7 +77,7 @@ class ReviewScreenTest {
         val texts = node.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text }
         val toggle = node.children.count { it.config.getOrNull(SemanticsProperties.ToggleableState) != null }
         // name, quantity and the in-stock box.
-        assertTrue("texts $texts", texts.containsAll(listOf("onion", "2")))
+        assertTrue("texts $texts", texts.containsAll(listOf("Onion", "2")))
         assertTrue(texts.size + toggle <= 4) // "In stock" label + name + quantity + box, read as one node
         compose.onNodeWithTag("row-cat:onion").performClick()
         assertEquals("row cat:onion", events.last())
@@ -86,7 +87,7 @@ class ReviewScreenTest {
     fun headerAndActions() {
         show()
         compose.onNodeWithText("Add 4 items").assertIsEnabled().performClick()
-        compose.onNodeWithText("Cancel").performClick()
+        compose.onNodeWithContentDescription("Cancel").performClick()
         compose.onNodeWithText("Claude pending").fetchSemanticsNode()
         compose.onNodeWithText("Retry with Claude").performClick()
         compose.onNodeWithText("Serves 4").fetchSemanticsNode()

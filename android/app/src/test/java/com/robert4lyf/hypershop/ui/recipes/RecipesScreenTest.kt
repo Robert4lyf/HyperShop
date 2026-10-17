@@ -3,6 +3,7 @@ package com.robert4lyf.hypershop.ui.recipes
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -46,12 +47,12 @@ class RecipesScreenTest {
     @Test
     fun removeAsksFirstAndInStockOnlyWhenSomeWere() {
         show()
-        compose.onNodeWithText("Serves 4 · 6 items on the list · 3 in stock").assertExists()
+        compose.onNodeWithContentDescription("Serves 4 · 6 items on the list · 3 in stock").assertExists()
         compose.onNodeWithText("Add the in-stock items now").performClick()
         // Only the chilli has in-stock lines, so there is one such button (onNodeWithText above
         // would fail on two); every use can be removed, after a confirmation.
         compose.onAllNodesWithText("Remove from list").assertCountEquals(3)
-        compose.onNodeWithText("Serves 8 · 5 items on the list").assertExists()
+        compose.onNodeWithContentDescription("Serves 8 · 5 items on the list").assertExists()
         compose.onAllNodesWithText("Remove from list")[1].performClick()
         compose.onNodeWithText("Keep").performClick()
         compose.onAllNodesWithText("Remove from list")[1].performClick()
