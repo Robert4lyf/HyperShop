@@ -27,6 +27,35 @@ class CategoriserTest {
         assertEquals(AisleCode.OTHER to AisleSource.OTHER, c.aisle("unobtainium"))
     }
 
+    @Test
+    fun catalogueBeatsTheDriedAndCannedIdentityRules() {
+        assertEquals(AisleCode.PASTA_RICE_GRAINS to AisleSource.CATALOGUE, c.aisle("dried pasta"))
+        assertEquals(AisleCode.PASTA_RICE_GRAINS to AisleSource.CATALOGUE, c.aisle("dried beans"))
+        assertEquals(AisleCode.BAKERY to AisleSource.CATALOGUE, c.aisle("dried breadcrumbs"))
+        assertEquals(AisleCode.BAKING to AisleSource.CATALOGUE, c.aisle("dried yeast"))
+        assertEquals(AisleCode.WORLD_FOODS to AisleSource.CATALOGUE, c.aisle("canned pumpkin"))
+        assertEquals(AisleCode.WORLD_FOODS, c.aisle("dried porcini").first)
+        assertEquals(AisleCode.WORLD_FOODS, c.aisle("dried mushrooms").first)
+        // Not catalogued as written: dried X takes X's aisle unless X is fruit or a herb.
+        assertEquals(AisleCode.PASTA_RICE_GRAINS, c.aisle("dried spaghetti").first)
+        assertEquals(AisleCode.PASTA_RICE_GRAINS, c.aisle("dried red lentils").first)
+        assertEquals(AisleCode.PASTA_RICE_GRAINS, c.aisle("dried chickpeas").first)
+        assertEquals(AisleCode.WORLD_FOODS, c.aisle("dried egg noodles").first)
+        assertEquals(AisleCode.NUTS_DRIED_FRUIT, c.aisle("dried apricots").first)
+        assertEquals(AisleCode.SPICES_CONDIMENTS, c.aisle("dried rosemary").first)
+    }
+
+    @Test
+    fun groundRedPepperIsCayenne() {
+        assertEquals(AisleCode.SPICES_CONDIMENTS, c.aisle("ground red pepper").first)
+        assertEquals(AisleCode.PRODUCE, c.aisle("red pepper").first)
+    }
+
+    @Test
+    fun garlicClovesAreGarlicNotTheSpice() {
+        assertEquals(AisleCode.PRODUCE to AisleSource.CATALOGUE, c.aisle("garlic cloves"))
+    }
+
     /** Step 3 check: at least 85% of the golden names get an aisle other than Other. */
     @Test
     fun goldenNamesMostlyGetAnAisle() {

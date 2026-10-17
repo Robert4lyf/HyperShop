@@ -13,8 +13,8 @@ enum class AisleSource { OVERRIDE, IDENTITY, CATALOGUE, CLAUDE, HEAD_NOUN, KEYWO
 /**
  * Picks an item's aisle (PLAN §3.4), first match wins:
  * 1. your override (`CategoryOverride`, keyed by mergeKey)
- * 2. identity words ("frozen …", "tinned …", "dried apricots")
- * 3. catalogue id
+ * 2. catalogue id of the whole name ("dried pasta", "canned pumpkin")
+ * 3. identity words ("frozen …", "tinned …", "dried mango")
  * 4. Claude's `aisle_suggestion`
  * 5. head noun ("heirloom tomato" → tomato)
  * 6. keyword rules
@@ -31,8 +31,8 @@ class Categoriser(
     ): Pair<AisleCode, AisleSource> {
         val key = CatalogKey.of(name)
         overrides[normaliser.mergeKey(name)]?.let { return it to AisleSource.OVERRIDE }
-        identity(key)?.let { return it to AisleSource.IDENTITY }
         normaliser.entry(name)?.let { return it.aisle to AisleSource.CATALOGUE }
+        identity(key)?.let { return it to AisleSource.IDENTITY }
         if (claude != null && claude != AisleCode.OTHER) return claude to AisleSource.CLAUDE
         headNoun(key)?.let { return it to AisleSource.HEAD_NOUN }
         keyword(key)?.let { return it to AisleSource.KEYWORD }
@@ -47,11 +47,14 @@ class Categoriser(
         return when (first) {
             "frozen" -> AisleCode.FROZEN
             "tinned", "canned" -> AisleCode.TINS_JARS
-            // Dried herbs are spices; dried fruit is dried fruit.
+            // Dried herbs are spices; dried fruit is dried fruit; dried pulses sit with
+            // the dried beans; anything else ("dried egg noodles") keeps its own aisle.
             "dried" -> {
                 val fresh = normaliser.entry(rest)
                 when {
                     fresh == null -> null
+                    fresh.aisle != AisleCode.PRODUCE ->
+                        if (fresh.aisle == AisleCode.TINS_JARS) AisleCode.PASTA_RICE_GRAINS else fresh.aisle
                     fresh.displayPolicy == DisplayPolicy.PRESENCE -> AisleCode.SPICES_CONDIMENTS
                     else -> AisleCode.NUTS_DRIED_FRUIT
                 }
