@@ -58,6 +58,7 @@ data class ListActions(
     val onFinish: () -> Unit,
     val onClearAll: () -> Unit,
     val onOpenItem: (ListRow) -> Unit = {},
+    val onShare: () -> Unit = {},
 )
 
 /** The list (PLAN §3.5), stateless. [header] holds the "Add item" field and cards (Step 5.6b). */
@@ -79,6 +80,10 @@ fun ListScreen(
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "More") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(text = { Text("Share list as text") }, enabled = !ui.isEmpty, onClick = {
+                                menu = false
+                                actions.onShare()
+                            })
                             DropdownMenuItem(text = { Text("Clear all") }, enabled = !ui.isEmpty, onClick = {
                                 menu = false
                                 actions.onClearAll()

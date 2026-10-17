@@ -60,7 +60,18 @@ abstract class HyperShopDatabase : RoomDatabase() {
         fun build(context: Context): HyperShopDatabase =
             Room.databaseBuilder(context, HyperShopDatabase::class.java, NAME).addCallback(CALLBACK).build()
 
-        fun inMemory(context: Context): HyperShopDatabase =
-            Room.inMemoryDatabaseBuilder(context, HyperShopDatabase::class.java).addCallback(CALLBACK).allowMainThreadQueries().build()
+        /**
+         * Tests: [queryExecutor] can run Room's background work (invalidation
+         * refresh) on the calling thread, so none outlives the test.
+         */
+        fun inMemory(
+            context: Context,
+            queryExecutor: java.util.concurrent.Executor? = null,
+        ): HyperShopDatabase =
+            Room.inMemoryDatabaseBuilder(context, HyperShopDatabase::class.java)
+                .addCallback(CALLBACK)
+                .allowMainThreadQueries()
+                .apply { queryExecutor?.let { setQueryExecutor(it) } }
+                .build()
     }
 }

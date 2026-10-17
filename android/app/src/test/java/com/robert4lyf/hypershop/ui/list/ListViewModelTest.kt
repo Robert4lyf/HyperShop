@@ -107,4 +107,42 @@ class ListViewModelTest {
         await(vm.ui) { it.left == 1 }
         assertTrue(runBlocking { withTimeout(1000) { c.repository.snapshot() } }.liveItems.size == 1)
     }
+
+    @Test
+    fun typedItemsMultiLinePasteAndPlusOne() {
+        val c = TestContainer.create()
+        val vm = ListViewModel(c)
+        await(vm.ui) { it.isEmpty }
+        vm.addTyped("2 onions")
+        await(vm.ui) { it.aisles.isNotEmpty() && it.row("onion").main == "2 onions" }
+        vm.addTyped("milk\n\n6 eggs\n")
+        assertEquals("Added 2 items", nextMessage(vm).text)
+        await(vm.ui) { u -> u.aisles.flatMap { it.second }.size == 3 }
+        vm.addTyped("1 onion")
+        val asked = await(vm.ui) { it.plusOne != null }
+        assertEquals("onion", asked.plusOne!!.name)
+        vm.confirmPlusOne()
+        await(vm.ui) { it.plusOne == null && it.row("onion").main == "3 onions" }
+        vm.addTyped("onion")
+        await(vm.ui) { it.plusOne != null }
+        vm.dismissPlusOne()
+        assertEquals("3 onions", await(vm.ui) { it.plusOne == null }.row("onion").main)
+    }
+
+    @Test
+    fun suggestionsSampleAndShareText() {
+        val c = TestContainer.create()
+        val vm = ListViewModel(c)
+        await(vm.ui) { it.isEmpty }
+        assertTrue(vm.suggestions("o").isEmpty())
+        assertTrue(vm.suggestions("oni").contains("onion"))
+        vm.addSample()
+        val ui = await(vm.ui) { u -> u.aisles.flatMap { it.second }.size == ListViewModel.SAMPLE.size }
+        vm.toggle(ui.row("egg"))
+        await(vm.ui) { it.row("egg").state == TickState.DONE }
+        val text = vm.shareText()
+        assertTrue(text, text.startsWith("Shopping list\n\nProduce\n- 2 onions"))
+        assertTrue(text, !text.contains("egg"))
+        assertEquals("onion", vm.suggestions("on").first())
+    }
 }

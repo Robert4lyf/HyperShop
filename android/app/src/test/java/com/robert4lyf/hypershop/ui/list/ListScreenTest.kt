@@ -3,11 +3,14 @@ package com.robert4lyf.hypershop.ui.list
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.robert4lyf.hypershop.core.model.AisleCode
@@ -80,6 +83,60 @@ class ListScreenTest {
         compose.onNodeWithText("Finish shopping").performClick()
         compose.onNodeWithText("5 left").fetchSemanticsNode()
         assertEquals(listOf("toggle 1", "delete 4", "finish"), events)
+    }
+
+    private fun showWithHeader(
+        ui: ListUi,
+        dark: Boolean = false,
+    ) {
+        val header =
+            HeaderActions(
+                onAdd = { events += "add $it" },
+                suggestions = { q -> if (q.startsWith("on")) listOf("onion", "spring onion") else emptyList() },
+                onReview = { events += "review $it" },
+                onSample = { events += "sample" },
+                onPasteLink = { events += "paste" },
+            )
+        compose.setContent {
+            HyperShopTheme(dark = dark, dynamicColor = false) {
+                ListScreen(ui, actions, header = { listHeader(ui, header) }, empty = { EmptyState(header.onSample, header.onPasteLink) })
+            }
+        }
+    }
+
+    @Test
+    fun addFieldEnterSuggestionsAndPaste() {
+        showWithHeader(SAMPLE_LIST)
+        val field = compose.onNodeWithTag("add-item")
+        field.performTextInput("on")
+        compose.onNodeWithTag("suggestion-spring onion").performClick()
+        field.performTextInput("2 leeks")
+        field.performImeAction()
+        // The field is cleared and keeps focus, so the keyboard stays up.
+        field.assertIsFocused()
+        field.performTextInput("milk\neggs")
+        assertEquals(listOf("add spring onion", "add 2 leeks", "add milk\neggs"), events)
+    }
+
+    @Test
+    fun readyCardAndEmptyState() {
+        showWithHeader(ListUi(loaded = true, readyJobs = listOf(7, 8)))
+        compose.onNodeWithText("2 recipes ready to review").performClick()
+        compose.onNodeWithText("Try a sample list").performClick()
+        compose.onNodeWithText("Paste link").performClick()
+        assertEquals(listOf("review 7", "sample", "paste"), events)
+    }
+
+    @Test
+    fun recordEmptyLight() {
+        showWithHeader(ListUi(loaded = true, readyJobs = listOf(7)))
+        compose.onRoot().captureRoboImage(Shots.path("list-empty-light.png"))
+    }
+
+    @Test
+    fun recordEmptyDark() {
+        showWithHeader(ListUi(loaded = true, readyJobs = listOf(7)), dark = true)
+        compose.onRoot().captureRoboImage(Shots.path("list-empty-dark.png"))
     }
 
     @Test

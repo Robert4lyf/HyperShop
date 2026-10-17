@@ -37,7 +37,7 @@ object TestContainer {
         container =
             AppContainer(
                 context = context,
-                db = HyperShopDatabase.inMemory(context),
+                db = HyperShopDatabase.inMemory(context) { it.run() },
                 dataStore = PreferenceDataStoreFactory.create { File(dir, "settings.preferences_pb") },
                 apiKeyStore = InMemoryApiKeyStore(key),
                 fetchPolicy = pages?.let { loopbackOnly(it.port) } ?: FetchPolicy.STRICT,

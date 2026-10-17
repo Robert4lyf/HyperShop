@@ -1,11 +1,13 @@
 package com.robert4lyf.hypershop.ui.list
 
+import android.content.Intent
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.di.AppContainer
@@ -23,10 +25,27 @@ fun ListRoute(
     val vm: ListViewModel = viewModel(factory = factoryFor { ListViewModel(container) })
     val ui by vm.ui.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
+    val context = LocalContext.current
+    val header = HeaderActions(onAdd = vm::addTyped, suggestions = vm::suggestions, onReview = onReview, onSample = vm::addSample)
     ListScreen(
         ui,
-        ListActions(onToggle = vm::toggle, onDelete = vm::delete, onFinish = vm::finishShopping, onClearAll = vm::clearAll),
+        ListActions(
+            onToggle = vm::toggle,
+            onDelete = vm::delete,
+            onFinish = vm::finishShopping,
+            onClearAll = vm::clearAll,
+            onShare = {
+                val send =
+                    Intent(Intent.ACTION_SEND)
+                        .setType("text/plain")
+                        .putExtra(Intent.EXTRA_TEXT, vm.shareText())
+                context.startActivity(Intent.createChooser(send, "Share list"))
+            },
+        ),
+        header = { listHeader(ui, header) },
+        empty = { EmptyState(header.onSample, header.onPasteLink) },
     )
+    ui.plusOne?.let { PlusOneDialog(it, onYes = vm::confirmPlusOne, onNo = vm::dismissPlusOne) }
 }
 
 /** Shows [m] with Undo for [UiMessage.seconds], outliving the screen that asked. */
