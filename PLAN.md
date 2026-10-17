@@ -12,7 +12,7 @@ A **personal** Android app (never published). You share a recipe URL, an Instagr
   - **Simpler and verified sync.**
     - A watch tick says "cover what I saw at `listRev` N". So ops never need a revision check, and the `lastWriter` rule is gone.
     - Ops use contiguous sequence numbers with cumulative acks (go-back-N). The phone checks the epoch and applies each op in one transaction.
-    - A small model checker found the gaps in the rev 3 design. This design passed it with 0 violations.
+    - A small model checker found the gaps in the rev 3 design. Its go-back-N variant passed with 0 violations, on 1 item and 1 watch. The new coverage and untick rules haven't been model-checked yet; Step 1.5b extends the checker to cover them.
   - **Personal use.** Removed: store release, Play policy and Data Safety, trademark checks, release signing, beta/release flavours, licence screens. minSdk 34. Only one watch model.
   - **Forerunner 245.**
     - It has buttons only, a 240×240 MIP screen and an older Connect IQ level.
