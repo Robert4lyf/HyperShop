@@ -39,7 +39,7 @@ Answer each with yes or no; note anything that's a "no".
 12. [ ] `docs/contact-sheet.png` looks right in light and dark (no clipped text, readable contrast)?
 13. [ ] `catalog/REVIEW.md` — the aisles, staples and pack notes look right for your shop?
 14. [ ] The 20 held-out golden lines (`docs/golden-held-out.md`) are labelled the way you'd read them?
-15. [ ] Eval: `docs/reports/eval-claude.md`. Claude Haiku 5.5 loses one NYT batch to the 4000-token cap (KNOWN_ISSUES #8); on the rest it is close to Sonnet/Opus at about 1/20 of the cost. Keep Haiku 5.5 as the default, and what to do about the cap?
+15. [ ] Eval: `docs/reports/eval-claude.md`. Keep Claude Haiku 5.5 as the default? (`max_tokens` is now 16000 after Haiku hit the old 4000 cap; KNOWN_ISSUES #8.)
 
 ## Before Run 2
 

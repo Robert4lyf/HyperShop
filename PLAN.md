@@ -320,7 +320,7 @@ Nothing is added until you confirm it here.
   - **One call per import.** It sends the extracted lines, or the trimmed page text when there was no structured data.
 - **Request:**
   - `output_config.effort:"low"` is always set explicitly. `thinking` is never disabled; Haiku 5.5's default effort is medium, so "low" has to be set.
-  - `max_tokens` is 4000.
+  - `max_tokens` is 16000 (raised from 4000 after the eval: Haiku 5.5 sometimes thinks first, and a long page needs the room). Replies are not streamed, so the HTTP timeouts are 180 s.
   - `fallbacks:"default"` with `anthropic-beta: server-side-fallback-2026-07-01` is sent **only for Opus 5.5 and Sonnet 5.5**. Haiku has no server-side fallback.
 - **Strict schema** (`output_config.format`):
   - `additionalProperties:false` everywhere, every field required, and optional ones nullable with `anyOf`.

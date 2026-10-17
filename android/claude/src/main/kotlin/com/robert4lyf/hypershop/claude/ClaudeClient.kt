@@ -178,10 +178,11 @@ class ClaudeClient(
         fun defaultHttp(): OkHttpClient =
             OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
-                // OkHttp's 10 s default read timeout is shorter than a non-streamed
-                // Opus reply to 15 lines (~14 s); the call timeout is the real limit.
-                .readTimeout(60, TimeUnit.SECONDS)
-                .callTimeout(60, TimeUnit.SECONDS)
+                // Replies are not streamed, so nothing arrives until the whole answer is
+                // written: ~14 s for 15 lines on Opus, ~2 min for a full MAX_TOKENS reply.
+                // OkHttp's 10 s default read timeout would cut those off.
+                .readTimeout(180, TimeUnit.SECONDS)
+                .callTimeout(180, TimeUnit.SECONDS)
                 .build()
     }
 }
