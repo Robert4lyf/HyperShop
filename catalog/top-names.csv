@@ -1,0 +1,401 @@
+rank,name,count,variants
+1,salt,14320,
+2,garlic,5837,
+3,black pepper,4945,black peppers
+4,olive oil,4874,
+5,pepper,4340,peppers
+6,onion,4167,onions
+7,sugar,4076,
+8,egg,3771,eggs
+9,butter,3113,
+10,unsalted butter,2474,
+11,water,2283,
+12,parsley,2253,
+13,lemon juice,2142,lemon juices
+14,tomato,1811,tomatoes|tomatos
+15,heavy cream,1575,
+16,flour,1571,
+17,lemon,1566,lemons
+18,ginger,1444,gingers
+19,milk,1405,
+20,carrot,1391,carrots
+21,shallot,1359,shallots
+22,scallion,1341,scallions
+23,thyme,1317,
+24,extra virgin olive oil,1289,
+25,all-purpose flour,1159,
+26,vegetable oil,1025,
+27,dry white wine,951,
+28,cinnamon,948,
+29,soy sauce,891,
+30,potato,882,potatoes
+31,cilantro,879,
+32,celery,848,
+33,nutmeg,779,nutmegs
+34,bay leaf,765,
+35,chicken broth,761,
+36,lime juice,740,
+37,chicken stock,736,
+38,baking powder,715,
+39,vanilla extract,676,
+40,extra-virgin olive oil,659,
+41,basil,643,
+42,mushroom,634,mushrooms
+43,oil,632,
+44,cumin,631,
+45,dijon mustard,627,
+46,chive,617,chives
+47,rosemary,617,
+48,honey,564,
+49,parmesan cheese,559,
+50,leek,540,leeks
+51,brown sugar,523,
+52,bread crumbs,520,
+53,shrimp,510,shrimps
+54,mint,506,
+55,red onion,499,red onions
+56,chicken,496,chickens
+57,lime,482,limes
+58,garlic clove,479,garlic cloves
+59,basil leaves,473,
+60,coriander,471,
+61,cayenne pepper,466,cayenne peppers
+62,orange,455,oranges
+63,clove,450,cloves
+64,white pepper,442,
+65,bay leave,439,bay leaves
+66,cornstarch,438,
+67,baking soda,436,
+68,tomato paste,431,
+69,almond,429,almonds
+70,sesame oil,428,
+71,dill,415,
+72,canola oil,414,
+73,thyme leaves,408,
+74,parmesan,405,
+75,peanut oil,403,
+76,oregano,397,
+77,white wine,397,
+78,rice,394,
+79,balsamic vinegar,384,
+80,red pepper flakes,381,
+81,zucchini,379,
+82,red bell pepper,376,red bell peppers
+83,cayenne,375,
+84,caper,374,capers
+85,walnut,369,walnuts
+86,sour cream,363,
+87,apple,363,apples
+88,red wine vinegar,361,
+89,sherry vinegar,360,
+90,plum tomato,353,plum tomatoes
+91,bacon,352,
+92,orange juice,342,
+93,cucumber,342,cucumbers
+94,red pepper,339,red peppers
+95,paprika,335,
+96,confectioners' sugar,333,
+97,yogurt,326,
+98,mint leave,316,mint leaves
+99,buttermilk,310,
+100,red-wine vinegar,308,
+101,tarragon,304,
+102,black peppercorns,299,
+103,eggplant,295,eggplants
+104,chicken breast,291,chicken breasts
+105,bread,290,breads
+106,cumin seed,286,cumin seeds
+107,egg yolk,282,egg yolks
+108,mayonnaise,281,
+109,coriander seed,272,coriander seeds
+110,spinach,272,
+111,sage,266,
+112,pine nuts,256,
+113,raisins,255,
+114,ground pepper to taste,255,
+115,turmeric,249,
+116,stock,239,
+117,salt to taste,231,
+118,dry red wine,227,
+119,worcestershire sauce,226,
+120,vanilla bean,225,vanilla beans
+121,sesame seed,225,sesame seeds
+122,curry powder,221,
+123,fennel,219,
+124,beef,219,
+125,cilantro leaves,218,
+126,green pepper,216,green peppers
+127,parsley leaves,214,
+128,anchovy,213,anchovies
+129,chocolate,213,
+130,pork,213,
+131,corn,213,
+132,pecan,210,pecans
+133,allspice,210,
+134,celery rib,203,celery ribs
+135,asparagus,203,
+136,maple syrup,201,
+137,vanilla,199,
+138,cider vinegar,196,
+139,cornmeal,195,
+140,mustard,195,mustards
+141,peas,195,
+142,flat-leaf parsley,193,
+143,italian parsley,190,
+144,rice vinegar,189,
+145,granulated sugar,188,
+146,whole milk,187,
+147,lemon zest,186,
+148,red wine,186,
+149,strawberry,184,strawberries
+150,peppercorns,184,
+151,white onion,180,white onions
+152,fennel seed,179,fennel seeds
+153,avocado,178,avocadoes|avocados
+154,salmon,174,
+155,dry sherry,170,
+156,vegetable stock,170,
+157,fish sauce,168,
+158,cheese,168,cheeses
+159,beet,168,beets
+160,white vinegar,166,
+161,chili powder,165,
+162,cabbage,164,cabbages
+163,white wine vinegar,164,
+164,arugula,164,
+165,jalapeno pepper,163,jalapeno peppers
+166,watercress,161,
+167,vinegar,161,
+168,olive,161,olives
+169,saffron,161,
+170,goat cheese,160,goat cheeses
+171,lamb,158,
+172,brandy,156,
+173,tabasco sauce,155,
+174,cognac,154,
+175,cranberry,152,cranberries
+176,mussel,151,mussels
+177,pear,151,pears
+178,coconut milk,149,
+179,corn oil,147,
+180,sage leaves,144,
+181,raspberry,143,raspberries
+182,bean,142,beans
+183,yellow onion,142,yellow onions
+184,sweet potato,138,sweet potatoes
+185,butternut squash,137,butternut squashes
+186,egg white,137,egg whites
+187,green bell pepper,136,green bell peppers
+188,light brown sugar,128,
+189,cauliflower,128,cauliflowers
+190,white-wine vinegar,128,
+191,corn kernels,127,
+192,shiitake mushroom,126,shiitake mushrooms
+193,coriander leaves,126,
+194,black olive,125,black olives
+195,cherry tomatoes,125,
+196,turnip,125,turnips
+197,walnut oil,124,
+198,dark brown sugar,124,
+199,cream,123,
+200,arborio rice,123,
+201,turkey,123,turkeys
+202,green beans,123,
+203,jalape o,122,jalape os
+204,ground cinnamon,122,
+205,"garlic,",121,
+206,creme fraiche,120,
+207,peanut,118,peanuts
+208,bourbon,118,
+209,fish stock,118,
+210,blueberries,117,
+211,cr me fra che,117,
+212,caraway seed,117,caraway seeds
+213,neutral oil,117,
+214,herb,117,herbs
+215,chickpeas,117,
+216,cake flour,116,
+217,prosciutto,116,
+218,ground cumin,115,
+219,broccoli,113,
+220,apricot,113,apricots
+221,rosemary leaves,113,
+222,cardamom,110,
+223,fennel bulb,110,fennel bulbs
+224,sea scallop,110,sea scallops
+225,radish,109,radishes
+226,dijon-style mustard,108,
+227,pasta,108,
+228,ham,107,hams
+229,parsnip,107,parsnips
+230,horseradish,107,
+231,hazelnut,107,hazelnuts
+232,gelatin,106,
+233,golden raisins,106,
+234,half-and-half,106,
+235,dark rum,106,
+236,chicken thigh,105,chicken thighs
+237,mango,104,mangoes|mangos
+238,ketchup,104,
+239,lemon wedge,104,lemon wedges
+240,banana,103,bananas
+241,tuna,102,
+242,cinnamon stick,102,cinnamon sticks
+243,cherry,101,cherries
+244,pancetta,101,
+245,ricotta,101,
+246,grapeseed oil,101,
+247,peach,100,peaches
+248,molasses,99,
+249,orange zest,99,orange zests
+250,pineapple,98,pineapples
+251,cream cheese,98,
+252,lobster,98,lobsters
+253,"onion,",98,
+254,apple cider,97,
+255,jalapeno,97,jalapenos
+256,lemon grass,97,
+257,whipped cream,97,
+258,currant,97,currants
+259,whole-wheat flour,97,
+260,dry yeast,96,
+261,chervil,96,
+262,coconut,96,coconuts
+263,star anise,95,
+264,lemon rind,95,
+265,black bean,94,black beans
+266,bell pepper,93,bell peppers
+267,celery root,93,celery roots
+268,mirin,93,
+269,brussels sprouts,92,
+270,almond extract,92,
+271,mozzarella,91,
+272,gin,91,
+273,rhubarb,91,
+274,bouquet garni,90,
+275,prune,90,prunes
+276,cheddar cheese,90,
+277,squid,90,squids
+278,marjoram,89,
+279,oyster,88,oysters
+280,dry mustard,88,
+281,plain yogurt,88,
+282,sausage,87,sausages
+283,ginger root,87,
+284,corn syrup,86,
+285,feta cheese,85,
+286,veal,84,
+287,low-fat milk,84,
+288,artichoke,83,artichokes
+289,spaghetti,83,
+290,lettuce,83,lettuces
+291,beef broth,82,
+292,pistachios,81,
+293,lemon peel,81,
+294,sweet paprika,81,
+295,tomato sauce,81,
+296,anchovy fillet,81,anchovy fillets
+297,green,81,greens
+298,simple syrup,80,
+299,vodka,79,
+300,duck,78,ducks
+301,yeast,78,
+302,garlic powder,78,
+303,cocoa powder,77,
+304,fig,77,figs
+305,orange peel,77,orange peels
+306,mustard seed,77,mustard seeds
+307,pumpkin,77,pumpkins
+308,linguine,77,
+309,ricotta cheese,77,
+310,leg of lamb,76,
+311,white bread,76,
+312,swiss chard,76,
+313,crab meat,76,
+314,tarragon leaves,76,
+315,red-pepper flakes,75,
+316,beef stock,75,
+317,rum,75,
+318,lentils,75,
+319,rice wine,75,
+320,corn tortillas,75,
+321,salmon fillet,75,salmon fillets
+322,parmigiano-reggiano,74,
+323,angostura bitters,73,
+324,lime wedge,73,lime wedges
+325,bittersweet chocolate,73,
+326,tofu,73,
+327,kale,73,
+328,sweet red pepper,73,sweet red peppers
+329,scallops,72,
+330,baguette,72,baguettes
+331,fava beans,72,
+332,cream of tartar,71,
+333,radicchio,70,
+334,active dry yeast,70,
+335,yellow bell pepper,70,yellow bell peppers
+336,quinoa,70,
+337,rice wine vinegar,70,
+338,tabasco,69,
+339,chili pepper,69,chili peppers
+340,apple cider vinegar,69,
+341,feta,69,
+342,white rice,68,
+343,dates,68,
+344,sweet butter,68,
+345,dry vermouth,68,
+346,brown rice,68,
+347,clams,68,
+348,to taste,68,
+349,couscous,67,
+350,blackberries,67,
+351,"garlic cloves,",67,
+352,yellow cornmeal,66,
+353,lard,66,
+354,broth,65,
+355,ice,65,
+356,chilies,65,
+357,mace,64,
+358,tomato puree,64,
+359,unbleached all-purpose flour,64,
+360,vegetable broth,64,
+361,chestnut,63,chestnuts
+362,endive,63,endives
+363,sherry,63,
+364,saffron threads,63,
+365,basmati rice,62,
+366,juniper berries,62,
+367,gruy re cheese,62,
+368,fish,62,
+369,allspice berry,62,allspice berries
+370,chicken liver,61,chicken livers
+371,hot red pepper flake,60,hot red pepper flakes
+372,tart apple,60,tart apples
+373,whole wheat flour,60,
+374,red potatoes,60,
+375,jalape o pepper,60,jalape o peppers
+376,vegetable,60,vegetables
+377,green olive,59,green olives
+378,orange rind,57,
+379,parmigiano reggiano,57,
+380,plum,57,plums
+381,grand marnier,56,
+382,green onion,56,green onions
+383,champagne vinegar,56,
+384,vanilla ice cream,56,
+385,spinach leaves,56,
+386,red,56,
+387,hot sauce,56,
+388,white bean,55,white beans
+389,pork shoulder,55,
+390,fleur de sel,55,
+391,morel,55,morels
+392,bulgur,55,
+393,sake,55,
+394,fettuccine,54,
+395,serrano chile,54,serrano chiles
+396,mild honey,54,
+397,penne,53,
+398,tomatillo,53,tomatilloes|tomatillos
+399,beer,53,
+400,watermelon,53,
