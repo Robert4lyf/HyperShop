@@ -59,16 +59,18 @@ fun ReviewScreen(
     onAisleInStock: (AisleCode) -> Unit,
     onClearInStock: () -> Unit,
 ) {
-    Column(Modifier.fillMaxSize()) {
-        Header(ui, onServings, onAdd, onCancel, onClearInStock)
-        BadgeRow(ui, onRetryClaude)
-        ui.notice?.let {
-            Text(it, Modifier.padding(horizontal = 16.dp, vertical = 4.dp).testTag("notice"), color = MaterialTheme.colorScheme.primary)
-        }
-        LazyColumn(Modifier.fillMaxSize()) {
-            for ((aisle, rows) in ui.aisles) {
-                item(key = "aisle-${aisle.name}") { AisleHeader(aisle, onAisleInStock) }
-                items(rows, key = { it.key }) { ReviewRowItem(it, onInStock, onRow) }
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(Modifier.fillMaxSize()) {
+            Header(ui, onServings, onAdd, onCancel, onClearInStock)
+            BadgeRow(ui, onRetryClaude)
+            ui.notice?.let {
+                Text(it, Modifier.padding(horizontal = 16.dp, vertical = 4.dp).testTag("notice"), color = MaterialTheme.colorScheme.primary)
+            }
+            LazyColumn(Modifier.fillMaxSize()) {
+                for ((aisle, rows) in ui.aisles) {
+                    item(key = "aisle-${aisle.name}") { AisleHeader(aisle, onAisleInStock) }
+                    items(rows, key = { it.key }) { ReviewRowItem(it, onInStock, onRow) }
+                }
             }
         }
     }

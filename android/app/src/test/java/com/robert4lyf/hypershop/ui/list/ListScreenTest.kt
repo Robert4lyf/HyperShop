@@ -1,0 +1,96 @@
+package com.robert4lyf.hypershop.ui.list
+
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.takahirom.roborazzi.captureRoboImage
+import com.robert4lyf.hypershop.core.model.AisleCode
+import com.robert4lyf.hypershop.testutil.Shots
+import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
+import org.junit.Assert.assertEquals
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+
+internal val SAMPLE_LIST =
+    ListUi(
+        aisles =
+            listOf(
+                AisleCode.PRODUCE to
+                    listOf(
+                        ListRow(1, "onion", "1 more onion", "2 already ticked", TickState.PARTIAL, AisleCode.PRODUCE),
+                        ListRow(2, "coriander", "coriander", "1 × 30 g pack", TickState.OPEN, AisleCode.PRODUCE),
+                        ListRow(3, "carrot", "2 carrots", null, TickState.DONE, AisleCode.PRODUCE),
+                    ),
+                AisleCode.DAIRY_EGGS to
+                    listOf(
+                        ListRow(4, "milk", "700 ml milk", "1 × 4 pint (2.27 l) bottle", TickState.OPEN, AisleCode.DAIRY_EGGS),
+                        ListRow(5, "butter", "250 g butter", "1 × 250 g block", TickState.OPEN, AisleCode.DAIRY_EGGS),
+                    ),
+                AisleCode.TINS_JARS to
+                    listOf(
+                        ListRow(6, "chopped tomatoes", "2 tins chopped tomatoes", "1 × 400 g tin", TickState.OPEN, AisleCode.TINS_JARS),
+                    ),
+            ),
+        loaded = true,
+    )
+
+@RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "w411dp-h891dp-xxhdpi")
+class ListScreenTest {
+    @get:Rule val compose = createComposeRule()
+
+    private val events = mutableListOf<String>()
+    private val actions =
+        ListActions(
+            onToggle = { events += "toggle ${it.id}" },
+            onDelete = { events += "delete ${it.id}" },
+            onFinish = { events += "finish" },
+            onClearAll = { events += "clear" },
+        )
+
+    private fun show(dark: Boolean = false) =
+        compose.setContent {
+            HyperShopTheme(dark = dark, dynamicColor = false) { ListScreen(SAMPLE_LIST, actions) }
+        }
+
+    @Test
+    fun rowsAreSingleNodesWithStateAndActions() {
+        show()
+        val node = compose.onNodeWithTag("item-1").fetchSemanticsNode()
+        assertEquals("Partly ticked", node.config.getOrNull(SemanticsProperties.StateDescription))
+        assertEquals(listOf("1 more onion, 2 already ticked"), node.config.getOrNull(SemanticsProperties.ContentDescription))
+        assertEquals(listOf("Delete", "Details"), node.config[SemanticsActions.CustomActions].map { it.label })
+        compose.onNodeWithTag("item-1").performClick()
+        val delete =
+            compose.onNodeWithTag(
+                "item-4",
+            ).fetchSemanticsNode().config[SemanticsActions.CustomActions].first { it.label == "Delete" }
+        compose.runOnIdle { delete.action() }
+        assertEquals("Ticked", compose.onNodeWithTag("item-3").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
+        compose.onNodeWithText("Finish shopping").performClick()
+        compose.onNodeWithText("5 left").fetchSemanticsNode()
+        assertEquals(listOf("toggle 1", "delete 4", "finish"), events)
+    }
+
+    @Test
+    fun recordLight() {
+        show()
+        compose.onRoot().captureRoboImage(Shots.path("list-light.png"))
+    }
+
+    @Test
+    fun recordDark() {
+        show(dark = true)
+        compose.onRoot().captureRoboImage(Shots.path("list-dark.png"))
+    }
+}

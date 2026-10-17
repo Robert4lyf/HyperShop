@@ -29,7 +29,7 @@ object TestContainer {
         pages: MockWebServer? = null,
         claude: MockWebServer? = null,
         key: String? = null,
-        clock: () -> Long = { 1_760_000_000_000L },
+        clock: () -> Long = ticking(),
     ): AppContainer {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val dir = File(context.cacheDir, "ds-${System.nanoTime()}").apply { mkdirs() }
@@ -71,3 +71,9 @@ suspend fun AppContainer.awaitJob(
     }
 
 private fun loopbackOnly(port: Int) = FetchPolicy(allowHttp = true, allowLoopback = true, allowedPorts = setOf(port))
+
+/** A clock that moves on a millisecond per reading, so undo stamps never collide. */
+fun ticking(start: Long = 1_760_000_000_000L): () -> Long {
+    val t = java.util.concurrent.atomic.AtomicLong(start)
+    return { t.getAndIncrement() }
+}

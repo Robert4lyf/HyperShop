@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -81,19 +82,21 @@ fun ReviewRowSheet(
     sheet: RowSheet,
     actions: SheetActions,
 ) {
-    Column(
-        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(sheet.name, style = MaterialTheme.typography.titleLarge)
-        Text(sheet.effect, Modifier.testTag("effect"))
-        sheet.packNote?.let { Text("Usually sold as $it", style = MaterialTheme.typography.bodyMedium) }
-        HorizontalDivider()
-        for (line in sheet.lines) key(line.id) { LineEditor(line, actions) }
-        HorizontalDivider()
-        HaveSome(actions.onHaveSome)
-        if (!sheet.isStaple) OutlinedButton(onClick = actions.onAlwaysInStock) { Text("Always in stock") }
-        MoveAisle(sheet.aisle, actions.onMoveAisle)
+    Surface(color = MaterialTheme.colorScheme.surface) {
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(sheet.name, style = MaterialTheme.typography.titleLarge)
+            Text(sheet.effect, Modifier.testTag("effect"))
+            sheet.packNote?.let { Text("Usually sold as $it", style = MaterialTheme.typography.bodyMedium) }
+            HorizontalDivider()
+            for (line in sheet.lines) key(line.id) { LineEditor(line, actions) }
+            HorizontalDivider()
+            HaveSome(actions.onHaveSome)
+            if (!sheet.isStaple) OutlinedButton(onClick = actions.onAlwaysInStock) { Text("Always in stock") }
+            MoveAisle(sheet.aisle, actions.onMoveAisle)
+        }
     }
 }
 
