@@ -41,6 +41,26 @@ class NormaliserTest {
     }
 
     @Test
+    fun vesPluralsOnlyBecomeFWhenTheyShould() {
+        assertEquals("garlic clove", Normaliser.singularKey("garlic cloves"))
+        assertEquals("olive", Normaliser.singularKey("olives"))
+        assertEquals("chive", Normaliser.singularKey("chives"))
+        assertEquals("loaf", Normaliser.singularKey("loaves"))
+        assertEquals("half", Normaliser.singularKey("halves"))
+        assertEquals("cat:garlic", n.mergeKey("garlic cloves"))
+        assertEquals("cat:olive", n.mergeKey("olives"))
+        assertEquals("cat:chives", n.mergeKey("chives"))
+    }
+
+    @Test
+    fun blankNamesDoNotShareAKey() {
+        assertNotEquals(n.mergeKey("", "1/0 cup"), n.mergeKey("", "2 x"))
+        assertNotEquals("name:", n.mergeKey(""))
+        assertNotEquals(n.mergeKey("", "(((("), n.mergeKey("", "))))"))
+        assertEquals("name:dragon fruit", n.mergeKey("dragon fruit", "2 dragon fruit"))
+    }
+
+    @Test
     fun singularKey() {
         assertEquals("cherry", Normaliser.singularKey("cherries"))
         assertEquals("potato", Normaliser.singularKey("potatoes"))

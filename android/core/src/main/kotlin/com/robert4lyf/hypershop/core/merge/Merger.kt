@@ -106,18 +106,19 @@ class Merger(
             servingsOriginal,
             servings,
             locale,
-            lines.map { (id, p) -> IncomingLine(id, p, target(p.name, p.aisleSuggestion, overrides)) },
+            lines.map { (id, p) -> IncomingLine(id, p, target(p.name, p.aisleSuggestion, overrides, p.raw)) },
         )
 
     fun target(
         name: String,
         claudeAisle: com.robert4lyf.hypershop.core.model.AisleCode? = null,
         overrides: Map<String, com.robert4lyf.hypershop.core.model.AisleCode> = emptyMap(),
+        raw: String = name,
     ): NewItem {
         val entry = normaliser.entry(name)
         val norm = normaliser.normName(name)
         return NewItem(
-            mergeKey = normaliser.mergeKey(name),
+            mergeKey = normaliser.mergeKey(name, raw),
             catalogId = entry?.id,
             normName = norm,
             displayName = entry?.name ?: norm,

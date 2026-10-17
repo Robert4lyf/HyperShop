@@ -129,6 +129,102 @@ class RuleParserTest {
     }
 
     @Test
+    fun r36PlusAmountGoesToTheNote() {
+        val a = p.parse("1 tablespoon plus 1 teaspoon sugar")
+        assertEquals("sugar", a.name)
+        assertEquals(Rational.ONE, a.quantity)
+        assertEquals(QtyUnit.TBSP, a.unit)
+        assertEquals("plus 1 teaspoon", a.note)
+        val b = p.parse("½ cup plus 2 tbsp sugar")
+        assertEquals("sugar", b.name)
+        assertEquals(Rational.of(1, 2), b.quantity)
+        assertEquals(QtyUnit.CUP, b.unit)
+        assertEquals("plus 2 tbsp", b.note)
+        assertEquals("flour", p.parse("1 cup and 2 tablespoons flour").name)
+    }
+
+    @Test
+    fun r6LeadingArticle() {
+        val onion = p.parse("a large onion")
+        assertEquals("onion", onion.name)
+        assertEquals(Rational.ONE, onion.quantity)
+        assertEquals("large", onion.note)
+        val egg = p.parse("an egg")
+        assertEquals("egg", egg.name)
+        assertEquals(Rational.ONE, egg.quantity)
+        val basil = p.parse("a few basil leaves")
+        assertEquals("basil leaves", basil.name)
+        assertNull(basil.quantity)
+        assertEquals("a few", basil.note)
+        assertTrue(basil.noScale)
+        val sprigs = p.parse("a few sprigs of thyme")
+        assertNull(sprigs.quantity)
+        assertEquals("thyme", sprigs.name)
+    }
+
+    @Test
+    fun r41LeadingQualifierBeforeTheAmount() {
+        val stock = p.parse("about 2 cups stock")
+        assertEquals(Rational.of(2), stock.quantity)
+        assertEquals(QtyUnit.CUP, stock.unit)
+        assertEquals("stock", stock.name)
+        assertEquals("about", stock.note)
+        assertEquals("2", stock.quantityText)
+        assertEquals(Rational.of(500), p.parse("approx. 500g potatoes").quantity)
+    }
+
+    @Test
+    fun r33Dozen() {
+        val eggs = p.parse("1 dozen eggs")
+        assertEquals(Rational.of(12), eggs.quantity)
+        assertEquals("eggs", eggs.name)
+        assertEquals(Rational.of(24), p.parse("2 dozen clams").quantity)
+        assertEquals(Rational.of(6), p.parse("half a dozen eggs").quantity)
+        val range = p.parse("2-3 dozen oysters")
+        assertEquals(Rational.of(24), range.quantity)
+        assertEquals(Rational.of(36), range.quantityMax)
+    }
+
+    @Test
+    fun r34SizeBeforeAContainerWithoutParentheses() {
+        val tins = p.parse("2 400g tins chopped tomatoes")
+        assertEquals(Rational.of(2), tins.quantity)
+        assertEquals(QtyUnit.TIN, tins.unit)
+        assertEquals(Rational.of(400), tins.altQuantity)
+        assertEquals(QtyUnit.G, tins.altUnit)
+        assertEquals("chopped tomatoes", tins.name)
+        val can = p.parse("one 14-ounce can tomatoes")
+        assertEquals(Rational.ONE, can.quantity)
+        assertEquals(QtyUnit.TIN, can.unit)
+        assertEquals(Rational.of(14), can.altQuantity)
+        assertEquals(QtyUnit.OZ, can.altUnit)
+        assertEquals("tomatoes", can.name)
+    }
+
+    @Test
+    fun r31MixedNumberWithUnicodeFraction() {
+        val r = p.parse("1-½ cups flour")
+        assertEquals(Rational.of(3, 2), r.quantity)
+        assertNull(r.quantityMax)
+        assertEquals(QtyUnit.CUP, r.unit)
+        assertEquals("flour", r.name)
+    }
+
+    @Test
+    fun r7LeftoverAmountInTheNameIsChecked() {
+        assertTrue(p.parse("1 lb. 4 oz. beef").check)
+        assertTrue(p.parse("1/0 cup sugar").check)
+        assertFalse(p.parse("2 cups flour").check)
+    }
+
+    @Test
+    fun unclosedParenthesisKeepsItsLastWord() {
+        val r = p.parse("2 cups flour (sifted")
+        assertEquals("flour", r.name)
+        assertEquals("sifted", r.note)
+    }
+
+    @Test
     fun hostileLinesDoNotThrowAndStayFast() {
         val lines = listOf("", "(((((", ")))", "1/", "½-½-½", "x x x 2 x", "of of of", ",,,,", "(".repeat(3000), "1 ".repeat(3000))
         for (l in lines) p.parse(l)
