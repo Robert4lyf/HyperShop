@@ -12,6 +12,7 @@ import com.robert4lyf.hypershop.core.merge.Rekey
 import com.robert4lyf.hypershop.core.merge.RowDecision
 import com.robert4lyf.hypershop.core.merge.ShoppingList
 import com.robert4lyf.hypershop.core.merge.TickSource
+import com.robert4lyf.hypershop.core.merge.UseKind
 import com.robert4lyf.hypershop.core.merge.WatchTickResult
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.ParsedBy
@@ -35,6 +36,17 @@ data class StoredRecipe(
 )
 
 /** The phone's answer to a watch message (PLAN §3.6): always sent. */
+data class UseSummary(
+    val useId: Long,
+    val recipeId: Long?,
+    val title: String,
+    val url: String?,
+    val servings: Int?,
+    val itemCount: Int,
+    /** Lines left out as in stock on import. */
+    val inStockCount: Int,
+)
+
 data class WatchReply(
     val ackedThrough: Int,
     val ackExceptions: List<Pair<Int, OpResult>>,
@@ -156,6 +168,51 @@ class ListRepository(
         val recipes = dao.recipesByUrl(url).map { it.id }.toSet()
         return recipes.isNotEmpty() && dao.uses().any { it.recipeId in recipes && it.archivedAt == null }
     }
+
+    /** The Recipes tab: uses with something on the list, newest first. */
+    suspend fun usesOnList(): List<UseSummary> =
+        db.withTransaction {
+            val l = load()
+            val live = l.liveItems.map { it.id }.toSet()
+            l.uses.values
+                .filter { u -> u.archivedAt == null && l.contributions.any { it.useId == u.id && it.itemId in live } }
+                .sortedByDescending { it.addedAt }
+                .map { u ->
+                    val r = u.recipeId?.let { dao.recipe(it) }
+                    val statuses = dao.decisions(u.id).map { it.status }
+                    UseSummary(
+                        useId = u.id,
+                        recipeId = u.recipeId,
+                        title = r?.title ?: if (u.kind == UseKind.MANUAL) "Added by hand" else "Recipe",
+                        url = r?.url,
+                        servings = u.servings.takeIf { r?.servingsOriginal != null },
+                        itemCount = l.contributions.filter { it.useId == u.id && it.itemId in live }.map { it.itemId }.distinct().size,
+                        inStockCount = statuses.count { it == LineStatus.IN_STOCK.name },
+                    )
+                }
+        }
+
+    /** Titles of the uses behind an item, for the item sheet. */
+    suspend fun useTitles(useIds: Collection<Long>): Map<Long, String> =
+        db.withTransaction {
+            val l = load()
+            useIds.associateWith { id ->
+                val u = l.uses[id]
+                val r = u?.recipeId?.let { dao.recipe(it) }
+                r?.title ?: if (u?.kind == UseKind.MANUAL) "Added by hand" else "Recipe"
+            }
+        }
+
+    /** "Add the in-stock items now": the lines of [useId] that were left out as in stock. */
+    suspend fun inStockLines(useId: Long): Pair<RecipeEntity, List<ParsedIngredient>>? =
+        db.withTransaction {
+            val recipeId = load().uses[useId]?.recipeId ?: return@withTransaction null
+            val recipe = dao.recipe(recipeId) ?: return@withTransaction null
+            val inStock = dao.decisions(useId).filter { it.status == LineStatus.IN_STOCK.name }.map { it.recipeLineId }.toSet()
+            val lines =
+                dao.lines(recipeId).filter { it.id in inStock }.map { json.decodeFromString(ParsedIngredient.serializer(), it.parsedJson) }
+            recipe to lines
+        }
 
     suspend fun preview(
         stored: StoredRecipe,

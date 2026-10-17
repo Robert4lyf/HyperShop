@@ -13,16 +13,18 @@ suspend fun AppContainer.readyJob(
     title: String = "Weeknight chilli",
     servings: Int? = 4,
     claudePending: Boolean = false,
+    // Each job its own page, unless a test is about importing the same URL again.
+    url: String = "https://example.com/recipe-${java.util.UUID.randomUUID()}",
 ): Long {
     val id =
         db.dao().insertJob(
-            ImportJobEntity(0, JobState.RUNNING.name, """{"url":"https://example.com/chilli"}""", null, null, clock()),
+            ImportJobEntity(0, JobState.RUNNING.name, """{"url":"$url"}""", null, null, clock()),
         )
     val raw = lines.toList()
     importJobs.finish(
         id,
         ImportResult(
-            url = "https://example.com/chilli",
+            url = url,
             title = title,
             servings = servings,
             locale = UnitLocale.METRIC,

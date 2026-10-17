@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -41,6 +42,18 @@ data class PlusOne(
     val line: String,
 )
 
+/** The item sheet (PLAN §3.5). */
+data class ItemSheet(
+    val id: Long,
+    val name: String,
+    /** One line per dimension: "2", "300 g". */
+    val totals: List<String>,
+    /** The recipes (or "Added by hand") that contributed. */
+    val sources: List<String>,
+    val packNote: String?,
+    val aisle: AisleCode,
+)
+
 data class ListUi(
     val aisles: List<Pair<AisleCode, List<ListRow>>> = emptyList(),
     val loaded: Boolean = false,
@@ -62,6 +75,8 @@ class ListViewModel(
     val events: Flow<UiMessage> = messages.receiveAsFlow()
 
     private val plusOne = MutableStateFlow<PlusOne?>(null)
+    private val _sheet = MutableStateFlow<ItemSheet?>(null)
+    val sheet: StateFlow<ItemSheet?> = _sheet
     private var lastList: ShoppingList = ShoppingList()
 
     val ui: StateFlow<ListUi> =
@@ -121,6 +136,54 @@ class ListViewModel(
             val stamp = c.repository.finishShopping()
             messages.send(UiMessage("Finished: removed $n ticked items", undo = { c.repository.undoDelete(stamp) }))
         }
+
+    // ---- the item sheet (5.7) ---------------------------------------------------------------
+
+    fun openItem(id: Long) =
+        viewModelScope.launch {
+            val list = c.repository.snapshot()
+            val item = list.items[id] ?: return@launch
+            val entry = item.catalogId?.let { c.catalog.byId[it] }
+            val units = c.settings.units.first()
+            val produce = item.aisle == AisleCode.PRODUCE
+            val hint = list.contributionsOf(id).mapNotNull { it.unitHint }.distinct().singleOrNull()
+            val totals =
+                list.total(id).parts.filterValues { it > Rational.ZERO }.mapNotNull { (k, v) ->
+                    Display.amount(QtyBase(mapOf(k to v)), units, produce, hint)
+                }
+            val uses = list.contributionsOf(id).map { it.useId }.distinct()
+            val titles = c.repository.useTitles(uses)
+            _sheet.value =
+                ItemSheet(id, entry?.name ?: item.displayName, totals, uses.mapNotNull { titles[it] }, entry?.packNote, item.aisle)
+        }
+
+    fun closeItem() {
+        _sheet.value = null
+    }
+
+    fun moveItem(
+        id: Long,
+        aisle: AisleCode,
+        always: Boolean,
+    ) = viewModelScope.launch {
+        c.repository.moveAisle(id, aisle, always)
+        _sheet.value = null
+    }
+
+    /** Edit quantity: the new total; the difference becomes a manual contribution. False if [text] has no amount. */
+    fun editQuantity(
+        id: Long,
+        text: String,
+    ): Boolean {
+        val parsed = c.ruleParser.parse(text.trim() + " x")
+        val q = QtyBase.of(parsed.quantityMax ?: parsed.quantity, parsed.unit, UnitLocale.METRIC)
+        if (q.isPresence) return false
+        viewModelScope.launch {
+            c.repository.editQuantity(id, q)
+            _sheet.value = null
+        }
+        return true
+    }
 
     // ---- the "Add item" field (5.6b) ----------------------------------------------------
 

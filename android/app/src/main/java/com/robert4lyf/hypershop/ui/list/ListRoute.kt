@@ -34,6 +34,7 @@ fun ListRoute(
             onDelete = vm::delete,
             onFinish = vm::finishShopping,
             onClearAll = vm::clearAll,
+            onOpenItem = { vm.openItem(it.id) },
             onShare = {
                 val send =
                     Intent(Intent.ACTION_SEND)
@@ -45,6 +46,14 @@ fun ListRoute(
         header = { listHeader(ui, header) },
         empty = { EmptyState(header.onSample, header.onPasteLink) },
     )
+    val sheet by vm.sheet.collectAsStateWithLifecycle()
+    sheet?.let { s ->
+        ItemSheetHost(
+            s,
+            ItemSheetActions(onMove = { a, always -> vm.moveItem(s.id, a, always) }, onEditQuantity = { vm.editQuantity(s.id, it) }),
+            onDismiss = vm::closeItem,
+        )
+    }
     ui.plusOne?.let { PlusOneDialog(it, onYes = vm::confirmPlusOne, onNo = vm::dismissPlusOne) }
 }
 

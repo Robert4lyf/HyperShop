@@ -4,12 +4,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -90,6 +92,14 @@ fun ReviewRoute(
                 }
             }
         ReviewState.Cancelled -> LaunchedEffect(Unit) { onDone() }
+        is ReviewState.AlreadyOnList ->
+            AlertDialog(
+                onDismissRequest = vm::cancel,
+                title = { Text("Already on your list") },
+                text = { Text("${s.title} is already on your list. Add it again?") },
+                confirmButton = { TextButton(onClick = vm::addAgain) { Text("Add again") } },
+                dismissButton = { TextButton(onClick = vm::cancel) { Text("Cancel") } },
+            )
     }
     sheetKey?.let { key -> ReviewRowSheetHost(vm, key, onDismiss = { sheetKey = null }) }
 }

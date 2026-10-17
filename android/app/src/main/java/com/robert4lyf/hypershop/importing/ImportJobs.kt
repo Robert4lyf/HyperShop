@@ -46,6 +46,22 @@ class ImportJobs(
         return id
     }
 
+    /** A job that needs no fetch, straight to review ("Add the in-stock items now"). */
+    suspend fun enqueueReady(
+        input: ImportInput,
+        result: ImportResult,
+    ): Long =
+        dao.insertJob(
+            ImportJobEntity(
+                0,
+                JobState.READY.name,
+                json.encodeToString(ImportInput.serializer(), input),
+                json.encodeToString(ImportResult.serializer(), result),
+                null,
+                clock(),
+            ),
+        )
+
     suspend fun get(id: Long): Job? = dao.job(id)?.let(::map)
 
     suspend fun setState(

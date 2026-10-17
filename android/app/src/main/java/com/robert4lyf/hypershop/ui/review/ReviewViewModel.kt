@@ -86,6 +86,11 @@ sealed interface ReviewState {
     ) : ReviewState
 
     data object Cancelled : ReviewState
+
+    /** "Already on your list — add again?" */
+    data class AlreadyOnList(
+        val title: String,
+    ) : ReviewState
 }
 
 /**
@@ -125,9 +130,22 @@ class ReviewViewModel(
         }
         if (r.lines.isEmpty()) return fail(r.error ?: ImportError.NO_RECIPE, r.rawLines)
         result = r
+        val url = r.url
+        if (r.preTick && url != null && c.repository.alreadyOnList(url)) {
+            _state.value = ReviewState.AlreadyOnList(r.title ?: "This recipe")
+            return
+        }
+        begin(r)
+    }
+
+    /** "Add again" on [ReviewState.AlreadyOnList]. */
+    fun addAgain() = viewModelScope.launch { result?.let { begin(it) } }
+
+    private suspend fun begin(r: ImportResult) {
         servings = r.servings
         store(r)
         decisions = c.repository.merger.defaultDecisions(preview!!.incoming, c.repository.staples()).toMutableMap()
+        if (!r.preTick) decisions.replaceAll { _, d -> d.copy(inStock = false) }
         recompute()
     }
 

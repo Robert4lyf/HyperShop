@@ -145,4 +145,22 @@ class ListViewModelTest {
         assertTrue(text, !text.contains("egg"))
         assertEquals("onion", vm.suggestions("on").first())
     }
+
+    @Test
+    fun itemSheetTotalsSourcesEditAndMove() {
+        val c = TestContainer.create()
+        c.add("2 onions", "200g onions")
+        val vm = ListViewModel(c)
+        val ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
+        vm.openItem(ui.row("onion").id)
+        val sheet = await(vm.sheet) { it != null }!!
+        assertEquals(listOf("2", "200 g"), sheet.totals)
+        assertEquals(listOf("Weeknight chilli"), sheet.sources)
+        assertEquals(AisleCode.PRODUCE, sheet.aisle)
+        assertTrue(!vm.editQuantity(sheet.id, "lots"))
+        assertTrue(vm.editQuantity(sheet.id, "5"))
+        await(vm.ui) { it.row("onion").main.startsWith("5 onions") }
+        vm.moveItem(sheet.id, AisleCode.TINS_JARS, always = false)
+        await(vm.ui) { it.row("onion").aisle == AisleCode.TINS_JARS }
+    }
 }

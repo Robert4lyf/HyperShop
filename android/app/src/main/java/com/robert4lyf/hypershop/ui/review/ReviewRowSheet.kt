@@ -143,7 +143,7 @@ private fun HaveSome(onHaveSome: (String) -> Boolean) {
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun MoveAisle(
+internal fun MoveAisle(
     current: AisleCode,
     onMove: (AisleCode, Boolean) -> Unit,
 ) {
