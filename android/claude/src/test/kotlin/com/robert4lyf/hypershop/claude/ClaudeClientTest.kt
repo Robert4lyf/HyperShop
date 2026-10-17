@@ -250,6 +250,13 @@ class ClaudeClientTest {
         }
 
     @Test
+    fun readTimeoutCoversASlowReply() {
+        // A non-streamed Opus reply can take ~14 s before the first byte.
+        val h = ClaudeClient.defaultHttp()
+        assertEquals(h.callTimeoutMillis, h.readTimeoutMillis)
+    }
+
+    @Test
     fun ringLogKeepsTheLast500() {
         val l = RingLog()
         repeat(600) { l.log("line $it") }
