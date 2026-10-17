@@ -37,6 +37,23 @@ class DisplayTest {
     }
 
     @Test
+    fun solidsMeasuredByVolumeAreNeverShownInMl() {
+        fun amount(
+            q: QtyBase,
+            id: String,
+            hint: QtyUnit? = null,
+        ) = cat.byId.getValue(id).let { Display.amount(q, hint = hint, gramsPerCup = it.gramsPerCup, policy = it.displayPolicy) }
+        // Density known: weigh it.
+        assertEquals("60 g", amount(QtyBase.of(Rational.of(4), QtyUnit.TBSP, UnitLocale.US), "butter", QtyUnit.TBSP))
+        // No density: cups as written, whether the recipe's cups were 240 or 250 ml.
+        assertEquals("1 cup", amount(QtyBase.of(Rational.ONE, QtyUnit.CUP, UnitLocale.METRIC), "cheddar", QtyUnit.CUP))
+        assertEquals("¾ cup", amount(QtyBase.of(Rational.of(3, 4), QtyUnit.CUP, UnitLocale.US), "mozzarella", QtyUnit.CUP))
+        assertEquals("2 cups", amount(QtyBase.of(Rational.of(2), QtyUnit.CUP, UnitLocale.METRIC), "chicken", QtyUnit.CUP))
+        // Liquids stay in ml.
+        assertEquals("500 ml", amount(QtyBase.of(Rational.of(500), QtyUnit.ML, UnitLocale.METRIC), "milk", QtyUnit.ML))
+    }
+
+    @Test
     fun rowsShowPluralsPackNotesAndPartialTicks() {
         var (l, _) = add(ShoppingList(), listOf("2 onions", "250g butter"))
         val onion = l.itemByKey("cat:onion")!!

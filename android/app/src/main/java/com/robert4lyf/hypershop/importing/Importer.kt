@@ -135,7 +135,12 @@ class Importer(
     ) = ImportResult(url, title, null, locale, Method.MANUAL.name, error = error)
 
     companion object {
-        /** R2.2: metric when lines use g/ml; UK for UK sites; else US. */
+        private val ML_IN_LINE = Regex("""(\d+(?:[.,]\d+)?)\s*(ml|l)\b""", RegexOption.IGNORE_CASE)
+
+        /**
+         * R2.2: metric when lines use g/ml; UK for UK sites; else US. A line that
+         * gives both, like "2 cups milk (500ml)", settles the cup size outright.
+         */
         fun localeFor(
             url: String?,
             lines: List<String>,
@@ -143,6 +148,16 @@ class Importer(
             val host = url?.substringAfter("://")?.substringBefore('/')?.lowercase().orEmpty()
             if (host.endsWith(".co.uk") || host.endsWith(".uk") || "bbcgoodfood" in host) return UnitLocale.UK
             val rp = RuleParser()
+            for (l in lines.take(50)) {
+                val p = rp.parse(l)
+                val cups = p.quantity?.toDouble()?.takeIf { p.unit == QtyUnit.CUP && it > 0 } ?: continue
+                val m = ML_IN_LINE.find(l) ?: continue
+                val n = m.groupValues[1].replace(',', '.').toDoubleOrNull() ?: continue
+                val ml = if (m.groupValues[2].lowercase() == "l") n * 1000 else n
+                val perCup = ml / cups
+                if (perCup in 245.0..255.0) return UnitLocale.METRIC
+                if (perCup in 230.0..242.0) return UnitLocale.US
+            }
             val metric =
                 lines.take(50).count {
                         l ->
