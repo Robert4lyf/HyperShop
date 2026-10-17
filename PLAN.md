@@ -1,679 +1,781 @@
-# HyperShop — Plan (rev 3)
+# HyperShop — Plan (rev 4)
 
-Recipe URL, Instagram reel or cookbook photo → parsed ingredients → you review it and tick what's in stock → merged, aisle-sorted shopping list on Android, mirrored and tickable on a Garmin watch. Optional Claude API integration for harder parsing.
+A **personal** Android app (never published). You share a recipe URL, an Instagram reel or a cookbook photo. The app parses the ingredients and shows them for review, where you tick what you already have in stock. Everything else is merged into an aisle-sorted shopping list, mirrored and tickable on a **Garmin Forerunner 245**. Optional Claude API parsing uses your own key.
 
 ## 0. Change log
-- **rev 2:** five reviews (Android, parsing, Claude/Instagram, Garmin/sync, execution). Watch work moved before Claude; MVP cut line; progress files; new sync protocol; Claude calls made directly over HTTP.
-- **Since rev 2:** review screen with in-stock ticks; stock learning; pack sizes; watch extras; learned aisle order; cookbook photos; meal planner.
-- **rev 3:** four adversarial reviews (user scenarios, consistency, one-shot failure, new features). Main changes:
-  - **The build is split into three runs (§6).** One run can't build everything. The watch can't be compiled without device files that you have to download, and Claude can't be tested without your key.
-  - **Purchases are recorded per item** (`Purchase`), not as a flag on each recipe's contribution. Removing a recipe, rescaling it, or buying more than needed through packs no longer loses or miscounts what you've bought.
-  - **Each time a recipe is added counts separately** (`RecipeUse`), so a recipe planned twice, or added twice, is tracked correctly.
-  - **Items are keyed by `mergeKey`.** Catalogue updates merge duplicate items instead of crashing.
-  - **Sync fixes:**
-    - Every acknowledgement now says whether each op was applied or rejected, and returns the item's new revision, so undo works.
-    - Each watch install and each phone database has its own ID, so reinstalls and restores don't tick the wrong items.
-    - Ops carry timestamps from v1, so aisle-order learning later needs no protocol change.
-    - When the list is too big for the watch, the true counts per aisle are still sent.
-  - **Several rules are now defined exactly:** the pack choice, stock learning (only your own taps count, plus an "assumed in stock" banner), and aisle learning (which aisle came before which, ignoring "ticked at home" trips). Auto "next aisle" is replaced by a prompt, and long-press Back is dropped.
-  - **Agent safeguards:**
-    - Exact library versions are pinned.
-    - The golden test data is frozen before any parser code.
-    - Every data row that wasn't checked by a person is tagged.
-    - Gates run locally; CI is best-effort.
-    - Clear memory limits for Gradle.
-    - No branch or PR changes made by the agent.
+- **rev 2 – rev 3:** nine reviews. Watch work comes before Claude. MVP cut line. Progress files. Three build runs. Per-use contributions. Strict Claude schema.
+- **rev 4:** a second round of four reviews (quantity model, sync with a model checker, Run 1 dry run, UX and security). Plus your answers: personal use only, Forerunner 245, Android 14+.
+  - **Simpler quantity model.**
+    - The purchase ledger, the PARTIAL state and overrides are gone.
+    - Ticking an item **covers** the contributions it had when ticked. A recipe added later shows only the new amount.
+    - Nothing you bought carries over silently to later trips.
+  - **Simpler and verified sync.**
+    - A watch tick says "cover what I saw at `listRev` N". So ops never need a revision check, and the `lastWriter` rule is gone.
+    - Ops use contiguous sequence numbers with cumulative acks (go-back-N). The phone checks the epoch and applies each op in one transaction.
+    - A small model checker found the gaps in the rev 3 design. This design passed it with 0 violations.
+  - **Personal use.** Removed: store release, Play policy and Data Safety, trademark checks, release signing, beta/release flavours, licence screens. minSdk 34. Only one watch model.
+  - **Forerunner 245.**
+    - It has buttons only, a 240×240 MIP screen and an older Connect IQ level.
+    - Its memory limit, API level and glance support are read from its device file **before** any watch code is written.
+  - **UX.**
+    - The review screen is minimal by default.
+    - A quick "Add item" field, Undo after an import, and an empty or first-run state.
+    - Accessibility basics from the start.
+    - Watch press debounce, with "Next aisle" as the default focus.
+  - **Security.** URL fetch limits (https only, no private IPs, redirect checks). Parser size and depth limits. Hostile test fixtures. JSON import validation. Log redaction. Claude is called only from the review screen.
+  - **Build details.** Verified pinned versions (§2). Step 1 reordered. A stratified, scripted golden set. A checksum and change log for golden data. Named fixture sources. Sub-steps split up.
 
 ## 1. Architecture
 
 ```
  Chrome / Instagram ─share URL──▶ ┌──────────────── Android app (Kotlin) ─────────────────┐
- Camera / gallery (v1.1) ───────▶ │ Import worker ─▶ Extractor ─▶ Rule parser               │
- paste link (chip)                │      │           (WPRM/JSON-LD/  │                      │
-                                  │      │            microdata)     │                      │
-                                  │      └─▶ OCR (v1.1) ─▶ Claude (opt-in) ─┤               │
-                                  │                                         ▼               │
-                                  │               Review before adding (in-stock ticks)     │
-                                  │                                         ▼               │
-                                  │        Merge ─▶ Categorise ─▶ Room (:data)              │
-                                  │                                 ▲        │              │
-                                  │              WatchSync (App-scoped) ◀────┘  ▼ UI        │
-                                  └──────────────────────────┬──────────────────────────────┘
+ Camera / gallery (v1.1) ───────▶ │ Import worker ─▶ Safe fetch ─▶ Extractor ─▶ Rule parser │
+ "Add item" field / paste chip    │      │                    (WPRM/JSON-LD/  │           │
+                                  │      │                     microdata)     │           │
+                                  │      └─▶ OCR (v1.1) ─▶ Claude (opt-in, foreground) ─┤ │
+                                  │                                              ▼        │
+                                  │               Review before adding (in-stock ticks)    │
+                                  │                                              ▼        │
+                                  │        Merge ─▶ Categorise ─▶ Room (:data)             │
+                                  │                                 ▲        │             │
+                                  │              WatchSync (App-scoped) ◀────┘  ▼ UI       │
+                                  └──────────────────────────┬─────────────────────────────┘
                                                              │ Connect IQ Mobile SDK
                                                  ┌───────────▼────────────┐
-                                                 │ Connect IQ watch-app   │ list, ticks,
-                                                 │ + glance  (Monkey C)   │ outbox, offline
+                                                 │ Forerunner 245 app     │ list, ticks,
+                                                 │ (Monkey C, buttons)    │ outbox, offline
                                                  └────────────────────────┘
-          api.anthropic.com ◀── HTTPS, only when the user enables Claude, with their key
+          api.anthropic.com ◀── HTTPS, only when you enable Claude, with your key
 ```
 
-- **Local-first, no backend.** Network is used only to fetch pages, Meta oEmbed (v1.1), and Claude when it's turned on.
-- **Why not a web app:** a Garmin watch app can only talk to a phone companion app through the Connect IQ SDK, or to a server. A web app would need a backend.
+- **Local-first, no backend.** The network is used only to fetch pages, Meta oEmbed (v1.1), and Claude when it is turned on.
+- **Native Android, not a web app.** A Garmin watch app can only talk to a phone companion app through the Connect IQ SDK, or to a server.
 
-## 2. Tech stack
+## 2. Tech stack (pinned — verified against Maven/Google Maven, Oct 2026)
 
-**Pinned versions.** In step 0.4 the agent writes `libs.versions.toml` with exact versions from the list below, using the latest *stable* patch release within each listed line. It proves the whole stack with one empty Robolectric + Roborazzi + Hilt test before any feature code, then **freezes the versions for the rest of the run.** No betas.
+**Version rules:**
+- **Never upgrade during a run.** These versions are frozen.
+- **A library not in the table** gets the newest version whose AAR metadata has minCompileSdk ≤ 36 and minAGP ≤ 8.13.
+- **Many of the newest AndroidX releases need AGP 9.1 or compileSdk 37.** That is why some lines below are pinned below their latest version.
 
-| Area | Choice |
-|---|---|
-| Build | Gradle **8.14.3** wrapper, **AGP 8.13.x** (not 9.x), Kotlin **2.2.x** stable with the matching KSP, JDK **21** toolchain for compile and tests (`jvmTarget` 17) |
-| Android | Compose BOM (stable for Kotlin 2.2), Material 3, **compileSdk/targetSdk 36**, minSdk 26, edge-to-edge, predictive back |
-| Storage | Room 2.7.x (KSP, `exportSchema`) in `:data`; DataStore |
-| Background | WorkManager plain `OneTimeWorkRequest` (not expedited); `hilt-work` with `Configuration.Provider` and the default initializer removed from the manifest |
-| Networking / HTML | OkHttp 4.12.x (5 MB body cap, no cleartext) + MockWebServer; Jsoup |
-| Serialization | kotlinx.serialization |
-| DI | Hilt 2.5x (latest stable that supports AGP 8.13), `:app` only |
-| Claude API | Direct calls to `/v1/messages` over OkHttp, `anthropic-version: 2023-06-01`. Default `claude-opus-5-5`; the model is chosen in settings |
-| Secrets | Android Keystore AES-256-GCM key; the encrypted API key goes in its own DataStore file, excluded from backup |
-| Watch link | `com.garmin.connectiq:ciq-companion-app-sdk` **2.4.0** |
-| Watch app | Monkey C, Connect IQ SDK **9.2.0**, `watch-app` + `(:glance)`, minApiLevel 3.2 |
-| Logging | Timber, plus an in-app "Debug log → share" screen |
-| Tests | JUnit5 + kotest-property (pure JVM); JUnit4 + Robolectric **4.16+** (`sdk=36`, plus `sdk=26` for worker tests) + Compose test rule with **semantics assertions** + Roborazzi (snapshots recorded only, never a gate) |
-| Lint | ktlint and detekt **Gradle plugins** (no CLI downloads) |
-| CI | GitHub Actions, best-effort: tests, `assembleDebug`, APK artifact, nightly release (`permissions: contents: write`) |
-| **Not in v1 dependencies** | ML Kit, `MediaMetadataRetriever` frame sampling, Photo Picker, `SpeechRecognizer`, CameraX/FileProvider: these arrive in Steps 8–9 |
+| Item | Version | Notes |
+|---|---|---|
+| Gradle wrapper | 8.14.3 | also at `/opt/gradle-8.14.3` |
+| AGP | 8.13.2 | set `buildToolsVersion = "36.0.0"` explicitly |
+| Kotlin + compose-compiler plugin | 2.2.21 | |
+| KSP | 2.2.21-2.0.5 | |
+| Hilt / Dagger | 2.58 | 2.59+ requires AGP 9 |
+| androidx.hilt (hilt-work, hilt-compiler) | 1.3.0 | |
+| Compose BOM | 2026.06.01 | ui 1.11.4, material3 1.4.0 |
+| activity-compose / core-ktx | 1.12.4 / 1.18.0 | |
+| lifecycle (runtime-compose, viewmodel-compose) | 2.10.0 | |
+| navigation-compose | 2.9.8 | |
+| Room (+ plugin, testing) | 2.7.2 | KSP |
+| WorkManager (+ testing) | 2.11.2 | plain `OneTimeWorkRequest` |
+| DataStore | 1.2.1 | |
+| kotlinx-serialization / coroutines | 1.9.0 / 1.10.2 | |
+| OkHttp + mockwebserver | 4.12.0 | |
+| Jsoup | 1.23.2 | |
+| Timber | 5.0.1 | |
+| JUnit Jupiter / JUnit4 | 5.14.4 / 4.13.2 | Jupiter for `:core` only; Android modules use JUnit4 |
+| androidx.test core / ext-junit | 1.7.0 / 1.3.0 | |
+| kotest-property | 6.0.7 | |
+| Robolectric | 4.16.1 | `sdk=36` (plus 34 for worker tests); JDK 21 |
+| Roborazzi (core, compose, junit-rule, plugin) | 1.76.0 | record only, never a gate |
+| ktlint-gradle | 14.2.0 (fallback 13.1.0) | |
+| detekt | 1.23.8 | force `org.jetbrains.kotlin:*` to 2.0.21 on the `detekt` configuration |
+| ciq-companion-app-sdk | 2.4.0 | Maven Central, Run 2 |
+| Android SDK | `platforms;android-36`, `build-tools;36.0.0`, `platform-tools` | cmdline-tools `commandlinetools-linux-16111833_latest.zip` |
+| Connect IQ SDK | 9.2.0 | Run 2; confirm it supports `fr245` (Step 5.0) |
 
-`gradle.properties`: `org.gradle.jvmargs=-Xmx4g`, `kotlin.daemon.jvmargs=-Xmx2g`, `org.gradle.workers.max=3`, test `maxHeapSize=2g`, `maxParallelForks=1` for `:app`. The container has 15 GB and no swap.
+- **App:** Kotlin, Compose + Material 3. compileSdk/targetSdk 36, **minSdk 34**. Edge-to-edge, predictive back. JDK 21 toolchain with `jvmTarget` 17.
+- **Modules:**
+  - `:core`: a pure JVM module (`kotlin("jvm")`) holding model, catalog, parser, merge, packs, stock and the sync codec as packages.
+  - `:data`: Room plus the repository.
+  - `:extract`: safe fetch plus extractors.
+  - `:app`.
+  - `:claude`: Run 3.
+  - `:media`: v1.1.
+- **Secrets:** the Claude key is encrypted with an AES-GCM key held in the Android Keystore (no user-auth binding). The encrypted value lives in a DataStore file excluded from backup.
+- **Not in v1 dependencies:** ML Kit, Photo Picker, `SpeechRecognizer`, CameraX/FileProvider (all v1.1).
+- **`gradle.properties`:** `org.gradle.jvmargs=-Xmx4g`, `kotlin.daemon.jvmargs=-Xmx2g`, `org.gradle.workers.max=3`. In the build scripts: test `maxHeapSize=2g`, `maxParallelForks=1` for `:app`.
 
 ## 3. Core features
 
 ### 3.1 Import
 - **Entry points (v1):**
-  - **`ACTION_SEND` text.** The app pulls the URL out with `Patterns.WEB_URL`, takes the first https link, strips `utm_*` and `igsh`, and uses `EXTRA_SUBJECT` as the fallback title.
+  - **`ACTION_SEND` text.** URLs are extracted with `Patterns.WEB_URL`. The first https URL is used, with `utm_*` and `igsh` stripped. `EXTRA_SUBJECT` is the fallback title.
   - **"Paste link" chip.** It appears only when `ClipDescription` says the clipboard holds text, and the clipboard is read only when you tap it.
-  - **Surviving restarts.** `singleTop` + `onNewIntent`, with state in SavedStateHandle and a Room `ImportJob`.
-  - **Image and video shares are v1.1** (Step 8).
-- **Imports run as a WorkManager job** that writes `ImportJob(id, state, inputRefs, resultJson, error)`, and the review screen observes it.
-- **Extraction order:**
-  1. WPRM/Tasty plugin markup
-  2. JSON-LD `Recipe`
-  3. Microdata
-  4. Heading heuristic
-  5. "Select lines manually"
-- **JSON-LD quirks**, each with its own test: `@graph`; `@type` given as an array; several Recipe objects on one page; `recipeIngredient` as a single string or under `ingredients`; nested arrays; HTML entities, including double-encoded ones; tags inside strings; lenient JSON; the forms `recipeYield` takes.
-- **Blocked or JavaScript-only pages (v1.1, Step 10.4):** a visible in-app WebView sheet with an "Extract recipe" button. It uses a separate profile, clears cookies afterwards and has file access off. It is never used for Instagram. **Until then, these pages go to "Select lines manually".**
-- **Importing the same URL again** asks: "Already on your list — add again?" Yes creates a second `RecipeUse`.
+  - **"Add item" field** (§3.5).
+  - `singleTop` + `onNewIntent`. State survives process death via SavedStateHandle and an `ImportJob` row.
+- **Safe fetch (`:extract`):**
+  - **URLs:** `https` only, re-checked after every redirect, at most 5 redirects.
+  - **Addresses:** a custom OkHttp `Dns` refuses loopback, RFC1918, link-local, CGNAT, ULA and multicast addresses, as well as literal-IP hosts and non-443 ports. `file:`, `content:` and `intent:` URLs never reach the fetcher.
+  - **Requests:** no cookies, a real browser user agent, 10 s to connect and 30 s for the whole call.
+  - **Responses:** only `text/html` or `application/ld+json` is accepted, capped at **3 MB after decompression**.
+- **Parser limits:**
+  - Each JSON-LD script is capped at 512 KB, with nesting depth 64 or less (checked before decoding).
+  - At most 10 Recipe objects, 300 lines per recipe and 500 characters per line.
+  - The tokeniser scans linearly, with no regex backtracking.
+  - An `OutOfMemoryError` or `StackOverflowError` sends you to "Select lines manually".
+- **Extraction order:** WPRM/Tasty → JSON-LD `Recipe` → microdata → heading heuristic → "Select lines manually".
+- **JSON-LD quirks, each with a test:** `@graph`, `@type` given as an array, several recipes on one page, `recipeIngredient` as a single string or under `ingredients`, nested arrays, HTML entities (including double-encoded), HTML tags inside strings, lenient JSON, and the different forms `recipeYield` takes.
+- **Blocked or JavaScript-only pages** go to "Select lines manually". A visible WebView sheet for these comes in v1.1 (Step 10.3) and uses the same address filter.
+- **Same URL imported again:** "Already on your list — add again?"
+- **Background imports:** an import left running in the background shows a "1 recipe ready to review" card on the list. There are no notifications in v1.
 
 #### Review before adding
-Nothing is added to the list until you confirm on this screen. It is used for every import, and in v1.1 for "Shop for this week".
-- **Header:** title(s), a servings scaler, and a summary line such as "14 items · 9 new · 3 added to existing · 2 in stock".
-- **Rows**, grouped by aisle in the active store's order. Each row shows what the item will look like after merging:
-  - **New:** "Red onion — 2"
-  - **Existing:** "Milk — +200 ml → 700 ml". With packs on: "Milk — still 1 × 1 l" or "Flour — 1 → 2 packs".
-  - **Partly bought:** "Butter — need 50 g more (100 g bought)"
-- **"In stock" checkbox on every row.** Ticking it stops the item being added.
-  - In-stock rows **stay where they are** in their aisle, greyed out with a strikethrough. They do not sink.
-  - **Pre-ticked by rule:** staples (from the `Staple` table, seeded with salt, pepper, oil and water), and optional or garnish lines.
-  - **"I have some" (long press):** set how much you have. It's stored once per item per review (`ItemHave`), so it is never counted twice when several recipes need the same item.
-  - **"Always in stock"** adds the item to `Staple`.
-- **Stock learning**, which pre-ticks items you usually have:
-  - **What gets recorded:** only reviews you *confirm* count, and each item counts at most once per review, in `StockStat`.
-  - **Only explicit choices count.** Items pre-ticked by the staple or flag rules, or by learning itself, are **not** counted as "marked in stock" unless you tap them.
-  - **When it pre-ticks:** after 3 or more explicit in-stock marks in the last 4 confirmed reviews where the item came up. Such rows get a "usually in stock" label.
-  - **When it stops:** if you untick a learned pre-tick twice in a row, it's suppressed. The suppression expires after 5 more reviews, or as soon as you mark the item in stock by hand 3 times.
-  - **It decays:** if the item hasn't come up in 60 days, learning for it resets.
-  - **Banner above the Add button:** "5 assumed in stock: Butter, Eggs, … [Review]". Tapping it scrolls through those rows.
-  - **Settings:** "Forget stock habits", plus a reset on each item.
-- **Bulk actions:** "Mark aisle in stock" and "Clear in-stock".
-- **Line details:** tapping a row shows the source line(s), with live re-parsing as you edit the raw text and structured fields below it. "A or B" lines let you swap to the alternative.
-- **"Add N items" / "Cancel".**
-  - Confirming applies the preview's **insert-only** diff (new contributions, haves and decisions) in one transaction.
-  - If `listRev` changed while the screen was open, the preview is recomputed and the screen shows "List changed — review updated" before applying.
+Nothing is added until you confirm on this screen. It is used for every import (and in v1.1, for "Shop for this week").
+- **Default view (minimal):**
+  - **Header:** title, a servings stepper, and an **"Add N items"** button.
+  - **Rows:** grouped by aisle. Each row has three elements only: the name, one quantity (the pack if packs are on), and an **"In stock"** checkbox.
+  - **In-stock rows** stay in place, greyed out with a strikethrough.
+- **Pre-ticked as in stock:**
+  - **Staples** (the `Staple` table, seeded with salt, pepper, oil and water), plus optional and garnish lines.
+  - **Learned items:** stock learning ticks these and labels them "usually in stock".
+  - **Banner:** whenever learning has pre-ticked something, a banner above Add says "5 assumed in stock: Butter, Eggs… [Review]". It is an accessibility live region.
+- **Row detail sheet** (tap a row):
+  - Merge preview, e.g. "Milk: +200 ml → 700 ml on list".
+  - The pack plan, and the source line(s), with live re-parse while you edit.
+  - "A or B" swap, **"I have some"** (enter an amount), **"Always in stock"** (adds to `Staple`), move aisle.
+- **Overflow menu:** mark this aisle in stock, clear in-stock.
+- **Applying "I have some":** the amount is subtracted from the merged row when contributions are created, starting with the earliest line. It is **never stored as a separate "have"**, so it can't be counted twice or outlive the review.
+- **Stock learning** (`StockStat`):
+  - **What counts:** only reviews you **confirm**, at most once per item. Only **explicit taps** count. Rows pre-ticked by staples, flags or learning don't count unless you tap them.
+  - **When it pre-ticks:** after 3 or more explicit in-stock taps in the last 4 confirmed reviews where the item appeared.
+  - **Suppression:** two untick overrides in a row suppress it. Suppression expires after 5 reviews, or after 3 manual taps.
+  - **Decay:** an item that hasn't appeared for 60 days is reset.
+  - **Reset:** "Forget stock habits", or reset a single item.
+- **Confirming:**
+  - The app re-checks, in the same transaction, the `rev` of every item shown. If any changed, it shows "List changed — review updated" and recomputes.
+  - Otherwise it inserts the contributions and decisions, then shows a **"Added 14 items · Undo"** snackbar for 10 s.
+  - **Undo** deletes that `RecipeUse` (cascade), rolls back that review's `StockStat` updates, and bumps the affected items' revs.
+- **Speed goal:** for a 12-line recipe, share → glance → Add should take under 5 s.
 
 ### 3.2 Ingredient parser
-`"2 ½ cups (300g) plain flour, sifted"` → `{qty 5/2, unit CUP(locale), alt 300 g, name "plain flour", note "sifted"}`.
-- **Prep words vs identity words.** Prep words (chopped, diced, sifted…) go to `note`. Identity words (ground, smoked, red, dried, tinned, frozen, powder, unsalted…) stay in the name.
-- **Units depend on the recipe's locale.** The locale comes from the TLD, `inLanguage`, or a setting.
-  - cup: 240 ml (US) or 250 ml (metric)
-  - pint: 568 ml (UK) or 473 ml (US)
-  - "stick" of butter
-  - Case matters: `T` = tbsp, `t` = tsp.
-  - "oz" in front of a liquid lowers confidence.
-  - The Australian 20 ml tablespoon is v1.1.
-- **Item-specific units:** clove, bunch, tin, packet, sprig and slice.
-- **Several ingredients on one line:**
+Example: `"2 ½ cups (300g) plain flour, sifted"` → `{qty 5/2, unit CUP(locale), alt 300 g, name "plain flour", note "sifted"}`.
+- **Prep words vs identity words.** Prep words (chopped, sifted…) go to `note`. Identity words (ground, smoked, red, dried, tinned, frozen, powder, unsalted…) stay in the name.
+- **Units (`QtyUnit` enum):**
+  - **Mass:** g, kg, oz, lb.
+  - **Volume:** ml, l, tsp, tbsp, cup, fl oz, pint, quart.
+  - **Item-specific:** clove, bunch, tin/can, packet, sprig, slice, head, stalk, ear, fillet, piece, stick.
+  - **Small amounts:** pinch, dash.
+  - **Locale factors:** cup is 240 ml (US) or 250 ml (metric); pint is 568 ml (UK) or 473 ml (US).
+  - **Case:** `T` means tbsp and `t` means tsp.
+  - **Liquids:** "oz" next to a liquid lowers confidence, because it may mean fl oz.
+- **Splitting lines:**
   - "X and Y" is split only when both halves are in the catalogue.
-  - "A or B" becomes A, with B stored as the alternative.
-  - "juice/zest of N lemon(s)" becomes N lemons.
-- **Flags:** `optional`, `garnish`, and `noScale` ("to taste", "for frying", or no quantity at all).
-- **Section headers:** lines ending in ":", lines starting "For the…", and WPRM group names. These become labels, not items.
-- **Singularising:** only the head noun, and only when the singular form is in the catalogue. Otherwise the word stays as written.
-- **Synonyms:** map to one catalogue ID, which can depend on locale. "pepper" is disambiguated from context.
-- **Confidence:** start at 1.0, then subtract:
-  - unparsed tokens −0.4
-  - unknown unit −0.3
-  - name not in the catalogue −0.2
-  - ambiguous split −0.2
+  - "A or B" becomes A, with B kept as an alternative.
+  - "juice/zest of N lemons" becomes N lemons.
+- **Flags:** `optional`, `garnish`, `noScale` ("to taste", "for frying", or no quantity).
+- **Section headers:** lines ending in ":", lines starting "For the…", and WPRM group names become labels.
+- **Singularising:** only the head noun, and only when the singular form is in the catalogue.
+- **Synonyms:** each maps to one catalogue ID, which may depend on locale. "pepper" is resolved from context.
+- **Confidence:** starts at 1.0. Deduct 0.4 for unparsed tokens, 0.3 for an unknown unit, 0.2 for a name not in the catalogue, and 0.2 for an ambiguous split. Lines that are meant to have no quantity score 1.0. `CONFIDENCE_THRESHOLD` defaults to 0.6.
+- **Corrections map (v1.1):** a personal map of corrections you've made.
 
-  Lines that are meant to have no quantity score 1.0. `CONFIDENCE_THRESHOLD` defaults to 0.6, and the eval in step 7.6 can change it.
-- **Personal corrections map (v1.1):** when you correct a line, the raw pattern and its parse are saved and applied to future imports.
-
-### 3.3 Merge engine and quantities
+### 3.3 Quantities, merging and ticking (simplified in rev 4)
 - **Item identity:**
-  - Every item has a single `mergeKey`, either `cat:<catalogId>` or `name:<normName>`, and it is unique.
-  - When the catalogue changes version, a re-resolution migration merges items that now share a key, and rewrites the keys in `CategoryOverride`, `StockStat`, `PackOverride` and `Staple`.
-  - Head-noun matching is used **only to pick an aisle**, never to merge items.
-- **What you need:** `need = max(0, Σ contributions − Σ purchases − Σ haves)`, worked out separately for each dimension.
-  - Contributions are stored in base units as rationals.
-  - Volume and mass are converted into each other only for catalogue rows that have `gramsPerCup`. Other mixes stay as a compound quantity, e.g. "1 onion + 200 g".
-- **Item states:**
-  - **NEED** — nothing bought yet.
-  - **PARTIAL** — something bought, more still needed. Shown as "need 1 more (2 bought)" and counted as **unticked** everywhere.
-  - **DONE** — `need = 0` and at least one purchase.
-  - "Ticked" in the UI and in the sync protocol means **DONE**.
-- **Ticking and unticking:**
-  - **Ticking** records a `Purchase` of the amount shown: the remaining need, or the total of the planned packs when packs are on. So leftover from a pack covers later recipes.
-  - **Unticking** deletes the most recent `Purchase` for that item.
-- **Removing or rescaling a recipe** changes only the contributions. Purchases are never deleted this way. If the purchases now exceed the need, the item becomes DONE.
-- **"Clear ticked"** deletes DONE items along with their purchases.
-- **Shopping display:**
-  - Spoonfuls or pinches of pantry and liquid items show as the name alone.
-  - Container conversions: clove → bulb, tin = 400 g.
-  - The exact totals are shown in the item detail sheet.
-- **Pack sizes:**
-  - Each catalogue row lists its sizes with dimensions, e.g. `500g|1kg`, `6ct|12ct`, `1l|2l`. Packs are on by default.
-  - **Choice rule:** among combinations of up to 4 packs that cover the unpurchased need, minimise the leftover. Leftovers up to max(the smallest pack, 15% of the need) count as equal. Then prefer fewer packs, then the larger single pack. A small dynamic-programming search over base units does this.
-  - If no combination of 4 or fewer packs covers the need, or the item has a compound or mixed-dimension quantity, it shows the rounded quantity instead.
-  - **Display:** "1 × 500 g (need 350 g)". On the watch the sub-label is limited to 18 characters, e.g. "1×500g · need 350g".
-  - `PackOverride` lets you edit the sizes per item.
-- **Rounding:**
-  - Counts round up, or to the nearest ½ for produce.
-  - Mass and volume round to friendly steps.
-  - Fractions are shown as ½ ⅓ ¼.
-  - A setting chooses metric, imperial or as-written.
-- **Scaling:**
-  - Each `RecipeUse` has its own servings, and its contributions are stored already scaled.
-  - Changing servings rescales that use's contributions; `noScale` lines are left alone. If an `ItemHave` exists, it is kept as it is.
+  - Each item has a unique `mergeKey`: `cat:<catalogId>` or `name:<normName>`.
+  - Head-noun matching only picks the aisle, never the merge.
+  - **When the catalogue version changes**, `name:` items that now resolve to a `cat:` key are re-keyed. If two items collide:
+    - The lower id survives.
+    - Contributions move across.
+    - The survivor's aisle and position win.
+    - USER-sourced overrides beat SEED ones.
+    - `StockStat` keeps the more recent entry.
+    - The new rev is the higher of the two plus 1.
+    - `ItemAlias(oldId → newId)` redirects watch ops.
+- **What's on the list:** each item is the sum of its **contributions**. Every contribution belongs to a `RecipeUse` (a recipe import, a planned meal, or a manual add) and a recipe line. It stores `qtyBase`, worked out per dimension, already scaled, with "I have some" already subtracted.
+  - **Quantity-less lines** ("salt to taste") are stored as a *presence* contribution (no amount).
+  - **Mixing volume and mass:** these combine only for catalogue rows that have `gramsPerCup`. Otherwise the item shows a compound quantity, e.g. "1 onion + 200 g".
+- **Ticking an item:**
+  - **Tick = covered.** Ticking marks every contribution the item has *at that moment* as covered (`coveredBy = tickId`). The `Tick(id, itemId, at, source PHONE|WATCH, installId?, seq?)` row records it.
+  - **The item is DONE** when every contribution is covered. Otherwise it shows the uncovered total only: "1 more", with a sub-line "2 already ticked".
+  - **Contributions added after a tick** (new recipes) start uncovered, so a DONE item comes back showing just the new amount.
+  - **Untick** uncovers exactly the contributions that its most recent `Tick` covered, then deletes that `Tick`.
+  - **Removing or rescaling a recipe use** deletes or rescales its contributions, whether they're covered or not. **Ticks never create stock.** Leftovers and packs never silently cover a later recipe.
+  - **Rounding and packs only affect what's displayed**, so a tick always fully covers. Nothing can be left with "⅕ onion more".
+- **"Finish shopping"** (replaces "Clear ticked") deletes DONE items and any `RecipeUse` left with no contributions.
+  - **Deleting items** is a soft delete (`deletedAt`), so it can be undone.
+  - **Old uses:** uses whose contributions are all covered for 7 days are archived automatically.
 - **Manual changes:**
-  - A `ManualAdjustment` records `DELTA` or `OVERRIDE(qty, baselineSum)`.
-  - **Overrides:** if the contributions change after an override is set, the item is flagged: "Recipe changed: keep 3 or use 6?" Need = override − purchases. Removing the last contribution asks whether to keep the override.
-  - **Manually added items** are a `RecipeUse` with no recipe (`kind=MANUAL`).
-- **Dry run:** `Merger.preview(list, incoming, decisions, haves)` is a pure function. It returns an **insert-only** diff, which can be safely combined with ticks that arrive in the meantime.
+  - A manual add, or editing an item's quantity, adds or changes a contribution in a `kind=MANUAL` `RecipeUse`. Negative amounts are allowed, but the item's total is clamped at 0.
+  - There are no overrides.
+- **Packs** (display only):
+  - **Where sizes come from:** each catalogue row lists sizes per dimension, e.g. `500g|1kg` or `6ct|12ct`. You can change them with `PackOverride`.
+  - **Choosing packs** (for the uncovered need in that dimension):
+    - Among combinations of up to 4 packs, pick the least leftover.
+    - Leftovers up to max(smallest pack, 15% of the need) count as equal. Among those, pick the fewest packs, then the larger single pack.
+    - With no fit, or a compound or presence quantity, show the rounded amount instead.
+  - **Display:** main line "1 × 500 g", sub-line "for 350 g".
+  - **Trust:** pack sizes the agent estimated are shown in a muted style until you tap "Looks right" or edit them.
+- **Rounding:** counts round up (produce to the nearest ½). Mass and volume use friendly steps. Fractions show as ½ ⅓ ¼. Display can be set to metric, imperial or as written.
+- **Revisions:**
+  - **What bumps `Item.rev`:** any change to its contributions or ticks, its aisle, or the inputs to its display (pack override, pack toggle, display units, a catalogue update). The bump happens in the same transaction.
+  - `listRev` (stored in Room `Meta`) goes up with every list change.
+  - Each contribution stores `createdListRev`.
+- **Dry run:** `Merger.preview(list, incoming, decisions)` is pure. It returns the rows to insert plus the revs of the items it shows.
 
 ### 3.4 Aisles and categorisation
-- **Aisles** are a table seeded with stable codes, and you can rename, hide or add them.
-  - The defaults are Produce, Bakery, Meat & Fish, Dairy & Eggs, Chilled, Frozen, Tins & Jars, Pasta/Rice/Grains, World Foods, Baking, Nuts & Dried Fruit, Oils & Vinegars, Spices & Condiments, Free-from, Drinks, Household and Other.
-- **Stores:**
-  - Migration 1 seeds `StoreProfile(1, "My store")`, with `AisleOrder` rows copied from `Aisle.defaultOrder`.
-  - The list always reads its order from `AisleOrder` for the active store, which is kept in DataStore and starts as 1.
-  - The v1 UI supports one store. More stores arrive with Step 9.1.
-- **Lookup order:**
-  1. User override
-  2. Identity words (frozen → Frozen, tinned → Tins)
-  3. Catalogue ID
-  4. Head noun
-  5. Keyword rules
-  6. Other
-- **Moving an item to another aisle** asks "Always put <item> in <aisle>?". Yes writes a `CategoryOverride`; "Just this time" doesn't.
-- **Catalogue:**
-  - **Source:** the most frequent names from the **NYT ingredient-phrase-tagger snapshot (Apache-2.0)**, about 400 rows.
-  - **UK names, aisles, staples and pack sizes** are written by the agent from general knowledge, and every row is tagged `src=nyt-freq` or `src=agent-estimate`. The MVP has pack sizes for about 40 items.
-  - **Format:** a CSV, generated into a resource file that is loaded lazily. A Gradle task validates it.
-  - **Review:** `catalog/REVIEW.md` is generated for you. It lists the top 60 rows, every UK/US synonym and every pack size, and takes about 10 minutes to check.
+- **Aisles:** a table with stable codes (an `AisleCode` enum gives the seed codes and default order). You can rename, hide or add aisles.
+  - **Default aisles:** Produce, Bakery, Meat & Fish, Dairy & Eggs, Chilled, Frozen, Tins & Jars, Pasta/Rice/Grains, World Foods, Baking, Nuts & Dried Fruit, Oils & Vinegars, Spices & Condiments, Free-from, Drinks, Household, Other.
+- **Store:** `RoomDatabase.Callback.onCreate` seeds `StoreProfile(1, "My store")` and its `AisleOrder`. The list always reads `AisleOrder`. The v1 UI has one store.
+- **Lookup order:** override → identity words → catalogue ID → head noun → keyword rules → Other.
+- **Moving an item to another aisle** asks "Always put X in Y?". Yes writes a `CategoryOverride`; "Just this time" doesn't.
+- **Catalogue:** about 400 rows.
+  - **Names:** taken by script from the most frequent normalised names in the **NYT ingredient-phrase-tagger snapshot** (Apache-2.0; LICENSE and NOTICE copied to `catalog/`).
+  - **Agent-written columns:** UK names, aisle, staple and pack sizes (about 40 items), tagged `src=agent-estimate`.
+  - **Review:** `catalog/REVIEW.md` is generated for a 10-minute check.
 - **Learned aisle order (v1.1, Step 9.1):**
-  - **What's logged:** `TickEvent(storeId, aisleCode, tickedAt (UTC, phone-corrected), source, afterAutoPrompt, bulk)`. The phone works out the watch's clock offset from the watch time sent in `hello`.
-  - **What counts as a trip:** ticks from **one device**, with gaps under 20 minutes, at least 5 ticks, and at least 8 minutes long.
-  - **Trips that are thrown out:**
-    - 80% or more of the ticks fall within 5 s of each other
-    - ticks that came from "Clear ticked" or a bulk action
-    - ticks made straight after a "next aisle" prompt
-  - **How the order is learned:**
-    - It counts, for each pair of aisles, which came first: A before B in at least 70% of the trips where both appear. The pairs are combined into one order with a Borda count.
-    - Only trips whose order *differs* from the order shown on screen count, so the learner doesn't just repeat the current sort.
-  - **Applying it:** after 2 trips that count, a card suggests the reorder and you choose. Pinned aisles stay where they are.
-    - There's no silent auto-apply. If you turn on "Auto-apply", a snackbar with Undo appears each time it reorders.
-  - **Simpler option, also offered:** "Sort aisles like my last trip".
-  - **Privacy:** `TickEvent` is kept for 90 days, left out of backup and export, and cleared together with "Forget stock habits".
-  - **Active store:** a "Shopping at: <store>" chip on the list shows which store the ticks are logged against.
+  - **What's logged:** `TickEvent` rows, ordered by seq within a trip.
+  - **What counts as a trip:** one device, gaps under 20 min, at least 5 ticks, at least 8 min long.
+  - **Filters:** drop trips where 80% of ticks are within 5 s of each other, ticks from bulk actions, and ticks made straight after a next-aisle prompt.
+  - **Learning:** pairwise precedence (≥70%) combined with a Borda count, using only trips whose order differs from the displayed order.
+  - **Applying it:** after 2 qualifying trips the app *suggests* a reorder. Pinned aisles never move.
+  - **Shortcut:** a "Sort like my last trip" option.
+  - **Retention:** `TickEvent` is kept 90 days and excluded from backup and export.
 
 ### 3.5 List UI
-- **Layout:** grouped by aisle, in store order. DONE items sink to the bottom of their aisle and are dimmed, with a tick mark too, so it doesn't rely on colour alone. PARTIAL items stay in place and show "need X more".
-- **Actions:** tap to tick or untick, swipe to delete (with an accessibility action as an alternative), add by hand (parsed), clear ticked, clear all, undo.
-- **Item detail sheet:** the exact total for each dimension, which recipes it comes from, the pack plan and leftover, edit pack sizes, change aisle, and manual adjustment or override.
+- **"Add item" field**, always at the top:
+  - Autocompletes from recent items and the catalogue.
+  - **Enter** adds the item and keeps the keyboard open. Pasting several lines adds one item per line.
+  - **No review screen.** If the item is already on the list, it shows "Milk — already on list · +1?".
+- **Empty state:** "Share a recipe from Chrome" (two-step picture), plus the add field and "Try a sample list".
+- **Rows:**
+  - Grouped by aisle in store order.
+  - The main line is what to put in the basket; the sub-line is context.
+  - Partly ticked items show a half-filled tick icon. DONE items sink to the bottom of their aisle, dimmed and marked with a tick (not colour alone).
+- **Actions:**
+  - Tap to tick or untick, with undo.
+  - Swipe to delete, with an accessibility action as an alternative.
+  - "Finish shopping" and "Clear all", both with undo.
+  - "Share list as text".
+- **Item detail sheet:**
+  - Totals per dimension, and the recipes it came from.
+  - The pack plan, with "Looks right" and edit.
+  - Change aisle, and edit quantity (which creates a manual contribution).
 - **Recipes tab:**
-  - Shows the recipe uses that are on the list, with their source and servings.
-  - **Remove from list** deletes the use's contributions and decisions. The `Recipe` row stays.
-  - **"Add the in-stock items now"** reopens the review screen, pre-filled with the full amounts and nothing pre-ticked.
-- **Other:** "Share list as text". JSON export/import through SAF: import **always assigns new item IDs** and a new `listEpoch`. Auto-backup leaves out the key file and `TickEvent`.
+  - Lists the uses currently on the list.
+  - Each use has "Remove from list", which also rolls back stock learning if nothing from it has been ticked yet.
+  - Each use also has "Add the in-stock items now", which reopens the review with full amounts and nothing pre-ticked.
+- **Export and import:**
+  - JSON through the Storage Access Framework, with a `formatVersion`.
+  - Import rules:
+    - The file is capped at 10 MB.
+    - Decoding is strict, with limits on strings and counts. Rationals must fit in 64 bits.
+    - Foreign keys are checked, and everything is written in one transaction.
+    - You see a preview, "Replace current list (23 items) with file (41)?", and the app makes an automatic export before replacing.
+    - Import **always assigns new ids and a new `listEpoch`**.
+  - An optional weekly auto-export goes to a folder you choose.
+- **Settings**, grouped:
+  - **List:** staples, stock habits, packs, units.
+  - **Aisles.**
+  - **Watch.**
+  - **Smart parsing:** Claude, collapsed by default.
+  - **Advanced:** model, spend, debug log.
+- **Accessibility, required from Step 4, not left to polish:**
+  - Every row is a single TalkBack node with `customActions` (I have some, always in stock, move aisle, delete).
+  - Touch targets are at least 48 dp. Contrast is at least 4.5:1, with a dark-theme snapshot.
+  - Layout works at 200% font scale.
+  - Never rely on red or green alone.
 
-### 3.6 Garmin app and sync
+### 3.6 Garmin Forerunner 245 app and sync
+- **The device:**
+  - **Controls:** 5 buttons and **no touchscreen**: Start/Stop = select, Back, Up, Down, Light. Every interaction must work with buttons alone.
+  - **Screen:** 240×240 round, with the MIP display.
+  - **Checked from `fr245/compiler.json` in Step 5.0:** API level, app memory limit, glance support, and `Attention` vibrate.
+  - **Sizing:** `minApiLevel` is set to the device's level. The snapshot size cap, the menu size and the outbox cap are taken from the measured memory limit.
 - **Watch UI:**
-  - **Aisle list:** shows the true number of items left in each aisle, from `leftByAisle`. An aisle with hidden items shows "+N on phone".
-  - **Opening an aisle:** a `CheckboxMenu`. Choosing an item ticks it, and choosing it again unticks it. That *is* the undo.
-  - **Finishing an aisle:** shows the prompt "Produce done ✓ — [Next: Bakery ▸] [Undo <last item>]". Moving on happens only when you choose it, via `switchToView`.
-  - **Optional auto-advance**, off by default, in the watch app's settings.
-  - **There's no long-press Back.** Devices reserve it for the system.
-  - **Vibration:** on tick and on aisle done, only `if (Attention has :vibrate)`, and it can be turned off.
-  - **Each row:** the item name as the label, plus a sub-label of up to 18 characters with the quantity or pack.
-  - "Last synced", an empty state, and "Update watch app".
-  - A `CustomMenu` prototype is v1.1.
-- **Glance:** "Shopping: 14 left · Produce next", read from the `glanceSummary` key.
-- **Messages:**
-  - Messages are native Monkey C objects, not JSON. Each one is `{v, t, epoch, ...}`.
-  - `hello` carries `minV`/`maxV`, `installId`, `listRev` and the watch clock.
-  - **Version rules:** unknown keys are ignored. `v` changes only for breaking changes. The two sides use the highest version they share, or show "Update app" if there's none.
-- **Protocol (v1):**
-  - **The phone is the source of truth.**
-    - Every change to an item increments its `rev`, and every change to the list increments `listRev`.
-    - `listEpoch` is a UUID that is regenerated whenever the database is restored or imported. The watch throws away its cache and outbox when the epoch changes.
-  - **Phone → watch:** always a full snapshot, `{epoch, listRev, items:[[id, name, sub, aisleIdx, done, rev]], aisles:[[code, name, leftCount, hiddenCount]], more, acks:[[seq, result, itemId, newRev]]}`.
-    - **When the list doesn't fit:** items are dropped in this order:
-      1. DONE items
-      2. Names shortened to 16 characters
-      3. Unticked items, starting from the end of the store order
-
-      Then `more` and `hiddenCount` are set. The size cap is measured on each target.
-  - **Watch → phone:** ops `{installId, seq, itemId, done, baseRev, ts}`.
-    - The phone deduplicates on `(installId, seq)`.
-    - It applies the op if the item exists and either `rev == baseRev` **or** every change since `baseRev` came from this same install (`Item.lastWriter`).
-    - **A stale tick**, where the item gained a contribution since the watch last saw it, records a `Purchase` of what the watch saw. The result is `partial`, and the watch shows "need 1 more".
-    - Ops on deleted or unknown items are acked as `rejected`, and the watch shows "Changed on phone".
-    - **Every op is acked with a result and the item's `newRev`.** The watch updates its local rev from it, so a second op on the same item (such as an undo) is accepted.
-  - **Pull, not push:**
-    - When the watch app starts or resumes it sends `hello`, and the phone replies with a snapshot.
-    - Pushing a snapshot after each change is best-effort only.
-    - On `onDeviceStatusChanged(CONNECTED)` or when the phone app starts, the phone sends `resync`. That means "send `hello` and your unacked outbox".
-  - **Optimistic watch:** pending ops are re-applied on top of every snapshot.
-  - **Outbox:**
-    - Holds up to 500 ops.
-    - Only ops that haven't been **sent yet** are collapsed, to the latest state for each item, keeping the first `ts`.
-    - Ops that have been sent but not yet acked are never collapsed.
-- **Watch storage:** one key per aisle chunk, plus `meta` (epoch, installId, listRev), `outbox` and `glanceSummary`. Each is under 32 KB, and everything is wrapped in try/catch.
+  - **Aisle list:** shows `leftCount` from the phone, plus "+N on phone" only when N > 0.
+  - **Inside an aisle:** a `CheckboxMenu`.
+    - Select ticks an item, and selecting it again unticks it.
+    - A second press on the same row within 700 ms is ignored.
+    - Ticked rows sink, so the next item is always at the top.
+  - **When an aisle is done:** a prompt "Produce done ✓ — [Next: Bakery ▸] [Undo <item>]", with **Next as the default focus**. It moves on using `switchToView`. Auto-advance is optional and off by default.
+  - **Vibration:** only `if (Attention has :vibrate)`, and it can be turned off.
+  - **Rows:** the label is the name; the sub-label (18 characters or fewer) is the quantity or pack.
+  - **Other screens:** "Last synced", "N unsynced", an empty state, and "Update watch app".
+  - **Glance:** "14 left · Produce next", only if the 245 supports glances, otherwise skipped.
+- **Envelope:** `{v, t, epoch, installId, ...}` as native Monkey C objects, not JSON.
+  - `hello` carries `minV`/`maxV`, `listRev`, `watchNow` and `ackedThrough`.
+  - **Versioning:** unknown keys are ignored. `v` only changes for breaking changes, and both sides use the highest version they both support.
+- **Ops (watch → phone):**
+  - **Format:** compact arrays `[seq, itemId, done, seenListRev, ts]`.
+  - **Sequence numbers:** `nextSeq` is stored in the same Storage key as the outbox. It is written **before** sending and never reset. A seq is assigned when an op is **first sent**; collapsing unsent ops keeps the earliest seq, so there are never gaps.
+  - **Sending:** batches of up to 32 ops, one batch in flight at a time, with retry and back-off (5 s / 15 s / 60 s) while the app is open. The watch also tries to flush in `onStop`.
+  - **Outbox full:** at the measured cap, ticking is blocked with "Sync with phone".
+- **Phone applies an op** in **one Room transaction**, covering the op's effect, `WatchInstall.lastSeq` and the stored result. It goes through these checks in order:
+  1. **Wrong epoch** → result `epoch`. The watch drops those ops and shows "N watch ticks discarded (list replaced)".
+  2. **Out of sequence:** only `seq == lastSeq + 1` is applied. Others are ignored, and the watch resends from `ackedThrough + 1` (go-back-N).
+  3. **Item id** is resolved through `ItemAlias`. Unknown or deleted → `rejected`, and the watch shows "Changed on phone".
+  4. **`done=true`** covers the uncovered contributions with `createdListRev ≤ seenListRev`:
+     - nothing to cover → `noop`
+     - some contributions created later stay uncovered → `partial`, and the watch shows "1 more"
+  5. **`done=false`** undoes the most recent `Tick` made by **this install** for that item. If there's none, the result is `noop`. If the item stays DONE because of another tick, the result is `still_done`.
+  6. **Old ops:** an op with `ts` more than 6 hours old (after clock-offset correction) is queued for confirmation on the phone ("Apply 3 ticks from yesterday?").
+- **Snapshots (phone → watch):**
+  - **Format:** `{epoch, listRev, ackedThrough, ackExceptions:[[seq,result]], items:[[id, name, sub, aisleIdx, done, rev]], aisles:[[code, name, leftCount, hiddenCount]], more}`.
+  - **When the phone replies:** it *always* answers `hello` and every op batch, even when nothing changed. An ack-only reply is fine.
+  - **Ack bookkeeping:** the phone keeps the last 64 results for each install, so duplicates are re-acked correctly.
+  - **Truncation:** ack data is reserved first. Then, in this order:
+    1. Drop DONE items, except those ticked in the last 30 minutes or in the aisle you're in.
+    2. Shorten names to 16 characters.
+    3. Drop unticked items from the end of the store order.
+  - **Watch handling:**
+    - The watch ignores item state from snapshots with a lower `listRev` (same epoch), but always processes acks.
+    - Pending ops are re-applied on top optimistically.
+- **Epoch:**
+  - `listEpoch` is stored in Room `Meta`, next to a marker file in `noBackupFilesDir`. If the marker is missing or doesn't match on startup (after a restore), a new epoch is generated.
+  - A JSON import also creates a new epoch.
+  - The watch clears its cache when the epoch changes, but keeps `nextSeq`.
+- **Watch storage:** chunks of 32 KB or less. Keys: `meta` (epoch, installId, listRev), `outbox` + `nextSeq`, and `glanceSummary`. All access is wrapped in try/catch.
 - **Android side:**
-  - `WatchSync` is application-scoped, with no permanent service.
-  - Add `<queries>` for `com.garmin.android.apps.connectmobile`.
-  - Handle the init errors with prompts. `openStore(appId)` opens the store page.
-  - A "Shopping mode" foreground service (`connectedDevice`) is v1.1.
-- **Devices:** the exact product IDs and memory limits come from the device files and go in a table in `garmin/README.md`. Start with 3 devices you supply (e.g. fr265, fenix7, venu3), then add more.
+  - The receiver is registered in `Application.onCreate`, with app-scoped `WatchSync` and no permanent service.
+  - Add `<queries>` for Garmin Connect, handle init-error prompts, and use `openStore` only if needed.
+  - **Treat watch input as untrusted:** check types and ranges, cap message size and op rate, and never let watch data reach SQL strings or file paths.
 
 ### 3.7 Claude API integration (optional, opt-in)
 - **Settings:**
-  - Mode: Off / Fallback / Always.
-  - **Key:** "Test key" calls `GET /v1/models`, which costs nothing.
-  - **Model dropdown:** Opus 5.5 is the default, with Sonnet 5.5 and Haiku 5.5 as the other options.
-  - A monthly spend cap, and a cost counter that includes cache tokens.
-  - Advice to create a dedicated key with a spend limit set in the Console.
+  - Mode: Off, Fallback or Always.
+  - The key field uses `textPassword`, no autofill save, and `FLAG_SECURE`. "Test key" calls `GET /v1/models`, which costs nothing.
+  - Model: Opus 5.5 by default, or Sonnet 5.5 or Haiku 5.5.
+  - Limits: a monthly spend cap, plus a daily call cap.
+  - A cost counter, which includes cache tokens.
+- **When Claude is called:**
+  - **Only from the review screen while it's in the foreground.** A share intent alone never spends money.
+  - In Fallback mode, only lines below `CONFIDENCE_THRESHOLD` are sent, or the whole page if extraction failed.
 - **Request:**
-  - `output_config.effort:"low"` is always set explicitly, and `thinking` is never sent as disabled.
-  - `max_tokens` 8000, non-streaming.
-  - **Refusal fallbacks:** for Opus 5.5 and Sonnet 5.5 only, send `fallbacks:"default"` with `anthropic-beta: server-side-fallback-2026-07-01`. Haiku gets neither.
+  - `output_config.effort:"low"` is set explicitly, `thinking` is never disabled, and `max_tokens` is 8000.
+  - **Refusal fallback:** for Opus 5.5 and Sonnet 5.5 only, send `fallbacks:"default"` with the `anthropic-beta: server-side-fallback-2026-07-01` header.
 - **Strict schema** (`output_config.format`):
-  - `additionalProperties:false` on every object, all fields listed in `required`, and optional fields made nullable with `anyOf`.
-  - **Top level:** a `status` enum (`ok | no_ingredients | not_a_recipe`), `title`, `servings`, `ingredients[]`, `source_urls[]`.
+  - `additionalProperties:false` everywhere, all fields required, and optional ones nullable through `anyOf`.
+  - **Top level:** `status` (`ok | no_ingredients | not_a_recipe`), `title`, `servings`, `ingredients[]` and `source_urls[]`.
   - **Each ingredient:** `raw`, `name`, `quantity`, `quantity_max`, `quantity_text`, a `unit` enum (plus `other`), `alt_quantity`, `alt_unit`, `note`, `section`, `optional`, `estimated`, and an `aisle_suggestion` enum.
-  - No numeric or length constraints; those are checked in Kotlin.
+  - Number ranges aren't in the schema; they're checked in Kotlin.
 - **Response handling:**
-  - Check `stop_reason` first. A `refusal` gives "Couldn't parse — edit manually" with no retry; `max_tokens` is an error.
+  - Check `stop_reason` first. On `refusal`, show "Couldn't parse — edit manually"; `max_tokens` is an error.
   - Then validate against the schema.
-  - **HTTP errors:** 401/403 means a bad key; 429/529 back off; 5xx retries once.
-  - `x-api-key` is always redacted from logs.
-- **Prompt injection:**
-  - Page and caption text goes inside `<untrusted_content>` tags, and Claude gets no tools.
-  - A URL is accepted only if it appears word for word in the source text, is https, and you tap it.
-  - Input length is capped, and everything still goes through the review screen.
-- **Offline:** the rule parser's result is used, marked "Claude pending", with a manual "Retry with Claude".
-- **Prompt caching:** off. It's turned on only for the combined weekly review in v1.1, and only when the prompt is over the model's minimum cacheable length.
-- **Cost on Opus 5.5:**
-  - About $0.04 per text import.
-  - About $0.05 per reel with OCR and 3 frames.
-  - Sonnet 5.5 costs half that. Haiku 5.5 costs about $0.001–0.003 per import.
-  - Media imports show an estimate before sending.
-- **Privacy dialog:**
-  - Content goes to Anthropic under your account's terms.
-  - Google may receive audio (v1.1).
-  - Media is deleted after import.
+  - Errors: 401/403 means a bad key, 429/529 back off, and a 5xx is retried once.
+- **Prompt injection:** page text and captions go inside `<untrusted_content>`, with no tools. A URL Claude returns is accepted only if it appears verbatim in the source, is https, and you tap it. Input length is capped.
+- **Key failures:**
+  - Missing after a restore → "Re-enter key".
+  - `KeyPermanentlyInvalidatedException`, `AEADBadTagException` or `ProviderException` → wipe the key, set Claude to Off, and show a one-time notice.
+  - "Remove key" clears it from memory.
+- **Offline:** use the rule-parser result, marked "Claude pending", with a manual "Retry with Claude".
+- **Logging:**
+  - Release builds use an in-memory ring buffer of 500 lines. Request and response bodies never go to Logcat.
+  - URLs are logged without their query strings, and `sk-ant-…` and `x-api-key` values are redacted.
+  - `verify.sh` scans for `sk-ant-` strings.
+- **Cost on Opus 5.5:** about $0.04 per text import, or about $0.05 for a reel with OCR plus 3 frames. Sonnet 5.5 costs half that, and Haiku 5.5 about $0.001–0.003. Media imports show an estimate first.
 
 ### 3.8 Instagram import (v1.1)
-Sharing from the Instagram app sends only the URL.
-1. **Caption.** Try Meta oEmbed first (`graph.facebook.com/v25.0/instagram_oembed`). A reviewer reported it needs no token since 2026-06; **check this in 8.1**. The caption comes from the returned `html`, with one plain `og:` fetch as a fallback.
+Sharing from Instagram sends only the URL.
+1. **Caption:** try Meta oEmbed (`graph.facebook.com/v25.0/instagram_oembed`).
+   - A reviewer reported it needs no token since 2026-06. **Check this in 8.1.**
+   - Take the caption from the returned `html`, then try one plain `og:` fetch.
    - One call per share, and no WebView on instagram.com.
-   - Pulling text this way is a grey area under Meta's terms.
-2. **Routing.** If the caption contains a recipe link, run the web import. If the text looks like an ingredient list, use the rule parser, then Claude if confidence is low. Otherwise go to "Add media".
-3. **"Add media"** explains: use Instagram's Download, or screen-record with audio (Android 11+), or screenshot the expanded caption.
-   - **Screenshots:** OCR (§3.9 post-processing), then the parser, then Claude if needed. Works without Claude.
-   - **Video:**
-     - Sample about 1 frame per second, run OCR on each, and keep the frames where the text changed.
-     - Send the OCR text, plus 2–3 frames at 1092 px when confidence is low.
-   - **Transcript (experiment, ADR 004):** decode the audio to PCM, then use the on-device recogniser with `EXTRA_AUDIO_SOURCE`. This needs API 33+, and is only used when the phone supports it; otherwise it's skipped with a notice. whisper.cpp is v2.
+2. **Routing:**
+   - The caption has a recipe link → web import.
+   - The caption looks like an ingredient list → parser, then Claude if confidence is low.
+   - Otherwise → "Add media".
+3. **"Add media" options:** a how-to (Download, or screen-record with audio, or screenshot the caption), plus:
+   - **Screenshots:** OCR (§3.9 post-processing), then the parser.
+   - **Video:** OCR at about 1 fps, keeping frames whose text changed. Add 2–3 frames at 1092 px when confidence is low.
+   - **Transcript experiment (ADR 004):** decode the audio to PCM, then use the on-device recogniser with `EXTRA_AUDIO_SOURCE` (API 33+, which your phone has), if it's available.
    - **Paste caption.**
-4. Everything goes to the review screen. Anything taken from video or speech is marked "estimated".
+4. Everything then goes to the review screen. Anything taken from video or speech is marked "estimated".
 
 ### 3.9 Cookbook photo import (v1.1)
-- **Entry points:** "Scan a cookbook page", which uses `TakePicture` with a `FileProvider` cache file, deleted after use. Also the Photo Picker and image shares.
-  - `verify.sh` checks that the merged manifest does **not** contain `CAMERA`.
-- **No crop UI.** OCR runs on the whole page, and the recognised lines appear as a tappable list. The ingredient block is preselected: lines under an "Ingredients" heading, or the densest run of lines that start with a quantity. This reuses the "Select lines manually" screen.
+- **Entry points:**
+  - `TakePicture` with a `FileProvider` cache file, which is deleted after use. `verify.sh` checks that the merged manifest contains no `CAMERA` permission.
+  - The Photo Picker, or an image share.
+- **No crop step:** OCR reads the whole page, then you get a tappable list of lines with the ingredient block preselected. This reuses the "Select lines manually" screen.
 - **OCR post-processing:**
-  - **Columns:** blocks are grouped into columns by how much their x-ranges overlap, then sorted top to bottom within each column, with columns read left to right.
-  - **Wrapped lines:** joined using layout, not wording: an indent relative to the column edge, and a line gap under 1.3× the line height. Text cues only break ties.
-  - **Fractions** (`source=OCR`):
-    - `%`, `Y2`, `V2` or `Vz` next to a number becomes ½.
-    - `O` inside a number becomes `0`, and `l` becomes `1`.
-    - "N1/2" patterns that give implausible amounts (more than 4 cups or 6 tbsp) are re-read as "N ½" and lower the confidence.
-  - OCR quantities are flagged "check" on the review screen. Low-confidence lines go to Claude with a downscaled page image.
-- **Saving:** title and servings are suggested from "Serves/Makes". `source: PHOTO`. Only the text is kept.
+  - **Columns:** found by x-range overlap, sorted top to bottom within each column, then read left to right.
+  - **Wrapped lines:** joined using the indent and a line gap under 1.3× the line height.
+  - **Fraction fixes:**
+    - `%`, `Y2`, `V2` and `Vz` next to a number become ½.
+    - Inside numbers, `O` becomes 0 and `l` becomes 1.
+    - An implausible "N1/2" becomes "N ½" with lower confidence.
+  - OCR quantities are flagged "check". Low-confidence lines go to Claude with the image.
 
 ### 3.10 Meal planner (v1.1)
-- **Library:** every imported `Recipe` is saved. There's search, favourites, and filters for "on list" and "planned". Deleting a recipe that's on the list or planned asks first, then turns its contributions into manual ones (FK RESTRICT plus a confirm).
-- **Week view:** 7 days, each with optional Breakfast, Lunch, Dinner and Other slots. You add from the library, or from the review screen with "Plan for…". Each `PlannedMeal` has its own servings.
+- **Library:** every imported recipe is saved, with search and favourites.
+  - **Deleting a recipe that's in use:** the app confirms first, then turns its contributions into manual ones. `PlannedMeal` uses FK RESTRICT.
+- **Week view:**
+  - Slots: Breakfast, Lunch, Dinner and Other.
+  - Each meal has its own servings.
+  - "Plan for…" on the review screen.
 - **"Shop for this week":**
-  - Opens one combined review of every meal not yet added. Rows show which meals need each item ("Onion — 3 · Mon, Wed").
-  - Confirming creates one `RecipeUse` for each meal. Each use keeps its own decisions.
-- **Removing a planned meal** removes only that use's contributions. A recipe planned twice counts twice, and moving a meal to another day changes nothing.
-- **Other:** "on list" and "shopped" are worked out from the uses, not stored as flags. Copy last week, clear a week.
+  - One combined review screen, with rows like "Onion — 3 · Mon, Wed".
+  - Confirming creates one `RecipeUse` per meal.
+  - "I have some" is subtracted across those meals, earliest first.
+- **Rules:**
+  - Removing a meal removes only its use.
+  - A recipe planned twice counts twice.
+  - Moving a meal to another day changes nothing.
+  - "On list" and "shopped" are derived from the meal's use, not stored.
 
 ## 4. Data model (Room, `:data`)
 
 **MVP schema (v1):**
-- `Item(id AUTOINCREMENT, mergeKey UNIQUE, catalogId?, normName, displayName, aisleCode, position, rev, lastWriter?, updatedAt)`
-- `RecipeUse(id, recipeId FK SET NULL nullable, kind: RECIPE|MANUAL, servings, addedAt)`: one row each time something is added to the list.
-- `Contribution(id, itemId FK CASCADE, useId FK CASCADE, qtyBase)`
-- `Purchase(id, itemId FK CASCADE, qtyBase, at, source: PHONE|WATCH)`
-- `ItemHave(id, itemId FK CASCADE, useId FK CASCADE, qtyBase)`
-- `LineDecision(useId FK CASCADE, recipeLineId, status: ADDED|IN_STOCK|PARTIAL|EXCLUDED)`
-- `ManualAdjustment(itemId, kind: DELTA|OVERRIDE, qty, baselineSum?)`
+- `Meta(id=1, listEpoch, listRev, catalogVersion, epochMarker)`
+- `Item(id AUTOINCREMENT, mergeKey UNIQUE, catalogId?, normName, displayName, aisleCode, position, rev, deletedAt?, updatedAt)`
+- `ItemAlias(oldId PK, newId)`
+- `RecipeUse(id, recipeId FK RESTRICT nullable, kind: RECIPE|MANUAL, servings, addedAt, archivedAt?)`, with CHECK (kind='MANUAL' OR recipeId NOT NULL)
+- `Contribution(id, useId FK CASCADE, recipeLineId FK nullable, itemId FK CASCADE, qtyBase?, noScale, createdListRev, coveredBy FK→Tick SET NULL)`
+- `Tick(id, itemId FK CASCADE, at, source: PHONE|WATCH, installId?, seq?)`
+- `LineDecision(useId FK CASCADE, recipeLineId FK CASCADE, status: ADDED|IN_STOCK|PARTIAL|EXCLUDED, PK(useId, recipeLineId))`
 - `Recipe(id, url, title, servingsOriginal, unitLocale, importedAt, source: WEB|MANUAL, parsedBy: RULES|CLAUDE, claudePending)`
-- `RecipeLine(id, recipeId FK CASCADE, section, raw, parsedJson)`
+- `RecipeLine(id, recipeId FK CASCADE, section, raw, parsedJson)`. Lines are immutable; importing again creates a new `Recipe`.
 - `ImportJob(id, state, inputRefs, resultJson, error, createdAt)`
 - `Aisle(code PK, name, hidden, defaultOrder)`, `StoreProfile(id, name)`, `AisleOrder(storeId, aisleCode, position)`
-- `CategoryOverride(key, aisleCode)`, `Staple(key, source: SEED|USER)`, `StockStat(key, history bits, lastSeenAt, suppressedUntilReview?)`, `PackOverride(key, packSizes)`. Here `key` means `mergeKey`.
-- `ClaudeUsage(date, model, inputTokens, outputTokens, cacheWrite, cacheRead)` (added with Run 3, migration v2)
-- `DeletedItem(id, deletedAt)` (7 days), `WatchInstall(installId, lastSeq, clockOffsetMs)`
-- **Meta (DataStore):** `listEpoch`, `listRev`, `catalogVersion`, `activeStoreId`
+- `CategoryOverride(key PK, aisleCode, source)`, `Staple(key PK, source: SEED|USER)`
+- `StockStat(key PK, historyBits, lastSeenAt, suppressedUntilReview?)`, `StockStatDelta(useId, key, before)` (lets Undo roll back stock learning)
+- `PackOverride(key PK, packSizes, confirmed)`. Throughout, `key` means the item's `mergeKey`.
+- `DeletedItem(id, deletedAt)` (7 days)
+- `WatchInstall(installId PK, lastSeq, clockOffsetMs)`, `WatchOpResult(installId, seq, result, PK(installId, seq))` (the last 64 per install)
 
-**v1.1 additions:**
-- `Recipe.source` gains `INSTAGRAM|PHOTO`, plus `favourite`.
-- `PlannedMeal(id, date, slot, recipeId FK RESTRICT, servings, useId?)`
-- `TickEvent(…)` (§3.4), and `AisleOrder.pinned`.
-- `UserCorrection(rawPattern, parsedJson)`
+**Added later:**
+- **Run 3:** `ClaudeUsage(date, model, inputTokens, outputTokens, cacheWrite, cacheRead)` (schema v2).
+- **v1.1:**
+  - `Recipe.source` gains `INSTAGRAM` and `PHOTO`, and `Recipe` gains `favourite`.
+  - `PlannedMeal(id, date, slot, recipeId FK RESTRICT, servings, useId?)`, `TickEvent`, `AisleOrder.pinned`, `UserCorrection`.
 
-**Migrations:** the schema is exported to `android/data/schemas/`. `MigrationTestHelper` tests start from v2.
+**Schema exports and migrations:** schemas are exported to `android/data/schemas/`. `MigrationTestHelper` tests start from v2.
 
-## 5. Repo layout and project constants
+## 5. Repo layout and constants
 
 ```
-android/      :app, :core (pure JVM: model, catalog, parser, merge, sync codec — packages, not modules),
-              :data (Room + repository), :extract (fetch + extractors), :claude (Run 3), :media (v1.1)
-garmin/       Connect IQ project (manifest, source/, resources/, test/), README with device table
-catalog/      ingredients.csv, synonyms.csv, SOURCES.md, REVIEW.md (generated)
-testdata/     ingredients/ (golden, frozen), pages/ (trimmed fragments + synthetic HTML),
-              sync/ (shared protocol test vectors), claude/ (recorded: synthetic|live), ocr/, video/ (v1.1)
-tools/        verify.sh, eval-claude/, fetch-live-check/, contact-sheet (screenshots → one image)
-docs/         decisions/ (ADRs), HANDOFF.md, KNOWN_ISSUES.md, parser-spec.md, screenshots/
-.github/workflows/, .claude/ (SessionStart hook)
+android/      :app, :core, :data, :extract, :claude (Run 3), :media (v1.1)
+garmin/       Connect IQ project (manifest, source/, resources/, test/), README (fr245 facts)
+catalog/      ingredients.csv, synonyms.csv, SOURCES.md, REVIEW.md (generated), LICENSE-NYT, NOTICE-NYT
+testdata/     ingredients/ (golden: frozen.json, CHECKSUM, CHANGES.md, info set, synthetic-uk.json),
+              pages/ (trimmed fragments + SOURCES.md, synthetic/, hostile/), sync/ (protocol vectors),
+              claude/ (synthetic-*, live-*), ocr/, video/ (v1.1)
+tools/        verify.sh, pick-golden (seeded), nyt-to-golden, contact-sheet, eval-claude/, fetch-live-check/
+docs/         decisions/ (ADRs), HANDOFF.md, KNOWN_ISSUES.md, parser-spec.md, screenshots/ (contact sheet only)
+.github/workflows/, .claude/ (settings.json + hooks/session-start.sh)
 PROGRESS.md
 ```
 
 | Constant | Value |
 |---|---|
-| Android app ID | `com.robert4lyf.hypershop` |
-| Watch app UUID | generated in 0.4; separate UUIDs for beta and release, set as Android build flavours |
-| Versioning | `versionCode` = CI run number, or `git rev-list --count HEAD` when built locally; `versionName` from the git tag, or `0.0.0-dev` |
-| Signing | the debug keystore is committed; the release keystore and the Connect IQ developer key are CI secrets **[YOU]**; a throwaway developer key is generated in the container for compiling only |
+| App ID | `com.robert4lyf.hypershop` |
+| Watch app UUID | generated in 0.3 and stored in `gradle.properties` and `garmin/manifest.xml` |
+| versionCode | `git rev-list --count HEAD` (via `providers.exec`; CI uses `fetch-depth: 0`) |
+| versionName | `git describe --tags --always`, falling back to `0.0.0-dev` |
+| Signing | the committed debug keystore only (personal use) |
+| Developer key | generated locally with openssl, git-ignored, CI secret optional |
 
 ## 6. Build plan
 
-### Three runs, not one
-A single run can't build the whole MVP reliably:
-- **The watch app can't be compiled in the container.** The Connect IQ SDK downloads fine, but `monkeyc -d <device>` needs device files, which require a Garmin login. The simulator also needs graphics libraries this container doesn't have.
-- **Claude can't be tested honestly without your key.**
-- **The work is too big for one agent session.** It would fill several context windows.
-
-| Run | Delivers | Needs from you before it starts |
+### Three runs
+| Run | Delivers | Needs from you first |
 |---|---|---|
-| **Run 1** | Steps 0–4: phone app, parser, merge, review screen, list, sync codec in Kotlin | nothing |
-| **Run 2** | Steps 5–6: watch app and phone ↔ watch sync | Hand-off A done, **plus device files** for 2–3 watches (see Step 5.0) |
-| **Run 3** | Step 7: Claude for text | Hand-off B done, **plus an API key** set as `ANTHROPIC_API_KEY` in the environment, with a spend limit |
-| Later | Steps 8–10 (v1.1) | as listed per step |
+| **Run 1** | Steps 0–4: phone app, parser, merge, review, list, sync codec | nothing |
+| **Run 2** | Steps 5–6: Forerunner 245 app and sync | Hand-off A done, plus the **`fr245` device folder** from your PC's SDK Manager (`~/.Garmin/ConnectIQ/Devices/fr245`), uploaded as a private release asset or via a URL in the environment, never committed |
+| **Run 3** | Step 7: Claude for text | Hand-off B done, plus `ANTHROPIC_API_KEY` set in the environment (a dedicated key with a spend limit) |
+| Later | Steps 8–10 (v1.1) | per step |
 
 ### Rules for the agent
-1. **On start:** read `PROGRESS.md` and resume at the first unchecked item in **this run's** steps. Never redo checked items, and never start the next run's steps.
-2. **Each sub-step:** implement it, run its check, then commit, updating `PROGRESS.md` in the same commit. Mark it `[x]`, `[~] stubbed` or `[!] blocked`, with the SHA, a note and the check command.
-3. **Gates run locally:** `tools/verify.sh` must pass in the container. CI is best-effort; check its status via the API where possible.
-4. **Branches:** work only on the session branch. Don't create other branches and don't merge. At the end of the run, open one PR if a base branch exists; otherwise note "create `main` and merge" in `HANDOFF.md`.
-5. **Versions:** never upgrade the frozen versions mid-run. A problem goes in `KNOWN_ISSUES.md` with a workaround.
-6. **Golden data and fixtures:** never edit to make a test pass. A real label error needs its own commit with a reason.
-7. **Context running low:** commit, update `PROGRESS.md` and `HANDOFF.md`, and stop cleanly.
-8. **Stop** at the end of the run's steps. No gold-plating.
+1. **On start:** read `PROGRESS.md` and resume at the first unchecked item **of this run**. Never redo checked items, and never start the next run.
+2. **Each sub-step:** implement it, check it, then commit with the subject `[<step id>] …`, updating `PROGRESS.md` in the same commit (`[x]`, `[~] stubbed` or `[!] blocked`, plus a note and the check command). Find SHAs with `git log --grep`.
+3. **Gates run locally:** `tools/verify.sh` must pass in the container. CI is best-effort.
+4. **Branches:** work only on the session branch. Never create branches and never merge. At the end of each run, open a PR if `main` exists; otherwise note the PR in `HANDOFF.md`.
+5. **Versions are frozen** (§2). Problems go in `KNOWN_ISSUES.md`.
+6. **Golden data:**
+   - Never edit it to make a test pass.
+   - A fix gets its own commit with the subject `golden-fix: …`, touches nothing under `android/`, updates `CHECKSUM`, and adds an entry to `CHANGES.md`.
+   - At most 3 fixes per run, all listed in the hand-off.
+7. **Running low on context:** commit, update `PROGRESS.md` and `HANDOFF.md`, and stop cleanly.
+8. **Stop** at the end of the run. No gold-plating.
 
 ### Things only you can provide
 | Item | When |
 |---|---|
-| Install the APK (nightly release link) on an Android phone | Hand-offs A, B, C |
-| Check the screenshot contact sheet, `catalog/REVIEW.md`, and 20 golden lines | Hand-off A |
-| Create a `main` branch and merge each run's PR | After each run |
-| Device files for 2–3 watches (SDK Manager on your PC, then upload as a private release asset or a URL in the environment; never commit them) | Before Run 2 |
-| Garmin watch + Garmin Connect app; sideload the `.prg` | Hand-off B |
-| Release keystore + Connect IQ developer key as CI secrets (keep offline backups) | Before any store build |
-| Optional: a PC with a display, to run the simulator and the Monkey C unit tests | Run 2 (optional) |
-| Anthropic API key with a spend limit | Before Run 3 |
-| 10 test reels; 5 photographed cookbook pages | Steps 8, 9.2 |
-| Play Console and Connect IQ Store accounts, privacy policy, Data Safety form | Release |
+| Create `main` and merge each run's PR (do this first at each hand-off) | after each run |
+| Install the APK (from the PR or CI artifact) | Hand-offs A, B, C |
+| Check the contact sheet, `catalog/REVIEW.md` and the 20 held-out golden lines | Hand-off A |
+| The `fr245` device folder | before Run 2 |
+| Sideload the `.prg` to the Forerunner 245 (USB → `GARMIN/APPS`) | Hand-off B |
+| Optional: run the simulator and the Monkey C unit tests on your PC | Run 2 |
+| Anthropic API key | before Run 3 |
+| 10 reels; 5 cookbook pages | Steps 8, 9.2 |
 
 ---
 
 ## Run 1
 
 ### Step 0 — Toolchain and scaffolding
-- **0.1** Add `.gitignore`, `README.md`, `LICENSE`, `PROGRESS.md` (the checklist for every step), `docs/HANDOFF.md` and `docs/KNOWN_ISSUES.md`.
-- **0.2** Install the Android tools with `cmdline-tools` plus `yes | sdkmanager --licenses`, pinning `platforms;android-36`, `build-tools;36.0.0` and `platform-tools`. Add an **idempotent** SessionStart hook that skips anything already installed and doesn't download the Connect IQ SDK.
-  - **Check:** `sdkmanager --list_installed`.
-- **0.3** Set up the Gradle project and modules (§5), `gradle.properties` (§2) and the debug keystore.
-- **0.4** Write the version catalog (§2). Add one "hello" test of each kind: JUnit5, kotest-property, Robolectric `sdk=36` Compose with a semantics assertion, a Roborazzi recording, and Hilt. **Freeze the versions.**
-- **0.5** ktlint and detekt plugins, `tools/verify.sh` (all tests, lint, `assembleDebug`, and the CAMERA manifest check from v1.1), and the CI workflow with the artifact and nightly release.
-- **Check:** a cold `tools/verify.sh` passes in the container.
+- **0.1** Add `.gitignore`, `README.md`, `PROGRESS.md` (Run 1 items only, about 50 lines), `docs/HANDOFF.md` and `docs/KNOWN_ISSUES.md`.
+- **0.2** Android SDK:
+  - Download `cmdline-tools` and run `yes | sdkmanager --licenses`.
+  - Install the §2 packages to `$HOME/android-sdk`.
+  - Write a git-ignored `local.properties`.
+  - **SessionStart hook** in `.claude/settings.json`, `matcher: "startup"`, running `.claude/hooks/session-start.sh`. The script:
+    - runs only when `CLAUDE_CODE_REMOTE` is set;
+    - is idempotent, and survives network failure;
+    - exports `ANDROID_HOME` via `$CLAUDE_ENV_FILE`;
+    - does **not** download the Connect IQ SDK.
+  - **Check:** `java -version`, `echo $ANDROID_HOME`, and `sdkmanager --list_installed`.
+- **0.3** Gradle project and modules (§2), `gradle.properties`, the debug keystore, and the watch UUID.
+- **0.4** Version catalog (§2), plus one hello test for each of: JUnit5, kotest-property, a Robolectric `sdk=36` Compose test with a semantics assertion, a Roborazzi recording (`@GraphicsMode(NATIVE)`, `roborazzi.test.record=true`), and Hilt.
+- **0.5** ktlint plugin, and detekt with the Kotlin force.
+- **0.6** `tools/verify.sh`:
+  - lint, then all tests;
+  - `assembleDebug`, then lint the merged manifest: no `CAMERA`, and only the launcher and share activity exported;
+  - the `sk-ant-` scan;
+  - the golden `CHECKSUM` check.
 
-### Step 1 — Golden data first, then the core model
-- **1.1** `docs/parser-spec.md`, covering the output format and every §3.2 rule.
-- **1.2** **Golden lines, frozen before any parser code:**
-  - 60 lines taken from the NYT snapshot. Each label is reconciled to the spec, and every change from NYT's label is written down with its reason.
-  - About 300 more NYT lines with their original labels, for information only.
-  - Commit them on their own, and store a checksum in `verify.sh`.
-- **1.3** Model, in the `:core` model package:
-  - `Rational`, `Dimension`, and `Unit` with locale factors.
-  - `QtyBase`, a quantity per dimension.
+  Then the CI workflow: tests, plus the APK artifact. If pushing the workflow is refused, mark it `[!]`.
+- **Check:** a cold `tools/verify.sh` passes.
+
+### Step 1 — Spec, enums and golden data (before any parser code)
+- **1.1** `docs/parser-spec.md`:
+  - Numbered rules from §3.2, plus the golden JSON schema. `name` is a normalised string; there are no catalogue IDs.
+  - The `QtyUnit` list (§3.2).
+  - The `AisleCode` enum (codes and default order).
+  - A mapping from NYT labels to the spec: NYT keeps identity words in its `comment` field, treats "salt and pepper" as one item, uses qty 0 for "no quantity", and has noisy unit plurals.
+- **1.2** Golden data:
+  - **Frozen set:** `tools/pick-golden` with a committed seed selects **80** NYT lines, stratified as 25 simple, 20 with a comment or parentheses, 15 fractions or ranges, and 20 with no quantity or "to taste".
+    - `tools/nyt-to-golden` converts the NYT labels by script.
+    - Every manual change cites a spec rule number.
+    - **20 of the 80 are held out** for you to check at Hand-off A.
+  - **UK set:** add 25 hand-written UK and metric lines (`synthetic-uk.json`), covering T/t, pints, "plain flour", tins and "x 400g".
+  - **Info set:** about 300 NYT lines.
+  - **Freeze:** commit all of this on its own, with `CHECKSUM` and `CHANGES.md`.
+- **1.3** Model in `:core`:
+  - `Rational`, `Dimension`, `QtyUnit` with locale factors, and `QtyBase` (per dimension, plus presence).
+  - The `AisleCode` enum.
   - `ParsedIngredient` and `RecipeImport`.
-  - The `need` formula and the NEED/PARTIAL/DONE states.
-  - Record this in ADR 002.
-- **1.4** Catalogue:
-  - **CSV columns:** `id, name, plural, synonyms, aisleCode, staple, shoppingUnit, displayPolicy, gramsPerCup, packSizes, src`.
-  - **Contents:** about 400 rows, with packs for about 40 of them.
-  - **Tooling:** a Gradle validation task, a generated resource file plus a lazy loader, `SOURCES.md`, and the `REVIEW.md` generator.
-- **1.5** Sync codec in the `:core` sync package:
-  - The message types (§3.6 v1, `ts` included).
-  - A list/map codec, a size estimator, and the snapshot builder with the truncation order and `leftByAisle` / `hiddenCount`.
-  - The op-apply rules as a **pure function**.
-  - Shared vectors in `testdata/sync/*.json`.
+  - The covered/DONE rules (ADR 002).
+- **1.4a** `tools/` script that builds the NYT top-400 normalised names. It merges plural duplicates and "kosher salt"→"salt", and splits compound names.
+- **1.4b** Catalogue CSV with columns `id, name, plural, synonyms, aisleCode, staple, shoppingUnit, displayPolicy, gramsPerCup, packSizes, src`. Agent-written columns are tagged.
+- **1.4c** A Gradle validator, a generated resource file plus a lazy loader, `SOURCES.md`, the NYT LICENSE/NOTICE files, and the `REVIEW.md` generator.
+- **1.5a** Sync codec:
+  - The envelope, ops and snapshot formats (§3.6).
+  - A size estimator.
+  - A snapshot builder with ack reservation and the truncation order.
+- **1.5b** Pure protocol rules:
+  - **Phone side:** epoch check, contiguous seq, alias resolution, cover by `seenListRev`, the untick decision table, re-acking duplicates.
+  - **Watch side:** outbox model (seq assigned on first send, collapsing only unsent ops while keeping the earliest seq), go-back-N resend, ignoring older snapshots, re-applying pending ops.
+  - Write the vectors to `testdata/sync/*.json`.
+  - **Also port the model checker** (`tools/sync-model`) and run it in `verify.sh` with small bounds.
 - **Check:**
-  - Tests for `Rational`, units and the catalogue checks.
-  - Codec round-trips and the size cap.
-  - Every sync vector, covering: tick → ack → untick; a stale tick → partial; deleted → rejected; a new `installId`; an epoch change; collapsing only unsent ops; truncation counts.
+  - Unit tests for `Rational`, units and the catalogue validator.
+  - Codec round-trip and the size cap.
+  - **All sync vectors pass:**
+    - acks: a lost ack followed by a resend; tick → ack → untick; a duplicate after the ack;
+    - sequence: a seq gap or reordered ops; collapsing without leaving a gap;
+    - epoch: an epoch mismatch; a restore with the same epoch caught by the marker;
+    - covering: a stale tick that becomes `partial`; a "need decreased" tick that becomes `noop`; a tick made on both phone and watch;
+    - lifecycle: an op on a merged id redirected by `ItemAlias`; a full outbox; truncation keeping recent DONE items;
+    - snapshots: an older snapshot arriving after a newer one.
+  - The model checker finds 0 violations.
 
 ### Step 2 — Ingredient parser
-- **2.1** Tokeniser.
-- **2.2** Grammar, flags, headers, and/or handling.
-- **2.3** Normaliser, synonyms, `mergeKey`.
-- **2.4** Confidence.
-- **Check:** on the **frozen 60**: name ≥97%, qty ≥98%, unit ≥97%. Report the score on the NYT-labelled set for information only.
+- **2.1** Tokeniser, linear scanning only. It must handle a 10 KB pathological line in under 50 ms.
+- **2.2** Grammar, flags, section headers, "and"/"or" lines.
+- **2.3** Normaliser, synonyms and `mergeKey`.
+- **2.4** Confidence score.
+- **Check:**
+  - **Frozen 60 (not held out):** name ≥95%, qty ≥97%, unit ≥95%.
+  - **UK set:** name ≥90%.
+  - **Info set:** reported for information only.
+  - These are **self-consistency** gates; the 20 held-out lines are the real test.
 
-### Step 3 — Categoriser, merge, packs, preview
+### Step 3 — Categoriser, merge, packs, stock
 - **3.1** Categoriser (§3.4).
-- **3.2** Merger: sums per dimension, density, the `need` formula, display policy, rounding.
-- **3.3** `PackPlanner` (§3.3 rule). Test cases:
-  - 1.1 kg with sizes `1kg|5kg` → 2 × 1 kg
-  - 1.6 kg
-  - packs counted in items
-  - no combination of 4 or fewer packs fits → rounded quantity
-  - a compound quantity → no packs
-  - turning packs off
-- **3.4** Scaling per use, `noScale`, ManualAdjustment with `baselineSum`.
-- **3.5** `Merger.preview`, an insert-only diff that includes haves and decisions.
-- **3.6** Stock learning as a pure function, `StockLearner` (§3.1 rules).
-- **3.7** Catalogue re-resolution migration logic.
+- **3.2a** Contribution building:
+  - Scaling, noScale handling, presence lines.
+  - "I have some" subtracted, earliest line first.
+- **3.2b** Covered and DONE derivation; tick and untick; "Finish shopping".
+- **3.2c** Display policy, rounding, units setting.
+- **3.3** `PackPlanner`, with these cases:
+  - 1.1 kg against packs `1kg|5kg` → 2 × 1 kg.
+  - 1.6 kg.
+  - Count-based packs.
+  - No fit within 4 packs → the rounded amount.
+  - A compound quantity → no packs.
+  - Packs turned off.
+- **3.4** `Merger.preview`, plus the shown-rev check.
+- **3.5** `StockLearner` (§3.1).
+- **3.6** Catalogue re-key and merge logic, with `ItemAlias`.
 - **Check:**
   - **Property tests:**
-    - Adding a recipe use and then removing it gives back the original need.
-    - Purchases are never lost when a recipe is removed or rescaled.
-    - Applying a preview gives the same result as a direct merge.
-    - The preview diff commutes with ticks made while the review is open.
-  - **Must-not-merge pairs** (e.g. red onion and onion).
-  - **StockLearner cases:** passive pre-ticks don't count; 3 of 4 triggers; suppression expires; decay after 60 days.
-  - **Categorising:** at least 90% of the frozen names land in an aisle other than Other.
+    - Adding then removing a use returns the same list.
+    - A tick always makes the item DONE.
+    - A contribution added after a tick is uncovered.
+    - Untick restores the exact state from before the tick.
+    - Apply-preview gives the same result as a direct merge.
+  - **Must-not-merge pairs** stay separate.
+  - **`StockLearner` cases:** passive pre-ticks don't count; 3 of 4 pre-ticks; suppression expires; decay after 60 days.
+  - **Categoriser:** at least 85% of **info-set** names land somewhere other than Other.
 
 ### Step 4 — Android app (phone only)
-- **4.1** `:extract`: the fetcher plus the extractors, with a test for each quirk. About 15 trimmed real fragments plus synthetic HTML. `fetch-live-check` is manual only.
-- **4.2** `:data`:
-  - Schema v1 (§4), with migration 1 seeding the aisles, the store and the staples.
-  - `ListRepository`, which:
-    - applies previews
-    - records ticks as `Purchase` rows
-    - removes or rescales uses
-    - handles overrides
-    - handles "Clear ticked"
-    - handles export/import, giving new IDs and a new epoch
-    - runs the catalogue re-resolution
-  - Every change bumps `rev` and `listRev`.
-  - **Acceptance tests** for each of these.
+- **4.1** `:extract`:
+  - Safe fetch (§3.1), with MockWebServer tests for these: a redirect to a private IP, `file:`, a literal IP, non-443 ports, a non-HTML response, a gzip bomb.
+  - Extractors, with a test for each quirk.
+  - **Fixtures:**
+    - The agent fetches about 15 pages **once**: BBC Good Food, NYT Cooking, a WPRM blog, a Tasty blog, a Yoast `@graph` site, a microdata site, and others.
+    - Each page is trimmed to its structured block and recorded in `testdata/pages/SOURCES.md` as `src=live-YYYY-MM-DD`.
+    - A blocked site gets a synthetic page instead.
+    - `hostile/` holds a 10k-deep array, a 50k-entry ingredient list and an oversized script.
+- **4.2a** `:data` schema v1 (§4), with `Callback.onCreate` seeding aisles, store and staples, plus the `Meta` and epoch marker.
+- **4.2b** Repository: apply the preview; tick and untick; manual adds; edit quantity.
+- **4.2c** Repository: remove a use or Undo an import (including the `StockStatDelta` rollback), rescale, "Finish shopping", soft delete with undo.
+- **4.2d** Repository: export and import (validation, preview, automatic pre-export, new ids and epoch); catalogue re-key; applying watch ops in a single transaction.
+- **Check (4.2):** an acceptance test for each path. Import followed by Undo must leave the database equal apart from revs.
 - **4.3** App shell:
-  - Hilt, `hilt-work` wiring, navigation, theme, edge-to-edge and predictive back.
-  - `ClaudeExtractor` interface with a `Noop` implementation.
-  - `WatchLink` interface with a fake.
-  - The import worker as a plain OneTimeWorkRequest. Robolectric tests run it at `sdk=26` and `sdk=36` with `WorkManagerTestInitHelper`.
-- **4.4–4.7:** one screen per sub-step. Each has a ViewModel test, a Robolectric Compose test with **semantics assertions** (aisle order, row text, counts), and a recorded Roborazzi snapshot.
-  - **4.4** Review before adding (§3.1). Tests:
-    - In stock stops the item being added.
-    - "I have some" is counted once for each item.
-    - The banner lists the assumed items.
-    - Cancel changes nothing.
-    - A `listRev` change while the screen is open triggers a recompute.
-  - **4.5** List and item detail sheet (§3.5): tick/untick creates and removes purchases, PARTIAL display, swipe/accessibility delete, add by hand, clear, undo, share as text, the "Always put in…" aisle prompt.
-  - **4.6** Recipes: uses, remove from list, "Add the in-stock items now", and the "add again?" prompt for a URL already imported.
-  - **4.7** Settings: aisle order, rename and hide for the single store; staples; stock habits (forget all, or per item); packs on/off; display units; export/import; debug log. The Claude section is a placeholder.
-- **4.8** Text share intent, paste chip, and error states (offline, blocked, not found → "Select lines manually"). Tests use real share payloads.
-- **4.9** Debug "Load sample list" (3 recipes, about 40 items, partial purchases, packs) and "Fake watch". Backup rules (exclude key file).
-- **4.10** `tools/contact-sheet` turns every screenshot into one image in `docs/screenshots/`.
-- **Check:** `verify.sh` is green. The APK is built and on the nightly release (best-effort).
-- **⏸ Hand-off A [YOU]** — a checklist in `HANDOFF.md`, at most 15 yes/no items:
+  - Hilt.
+  - `hilt-work`:
+    - KSP for both `com.google.dagger:hilt-compiler` and `androidx.hilt:hilt-compiler`.
+    - `Application : Configuration.Provider` with `HiltWorkerFactory`.
+    - In the manifest, `InitializationProvider` with `tools:node="merge"` and the `WorkManagerInitializer` meta-data set to `tools:node="remove"`.
+  - Navigation, theme (with dynamic colour turned off in tests), edge-to-edge and predictive back.
+  - A `ClaudeExtractor` Noop and a `WatchLink` fake.
+  - The import worker.
+  - **Worker tests:** `@HiltAndroidTest` + `@Config(application=HiltTestApplication::class, sdk=[34,36])`, with `WorkManagerTestInitHelper` + `SynchronousExecutor`.
+- **4.4–4.8:** one screen per sub-step. Each has a ViewModel test, a Robolectric Compose test with **semantics assertions** (order, text, counts, a single TalkBack node per row, custom actions), and Roborazzi light and dark snapshots, recorded only.
+  - **4.4** Review before adding, default view: a row exposes at most 3 elements; the banner; in stock; Cancel; Undo snackbar; the rev-change recompute.
+  - **4.5** Review row detail sheet: I have some, always in stock, swap, move aisle, edit line.
+  - **4.6a** List: grouping, tick/untick with undo, the half-tick icon, swipe and accessibility delete, Finish shopping, Clear all.
+  - **4.6b** List: the "Add item" field (autocomplete, Enter keeps the keyboard open, multi-line paste, "already on list +1?"). The empty state with sample list. The "ready to review" card. Share as text.
+  - **4.7** Item detail sheet and Recipes tab (remove from list with rollback, "Add the in-stock items now", the "add again?" prompt).
+  - **4.8** Settings, grouped as in §3.5. The Claude section is a placeholder.
+- **4.9** Share intent (text only), the paste chip, error states. Tests use real share payloads from Chrome, Firefox, Samsung Internet, Instagram and YouTube.
+- **4.10** Debug-only (debug source set): "Load sample list", "Fake watch", and the debug log viewer. Backup rules exclude the key file and `TickEvent`.
+- **4.11** `tools/contact-sheet`: `montage`, falling back to Pillow. It puts every Roborazzi PNG into `docs/screenshots/contact-sheet.png`.
+- **Check:** `verify.sh` is green, and `HANDOFF.md` lists the APK path and SHA-256.
+- **⏸ Hand-off A [YOU]** (`HANDOFF.md`, at most 15 yes/no items):
+  - Create `main` and merge the PR.
   - Install the APK.
-  - Share 5 recipes from Chrome, then use the review screen.
-  - Check the contact sheet.
-  - Check `catalog/REVIEW.md`.
-  - Check the 20 golden lines.
-  - Merge the PR into `main`.
+  - Share 5 recipes from Chrome.
+  - Add 5 items by typing.
+  - Look at the contact sheet and `REVIEW.md`.
+  - Check the 20 held-out lines.
 
 ## Run 2
 
-### Step 5 — Garmin watch app
-- **5.0 Prerequisite check:** the device files are available (§6 table). If they aren't, **stop the run here**, and record that in `HANDOFF.md`.
-- **5.1** Download and cache SDK 9.2.0 when this step starts. Generate a throwaway developer key with openssl (RSA 4096, PKCS#8 DER).
-  - **Check:** the SDK's `Comm` sample builds with `monkeyc -d <supplied device>`.
-- **5.2** `manifest.xml`: minApiLevel 3.2, the supplied product IDs, Communications, and the UUID.
-- **5.3** Data layer. Its logic mirrors the Kotlin sync package and is kept **data-driven** so the same vectors apply:
-  - chunked storage
-  - `meta` (epoch, installId)
-  - the outbox (collapsing only unsent ops, keeping the first `ts`)
-  - re-applying pending ops
-  - handling acks with `newRev`
-  - `glanceSummary`
-- **5.4** UI: the aisle list with counts and "+N on phone", a `CheckboxMenu` per aisle (choose again to untick), the "aisle done" prompt, optional auto-advance (off by default), vibration behind `has :vibrate`, sub-labels, the glance, the empty state, "Last synced" and "Update watch app".
-- **5.5** `:debug` build with embedded sample data.
-- **5.6** Monkey C `(:test)` tests that replay `testdata/sync/*.json`. They are compiled in the container (`monkeyc --unit-test`). **Running** them needs the simulator, so that's [YOU] or optional.
-- **Check:**
-  - `monkeyc` builds for every supplied device, with no warnings treated as errors.
-  - The test build compiles.
-  - The memory table is filled in from the device files.
+### Step 5 — Forerunner 245 app
+- **5.0** Prerequisites. If any fails, **stop the run** and write it in `HANDOFF.md`.
+  - The `fr245` device folder is available.
+  - Download and cache SDK 9.2.0, and confirm it compiles for `fr245`. If it doesn't, find the newest SDK that does (from `sdks.json`) and record it in an ADR.
+  - Read `compiler.json` and write `garmin/README.md`: API level, the memory limit for each app type, glance support, `Attention` vibrate, screen size and shape, buttons.
+  - Derive `minApiLevel`, the snapshot size cap and the outbox cap from those numbers.
+- **5.1** Generate a developer key with openssl (RSA 4096, PKCS#8 DER; git-ignored).
+  - **Check:** the SDK `Comm` sample builds for `fr245`.
+- **5.2** `manifest.xml`: `fr245` only, the minApiLevel from 5.0, Communications, and the watch UUID.
+- **5.3** Data layer: a data-driven port of the 1.5b watch rules, with `nextSeq`, the outbox, retry back-off, acks and ignoring older snapshots.
+- **5.4** UI, buttons only:
+  - The aisle list and per-aisle `CheckboxMenu`.
+  - Debounce, and ticked items sinking to the bottom.
+  - The "aisle done" prompt with Next focused.
+  - Vibration, sub-labels, and the "N unsynced", "Last synced" and "Update" screens.
+  - The glance, only if it's supported.
+- **5.5** A `:debug` build with an embedded 60-item, 12-aisle sample.
+- **5.6** Monkey C `(:test)` tests that replay `testdata/sync/*.json`, compiled with `monkeyc --unit-test`. Running them needs the simulator, which is a [YOU] or optional step.
+- **Check:** `monkeyc -d fr245` builds; the test build compiles; the peak memory estimate is within the 5.0 limit.
 
 ### Step 6 — Phone ↔ watch sync
 - **6.1** `WatchSyncImpl`:
-  - Initialise the SDK as `WIRELESS`, or `TETHERED` in debug builds.
-  - Discovery, and re-registering on CONNECTED.
-  - `<queries>`, the init-error prompts, and `openStore`.
-- **6.2** Glue between the protocol and the repository:
-  - Reply to `hello` with a snapshot.
-  - Best-effort push after a 1 s pause.
-  - Apply ops with the pure rules from 1.5.
-  - Ack with result and `newRev`.
-  - Handle `WatchInstall` and clock offset.
-  - Send `resync`.
-- **6.3** Tests against a fake `IQDevice` that replays every `testdata/sync` vector end to end through the repository.
+  - Register in `Application.onCreate`.
+  - `WIRELESS` mode (or `TETHERED` in debug), and re-register on CONNECTED.
+  - Add `<queries>` and the init-error prompts.
+  - Validate all input from the watch.
+- **6.2** Glue code:
+  - Always answer `hello` and op batches.
+  - Build each snapshot for this install.
+  - Apply ops in one transaction, keeping `WatchOpResult`.
+  - Track the clock offset, using `watchNow` from each batch.
+  - Show the "Apply old ticks?" prompt.
+  - Send `resync` on connect.
+- **6.3** A fake `IQDevice` replays every sync vector, end to end through the repository.
 - **Check:** `verify.sh` is green.
 - **⏸ Hand-off B [YOU]:**
-  - Sideload the `.prg`, install the APK, import a recipe, and open the watch app. The list should appear within 10 s.
-  - Tick an item while out of range, add a recipe on the phone that also needs that item, then reconnect. The watch should show "need N more".
-  - Undo a tick, and check the glance.
+  - Sideload the app and install the APK.
+  - Import a recipe and open the watch app. The list should appear within 10 s.
+  - Tick 3 items using buttons only.
+  - Go out of range, tick 2 more, add a recipe on the phone that also uses one of them, then reconnect. You should see "1 more".
+  - Undo from the aisle prompt.
+  - Test a 60-item sample for memory and speed.
 
 ## Run 3
 
 ### Step 7 — Claude for text
-- **7.1** ADR 001: OkHttp + kotlinx.serialization (no SDK).
-- **7.2** Key storage (Keystore AES-GCM, recovery from "can't decrypt"). Settings: mode, key, "Test key", model, cost counter, spend cap, privacy dialog. Room migration to v2 (`ClaudeUsage`).
-- **7.3** Request builder (§3.7): the fallbacks rule per model, explicit effort, the strict schema, untrusted-content wrapping, the input cap.
-- **7.4** Response handling: `stop_reason`, validation, error mapping, usage, redaction.
-- **7.5** Wiring: Fallback mode for lines below `CONFIDENCE_THRESHOLD` (or the whole page if extraction failed), "Claude pending" with retry, badges, caching results in `RecipeLine`.
-- **7.6** **Live smoke test** with your key: one call per model. Record the real responses as `testdata/claude/live-*.json`. Synthetic fixtures are named `synthetic-*`.
-  - `tools/eval-claude` runs the rule parser against each model on the frozen 60 plus 15 pages, reporting accuracy, cost and `output_tokens`, and suggests `CONFIDENCE_THRESHOLD` and a default model.
-- **Check:** MockWebServer tests cover every `stop_reason` and error path. The live smoke test passes. The eval report is committed.
-- **⏸ Hand-off C [YOU]:** using the eval report, choose the default model and mode. Try 5 hard recipes.
+- **7.1** ADR 001: use OkHttp + kotlinx.serialization (no SDK).
+- **7.2** Key storage and its failure modes (§3.7). Settings for the key, model, caps, cost and privacy note. Migration to schema v2 (`ClaudeUsage`).
+- **7.3** Request builder: the per-model fallbacks rule, effort, schema, untrusted-content wrapping and the input cap.
+- **7.4** Response handling (`stop_reason`, validation, errors, usage, redaction).
+- **7.5** Wiring:
+  - Claude is called **only from the review screen while it's in the foreground**.
+  - Fallback mode below the confidence threshold.
+  - "Claude pending" + Retry.
+  - Badges, and caching results in `RecipeLine`.
+- **7.6** **Live smoke test** with your key: one call per model.
+  - Redact the real responses and save them as `testdata/claude/live-*.json`.
+  - `tools/eval-claude` compares the rule parser with each model on the frozen 80 + UK 25 + 15 pages, reporting accuracy, cost and `output_tokens`. It suggests `CONFIDENCE_THRESHOLD` and a default model.
+- **Check:** MockWebServer tests cover every `stop_reason` and error; the live smoke test passes; the eval report is committed.
+- **⏸ Hand-off C [YOU]:** choose the default model and mode from the eval report, then try 5 hard recipes.
 
 **— End of MVP. —**
 
 ## Later (v1.1)
 
 ### Step 8 — Instagram and media
-- **8.1** Verify the oEmbed claim (ADR 003). Then build the `og:` fallback.
-- **8.2** Caption routing.
-- **8.3** Add the `:media` module and dependencies (ML Kit bundled, Photo Picker, image and video share intents). "Add media" screen with the how-to.
-- **8.4** OCR screenshots, using the §3.9 post-processing.
-- **8.5** Video frame sampling with OCR, and image blocks for Claude. Show the cost estimate.
+- **8.1** Check the oEmbed claim (ADR 003), then add the `og:` fallback.
+- **8.2** Caption routing (§3.8).
+- **8.3** `:media` module: ML Kit (bundled), Photo Picker, image and video share intents, and the "Add media" screen.
+- **8.4** OCR for screenshots, with the §3.9 post-processing.
+- **8.5** Video sampling, OCR and Claude image blocks, with a cost estimate first.
 - **8.6** Transcript experiment (ADR 004).
-- **8.7** Delete temporary media after import. Update the privacy dialog.
+- **8.7** Delete temporary media after use.
 - **Check:** unit tests for routing, the sampler and the OCR text merge.
-- **[YOU]:** test the 10 reels.
+- **[YOU]:** 10 reels.
 
 ### Step 9 — Smart shopping
-- **9.1** Multiple store profiles in the UI, the "Shopping at" chip, `TickEvent` (migration), and `AisleOrderLearner`: pairwise ordering and trip filters (§3.4). Suggestion card, pinned aisles, "Sort like my last trip".
-  - **Check:** tests on made-up trip logs: trips ticked at home are rejected, trips just after an auto-prompt are ignored, trips that only follow the displayed order are ignored, skipped aisles are handled, pinned aisles are respected.
-- **9.2** Cookbook photos (§3.9): FileProvider, OCR line list, column clustering, joining wrapped lines, fixing fractions.
-  - **Check:** at least 15 recorded OCR outputs, covering two columns, lines with no quantities, and fraction misreads.
-  - **[YOU]:** scan 5 pages.
-- **9.3** Meal planner (§3.10): migration (`PlannedMeal`, `Recipe.favourite`), library, week view, "Plan for…", combined review.
-  - **Check:** repository tests (planned twice, removing a meal, deleting a recipe that's in use asks first, moving a meal changes nothing). Migration test from v2.
-- **9.4** Personal corrections map. AU tablespoons.
+- **9.1** Store profiles UI, the "Shopping at" chip, `TickEvent`, `AisleOrderLearner`, "Sort like my last trip".
+  - **Check:** made-up trips (home-ticked, after a prompt, following the displayed order, skipped aisles, pinned aisles).
+- **9.2** Cookbook photos (§3.9).
+  - **Check:** at least 15 recorded OCR outputs.
+  - **[YOU]:** 5 pages.
+- **9.3** Meal planner (§3.10): migration, library, week view, combined review.
+  - **Check:** repository tests and the migration test.
+- **9.4** Corrections map; the Australian tablespoon.
 
 ### Step 10 — Polish
-- **10.1** Icons, an accessibility pass, font scaling.
-- **10.2** JVM benchmark (parsing and merging 20 recipes in under 200 ms). A list of 200 items.
-- **10.3** Shopping-mode foreground service. A watch `CustomMenu` prototype.
-- **10.4** Visible WebView fallback sheet (§3.1).
-- **Release checklist [YOU]:**
-  - Privacy policy and Data Safety: content is shared with Anthropic at your request, and the key stays on the device.
-  - Store listings, with no third-party logos.
-  - Play internal testing, and the Connect IQ beta (separate UUID, several days for review).
+- **10.1** Icons, plus a further accessibility pass.
+- **10.2** Benchmarks: parse and merge 20 recipes in under 200 ms; a 200-item list.
+- **10.3** Visible WebView fallback (with the safe-fetch address filter, `allowContentAccess=false`, no JavaScript bridges).
+- **10.4** Watch `CustomMenu` prototype; a "Shopping mode" foreground service, if needed.
 
 ### Exit criteria for each run
-- Every item in the run is `[x]` or `[~]`/`[!]` with a reason.
-- `tools/verify.sh` is green locally.
-- `HANDOFF.md` has the hand-off checklist and the next run's prerequisites.
-- `KNOWN_ISSUES.md` lists every shortcut.
+- Every item is either `[x]` or `[~]`/`[!]` with a reason.
+- `verify.sh` is green locally.
+- `HANDOFF.md` has the checklist and the next run's prerequisites.
+- `KNOWN_ISSUES.md` is up to date.
 
 ## 7. Risks
-- **Agent grading its own work.** Mitigations: golden data is frozen first; changes to labels are recorded; screenshots are recorded but not gated; real Claude responses are recorded in Run 3; you review the contact sheet and the catalogue.
-- **Catalogue and pack sizes are agent estimates.** They're tagged `src=agent-estimate`, you review them in REVIEW.md, and you can override them.
-- **Sync edge cases.** The shared vectors are tested in Kotlin and replayed in Monkey C, but they only run on real devices or the simulator at Hand-off B.
-- **Device files need a Garmin login.** Without them, Run 2 can't start (Step 5.0).
-- **Blocked recipe sites.** "Select lines manually" until the WebView fallback arrives (v1.1).
-- **Your own API key and cost.** Opus is the default, which costs the most. Mitigations: an estimate before sending, a spend cap, and Hand-off C picks the default. A backend proxy for other users is v2.
-- **Instagram and Meta's terms may change.** Video quantities will often be estimates.
-- **Speech recognition:** unavailable on API 26–32, and some phone makers' recognisers send audio to servers.
-- **Stock learning can hide something you need.** Mitigations: only explicit taps count, the banner lists assumed items, rows stay visible, and learning decays.
-- **Learned aisle order can be wrong.** Mitigations: trip filters, pairwise ordering, only suggestions, pinned aisles.
-- **Watch memory:** CheckboxMenu size, the 500-op outbox and the glance. Measured in Step 5.
-- **Clocks:** aisle learning uses UTC timestamps from one device per trip, corrected by the offset sent in `hello`.
-- **Out of scope:** iPhone, and shared lists (v2; "Share as text" for now).
-- **Copyright:** fixtures are trimmed to structured data only; golden lines come from Apache-2.0 data.
+- **The agent grading its own work.** Mitigations:
+  - The golden set is picked by script and frozen with a checksum, with 20 lines held out for you.
+  - Screenshots are recorded but never gated.
+  - Live Claude responses in Run 3.
+  - You review the contact sheet and the catalogue.
+- **The Forerunner 245 may be limited:** an older API level, little memory, possibly no glance, and possibly dropped from SDK 9.x. Step 5.0 measures this before any code is written; the fallbacks are an older SDK and a smaller snapshot.
+- **The sync design has been checked by a model checker,** but only on small bounds. The real devices are tested at Hand-off B.
+- **Agent-estimated catalogue and pack sizes.** They're tagged, shown muted until you confirm them, can be overridden, and are in REVIEW.md.
+- **Blocked recipe sites** fall back to "Select lines manually" until the v1.1 WebView.
+- **Claude cost:** Opus is the default and costs the most. Mitigations: estimates, a monthly cap and a daily call cap. Hand-off C chooses the default.
+- **Instagram and Meta's terms** may change, and video quantities are often estimates.
+- **Stock learning hiding something you need.** Mitigations: only explicit taps count, the banner, rows stay visible, decay, Undo.
+- **Learned aisle order** may be wrong. It only suggests changes, and pinned aisles never move.
+- **Copyright:** fixtures are trimmed to structured data; the golden lines come from the Apache-2.0 NYT dataset.
 
 ## 8. Later ideas (v2+)
-- Shared lists via a sync backend, and a backend proxy for Claude.
-- Full pantry tracking (stock levels, expiry dates).
-- Wear OS tile and home-screen widget.
+- Shared lists via a sync backend.
+- Pantry tracking (stock levels, expiry dates).
+- Home-screen widget.
 - whisper.cpp transcripts.
 - Claude-assisted substitutions.
