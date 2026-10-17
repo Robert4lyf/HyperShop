@@ -21,7 +21,7 @@ import kotlin.math.abs
  * Step 4.6 (tools/eval-claude): Claude Haiku 5.5, Sonnet 5.5, Opus 5.5 and the
  * rule parser on the frozen 80 golden lines, the 25 UK lines and the page
  * fixtures; per-field accuracy (spec R11), cost and output tokens. Run once:
- * `tools/eval-claude/run.sh` (needs ANTHROPIC_API_KEY; spends about $0.10).
+ * `tools/eval-claude/run.sh` (needs HYPERSHOP_ANTHROPIC_API_KEY; spends about $0.10).
  * Without -Deval=true it is skipped.
  */
 class ClaudeEvalTest {
@@ -81,8 +81,8 @@ class ClaudeEvalTest {
     @Test
     fun eval() {
         assumeTrue(System.getProperty("eval") == "true", "run with tools/eval-claude/run.sh")
-        val key = System.getenv("ANTHROPIC_API_KEY")
-        assumeTrue(!key.isNullOrBlank(), "ANTHROPIC_API_KEY not set")
+        val key = System.getenv("HYPERSHOP_ANTHROPIC_API_KEY")
+        assumeTrue(!key.isNullOrBlank(), "HYPERSHOP_ANTHROPIC_API_KEY not set")
         val gold = load("frozen.json") + load("synthetic-uk.json")
         val client = ClaudeClient(apiKey = { key })
         val rows =

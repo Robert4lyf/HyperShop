@@ -39,13 +39,13 @@ Answer each with yes or no; note anything that's a "no".
 12. [ ] `docs/contact-sheet.png` looks right in light and dark (no clipped text, readable contrast)?
 13. [ ] `catalog/REVIEW.md` — the aisles, staples and pack notes look right for your shop?
 14. [ ] The 20 held-out golden lines (`docs/golden-held-out.md`) are labelled the way you'd read them?
-15. [ ] Eval: **not available** — no key in the Run 1 container, so `docs/reports/eval-claude.md` doesn't exist yet. Run `ANTHROPIC_API_KEY=… tools/eval-claude/run.sh` (and the live smoke test) yourself, or give the next run a key; then confirm Haiku 5.5 stays the default?
+15. [ ] Eval: **not available** — no key in the Run 1 container, so `docs/reports/eval-claude.md` doesn't exist yet. Run `HYPERSHOP_ANTHROPIC_API_KEY=… tools/eval-claude/run.sh` (and the live smoke test) yourself, or give the next run a key; then confirm Haiku 5.5 stays the default?
 
 ## Before Run 2
 
 - Hand-off A done (above), with `main` in place.
 - Copy your BangGym secrets to this repository: `CIQ_DEVELOPER_KEY`, `GARMIN_USERNAME`, `GARMIN_PASSWORD` (Settings › Secrets and variables › Actions).
-- Give the run an `ANTHROPIC_API_KEY` if 4.5 and 4.6 should be finished then.
+- Give the run an `HYPERSHOP_ANTHROPIC_API_KEY` if 4.5 and 4.6 should be finished then.
 
 ## Open items carried forward
 
