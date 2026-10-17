@@ -31,7 +31,7 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 - [x] 2 Check: GoldenScoreTest gate (simple + comments_parens, not held out, 35 lines): name 100%, qty 100%; held-out and info strata in docs/reports/parser-golden.md. Caveat: the parser was tuned while reading the 35 gate lines; the 20 held-out lines (also 100% on these strata) are the honest check — check: `tools/gradle.sh :core:test --tests "*GoldenScoreTest*"`
 
 ## Step 3 — Categoriser and merge
-- [ ] 3.1 Categoriser
+- [x] 3.1 Categoriser (override → identity words → catalogue → Claude suggestion → head noun → keywords → Other); 97% of the 105 golden names categorised (≥ 85%) — check: `tools/gradle.sh :core:test --tests "*CategoriserTest*"`
 - [ ] 3.2a Contributions
 - [ ] 3.2b Covered/DONE, tick, untick, finish shopping
 - [ ] 3.2c Display rounding, units, pack note
