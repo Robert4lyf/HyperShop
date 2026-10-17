@@ -51,7 +51,7 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 **Step 4 check:** MockWebServer tests cover every stop_reason (end_turn, refusal, max_tokens, other) and every error (401, 403, 429, 529, 5xx, 4xx, offline, invalid/schema-violating output): pass. Live smoke test and eval report: **not done** (blocked, above).
 
 ## Step 5 — Android app (phone only)
-- [ ] 5.1 :extract (safe fetch, extractors, fixtures)
+- [x] 5.1 :extract: SafeFetcher (https only, DNS filter for loopback/RFC1918/link-local/CGNAT/ULA/multicast, raw IPs and non-443 refused, manual redirects ≤5 re-checked, no cookies, 10 s/30 s, html or ld+json only, 3 MB after gunzip); Extractor (WPRM → Tasty → JSON-LD → microdata → heading → page text → manual) with every JSON-LD quirk tested; 12 live fixtures + 4 synthetic + 3 hostile (testdata/pages/SOURCES.md) — check: `tools/gradle.sh :extract:test`
 - [ ] 5.2a Schema v1 + seeding
 - [ ] 5.2b Repository: apply preview, tick/untick, manual add, edit qty
 - [ ] 5.2c Remove use, undo import, rescale, finish shopping, soft delete
