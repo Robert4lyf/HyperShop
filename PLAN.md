@@ -4,6 +4,11 @@ A **personal** Android app (never published). You share a recipe URL, an Instagr
 
 ## 0. Change log
 - **rev 2 – rev 3:** nine reviews. Watch work comes before Claude. MVP cut line. Progress files. Three build runs. Per-use contributions. Strict Claude schema.
+- **rev 4.1:** your BangGym repo (Android + Forerunner 245 Connect IQ app) is now the template. Changes:
+  - **Build:** reuse its proven build stack, workflows and watch tooling, and its manual dependency injection instead of Hilt.
+  - **Watch facts:** it already measures the 245 at 128 KB for a watch app, minApiLevel 3.2, `fr245`+`fr245m`.
+  - **Device definitions:** CI downloads them with your Garmin secrets, so the container no longer needs the device folder.
+  - **Messaging:** short wire keys, a protocol parity check, and the payload-size caution it learned the hard way.
 - **rev 4:** a second round of four reviews (quantity model, sync with a model checker, Run 1 dry run, UX and security). Plus your answers: personal use only, Forerunner 245, Android 14+.
   - **Simpler quantity model.**
     - The purchase ledger, the PARTIAL state and overrides are gone.
@@ -51,7 +56,28 @@ A **personal** Android app (never published). You share a recipe URL, an Instagr
 - **Local-first, no backend.** The network is used only to fetch pages, Meta oEmbed (v1.1), and Claude when it is turned on.
 - **Native Android, not a web app.** A Garmin watch app can only talk to a phone companion app through the Connect IQ SDK, or to a server.
 
-## 2. Tech stack (pinned — verified against Maven/Google Maven, Oct 2026)
+## 2. Tech stack
+
+### Template: BangGym (rev 4.1)
+`robert4lyf/BangGym` is your own working Android + Forerunner 245 app, and its stack already builds in your CI. **Step 0 starts by copying its build setup, not by choosing new versions.**
+
+| From BangGym | Used for |
+|---|---|
+| Gradle wrapper (9.7.1), root `build.gradle.kts`, `settings.gradle.kts`, `gradle.properties`, `gradle/libs.versions.toml` (AGP 9.4.0, Kotlin 2.2.10, KSP 2.3.6, Room 2.7.1, Compose BOM, ktlint 12.1.2, Robolectric 4.14.1, ciq-companion-app-sdk 2.4.0) | the phone build |
+| Manual DI: an `AppContainer` on the `Application`, with no Hilt | simpler wiring, and a WorkManager factory taken from the container |
+| `.github/workflows/android.yml`, `connectiq.yml`, `release.yml` | CI, the device-independent watch compile, and the rolling APK release with `build-<n>` tags (works with Obtainium) |
+| `tools/build_watch.sh`, `tools/package_watch.sh`, `tools/check_protocol_parity.py`, `tools/check_monkeyc_limits.py` | watch builds, `.prg` and `.iq` packaging, Kotlin↔Monkey C protocol parity, Monkey C's 9-argument limit |
+| `garmin/` skeleton: `manifest.xml` layout, `monkey.jungle`, `test.jungle`, `PhoneLink.mc` and `SetQueue.mc` patterns | the watch app (new app UUID) |
+| `app/.../garmin/` patterns: `ConnectIqGarminSync`, `GarminCodec`, `GarminProtocol`, `GarminSyncCoordinator`, `FakeGarminSync` | the phone side of sync |
+| `CLAUDE.md` and `.claude/` conventions, and the docs style (`architecture.md`, `garmin-protocol.md`, `garmin-setup.md`) | agent rules and docs |
+
+**Libraries HyperShop adds** on top: OkHttp + mockwebserver 4.12.0, Jsoup 1.23.2, kotlinx-serialization, WorkManager, DataStore, kotest-property, Roborazzi, Timber.
+- Step 0.4 picks the newest version of each that is compatible with BangGym's AGP and Kotlin, proves it with a hello test, and then **freezes** it.
+- HyperShop sets **minSdk 34** (BangGym uses 26) and targetSdk 36.
+
+**Fallback:** if the BangGym stack fails in this container, use the rev-4 table below. Its versions were verified against Maven for AGP 8.13. Drop the Hilt rows either way.
+
+### Fallback version table (rev 4)
 
 **Version rules:**
 - **Never upgrade during a run.** These versions are frozen.
@@ -284,8 +310,17 @@ Example: `"2 ½ cups (300g) plain flour, sifted"` → `{qty 5/2, unit CUP(locale
 - **The device:**
   - **Controls:** 5 buttons and **no touchscreen**: Start/Stop = select, Back, Up, Down, Light. Every interaction must work with buttons alone.
   - **Screen:** 240×240 round, with the MIP display.
-  - **Checked from `fr245/compiler.json` in Step 5.0:** API level, app memory limit, glance support, and `Attention` vibrate.
-  - **Sizing:** `minApiLevel` is set to the device's level. The snapshot size cap, the menu size and the outbox cap are taken from the measured memory limit.
+  - **Already known from BangGym:**
+    - **Products:** `fr245` and `fr245m`.
+    - **API level:** `minApiLevel="3.2.0"` works.
+    - **Memory:** a **watch app gets 128 KB**. A release build (`-r -O 2`) of BangGym is about 15 KB, and a debug build is around 7× larger, so always sideload release builds.
+    - **Checks:** use `--build-stats 0` after each watch step.
+  - **Still to check from `compiler.json` (5.0):** glance support and its memory limit.
+  - **Payload size:** BangGym's protocol notes say messages on older devices are capped "in the low hundreds of bytes" and an oversized message is **dropped silently**. **This is unverified for the 245**, so the design assumes it is true:
+    - **Short keys:** wire keys are 1–2 characters.
+    - **Snapshots are sent in pages:** one `page` message per aisle chunk, each carrying `listRev`, `page` and `pages`. The watch treats a snapshot as complete only when every page for that `listRev` has arrived.
+    - **Small op batches:** the batch size is set from the measured limit, starting at 8 ops.
+    - **Measured at Hand-off B:** a debug "payload probe" screen sends increasing sizes and reports the largest that arrived.
 - **Watch UI:**
   - **Aisle list:** shows `leftCount` from the phone, plus "+N on phone" only when N > 0.
   - **Inside an aisle:** a `CheckboxMenu`.
@@ -298,8 +333,15 @@ Example: `"2 ½ cups (300g) plain flour, sifted"` → `{qty 5/2, unit CUP(locale
   - **Other screens:** "Last synced", "N unsynced", an empty state, and "Update watch app".
   - **Glance:** "14 left · Produce next", only if the 245 supports glances, otherwise skipped.
 - **Envelope:** `{v, t, epoch, installId, ...}` as native Monkey C objects, not JSON.
-  - `hello` carries `minV`/`maxV`, `listRev`, `watchNow` and `ackedThrough`.
-  - **Versioning:** unknown keys are ignored. `v` only changes for breaking changes, and both sides use the highest version they both support.
+  - `hello` carries `listRev`, `watchNow` and `ackedThrough`.
+  - **Versioning (BangGym's rule):**
+    - Each side drops any message whose `v` isn't exactly its own, and shows "Update HyperShop on the phone and watch".
+    - Unknown keys and new message types don't need a bump; bump only when an existing message changes shape or meaning.
+    - Both apps are installed as a pair.
+  - **Protocol in two files:** the protocol is declared in Kotlin (`WatchProtocol.kt`) and in Monkey C (`Protocol.mc`), and `check_protocol_parity.py` fails CI if they drift.
+  - **Battery:**
+    - The phone sends only when the list actually changes (`distinctUntilChanged`).
+    - It keeps the last snapshot to re-send on `hello` and whenever the connection reaches `APP_READY`.
 - **Ops (watch → phone):**
   - **Format:** compact arrays `[seq, itemId, done, seenListRev, ts]`.
   - **Sequence numbers:** `nextSeq` is stored in the same Storage key as the outbox. It is written **before** sending and never reset. A seq is assigned when an op is **first sent**; collapsing unsent ops keeps the earliest seq, so there are never gaps.
@@ -475,7 +517,7 @@ PROGRESS.md
 | Run | Delivers | Needs from you first |
 |---|---|---|
 | **Run 1** | Steps 0–4: phone app, parser, merge, review, list, sync codec | nothing |
-| **Run 2** | Steps 5–6: Forerunner 245 app and sync | Hand-off A done, plus the **`fr245` device folder** from your PC's SDK Manager (`~/.Garmin/ConnectIQ/Devices/fr245`), uploaded as a private release asset or via a URL in the environment, never committed |
+| **Run 2** | Steps 5–6: Forerunner 245 app and sync | Hand-off A done, plus your BangGym secrets **copied to the HyperShop repo**: `CIQ_DEVELOPER_KEY`, `GARMIN_USERNAME`, `GARMIN_PASSWORD`. CI then downloads the device definitions and builds the sideloadable `.prg`. The container only needs the device-independent strict compile, which works without definitions. |
 | **Run 3** | Step 7: Claude for text | Hand-off B done, plus `ANTHROPIC_API_KEY` set in the environment (a dedicated key with a spend limit) |
 | Later | Steps 8–10 (v1.1) | per step |
 
@@ -498,7 +540,7 @@ PROGRESS.md
 | Create `main` and merge each run's PR (do this first at each hand-off) | after each run |
 | Install the APK (from the PR or CI artifact) | Hand-offs A, B, C |
 | Check the contact sheet, `catalog/REVIEW.md` and the 20 held-out golden lines | Hand-off A |
-| The `fr245` device folder | before Run 2 |
+| Copy the 3 Garmin secrets from BangGym into HyperShop's repo settings (Settings → Secrets → Actions) | before Run 2 |
 | Sideload the `.prg` to the Forerunner 245 (USB → `GARMIN/APPS`) | Hand-off B |
 | Optional: run the simulator and the Monkey C unit tests on your PC | Run 2 |
 | Anthropic API key | before Run 3 |
@@ -520,9 +562,11 @@ PROGRESS.md
     - exports `ANDROID_HOME` via `$CLAUDE_ENV_FILE`;
     - does **not** download the Connect IQ SDK.
   - **Check:** `java -version`, `echo $ANDROID_HOME`, and `sdkmanager --list_installed`.
-- **0.3** Gradle project and modules (§2), `gradle.properties`, the debug keystore, and the watch UUID.
-- **0.4** Version catalog (§2), plus one hello test for each of: JUnit5, kotest-property, a Robolectric `sdk=36` Compose test with a semantics assertion, a Roborazzi recording (`@GraphicsMode(NATIVE)`, `roborazzi.test.record=true`), and Hilt.
-- **0.5** ktlint plugin, and detekt with the Kotlin force.
+- **0.3** **Copy BangGym's build setup** (§2 template): wrapper, root build files, version catalog, `.editorconfig`, ktlint, the `CLAUDE.md` conventions adapted for HyperShop, and the three workflows (with `banggym` renamed).
+  - Then add the HyperShop modules (§2), minSdk 34, the debug keystore, and a **new** watch UUID.
+  - Record what was copied, and from which BangGym commit, in `docs/decisions/000-template.md`.
+- **0.4** Add HyperShop's extra libraries (§2), plus one hello test for each of: JUnit5, kotest-property, a Robolectric Compose test with a semantics assertion, a Roborazzi recording (`@GraphicsMode(NATIVE)`, `roborazzi.test.record=true`), and the `AppContainer` wiring. If the BangGym stack fails here, switch to the fallback table and record that in an ADR.
+- **0.5** Lint: ktlint as in BangGym. detekt is optional (with the Kotlin force).
 - **0.6** `tools/verify.sh`:
   - lint, then all tests;
   - `assembleDebug`, then lint the merged manifest: no `CAMERA`, and only the launcher and share activity exported;
@@ -629,15 +673,14 @@ PROGRESS.md
 - **4.2d** Repository: export and import (validation, preview, automatic pre-export, new ids and epoch); catalogue re-key; applying watch ops in a single transaction.
 - **Check (4.2):** an acceptance test for each path. Import followed by Undo must leave the database equal apart from revs.
 - **4.3** App shell:
-  - Hilt.
-  - `hilt-work`:
-    - KSP for both `com.google.dagger:hilt-compiler` and `androidx.hilt:hilt-compiler`.
-    - `Application : Configuration.Provider` with `HiltWorkerFactory`.
+  - `AppContainer` (manual DI, as in BangGym).
+  - WorkManager:
+    - `Application : Configuration.Provider`, with a `WorkerFactory` that builds workers from the container.
     - In the manifest, `InitializationProvider` with `tools:node="merge"` and the `WorkManagerInitializer` meta-data set to `tools:node="remove"`.
   - Navigation, theme (with dynamic colour turned off in tests), edge-to-edge and predictive back.
   - A `ClaudeExtractor` Noop and a `WatchLink` fake.
   - The import worker.
-  - **Worker tests:** `@HiltAndroidTest` + `@Config(application=HiltTestApplication::class, sdk=[34,36])`, with `WorkManagerTestInitHelper` + `SynchronousExecutor`.
+  - **Worker tests:** Robolectric `@Config(sdk=[34,36])`, with `WorkManagerTestInitHelper` + `SynchronousExecutor` and a test container.
 - **4.4–4.8:** one screen per sub-step. Each has a ViewModel test, a Robolectric Compose test with **semantics assertions** (order, text, counts, a single TalkBack node per row, custom actions), and Roborazzi light and dark snapshots, recorded only.
   - **4.4** Review before adding, default view: a row exposes at most 3 elements; the banner; in stock; Cancel; Undo snackbar; the rev-change recompute.
   - **4.5** Review row detail sheet: I have some, always in stock, swap, move aisle, edit line.
@@ -660,14 +703,12 @@ PROGRESS.md
 ## Run 2
 
 ### Step 5 — Forerunner 245 app
-- **5.0** Prerequisites. If any fails, **stop the run** and write it in `HANDOFF.md`.
-  - The `fr245` device folder is available.
-  - Download and cache SDK 9.2.0, and confirm it compiles for `fr245`. If it doesn't, find the newest SDK that does (from `sdks.json`) and record it in an ADR.
-  - Read `compiler.json` and write `garmin/README.md`: API level, the memory limit for each app type, glance support, `Attention` vibrate, screen size and shape, buttons.
-  - Derive `minApiLevel`, the snapshot size cap and the outbox cap from those numbers.
-- **5.1** Generate a developer key with openssl (RSA 4096, PKCS#8 DER; git-ignored).
-  - **Check:** the SDK `Comm` sample builds for `fr245`.
-- **5.2** `manifest.xml`: `fr245` only, the minApiLevel from 5.0, Communications, and the watch UUID.
+- **5.0** Prerequisites. If any fails, write it in `HANDOFF.md`.
+  - `tools/build_watch.sh` (from BangGym) fetches SDK 9.2.0 and generates a throwaway key. A device-independent strict compile of an empty app passes.
+  - If the Garmin secrets are set, CI's release job (from BangGym) downloads the definitions with `connect-iq-sdk-manager` and runs `package_watch.sh`.
+  - From the CI build log, or BangGym's `docs/garmin-setup.md`, record the 245 facts in `garmin/README.md`: 128 KB, API 3.2, glance support.
+- **5.1** Developer key: the container uses the throwaway key, and CI uses your `CIQ_DEVELOPER_KEY` (the same key as BangGym, so both apps sideload or go through the store the same way).
+- **5.2** `manifest.xml`: `fr245` and `fr245m`, minApiLevel 3.2.0, Communications, and the new watch UUID. `tools/check_monkeyc_limits.py` must pass.
 - **5.3** Data layer: a data-driven port of the 1.5b watch rules, with `nextSeq`, the outbox, retry back-off, acks and ignoring older snapshots.
 - **5.4** UI, buttons only:
   - The aisle list and per-aisle `CheckboxMenu`.
@@ -677,7 +718,12 @@ PROGRESS.md
   - The glance, only if it's supported.
 - **5.5** A `:debug` build with an embedded 60-item, 12-aisle sample.
 - **5.6** Monkey C `(:test)` tests that replay `testdata/sync/*.json`, compiled with `monkeyc --unit-test`. Running them needs the simulator, which is a [YOU] or optional step.
-- **Check:** `monkeyc -d fr245` builds; the test build compiles; the peak memory estimate is within the 5.0 limit.
+- **Check:**
+  - The strict device-independent compile passes, and the test build compiles (`build_watch.sh --test`), in the container.
+  - The protocol parity check passes.
+  - CI's `package_watch.sh` produces `hypershop-fr245.prg` (when the secrets are set).
+  - `--build-stats 0` shows the release build well under 128 KB.
+- **Optional, like BangGym:** upload the `.iq` as a Connect IQ **beta app**. Only your account can see it, and updates then reach the watch through Garmin Connect without a cable.
 
 ### Step 6 — Phone ↔ watch sync
 - **6.1** `WatchSyncImpl`:
@@ -763,7 +809,9 @@ PROGRESS.md
   - Screenshots are recorded but never gated.
   - Live Claude responses in Run 3.
   - You review the contact sheet and the catalogue.
-- **The Forerunner 245 may be limited:** an older API level, little memory, possibly no glance, and possibly dropped from SDK 9.x. Step 5.0 measures this before any code is written; the fallbacks are an older SDK and a smaller snapshot.
+- **The Forerunner 245 is a known quantity** thanks to BangGym: SDK 9.2.0 builds for it, it allows 128 KB, and API 3.2 works. Two things are still unknown:
+  - **Glance support** — the app skips the glance if it isn't supported.
+  - **The real message size limit** — the design sends paged snapshots and small batches, and the debug probe measures the limit at Hand-off B.
 - **The sync design has been checked by a model checker,** but only on small bounds. The real devices are tested at Hand-off B.
 - **Agent-estimated catalogue and pack sizes.** They're tagged, shown muted until you confirm them, can be overridden, and are in REVIEW.md.
 - **Blocked recipe sites** fall back to "Select lines manually" until the v1.1 WebView.
