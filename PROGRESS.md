@@ -13,7 +13,7 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 **Step 0 check:** cold `tools/verify.sh` passes.
 
 ## Step 1 — Spec, enums, golden data, model, catalogue, sync codec
-- [ ] 1.1 docs/parser-spec.md
+- [x] 1.1 docs/parser-spec.md (schema R1, QtyUnit R2, AisleCode R9, prep/identity R4, NYT mapping R10, scoring R11) — check: review the doc
 - [ ] 1.2 Golden data (pick-golden, nyt-to-golden, 80 + 25 lines, CHECKSUM)
 - [ ] 1.3 :core model (Rational, Dimension, QtyUnit, QtyBase, ParsedIngredient, ADR 002)
 - [ ] 1.4a Top-400 NYT names script
