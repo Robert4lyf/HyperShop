@@ -49,8 +49,8 @@ class ShopAmountTest {
     }
 
     @Test
-    fun spoonsAreKeptEvenWithAMetricAlternative() {
-        val p =
+    fun gramsBeatSpoonsButMlDoesNot() {
+        val butter =
             ParsedIngredient(
                 "2 tbsp (30g) butter",
                 "butter",
@@ -59,8 +59,21 @@ class ShopAmountTest {
                 altQuantity = Rational.of(30),
                 altUnit = QtyUnit.G,
             )
-        assertEquals(QtyBase.of(Rational.of(2), QtyUnit.TBSP, UnitLocale.US), p.shopBase(UnitLocale.US))
-        assertEquals(QtyUnit.TBSP, p.shopUnit)
+        assertEquals(QtyBase.of(Rational.of(30), QtyUnit.G, UnitLocale.US), butter.shopBase(UnitLocale.US))
+        assertEquals(QtyUnit.G, butter.shopUnit)
+        assertEquals(QtyBase.of(Rational.of(30), QtyUnit.G, UnitLocale.US), rp.parse("2 tbsp butter (30g)").shopBase(UnitLocale.US))
+        val oil =
+            ParsedIngredient(
+                "2 tbsp (30ml) oil",
+                "oil",
+                Rational.of(2),
+                unit = QtyUnit.TBSP,
+                altQuantity = Rational.of(30),
+                altUnit = QtyUnit.ML,
+            )
+        assertEquals(QtyBase.of(Rational.of(2), QtyUnit.TBSP, UnitLocale.US), oil.shopBase(UnitLocale.US))
+        assertEquals(QtyUnit.TBSP, oil.shopUnit)
+        assertEquals(QtyUnit.TBSP, rp.parse("2 tbsp olive oil (30ml)").shopUnit)
     }
 
     @Test
