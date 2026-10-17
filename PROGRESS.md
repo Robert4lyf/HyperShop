@@ -25,7 +25,7 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 **Step 1 check:** model + catalogue validator unit tests, codec round-trips with every page under the cap, all listed sync vectors, model checker 0 violations.
 
 ## Step 2 — Rule parser
-- [ ] 2.1 Tokeniser
+- [x] 2.1 Tokeniser: one pass, no regex (ints, decimals, 1,000, slash and unicode fractions, glued 1½, letter/digit split); 10 KB pathological lines < 50 ms — check: `tools/gradle.sh :core:test --tests "*TokeniserTest*"`
 - [ ] 2.2 Grammar
 - [ ] 2.3 Normaliser, synonyms, mergeKey
 - [ ] 2 Check: name ≥90%, qty ≥95% on simple+parentheses strata
