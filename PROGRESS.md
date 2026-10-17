@@ -36,7 +36,7 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 - [x] 3.2b Covered/DONE, tick (covers all uncovered), untick (exactly the last tick), finish shopping (soft delete + 7-day archive) with undo; property tests: a tick always makes DONE, a later recipe is uncovered, untick restores exactly — check: `tools/gradle.sh :core:test --tests "*Ticking*"`
 - [x] 3.2c Display: counts round up (produce to ½), friendly mass/volume steps, ½ ⅓ ¼ glyphs, metric/imperial/as-written, gramsPerCup combining else compound amounts, plural names, pack-note sub-line, "1 more onion" / "2 already ticked" — check: `tools/gradle.sh :core:test --tests "*DisplayTest*"`
 - [x] 3.3 Merger.preview (pure) + apply re-checks every shown rev (and that new items are still new) → Stale; property tests: add then remove a use is identity, preview+apply equals merging directly — check: `tools/gradle.sh :core:test --tests "*Preview*"`
-- [ ] 3.4 Catalogue re-key + ItemAlias
+- [x] 3.4 Catalogue re-key: name: → cat: keys; clashes merge into the lower id (survivor aisle/position win, rev = max + 1, contributions and ticks move, ItemAlias) — check: `tools/gradle.sh :core:test --tests "*RekeyTest*"`
 
 ## Step 4 — Claude client
 - [ ] 4.1 ADR 001
