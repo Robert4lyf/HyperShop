@@ -19,7 +19,7 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 - [x] 1.4a Top-400 NYT names script (tools/catalog/top_names.py → catalog/top-names.csv; prep/size stripped, salt/pepper folded, compounds split, plurals merged) — check: `python3 tools/catalog/top_names.py && git diff --exit-code catalog/top-names.csv`
 - [x] 1.4b Catalogue CSV: catalog/ingredients.csv, 431 rows, 17 aisles, 5 staples (salt, black pepper, olive oil, vegetable oil, water), 20 pack notes, src=agent-estimate; covers 392/400 NYT top names (the 8 misses are non-names like "to taste") — check: validator in 1.4c
 - [x] 1.4c Validator (tools/catalog/build_catalog.py + CatalogTest), generated catalog.tsv + lazy CatalogLoader, synonyms.csv, SOURCES.md, LICENSE-NYT, NOTICE-NYT, REVIEW.md generator — check: `python3 tools/catalog/build_catalog.py --check; tools/gradle.sh :core:test`
-- [ ] 1.5a Sync codec (envelope, ops, paged snapshot, estimator, WatchProtocol.kt)
+- [x] 1.5a Sync codec (:core sync/): WatchProtocol.kt (short keys, VERSION 1, WATCH_APP_ID), typed messages, untrusted-input decoder, PayloadSize estimator + PayloadCap (default 384 B × 16 pages), SnapshotPager (acks reserved, truncation order) — check: `tools/gradle.sh :core:test` (CodecTest, PagerTest incl. property test: every page under the cap)
 - [ ] 1.5b Protocol rules, testdata/sync vectors, tools/sync-model
 
 ## Step 2 — Rule parser
