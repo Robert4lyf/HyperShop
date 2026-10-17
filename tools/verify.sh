@@ -22,8 +22,10 @@ fi
 step() { printf '\n== %s\n' "$*"; }
 
 step "Gradle: ktlint, unit tests, assembleDebug"
+# ktlint on its own and from scratch: ktlint-gradle 12.1.2 under Gradle's
+# caches keeps reporting errors in files that no longer exist (KNOWN_ISSUES #3).
+tools/gradle.sh ktlintCheck --rerun-tasks --no-configuration-cache --no-build-cache
 tools/gradle.sh \
-  ktlintCheck \
   :core:test :extract:test :claude:test \
   :data:testDebugUnitTest :app:testDebugUnitTest \
   :app:assembleDebug

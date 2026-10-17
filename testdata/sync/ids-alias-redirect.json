@@ -1,0 +1,47 @@
+{
+  "name": "ids-alias-redirect",
+  "group": "ids",
+  "description": "A catalogue re-key merges item 2 into item 1; a watch op naming 2 is redirected through ItemAlias.",
+  "steps": [
+    {
+      "do": "phone.add",
+      "name": "Onion"
+    },
+    {
+      "do": "phone.add",
+      "name": "Milk"
+    },
+    {
+      "do": "watch.hello"
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "do": "phone.rekey",
+      "from": 2,
+      "to": 1
+    },
+    {
+      "do": "watch.toggle",
+      "item": 2
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "watch.result": {
+          "1": "ok"
+        },
+        "phone.done": {
+          "1": true
+        },
+        "watch.items": [
+          1
+        ],
+        "converged": true
+      }
+    }
+  ]
+}

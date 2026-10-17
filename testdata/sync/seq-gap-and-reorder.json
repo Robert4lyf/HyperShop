@@ -1,0 +1,106 @@
+{
+  "name": "seq-gap-and-reorder",
+  "group": "sequence",
+  "description": "A batch that skips a seq is ignored (go-back-N); a resent superset overtaking the original applies once.",
+  "steps": [
+    {
+      "do": "phone.add",
+      "name": "Onion"
+    },
+    {
+      "do": "phone.add",
+      "name": "Milk"
+    },
+    {
+      "do": "watch.hello"
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "do": "watch.rawOps",
+      "ops": [
+        [
+          2,
+          1,
+          true,
+          3,
+          0
+        ]
+      ]
+    },
+    {
+      "do": "deliver",
+      "to": "phone"
+    },
+    {
+      "do": "deliverAll",
+      "to": "watch"
+    },
+    {
+      "expect": {
+        "phone.ticks": 0,
+        "phone.lastSeq": 0
+      }
+    },
+    {
+      "do": "watch.toggle",
+      "item": 1
+    },
+    {
+      "do": "watch.send"
+    },
+    {
+      "do": "watch.toggle",
+      "item": 2
+    },
+    {
+      "do": "watch.timeout"
+    },
+    {
+      "do": "watch.send"
+    },
+    {
+      "expect": {
+        "queue.phone": 2,
+        "watch.seqs": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "do": "deliver",
+      "to": "phone",
+      "index": 1
+    },
+    {
+      "do": "deliver",
+      "to": "phone",
+      "index": 0
+    },
+    {
+      "do": "deliverAll",
+      "to": "watch"
+    },
+    {
+      "expect": {
+        "phone.ticks": 2,
+        "phone.lastSeq": 2,
+        "phone.done": {
+          "1": true,
+          "2": true
+        },
+        "watch.outbox": 0
+      }
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "converged": true
+      }
+    }
+  ]
+}

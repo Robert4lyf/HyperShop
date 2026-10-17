@@ -1,0 +1,85 @@
+{
+  "name": "outbox-full",
+  "group": "outbox",
+  "description": "With the outbox full, ticking is refused ('Sync with phone') until a batch is acked.",
+  "outboxCap": 2,
+  "steps": [
+    {
+      "do": "phone.add",
+      "name": "Onion"
+    },
+    {
+      "do": "phone.add",
+      "name": "Milk"
+    },
+    {
+      "do": "watch.hello"
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "do": "phone.add",
+      "name": "Garlic"
+    },
+    {
+      "do": "watch.hello"
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "do": "watch.toggle",
+      "item": 1
+    },
+    {
+      "do": "watch.toggle",
+      "item": 2
+    },
+    {
+      "do": "watch.toggle",
+      "item": 3
+    },
+    {
+      "expect": {
+        "watch.toggled": false,
+        "watch.outbox": 2
+      }
+    },
+    {
+      "do": "watch.toggle",
+      "item": 1
+    },
+    {
+      "expect": {
+        "watch.toggled": true,
+        "watch.outbox": 1
+      }
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "do": "watch.toggle",
+      "item": 3
+    },
+    {
+      "expect": {
+        "watch.toggled": true
+      }
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "phone.done": {
+          "1": false,
+          "2": true,
+          "3": true
+        },
+        "converged": true
+      }
+    }
+  ]
+}

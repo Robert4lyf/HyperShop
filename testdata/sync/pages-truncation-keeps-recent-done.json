@@ -1,0 +1,53 @@
+{
+  "name": "pages-truncation-keeps-recent-done",
+  "group": "pages",
+  "description": "With a tight cap, an item ticked an hour ago is left off but one ticked 10 minutes ago stays.",
+  "cap": {
+    "bytes": 330,
+    "maxPages": 1
+  },
+  "steps": [
+    {
+      "do": "phone.add",
+      "name": "Onion"
+    },
+    {
+      "do": "phone.add",
+      "name": "Milk"
+    },
+    {
+      "do": "phone.add",
+      "name": "Garlic"
+    },
+    {
+      "do": "phone.add",
+      "name": "Butter"
+    },
+    {
+      "do": "phone.tick",
+      "item": 1,
+      "clockMin": 0
+    },
+    {
+      "do": "phone.tick",
+      "item": 3,
+      "clockMin": 50
+    },
+    {
+      "do": "watch.hello",
+      "clockMin": 60
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "watch.items": [
+          2,
+          3,
+          4
+        ]
+      }
+    }
+  ]
+}

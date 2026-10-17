@@ -1,0 +1,52 @@
+{
+  "name": "pages-late-older-page",
+  "group": "pages",
+  "description": "A snapshot page with an older listRev arriving after a newer one is ignored.",
+  "steps": [
+    {
+      "do": "phone.add",
+      "name": "Onion"
+    },
+    {
+      "do": "phone.add",
+      "name": "Milk"
+    },
+    {
+      "do": "watch.hello"
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "do": "phone.push"
+    },
+    {
+      "do": "phone.addContribution",
+      "item": 2
+    },
+    {
+      "do": "phone.push"
+    },
+    {
+      "do": "deliver",
+      "to": "watch",
+      "index": 1
+    },
+    {
+      "expect": {
+        "watch.listRevIsPhones": true
+      }
+    },
+    {
+      "do": "deliver",
+      "to": "watch",
+      "index": 0
+    },
+    {
+      "expect": {
+        "watch.listRevIsPhones": true,
+        "converged": true
+      }
+    }
+  ]
+}

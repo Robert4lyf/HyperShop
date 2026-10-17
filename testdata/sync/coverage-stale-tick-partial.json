@@ -1,0 +1,48 @@
+{
+  "name": "coverage-stale-tick-partial",
+  "group": "coverage",
+  "description": "A recipe adds onions after the watch's snapshot; the watch tick covers only what it saw: partial, '1 more'.",
+  "steps": [
+    {
+      "do": "phone.add",
+      "name": "Onion"
+    },
+    {
+      "do": "phone.add",
+      "name": "Milk"
+    },
+    {
+      "do": "watch.hello"
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "do": "watch.toggle",
+      "item": 1
+    },
+    {
+      "do": "phone.addContribution",
+      "item": 1
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "watch.result": {
+          "1": "partial"
+        },
+        "watch.notice": "1 more",
+        "phone.done": {
+          "1": false
+        },
+        "phone.uncovered": {
+          "1": 1
+        },
+        "phone.ticks": 1,
+        "converged": true
+      }
+    }
+  ]
+}

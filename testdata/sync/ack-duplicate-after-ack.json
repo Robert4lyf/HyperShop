@@ -1,0 +1,98 @@
+{
+  "name": "ack-duplicate-after-ack",
+  "group": "acks",
+  "description": "A duplicated batch arrives after its ack, and after a later untick; it is ignored both times.",
+  "steps": [
+    {
+      "do": "phone.add",
+      "name": "Onion"
+    },
+    {
+      "do": "phone.add",
+      "name": "Milk"
+    },
+    {
+      "do": "watch.hello"
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "do": "watch.toggle",
+      "item": 1
+    },
+    {
+      "do": "watch.send"
+    },
+    {
+      "do": "dup",
+      "to": "phone"
+    },
+    {
+      "do": "deliver",
+      "to": "phone"
+    },
+    {
+      "do": "deliverAll",
+      "to": "watch"
+    },
+    {
+      "expect": {
+        "phone.ticks": 1,
+        "watch.outbox": 0,
+        "queue.phone": 1
+      }
+    },
+    {
+      "do": "watch.toggle",
+      "item": 1
+    },
+    {
+      "do": "watch.send"
+    },
+    {
+      "do": "deliver",
+      "to": "phone",
+      "index": 1
+    },
+    {
+      "do": "deliverAll",
+      "to": "watch"
+    },
+    {
+      "expect": {
+        "phone.done": {
+          "1": false
+        },
+        "phone.ticks": 0,
+        "phone.lastSeq": 2
+      }
+    },
+    {
+      "do": "deliver",
+      "to": "phone"
+    },
+    {
+      "do": "deliverAll",
+      "to": "watch"
+    },
+    {
+      "expect": {
+        "phone.done": {
+          "1": false
+        },
+        "phone.ticks": 0,
+        "phone.lastSeq": 2,
+        "watch.outbox": 0
+      }
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "converged": true
+      }
+    }
+  ]
+}

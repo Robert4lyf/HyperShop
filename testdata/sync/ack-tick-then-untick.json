@@ -1,0 +1,61 @@
+{
+  "name": "ack-tick-then-untick",
+  "group": "acks",
+  "description": "Tick, ack, untick, ack: the untick undoes exactly the watch's own tick.",
+  "steps": [
+    {
+      "do": "phone.add",
+      "name": "Onion"
+    },
+    {
+      "do": "phone.add",
+      "name": "Milk"
+    },
+    {
+      "do": "watch.hello"
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "do": "watch.toggle",
+      "item": 1
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "phone.done": {
+          "1": true
+        },
+        "watch.result": {
+          "1": "ok"
+        },
+        "converged": true
+      }
+    },
+    {
+      "do": "watch.toggle",
+      "item": 1
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "phone.done": {
+          "1": false
+        },
+        "phone.ticks": 0,
+        "phone.uncovered": {
+          "1": 1
+        },
+        "watch.result": {
+          "2": "ok"
+        },
+        "converged": true
+      }
+    }
+  ]
+}

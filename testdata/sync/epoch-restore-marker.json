@@ -1,0 +1,112 @@
+{
+  "name": "epoch-restore-marker",
+  "group": "epoch",
+  "description": "A restore (new epoch, install table empty) while a sent op was lost: the hello after adopting the epoch voids the discarded seq, so the next op applies without a gap.",
+  "steps": [
+    {
+      "do": "phone.add",
+      "name": "Onion"
+    },
+    {
+      "do": "phone.add",
+      "name": "Milk"
+    },
+    {
+      "do": "watch.hello"
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "do": "watch.toggle",
+      "item": 1
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "do": "watch.toggle",
+      "item": 2
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "phone.lastSeq": 2
+      }
+    },
+    {
+      "do": "watch.toggle",
+      "item": 1
+    },
+    {
+      "do": "watch.send"
+    },
+    {
+      "do": "drop",
+      "to": "phone"
+    },
+    {
+      "do": "phone.newEpoch",
+      "epoch": 5
+    },
+    {
+      "do": "watch.hello"
+    },
+    {
+      "do": "deliver",
+      "to": "phone"
+    },
+    {
+      "expect": {
+        "phone.lastSeq": 2
+      }
+    },
+    {
+      "do": "deliverAll",
+      "to": "watch"
+    },
+    {
+      "expect": {
+        "watch.epoch": 5,
+        "watch.outbox": 0,
+        "watch.ackedThrough": 3,
+        "watch.nextSeq": 4,
+        "watch.helloDue": true
+      }
+    },
+    {
+      "do": "watch.hello"
+    },
+    {
+      "do": "deliver",
+      "to": "phone"
+    },
+    {
+      "expect": {
+        "phone.lastSeq": 3
+      }
+    },
+    {
+      "do": "deliverAll",
+      "to": "watch"
+    },
+    {
+      "do": "watch.toggle",
+      "item": 2
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "phone.lastSeq": 4,
+        "phone.done": {
+          "2": false
+        },
+        "converged": true
+      }
+    }
+  ]
+}

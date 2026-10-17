@@ -1,0 +1,74 @@
+{
+  "name": "epoch-mismatch",
+  "group": "epoch",
+  "description": "Ops from the old epoch get result epoch; the watch drops its outbox, says so, keeps nextSeq, and carries on.",
+  "steps": [
+    {
+      "do": "phone.add",
+      "name": "Onion"
+    },
+    {
+      "do": "phone.add",
+      "name": "Milk"
+    },
+    {
+      "do": "watch.hello"
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "do": "watch.toggle",
+      "item": 1
+    },
+    {
+      "do": "watch.send"
+    },
+    {
+      "do": "phone.newEpoch",
+      "epoch": 2
+    },
+    {
+      "do": "deliver",
+      "to": "phone"
+    },
+    {
+      "do": "deliverAll",
+      "to": "watch"
+    },
+    {
+      "expect": {
+        "watch.epoch": 2,
+        "watch.outbox": 0,
+        "watch.notice": "1 watch ticks discarded (list replaced)",
+        "phone.ticks": 0,
+        "watch.nextSeq": 2,
+        "watch.helloDue": true
+      }
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "converged": true
+      }
+    },
+    {
+      "do": "watch.toggle",
+      "item": 1
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "phone.done": {
+          "1": true
+        },
+        "phone.lastSeq": 2,
+        "converged": true
+      }
+    }
+  ]
+}

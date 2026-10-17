@@ -1,0 +1,92 @@
+{
+  "name": "ack-lost-then-resend",
+  "group": "acks",
+  "description": "The reply carrying the ack is lost; the watch times out and resends; the phone re-acks the duplicate without ticking twice.",
+  "steps": [
+    {
+      "do": "phone.add",
+      "name": "Onion"
+    },
+    {
+      "do": "phone.add",
+      "name": "Milk"
+    },
+    {
+      "do": "watch.hello"
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "do": "watch.toggle",
+      "item": 1
+    },
+    {
+      "do": "watch.send"
+    },
+    {
+      "do": "deliver",
+      "to": "phone"
+    },
+    {
+      "expect": {
+        "phone.done": {
+          "1": true
+        },
+        "phone.ticks": 1,
+        "phone.lastSeq": 1,
+        "queue.watch": 1
+      }
+    },
+    {
+      "do": "drop",
+      "to": "watch"
+    },
+    {
+      "expect": {
+        "watch.outbox": 1,
+        "watch.view": {
+          "1": true
+        }
+      }
+    },
+    {
+      "do": "watch.timeout"
+    },
+    {
+      "do": "watch.send"
+    },
+    {
+      "do": "deliver",
+      "to": "phone"
+    },
+    {
+      "do": "deliverAll",
+      "to": "watch"
+    },
+    {
+      "expect": {
+        "phone.ticks": 1,
+        "phone.lastSeq": 1,
+        "watch.outbox": 0,
+        "watch.ackedThrough": 1,
+        "watch.result": {
+          "1": "ok"
+        },
+        "watch.view": {
+          "1": true
+        },
+        "watch.helloDue": true
+      }
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "converged": true,
+        "phone.ticks": 1
+      }
+    }
+  ]
+}

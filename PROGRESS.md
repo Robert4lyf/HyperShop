@@ -20,7 +20,9 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 - [x] 1.4b Catalogue CSV: catalog/ingredients.csv, 431 rows, 17 aisles, 5 staples (salt, black pepper, olive oil, vegetable oil, water), 20 pack notes, src=agent-estimate; covers 392/400 NYT top names (the 8 misses are non-names like "to taste") — check: validator in 1.4c
 - [x] 1.4c Validator (tools/catalog/build_catalog.py + CatalogTest), generated catalog.tsv + lazy CatalogLoader, synonyms.csv, SOURCES.md, LICENSE-NYT, NOTICE-NYT, REVIEW.md generator — check: `python3 tools/catalog/build_catalog.py --check; tools/gradle.sh :core:test`
 - [x] 1.5a Sync codec (:core sync/): WatchProtocol.kt (short keys, VERSION 1, WATCH_APP_ID), typed messages, untrusted-input decoder, PayloadSize estimator + PayloadCap (default 384 B × 16 pages), SnapshotPager (acks reserved, truncation order) — check: `tools/gradle.sh :core:test` (CodecTest, PagerTest incl. property test: every page under the cap)
-- [ ] 1.5b Protocol rules, testdata/sync vectors, tools/sync-model
+- [x] 1.5b Protocol rules (PhoneSyncModel, WatchSyncModel; docs/garmin-protocol.md), 16 vectors in testdata/sync replayed through the real codec + pager (SyncVectorTest), tools/sync-model exhaustive checker (S1–S7 safety, C1 convergence; --small = 3 runs, ~113k states, 0 violations; mutation-checked) — check: `tools/gradle.sh :core:test`; `python3 tools/sync-model/model.py --small`. Design fixes found while writing vectors: ack-only replies set `helloDue` + acked-ok overlay (no flicker/stale view); a hello after epoch adoption voids discarded seqs so go-back-N has no gap
+
+**Step 1 check:** model + catalogue validator unit tests, codec round-trips with every page under the cap, all listed sync vectors, model checker 0 violations.
 
 ## Step 2 — Rule parser
 - [ ] 2.1 Tokeniser

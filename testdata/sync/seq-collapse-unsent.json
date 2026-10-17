@@ -1,0 +1,95 @@
+{
+  "name": "seq-collapse-unsent",
+  "group": "sequence",
+  "description": "Unsent ops on one item collapse; sent ones never do, so seqs have no gaps.",
+  "steps": [
+    {
+      "do": "phone.add",
+      "name": "Onion"
+    },
+    {
+      "do": "phone.add",
+      "name": "Milk"
+    },
+    {
+      "do": "watch.hello"
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "do": "watch.toggle",
+      "item": 1
+    },
+    {
+      "do": "watch.toggle",
+      "item": 1
+    },
+    {
+      "expect": {
+        "watch.outbox": 0
+      }
+    },
+    {
+      "do": "watch.toggle",
+      "item": 2
+    },
+    {
+      "do": "watch.toggle",
+      "item": 1
+    },
+    {
+      "do": "watch.send"
+    },
+    {
+      "expect": {
+        "watch.seqs": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "do": "watch.toggle",
+      "item": 2
+    },
+    {
+      "expect": {
+        "watch.seqs": [
+          1,
+          2,
+          null
+        ]
+      }
+    },
+    {
+      "do": "watch.toggle",
+      "item": 2
+    },
+    {
+      "expect": {
+        "watch.seqs": [
+          1,
+          2
+        ],
+        "watch.view": {
+          "2": true
+        }
+      }
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "phone.lastSeq": 2,
+        "watch.nextSeq": 3,
+        "phone.done": {
+          "1": true,
+          "2": true
+        },
+        "converged": true
+      }
+    }
+  ]
+}

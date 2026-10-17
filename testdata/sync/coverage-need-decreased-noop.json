@@ -1,0 +1,55 @@
+{
+  "name": "coverage-need-decreased-noop",
+  "group": "coverage",
+  "description": "The recipe that needed more is removed before the watch tick lands: nothing left to cover, noop, and the item is DONE.",
+  "steps": [
+    {
+      "do": "phone.add",
+      "name": "Onion"
+    },
+    {
+      "do": "phone.tick",
+      "item": 1
+    },
+    {
+      "do": "phone.addContribution",
+      "item": 1
+    },
+    {
+      "do": "watch.hello"
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "watch.view": {
+          "1": false
+        }
+      }
+    },
+    {
+      "do": "watch.toggle",
+      "item": 1
+    },
+    {
+      "do": "phone.removeContribution",
+      "item": 1
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "watch.result": {
+          "1": "noop"
+        },
+        "phone.done": {
+          "1": true
+        },
+        "phone.ticks": 1,
+        "converged": true
+      }
+    }
+  ]
+}

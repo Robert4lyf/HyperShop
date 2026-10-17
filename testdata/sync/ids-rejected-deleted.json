@@ -1,0 +1,44 @@
+{
+  "name": "ids-rejected-deleted",
+  "group": "ids",
+  "description": "An op for an item deleted on the phone is rejected: 'Changed on phone'.",
+  "steps": [
+    {
+      "do": "phone.add",
+      "name": "Onion"
+    },
+    {
+      "do": "phone.add",
+      "name": "Milk"
+    },
+    {
+      "do": "watch.hello"
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "do": "phone.delete",
+      "item": 2
+    },
+    {
+      "do": "watch.toggle",
+      "item": 2
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "watch.result": {
+          "1": "rejected"
+        },
+        "watch.notice": "Changed on phone",
+        "watch.items": [
+          1
+        ],
+        "converged": true
+      }
+    }
+  ]
+}

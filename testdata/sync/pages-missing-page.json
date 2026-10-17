@@ -1,0 +1,66 @@
+{
+  "name": "pages-missing-page",
+  "group": "pages",
+  "description": "A snapshot with a page missing is never used; a hello fetches a whole one.",
+  "cap": {
+    "bytes": 220,
+    "maxPages": 8
+  },
+  "steps": [
+    {
+      "do": "phone.add",
+      "name": "Onion"
+    },
+    {
+      "do": "phone.add",
+      "name": "Milk"
+    },
+    {
+      "do": "phone.add",
+      "name": "Garlic"
+    },
+    {
+      "do": "phone.add",
+      "name": "Butter"
+    },
+    {
+      "do": "watch.hello"
+    },
+    {
+      "do": "deliver",
+      "to": "phone"
+    },
+    {
+      "do": "drop",
+      "to": "watch",
+      "index": 1
+    },
+    {
+      "do": "deliverAll",
+      "to": "watch"
+    },
+    {
+      "expect": {
+        "watch.listRev": 0,
+        "watch.items": []
+      }
+    },
+    {
+      "do": "watch.hello"
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "converged": true,
+        "watch.items": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "name": "coverage-phone-and-watch",
+  "group": "coverage",
+  "description": "The same item ticked on the phone and the watch: the watch tick is a noop; its untick finds no watch tick and is a noop too.",
+  "steps": [
+    {
+      "do": "phone.add",
+      "name": "Onion"
+    },
+    {
+      "do": "phone.add",
+      "name": "Milk"
+    },
+    {
+      "do": "watch.hello"
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "do": "watch.toggle",
+      "item": 1
+    },
+    {
+      "do": "phone.tick",
+      "item": 1
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "watch.result": {
+          "1": "noop"
+        },
+        "phone.ticks": 1,
+        "phone.done": {
+          "1": true
+        },
+        "converged": true
+      }
+    },
+    {
+      "do": "watch.toggle",
+      "item": 1
+    },
+    {
+      "do": "settle"
+    },
+    {
+      "expect": {
+        "watch.result": {
+          "2": "noop"
+        },
+        "phone.done": {
+          "1": true
+        },
+        "watch.view": {
+          "1": true
+        },
+        "converged": true
+      }
+    }
+  ]
+}
