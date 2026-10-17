@@ -51,11 +51,12 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 **Step 4 check:** MockWebServer tests cover every stop_reason (end_turn, refusal, max_tokens, other) and every error (401, 403, 429, 529, 5xx, 4xx, offline, invalid/schema-violating output): pass. Live smoke test and eval report: **not done** (blocked, above).
 
 ## Step 5 — Android app (phone only)
+(5.2 check: an acceptance test per path; import + Undo leaves the database equal apart from revs — UsesTest.)
 - [x] 5.1 :extract: SafeFetcher (https only, DNS filter for loopback/RFC1918/link-local/CGNAT/ULA/multicast, raw IPs and non-443 refused, manual redirects ≤5 re-checked, no cookies, 10 s/30 s, html or ld+json only, 3 MB after gunzip); Extractor (WPRM → Tasty → JSON-LD → microdata → heading → page text → manual) with every JSON-LD quirk tested; 12 live fixtures + 4 synthetic + 3 hostile (testdata/pages/SOURCES.md) — check: `tools/gradle.sh :extract:test`
 - [x] 5.2a Schema v1 (§4, exported to android/data/schemas/1.json; enums by name; Meta.nextId added; mergeKey unique among live items via a partial index; RecipeUse CHECK via triggers), Callback.onCreate seeds aisles, store 1 + AisleOrder, 5 staples, Meta; EpochMarker (noBackupFilesDir) → new epoch + watch installs cleared on mismatch. The repository (ListRepository, one transaction per op over the pure ShoppingList) lands here too — check: `tools/gradle.sh :data:testDebugUnitTest --tests "*SchemaTest*"`
 - [x] 5.2b Repository: apply preview (rev re-check → Stale, LineDecision rows), tick/untick, manual add (one MANUAL use), edit quantity, move aisle (+ "always" override), already-on-list — check: `tools/gradle.sh :data:testDebugUnitTest --tests "*RepositoryTest*"`
 - [x] 5.2c Remove use, Undo of an import (database equal apart from revs, recipe removed when unused), rescale, finish shopping + undo, soft delete + undo + 7-day purge — check: `tools/gradle.sh :data:testDebugUnitTest --tests "*UsesTest*"`
-- [ ] 5.2d Re-key, apply watch ops
+- [x] 5.2d Catalogue re-key on version change (merge, ItemAlias, override precedence) and watch ops in one transaction (epoch, go-back-N, duplicates re-acked, alias, rejected, partial, untick own tick, WatchOpResult last 64) — check: `tools/gradle.sh :data:testDebugUnitTest --tests "*WatchAndRekeyTest*"`
 - [ ] 5.3 App shell (container, WorkManager, nav, theme, import worker, WatchLink fake)
 - [ ] 5.4 Review screen
 - [ ] 5.5 Review row sheet
