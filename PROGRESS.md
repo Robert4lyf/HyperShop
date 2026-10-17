@@ -34,7 +34,7 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 - [x] 3.1 Categoriser (override → identity words → catalogue → Claude suggestion → head noun → keywords → Other); 97% of the 105 golden names categorised (≥ 85%) — check: `tools/gradle.sh :core:test --tests "*CategoriserTest*"`
 - [x] 3.2a Contributions: ShoppingList (items, uses, contributions, ticks, aliases, revs) + Merger.preview contribution building: servings scaling (range → upper bound), noScale, presence lines, "I have some" subtracted earliest line first, in-stock defaults (staples, optional, garnish), manual add / edit quantity, must-not-merge pairs — check: `tools/gradle.sh :core:test --tests "*ContributionsTest*"`
 - [x] 3.2b Covered/DONE, tick (covers all uncovered), untick (exactly the last tick), finish shopping (soft delete + 7-day archive) with undo; property tests: a tick always makes DONE, a later recipe is uncovered, untick restores exactly — check: `tools/gradle.sh :core:test --tests "*Ticking*"`
-- [ ] 3.2c Display rounding, units, pack note
+- [x] 3.2c Display: counts round up (produce to ½), friendly mass/volume steps, ½ ⅓ ¼ glyphs, metric/imperial/as-written, gramsPerCup combining else compound amounts, plural names, pack-note sub-line, "1 more onion" / "2 already ticked" — check: `tools/gradle.sh :core:test --tests "*DisplayTest*"`
 - [ ] 3.3 Merger.preview + rev check
 - [ ] 3.4 Catalogue re-key + ItemAlias
 
