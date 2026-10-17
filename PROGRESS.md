@@ -67,5 +67,10 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 - [x] 5.9 Share intent (ACTION_SEND text/plain on the singleTop MainActivity, onNewIntent; first https URL, utm_*/igsh stripped, EXTRA_SUBJECT as fallback title; queued as an ImportJob row, then the review screen), "Paste link" chip (clipboard description checked on resume, clip read only on tap), error states with "Select lines manually" (tick page lines or paste them) — check: `tools/gradle.sh :app:testDebugUnitTest --tests "*SharedText*" --tests "*ImportShared*" --tests "*ManualLines*" --tests "*ReviewViewModelTest"`. Real-app payloads: KNOWN_ISSUES #5.
 - [x] 5.10 Debug source set (Settings › Advanced › Debug tools): "Load sample list", "Sample recipe" (offline import → review), "Fake watch" (ticks through the same `applyWatch` transaction Run 2 uses), payload probe placeholder, log viewer; release source set has a null stub. Settings › Advanced "Show the debug log" shows the redacted in-memory log in any build. Backup rules exclude `datastore/claude_key.preferences_pb` (tested) — check: `tools/gradle.sh :app:testDebugUnitTest --tests "*DebugToolsTest" :app:compileReleaseKotlin`
 - [x] 5.11 `tools/contact-sheet`: every Roborazzi PNG in `docs/screenshots` → `docs/contact-sheet.png`, light/dark side by side (Pillow; ImageMagick `montage` fallback) — check: `tools/contact-sheet`
-- [ ] 5 Check: verify.sh green; APK link in HANDOFF.md
-- [ ] Hand-off A checklist written
+
+**Step 5 check:** `tools/verify.sh` green; the rolling-release APK link is in `docs/HANDOFF.md` (live once `main` exists).
+
+## ⏸ Hand-off A — waiting on you
+Run 1 stops here. The yes/no checks are in `docs/HANDOFF.md`. No PR: there is no `main` (PLAN §6 rule 4).
+- [x] 5 Check: verify.sh green; APK link in HANDOFF.md
+- [x] Hand-off A checklist written (docs/HANDOFF.md)
