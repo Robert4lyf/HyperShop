@@ -44,7 +44,7 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 - [x] 4.1 ADR 001: OkHttp + kotlinx.serialization, no SDK (docs/decisions/001-claude-http.md) — check: read the ADR
 - [x] 4.2 Request builder: model ids + cost table (Haiku 5.5 default), effort "low" always, no thinking param, fallbacks "default" + beta header only for Sonnet/Opus 5.5, strict schema from QtyUnit/AisleCode (all required, nullable via anyOf), prompt rules, <untrusted_content> wrapping, ~30k cap — check: `tools/gradle.sh :claude:test --tests "*ClaudeRequestTest*"`
 - [x] 4.3 Response handling: stop_reason first (refusal → Refused/rule parser, max_tokens → error), strict decode of the schema output (missing/extra fields rejected), Kotlin range checks (bad numbers dropped + check), verbatim https source_urls only, 401/403 bad key, 429/529 back-off ×2 honouring retry-after, 5xx retried once, IOException → offline, usage (incl. cache tokens) to a UsageSink, RingLog (500 lines) with key/header/query redaction, bodies never logged; GET /v1/models for Test key — check: `tools/gradle.sh :claude:test --tests "*ClaudeClientTest*"`
-- [ ] 4.4 Spend control
+- [x] 4.4 Spend control: SpendGuard (monthly cap $2 incl. cache tokens and the next call's estimate, 50 calls/day), cost table per model (Haiku ≈ $0.001/import, Sonnet 20×, Opus 40×), unknown fallback models priced high, GuardedClaude wrapper — check: `tools/gradle.sh :claude:test --tests "*SpendGuardTest*"`
 - [ ] 4.5 Live smoke test
 - [ ] 4.6 tools/eval-claude report
 
