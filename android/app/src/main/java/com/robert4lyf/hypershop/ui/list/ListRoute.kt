@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -18,7 +19,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.util.factoryFor
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @Composable
@@ -92,13 +95,31 @@ fun show(
     m: UiMessage,
 ) {
     container.applicationScope.launch(kotlinx.coroutines.Dispatchers.Main) {
-        val dismiss =
-            launch {
-                delay(m.seconds * 1000L)
-                snackbar.currentSnackbarData?.dismiss()
-            }
-        val r = snackbar.showSnackbar(m.text, actionLabel = m.undo?.let { "Undo" }, duration = SnackbarDuration.Indefinite)
-        dismiss.cancel()
+        val r = snackbar.showTimed(m.text, m.undo?.let { "Undo" }, m.seconds)
         if (r == SnackbarResult.ActionPerformed) m.undo?.invoke()
     }
 }
+
+/**
+ * Shows a snackbar for [seconds] once it is on screen. The clock starts when
+ * this snackbar appears, not while it waits behind another, and it only ever
+ * dismisses this one.
+ */
+suspend fun SnackbarHostState.showTimed(
+    text: String,
+    action: String?,
+    seconds: Int,
+): SnackbarResult =
+    coroutineScope {
+        val timer =
+            launch {
+                val mine = snapshotFlow { currentSnackbarData }.first { it?.visuals?.message == text }
+                delay(seconds * 1000L)
+                if (currentSnackbarData === mine) mine?.dismiss()
+            }
+        try {
+            showSnackbar(text, actionLabel = action, duration = SnackbarDuration.Indefinite)
+        } finally {
+            timer.cancel()
+        }
+    }

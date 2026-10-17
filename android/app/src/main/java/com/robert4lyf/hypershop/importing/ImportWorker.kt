@@ -6,7 +6,9 @@ import androidx.work.Data
 import androidx.work.ListenableWorker
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
+import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.di.AppContainer
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 
 /**
@@ -28,12 +30,19 @@ class ImportWorker(
         jobs.setState(jobId, JobState.RUNNING)
         val input = job.input
         val result =
-            container.importer.fromUrl(
-                url = input.url,
-                fallbackTitle = input.subject,
-                allowClaude = container.reviewGate.visible.value,
-                model = container.settings.model.first(),
-            )
+            try {
+                container.importer.fromUrl(
+                    url = input.url,
+                    fallbackTitle = input.subject,
+                    allowClaude = container.reviewGate.visible.value,
+                    model = container.settings.model.first(),
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Never leave the job RUNNING: the review screen would wait on it for ever.
+                ImportResult(input.url, input.subject, null, UnitLocale.METRIC, "MANUAL", error = ImportError.NO_RECIPE)
+            }
         jobs.finish(jobId, result)
         return Result.success()
     }

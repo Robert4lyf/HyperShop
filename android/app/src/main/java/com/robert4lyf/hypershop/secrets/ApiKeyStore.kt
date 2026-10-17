@@ -11,7 +11,8 @@ interface ApiKeyStore {
     /** The key, or null when none is stored or it could not be decrypted. */
     suspend fun get(): String?
 
-    suspend fun set(key: String)
+    /** False when the key could not be stored (the keystore failed); nothing changes then. */
+    suspend fun set(key: String): Boolean
 
     /** "Remove key": also clears it from memory. */
     suspend fun clear()
@@ -27,9 +28,10 @@ class InMemoryApiKeyStore(
 
     override suspend fun get(): String? = key
 
-    override suspend fun set(key: String) {
+    override suspend fun set(key: String): Boolean {
         this.key = key
         has.value = true
+        return true
     }
 
     override suspend fun clear() {

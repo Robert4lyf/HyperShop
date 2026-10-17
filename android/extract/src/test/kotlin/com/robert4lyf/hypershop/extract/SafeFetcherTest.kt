@@ -95,6 +95,24 @@ class SafeFetcherTest {
     }
 
     @Test
+    fun numericHostFormsAreRawIps() {
+        val strict = SafeFetcher()
+        for (h in listOf("2130706433", "0x7f000001", "0x7f.1", "127.1", "0177.0.0.1", "10.0.0.1.")) {
+            assertNotNull(strict.check("https://$h/"), h)
+        }
+        assertNull(strict.check("https://123recipes.com/"))
+        assertNull(strict.check("https://www.food52.com/"))
+    }
+
+    @Test
+    fun v4InsideV6IsCheckedAsV4() {
+        for (a in listOf("64:ff9b::a00:1", "64:ff9b::7f00:1", "64:ff9b:1::808:808", "2002:a00:1::", "2002:7f00:1::1")) {
+            assertFalse(SafeFetcher.isPublic(InetAddress.getByName(a)), a)
+        }
+        for (a in listOf("64:ff9b::808:808", "2002:808:808::1")) assertTrue(SafeFetcher.isPublic(InetAddress.getByName(a)), a)
+    }
+
+    @Test
     fun nonHtmlIsRefused() {
         server.enqueue(MockResponse().setHeader("Content-Type", "application/pdf").setBody("%PDF"))
         assertEquals(FetchResult.WrongType("application/pdf"), fetcher.fetch(server.url("/").toString()))

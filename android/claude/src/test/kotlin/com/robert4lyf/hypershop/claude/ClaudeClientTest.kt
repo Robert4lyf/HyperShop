@@ -96,6 +96,15 @@ class ClaudeClientTest {
     private fun ok(body: String) = MockResponse().setResponseCode(200).setBody(body)
 
     @Test
+    fun aKeyThatCantBeAHeaderIsABadKeyAndNeverSent() =
+        runTest {
+            val c = client("sk-\u200btest\u00e9")
+            assertEquals(ClaudeResult.Failed(ClaudeResult.Reason.BAD_KEY), c.parse(input, ClaudeModel.HAIKU))
+            assertEquals(KeyCheck.BAD_KEY, c.testKey("sk-\u200btest"))
+            assertEquals(0, server.requestCount)
+        }
+
+    @Test
     fun endTurnParsesAndRecordsUsage() =
         runTest {
             server.enqueue(ok(message()))

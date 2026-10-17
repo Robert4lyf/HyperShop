@@ -247,8 +247,10 @@ class ListViewModel(
             val p = plusOne.value ?: return@launch
             plusOne.value = null
             val parsed = c.ruleParser.parse(p.line)
-            val q = QtyBase.of(parsed.quantity ?: Rational.ONE, parsed.unit.takeIf { parsed.quantity != null }, UnitLocale.METRIC)
-            c.repository.manualAdd(parsed.name, q, parsed.unit)
+            // As a typed add would: grams over spoons, the top of a range; one more when no amount was typed.
+            val typed = parsed.shopBase(UnitLocale.METRIC)
+            val q = if (parsed.quantity == null || typed.isPresence) QtyBase.of(Rational.ONE, null, UnitLocale.METRIC) else typed
+            c.repository.manualAdd(parsed.name, q, parsed.shopUnit.takeIf { parsed.quantity != null })
         }
 
     fun dismissPlusOne() {

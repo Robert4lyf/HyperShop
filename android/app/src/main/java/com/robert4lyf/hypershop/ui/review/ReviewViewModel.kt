@@ -31,6 +31,8 @@ data class ReviewRow(
     /** A rule-parsed line that matched an unhandled pattern (R7), highlighted. */
     val check: Boolean,
     val aisle: AisleCode,
+    /** False when everything this row needs is already covered, so nothing is added. */
+    val adds: Boolean = true,
 )
 
 enum class Badge { CLAUDE, CLAUDE_PENDING, RULES }
@@ -68,7 +70,7 @@ data class ReviewUi(
     /** The recipe's page, to open in the browser. */
     val url: String? = null,
 ) {
-    val addCount: Int get() = aisles.sumOf { (_, rows) -> rows.count { !it.inStock } }
+    val addCount: Int get() = aisles.sumOf { (_, rows) -> rows.count { !it.inStock && it.adds } }
 }
 
 sealed interface ReviewState {
@@ -129,7 +131,8 @@ class ReviewViewModel(
         }
         var r = job?.result ?: return fail(ImportError.NO_RECIPE, emptyList())
         failedFrom = r
-        if (r.claudePending && c.reviewGate.visible.value) {
+        // Once per import: a failure or refusal in the worker isn't retried on open ("Retry with Claude" is).
+        if (r.claudePending && !r.claudeTried && c.reviewGate.visible.value) {
             _state.value = ReviewState.Loading
             r = c.importer.parse(r, allowClaude = true, model = c.settings.model.first())
         }
@@ -147,7 +150,7 @@ class ReviewViewModel(
     fun addAgain() = viewModelScope.launch { result?.let { begin(it) } }
 
     private suspend fun begin(r: ImportResult) {
-        servings = r.servings
+        servings = r.targetServings ?: r.servings
         store(r)
         decisions = c.repository.merger.defaultDecisions(preview!!.incoming, c.repository.staples()).toMutableMap()
         if (!r.preTick) decisions.replaceAll { _, d -> d.copy(inStock = false) }
@@ -234,6 +237,7 @@ class ReviewViewModel(
             inStock = d.inStock,
             check = lines.any { it.parsed.check },
             aisle = r.target.aisle,
+            adds = preview!!.contributions.any { it.mergeKey == r.target.mergeKey },
         )
     }
 
@@ -284,17 +288,29 @@ class ReviewViewModel(
         }
 
     /** "Add N items": one transaction re-checking every rev shown. */
-    fun confirm() =
+    private var applying = false
+
+    /** "Add N items". Runs once: a second tap while applying (or after) does nothing. */
+    fun confirm() {
+        val ready = _state.value as? ReviewState.Ready ?: return
+        if (applying) return
+        applying = true
+        _state.value = ready.copy(ui = ready.ui.copy(busy = true))
         viewModelScope.launch {
-            val p = preview ?: return@launch
-            when (val r = c.repository.apply(p)) {
-                is ApplyResult.Applied -> {
-                    c.importJobs.done(jobId)
-                    _state.value = ReviewState.Added(r.added, r.useId)
+            try {
+                val p = preview ?: return@launch
+                when (val r = c.repository.apply(p)) {
+                    is ApplyResult.Applied -> {
+                        c.importJobs.done(jobId)
+                        _state.value = ReviewState.Added(r.added, r.useId)
+                    }
+                    ApplyResult.Stale -> recompute(notice = "List changed — review updated")
                 }
-                ApplyResult.Stale -> recompute(notice = "List changed — review updated")
+            } finally {
+                applying = false
             }
         }
+    }
 
     fun cancel() =
         viewModelScope.launch {
@@ -370,8 +386,14 @@ class ReviewViewModel(
         text: String,
     ): Boolean {
         val parsed = c.ruleParser.parse(text.trim() + " x")
-        val q = QtyBase.of(parsed.quantity, parsed.unit, preview?.incoming?.locale ?: com.robert4lyf.hypershop.core.model.UnitLocale.METRIC)
+        val inc = preview?.incoming
+        val q = QtyBase.of(parsed.quantity, parsed.unit, inc?.locale ?: com.robert4lyf.hypershop.core.model.UnitLocale.METRIC)
         if (q.isPresence) return false
+        // A volume can't come off a mass (and so on): refuse rather than pretend it worked.
+        if (inc != null) {
+            val needed = inc.lines.filter { it.target.mergeKey == key }.fold(QtyBase.PRESENCE) { acc, l -> acc + lineQty(l, inc) }
+            if (!needed.isPresence && q.parts.keys.none { it in needed.parts.keys }) return false
+        }
         viewModelScope.launch {
             decisions[key] = (decisions[key] ?: RowDecision()).copy(haveSome = q, inStock = false)
             recompute()

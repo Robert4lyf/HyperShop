@@ -10,7 +10,7 @@ local.properties
 captures/
 .externalNativeBuild/
 .cxx/
-release/
+/release/
 
 # Kotlin compiler scratch
 .kotlin/

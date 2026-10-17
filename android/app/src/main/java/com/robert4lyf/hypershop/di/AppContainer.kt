@@ -37,7 +37,7 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneOffset
+import java.time.ZoneId
 
 sealed interface ShareOutcome {
     data class Review(
@@ -122,7 +122,8 @@ class AppContainer(
         return id
     }
 
-    fun today(): LocalDate = Instant.ofEpochMilli(clock()).atZone(ZoneOffset.UTC).toLocalDate()
+    /** The local calendar day, so "today" resets at your midnight. */
+    fun today(): LocalDate = Instant.ofEpochMilli(clock()).atZone(ZoneId.systemDefault()).toLocalDate()
 
     private suspend fun recordUsage(
         model: String,

@@ -129,13 +129,21 @@ class KeystoreApiKeyStore(
         return null
     }
 
-    override suspend fun set(key: String) =
+    override suspend fun set(key: String): Boolean =
         lock.withLock {
-            val (iv, data) = cipher.encrypt(key.trim().toByteArray(Charsets.UTF_8))
+            val (iv, data) =
+                try {
+                    cipher.encrypt(key.trim().toByteArray(Charsets.UTF_8))
+                } catch (e: GeneralSecurityException) {
+                    return@withLock false
+                } catch (e: ProviderException) {
+                    return@withLock false
+                }
             val blob = Base64.encodeToString(iv, Base64.NO_WRAP) + ":" + Base64.encodeToString(data, Base64.NO_WRAP)
             store.edit { it[BLOB] = blob }
             cached = key.trim()
             has.value = true
+            true
         }
 
     override suspend fun clear() = lock.withLock { wipe() }

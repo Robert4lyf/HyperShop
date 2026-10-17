@@ -117,10 +117,11 @@ class Importer(
                             locale = localeFor(base.url, r.recipe.ingredients.map { it.raw }),
                         )
                 }
-            is ClaudeResult.Refused -> ruled.copy(claudePending = true, claudeNote = "Claude declined; parsed offline")
+            is ClaudeResult.Refused -> ruled.copy(claudePending = true, claudeTried = true, claudeNote = "Claude declined; parsed offline")
             is ClaudeResult.Failed ->
                 ruled.copy(
                     claudePending = true,
+                    claudeTried = true,
                     claudeNote = r.reason.name,
                     error = if (base.rawLines.isEmpty()) ImportError.NO_RECIPE else null,
                 )
