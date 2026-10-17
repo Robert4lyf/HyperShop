@@ -22,7 +22,14 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 private val SHEET =
-    ItemSheet(1, "onion", listOf("2", "200 g"), listOf("Weeknight chilli", "Added by hand"), "1 × 1 kg bag", AisleCode.PRODUCE)
+    ItemSheet(
+        1,
+        "onion",
+        listOf("2", "200 g"),
+        listOf(ItemSource("Weeknight chilli", "2"), ItemSource("Added by hand", "200 g")),
+        "1 × 1 kg bag",
+        AisleCode.PRODUCE,
+    )
 
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -61,7 +68,13 @@ class ItemSheetTest {
             CompositionLocalProvider(LocalUriHandler provides handler) {
                 HyperShopTheme(dynamicColor = false) {
                     ItemSheetContent(
-                        SHEET.copy(links = mapOf("Weeknight chilli" to "https://recipes.example/chilli")),
+                        SHEET.copy(
+                            sources =
+                                listOf(
+                                    ItemSource("Weeknight chilli", "2", "https://recipes.example/chilli"),
+                                    ItemSource("Added by hand", "200 g"),
+                                ),
+                        ),
                         ItemSheetActions(onMove = { _, _ -> }, onEditQuantity = { true }),
                     )
                 }
@@ -79,6 +92,7 @@ class ItemSheetTest {
         compose.onNodeWithText("On the list: 2 + 200 g").assertExists()
         compose.onNodeWithText("Usually sold as 1 × 1 kg bag").assertExists()
         compose.onNodeWithText("Added by hand").assertExists()
+        compose.onNodeWithText("200 g").assertExists()
         compose.onNodeWithTag("edit-qty").performTextInput("lots")
         compose.onNodeWithText("Set").performClick()
         compose.onNodeWithText("Enter an amount, like 2 or 200 ml").assertExists()

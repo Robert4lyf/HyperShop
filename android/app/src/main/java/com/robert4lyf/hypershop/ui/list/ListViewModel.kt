@@ -49,12 +49,17 @@ data class ItemSheet(
     val name: String,
     /** One line per dimension: "2", "300 g". */
     val totals: List<String>,
-    /** The recipes (or "Added by hand") that contributed. */
-    val sources: List<String>,
+    /** The recipes (or "Added by hand") that contributed, with how much each. */
+    val sources: List<ItemSource>,
     val packNote: String?,
     val aisle: AisleCode,
-    /** Source title to its recipe page. */
-    val links: Map<String, String> = emptyMap(),
+)
+
+/** One "From" row: "Weeknight chilli · 400 g", linked to the recipe's page when it has one. */
+data class ItemSource(
+    val title: String,
+    val amount: String? = null,
+    val url: String? = null,
 )
 
 data class ListUi(
@@ -154,12 +159,18 @@ class ListViewModel(
                 list.total(id).parts.filterValues { it > Rational.ZERO }.mapNotNull { (k, v) ->
                     Display.amount(QtyBase(mapOf(k to v)), units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy)
                 }
-            val uses = list.contributionsOf(id).map { it.useId }.distinct()
-            val titles = c.repository.useTitles(uses)
-            val urls = c.repository.useUrls(uses)
-            val links = uses.mapNotNull { u -> titles[u]?.let { t -> webLink(urls[u])?.let { t to it } } }.toMap()
-            _sheet.value =
-                ItemSheet(id, entry?.name ?: item.displayName, totals, uses.mapNotNull { titles[it] }, entry?.packNote, item.aisle, links)
+            val byUse = list.contributionsOf(id).groupBy { it.useId }
+            val titles = c.repository.useTitles(byUse.keys)
+            val urls = c.repository.useUrls(byUse.keys)
+            val sources =
+                byUse.mapNotNull { (u, cs) ->
+                    val title = titles[u] ?: return@mapNotNull null
+                    val useHint = cs.mapNotNull { it.unitHint }.distinct().singleOrNull()
+                    val qty = cs.fold(QtyBase.PRESENCE) { acc, x -> acc + x.qty }
+                    val amount = Display.amount(qty, units, produce, useHint, entry?.gramsPerCup, entry?.displayPolicy)
+                    ItemSource(title, amount, webLink(urls[u]))
+                }
+            _sheet.value = ItemSheet(id, entry?.name ?: item.displayName, totals, sources, entry?.packNote, item.aisle)
         }
 
     fun closeItem() {

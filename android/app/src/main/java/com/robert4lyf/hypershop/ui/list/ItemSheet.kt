@@ -66,16 +66,19 @@ fun ItemSheetContent(
                 Text("From", style = MaterialTheme.typography.labelLarge)
                 val open = rememberOpenLink()
                 for (s in sheet.sources) {
-                    val url = sheet.links[s]
-                    if (url == null) {
-                        Text(s, style = MaterialTheme.typography.bodyMedium)
-                    } else {
-                        Text(
-                            s,
-                            style = MaterialTheme.typography.bodyMedium.copy(textDecoration = TextDecoration.Underline),
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.clickable { open(url) }.testTag("source-link"),
-                        )
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        val url = s.url
+                        if (url == null) {
+                            Text(s.title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        } else {
+                            Text(
+                                s.title,
+                                style = MaterialTheme.typography.bodyMedium.copy(textDecoration = TextDecoration.Underline),
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.weight(1f).clickable { open(url) }.testTag("source-link"),
+                            )
+                        }
+                        s.amount?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                     }
                 }
             }
