@@ -23,7 +23,7 @@ class ClaudeRequestTest {
     fun haikuByDefaultWithLowEffortAndNoThinkingOrFallbacks() {
         val b = ClaudeRequest.body(input, ClaudeModel.DEFAULT)
         assertEquals("claude-haiku-5-5", b["model"]!!.jsonPrimitive.content)
-        assertEquals(4000, b["max_tokens"]!!.jsonPrimitive.int)
+        assertEquals(16000, b["max_tokens"]!!.jsonPrimitive.int)
         assertEquals("low", b["output_config"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
         assertEquals("json_schema", b["output_config"]!!.jsonObject["format"]!!.jsonObject["type"]!!.jsonPrimitive.content)
         assertNull(b["thinking"], "thinking is never disabled, so never sent")

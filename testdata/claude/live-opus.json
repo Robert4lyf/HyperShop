@@ -1,0 +1,11 @@
+{
+  "model": "claude-opus-5-5",
+  "usage": "Usage(inputTokens=2547, outputTokens=653, cacheWriteTokens=0, cacheReadTokens=0)",
+  "ingredients": [
+    "ParsedIngredient(raw=2 ½ cups (300g) plain flour, sifted, name=plain flour, quantity=5/2, quantityMax=null, quantityText=2 ½ cups, unit=CUP, altQuantity=300, altUnit=G, note=sifted, section=null, optional=false, estimated=false, aisleSuggestion=BAKING, check=false)",
+    "ParsedIngredient(raw=salt and pepper, name=salt, quantity=null, quantityMax=null, quantityText=null, unit=null, altQuantity=null, altUnit=null, note=null, section=null, optional=false, estimated=false, aisleSuggestion=SPICES_CONDIMENTS, check=false)",
+    "ParsedIngredient(raw=salt and pepper, name=black pepper, quantity=null, quantityMax=null, quantityText=null, unit=null, altQuantity=null, altUnit=null, note=null, section=null, optional=false, estimated=false, aisleSuggestion=SPICES_CONDIMENTS, check=false)",
+    "ParsedIngredient(raw=juice of 1 lemon, name=lemon, quantity=1, quantityMax=null, quantityText=1, unit=null, altQuantity=null, altUnit=null, note=juice, section=null, optional=false, estimated=false, aisleSuggestion=PRODUCE, check=false)",
+    "ParsedIngredient(raw=400g tin chopped tomatoes, name=chopped tomatoes, quantity=1, quantityMax=null, quantityText=400g tin, unit=TIN, altQuantity=400, altUnit=G, note=null, section=null, optional=false, estimated=false, aisleSuggestion=TINS_JARS, check=false)"
+  ]
+}

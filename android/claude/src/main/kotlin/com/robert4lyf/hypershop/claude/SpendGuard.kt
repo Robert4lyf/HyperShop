@@ -62,7 +62,7 @@ class SpendGuard(
         const val DEFAULT_MONTHLY_CAP_USD = 2.0
         const val DEFAULT_DAILY_CALLS = 50
 
-        /** Roughly 4 characters a token, plus the system prompt and schema; output up to the 4000-token cap at worst. */
+        /** Roughly 4 characters a token, plus the system prompt and schema; a typical 2000 output tokens (the cap is ClaudeRequest.MAX_TOKENS). */
         fun estimateUsd(
             model: ClaudeModel,
             inputChars: Int,

@@ -2,8 +2,8 @@
 
 ## Status: Run 1 finished — stopped at ⏸ Hand-off A
 
-Steps 0–5 are done on branch `claude/happy-bardeen-i5ervk`, apart from the two
-items blocked on a key (4.5 live smoke test, 4.6 eval; see below). `tools/verify.sh`
+Steps 0–5 are done (branch `claude/happy-bardeen-i5ervk`, now on `main`). The
+live smoke test (4.5) and eval (4.6) were run afterwards, once a key was set. `tools/verify.sh`
 is green on the last commit. Details per sub-step: `PROGRESS.md`. Problems and
 workarounds: `docs/KNOWN_ISSUES.md`.
 
@@ -39,17 +39,16 @@ Answer each with yes or no; note anything that's a "no".
 12. [ ] `docs/contact-sheet.png` looks right in light and dark (no clipped text, readable contrast)?
 13. [ ] `catalog/REVIEW.md` — the aisles, staples and pack notes look right for your shop?
 14. [ ] The 20 held-out golden lines (`docs/golden-held-out.md`) are labelled the way you'd read them?
-15. [ ] Eval: **not available** — no key in the Run 1 container, so `docs/reports/eval-claude.md` doesn't exist yet. Run `HYPERSHOP_ANTHROPIC_API_KEY=… tools/eval-claude/run.sh` (and the live smoke test) yourself, or give the next run a key; then confirm Haiku 5.5 stays the default?
+15. [ ] Eval: `docs/reports/eval-claude.md`. Keep Claude Haiku 5.5 as the default? (`max_tokens` is now 16000 after Haiku hit the old 4000 cap; KNOWN_ISSUES #8.)
 
 ## Before Run 2
 
 - Hand-off A done (above), with `main` in place.
 - Copy your BangGym secrets to this repository: `CIQ_DEVELOPER_KEY`, `GARMIN_USERNAME`, `GARMIN_PASSWORD` (Settings › Secrets and variables › Actions).
-- Give the run an `HYPERSHOP_ANTHROPIC_API_KEY` if 4.5 and 4.6 should be finished then.
 
 ## Open items carried forward
 
-- 4.5 live smoke test and 4.6 eval report: written, skipped without a key (KNOWN_ISSUES #1).
+- 4.5 live smoke test and 4.6 eval report: done after Run 1, once the key was set.
 - Real-app share payloads (KNOWN_ISSUES #5) and the real Android Keystore path (KNOWN_ISSUES #7) are checked by you in Hand-off A.
 - Settings › Aisles reorders the store's walking order; the list screen picks it up when it is next opened.
 - The watch: Settings › Watch says "not connected"; the debug build's "Fake watch" ticks through the same transaction Run 2's link will use.

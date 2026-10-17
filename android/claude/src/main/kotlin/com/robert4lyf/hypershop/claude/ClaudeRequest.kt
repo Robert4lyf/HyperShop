@@ -34,7 +34,10 @@ sealed interface ClaudeInput {
 object ClaudeRequest {
     const val API_VERSION = "2023-06-01"
     const val FALLBACK_BETA = "server-side-fallback-2026-07-01"
-    const val MAX_TOKENS = 4000
+
+    // About 150 output tokens per ingredient plus up to ~1000 of adaptive thinking:
+    // room for a 60+ ingredient page. 4000 cut off a 15-line Haiku batch that thought first.
+    const val MAX_TOKENS = 16000
 
     /** About 30k characters of input; longer page text is cut at a line break. */
     const val INPUT_CAP = 30_000
