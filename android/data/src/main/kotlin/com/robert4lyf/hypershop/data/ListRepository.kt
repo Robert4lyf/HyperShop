@@ -80,9 +80,39 @@ class ListRepository(
         return dao.aisleOrder().map { AisleCode.valueOf(it.aisleCode) }.filter { it.name !in hidden }
     }
 
-    /** Settings › Aisles: the store's walking order. */
+    /** Settings › Aisles: the store's walking order. Bumps listRev, so the list (and the watch) re-read it. */
     suspend fun setAisleOrder(order: List<AisleCode>) =
-        db.withTransaction { dao.putAisleOrder(order.mapIndexed { i, a -> AisleOrderEntity(1, a.name, i) }) }
+        db.withTransaction {
+            dao.putAisleOrder(order.mapIndexed { i, a -> AisleOrderEntity(1, a.name, i) })
+            val meta = dao.meta()!!
+            dao.putMeta(meta.copy(listRev = meta.listRev + 1))
+        }
+
+    /** The walking order, re-read whenever listRev changes. */
+    fun observeAisleOrder(): Flow<List<AisleCode>> =
+        dao.observeListRev().filterNotNull().distinctUntilChanged().map { aisleOrder() }.distinctUntilChanged()
+
+    /** The units setting changed: every live item's text changed, so bump every rev and listRev once. */
+    suspend fun unitsChanged() = write { it.unitsChanged() to Unit }
+
+    /** "Always put X in Y" from the review screen. */
+    suspend fun setOverride(
+        mergeKey: String,
+        aisle: AisleCode,
+    ) = dao.putOverride(CategoryOverrideEntity(mergeKey, aisle.name, "USER"))
+
+    /** Adds one Claude call to today's usage row, atomically. */
+    suspend fun recordUsage(
+        date: String,
+        model: String,
+        inputTokens: Long,
+        outputTokens: Long,
+        cacheWrite: Long,
+        cacheRead: Long,
+    ) = db.withTransaction {
+        dao.insertUsageIfAbsent(ClaudeUsageEntity(date, model, 0, 0, 0, 0, 0))
+        dao.addUsage(date, model, inputTokens, outputTokens, cacheWrite, cacheRead)
+    }
 
     fun observeStaples(): Flow<Set<String>> = dao.observeStaples().map { rows -> rows.map { it.key }.toSet() }
 
@@ -103,14 +133,20 @@ class ListRepository(
         )
     }
 
-    /** Writes [new] over [old]: inserts and updates parents first, deletes children first. */
+    /**
+     * Writes [new] over [old]: inserts and updates parents first, deletes children first.
+     * Items whose mergeKey changed (a re-key) are written last, after the items
+     * merged into them are gone: the loser may still hold the new key, and live
+     * keys are unique.
+     */
     private suspend fun persist(
         old: ShoppingList,
         new: ShoppingList,
     ) {
         val now = clock()
         val changedItems = new.items.values.filter { old.items[it.id] != it }
-        dao.upsertItems(changedItems.map { Mapping.item(it, now) })
+        val (rekeyed, others) = changedItems.partition { i -> old.items[i.id]?.let { it.mergeKey != i.mergeKey } == true }
+        dao.upsertItems(others.map { Mapping.item(it, now) })
         val newlyDeleted = changedItems.filter { it.deletedAt != null && old.items[it.id]?.deletedAt == null }
         dao.putDeleted(newlyDeleted.map { DeletedItemEntity(it.id, it.deletedAt!!) })
         val undeleted = changedItems.filter { it.deletedAt == null && old.items[it.id]?.deletedAt != null }.map { it.id }
@@ -128,6 +164,7 @@ class ListRepository(
         old.ticks.map { it.id }.filter { it !in newTicks }.takeIf { it.isNotEmpty() }?.let { dao.deleteTicks(it) }
         (old.uses.keys - new.uses.keys).toList().takeIf { it.isNotEmpty() }?.let { dao.deleteUses(it) }
         (old.items.keys - new.items.keys).toList().takeIf { it.isNotEmpty() }?.let { dao.deleteItems(it) }
+        dao.upsertItems(rekeyed.map { Mapping.item(it, now) })
 
         val meta = dao.meta()!!
         dao.putMeta(meta.copy(listRev = new.listRev, nextId = new.nextId))
@@ -169,11 +206,17 @@ class ListRepository(
             if (dao.uses().none { it.recipeId == id }) dao.deleteRecipe(id)
         }
 
-    /** "Already on your list — add again?" */
-    suspend fun alreadyOnList(url: String): Boolean {
-        val recipes = dao.recipesByUrl(url).map { it.id }.toSet()
-        return recipes.isNotEmpty() && dao.uses().any { it.recipeId in recipes && it.archivedAt == null }
-    }
+    /** "Already on your list — add again?": a use of this page that [usesOnList] would show. */
+    suspend fun alreadyOnList(url: String): Boolean =
+        db.withTransaction {
+            val recipes = dao.recipesByUrl(url).map { it.id }.toSet()
+            if (recipes.isEmpty()) return@withTransaction false
+            val l = load()
+            val live = l.liveItems.map { it.id }.toSet()
+            l.uses.values.any { u ->
+                u.recipeId in recipes && u.archivedAt == null && l.contributions.any { it.useId == u.id && it.itemId in live }
+            }
+        }
 
     /** The Recipes tab: uses with something on the list, newest first. */
     suspend fun usesOnList(): List<UseSummary> =
@@ -373,6 +416,13 @@ class ListRepository(
                 val existing = overrides[to]
                 if (existing == null || (existing.source != "USER" && o.source == "USER")) dao.putOverride(o.copy(key = to))
                 dao.deleteOverride(from)
+            }
+            val staples = dao.staples().associateBy { it.key }
+            for ((from, to) in r.renamed) {
+                val st = staples[from] ?: continue
+                val existing = staples[to]
+                if (existing == null || (existing.source != "USER" && st.source == "USER")) dao.putStaple(st.copy(key = to))
+                dao.deleteStaple(from)
             }
             dao.putMeta(dao.meta()!!.copy(catalogVersion = catalog.version))
             true

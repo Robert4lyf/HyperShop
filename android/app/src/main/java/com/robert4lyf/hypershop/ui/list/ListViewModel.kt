@@ -78,7 +78,8 @@ data class ListUi(
 class ListViewModel(
     private val c: AppContainer,
 ) : ViewModel() {
-    private val order = MutableStateFlow(AisleCode.entries.toList())
+    /** Re-read on every list change, so a new walking order from Settings shows straight away. */
+    private val order = c.repository.observeAisleOrder()
     private val messages = Channel<UiMessage>(Channel.BUFFERED)
     val events: Flow<UiMessage> = messages.receiveAsFlow()
 
@@ -92,10 +93,6 @@ class ListViewModel(
             lastList = list
             build(list, units, ord).copy(readyJobs = ready.map { it.id }, plusOne = p)
         }.stateIn(viewModelScope, SharingStarted.Eagerly, ListUi())
-
-    init {
-        viewModelScope.launch { order.value = c.repository.aisleOrder() }
-    }
 
     private fun build(
         list: ShoppingList,

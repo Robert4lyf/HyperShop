@@ -155,12 +155,44 @@ interface ListDao {
     @Upsert
     suspend fun putUsage(u: ClaudeUsageEntity)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertUsageIfAbsent(u: ClaudeUsageEntity)
+
+    /** One call's tokens, added in a single statement (no read-then-write). */
+    @Query(
+        "UPDATE ClaudeUsage SET inputTokens = inputTokens + :input, outputTokens = outputTokens + :output, " +
+            "cacheWrite = cacheWrite + :cacheWrite, cacheRead = cacheRead + :cacheRead, calls = calls + 1 " +
+            "WHERE date = :date AND model = :model",
+    )
+    suspend fun addUsage(
+        date: String,
+        model: String,
+        input: Long,
+        output: Long,
+        cacheWrite: Long,
+        cacheRead: Long,
+    )
+
     // ---- import jobs ------------------------------------------------------------
     @Insert
     suspend fun insertJob(j: ImportJobEntity): Long
 
     @Upsert
     suspend fun putJob(j: ImportJobEntity)
+
+    @Query("UPDATE ImportJob SET state = :state WHERE id = :id")
+    suspend fun setJobState(
+        id: Long,
+        state: String,
+    )
+
+    @Query("UPDATE ImportJob SET state = :state, resultJson = :resultJson, error = :error WHERE id = :id")
+    suspend fun finishJob(
+        id: Long,
+        state: String,
+        resultJson: String?,
+        error: String?,
+    )
 
     @Query("SELECT * FROM ImportJob WHERE id = :id")
     suspend fun job(id: Long): ImportJobEntity?

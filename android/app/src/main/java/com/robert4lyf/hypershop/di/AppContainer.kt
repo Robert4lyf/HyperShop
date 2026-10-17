@@ -12,7 +12,6 @@ import com.robert4lyf.hypershop.claude.UsageRecord
 import com.robert4lyf.hypershop.core.catalog.Catalog
 import com.robert4lyf.hypershop.core.catalog.CatalogLoader
 import com.robert4lyf.hypershop.core.parse.RuleParser
-import com.robert4lyf.hypershop.data.ClaudeUsageEntity
 import com.robert4lyf.hypershop.data.EpochMarker
 import com.robert4lyf.hypershop.data.HyperShopDatabase
 import com.robert4lyf.hypershop.data.ListRepository
@@ -128,20 +127,14 @@ class AppContainer(
     private suspend fun recordUsage(
         model: String,
         u: Usage,
-    ) {
-        val dao = db.dao()
-        val date = today().toString()
-        val row = dao.usageRow(date, model) ?: ClaudeUsageEntity(date, model, 0, 0, 0, 0, 0)
-        dao.putUsage(
-            row.copy(
-                inputTokens = row.inputTokens + u.inputTokens,
-                outputTokens = row.outputTokens + u.outputTokens,
-                cacheWrite = row.cacheWrite + u.cacheWriteTokens,
-                cacheRead = row.cacheRead + u.cacheReadTokens,
-                calls = row.calls + 1,
-            ),
-        )
-    }
+    ) = repository.recordUsage(
+        today().toString(),
+        model,
+        u.inputTokens,
+        u.outputTokens,
+        u.cacheWriteTokens,
+        u.cacheReadTokens,
+    )
 
     suspend fun usageHistory(): List<UsageRecord> =
         db.dao().usage().map {

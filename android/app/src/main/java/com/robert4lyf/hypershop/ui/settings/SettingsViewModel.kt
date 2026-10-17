@@ -83,7 +83,11 @@ class SettingsViewModel(
 
     // ---- List ------------------------------------------------------------------------------
 
-    fun setUnits(u: UnitsSetting) = viewModelScope.launch { c.settings.setUnits(u) }
+    fun setUnits(u: UnitsSetting) =
+        viewModelScope.launch {
+            c.settings.setUnits(u)
+            c.repository.unitsChanged()
+        }
 
     fun removeStaple(name: String) =
         viewModelScope.launch {

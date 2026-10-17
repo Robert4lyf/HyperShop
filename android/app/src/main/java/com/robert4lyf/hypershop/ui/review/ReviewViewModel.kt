@@ -416,7 +416,7 @@ class ReviewViewModel(
         always: Boolean,
     ) = viewModelScope.launch {
         if (always) {
-            c.db.dao().putOverride(com.robert4lyf.hypershop.data.CategoryOverrideEntity(key, aisle.name, "USER"))
+            c.repository.setOverride(key, aisle)
         } else {
             aisleMoves[key] = aisle
         }
