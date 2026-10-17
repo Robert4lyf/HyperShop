@@ -42,7 +42,7 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 
 ## Step 4 — Claude client
 - [x] 4.1 ADR 001: OkHttp + kotlinx.serialization, no SDK (docs/decisions/001-claude-http.md) — check: read the ADR
-- [ ] 4.2 Request builder
+- [x] 4.2 Request builder: model ids + cost table (Haiku 5.5 default), effort "low" always, no thinking param, fallbacks "default" + beta header only for Sonnet/Opus 5.5, strict schema from QtyUnit/AisleCode (all required, nullable via anyOf), prompt rules, <untrusted_content> wrapping, ~30k cap — check: `tools/gradle.sh :claude:test --tests "*ClaudeRequestTest*"`
 - [ ] 4.3 Response handling
 - [ ] 4.4 Spend control
 - [ ] 4.5 Live smoke test
