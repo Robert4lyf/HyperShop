@@ -1,0 +1,154 @@
+package com.robert4lyf.hypershop.importing
+
+import com.robert4lyf.hypershop.claude.ClaudeInput
+import com.robert4lyf.hypershop.claude.ClaudeModel
+import com.robert4lyf.hypershop.claude.ClaudeResult
+import com.robert4lyf.hypershop.claude.GuardedClaude
+import com.robert4lyf.hypershop.claude.RecipeStatus
+import com.robert4lyf.hypershop.core.model.ParsedBy
+import com.robert4lyf.hypershop.core.model.QtyUnit
+import com.robert4lyf.hypershop.core.model.UnitLocale
+import com.robert4lyf.hypershop.core.parse.RuleParser
+import com.robert4lyf.hypershop.extract.Extractor
+import com.robert4lyf.hypershop.extract.FetchResult
+import com.robert4lyf.hypershop.extract.Method
+import com.robert4lyf.hypershop.extract.SafeFetcher
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+
+/**
+ * Claude is only called while the review screen is in the foreground (PLAN §3.7):
+ * a share intent on its own never spends money.
+ */
+class ReviewGate {
+    private val v = MutableStateFlow(false)
+    val visible: StateFlow<Boolean> = v
+
+    fun set(visible: Boolean) {
+        v.value = visible
+    }
+}
+
+/** Fetch → extract → parse (PLAN §3.1). Rules always; Claude when allowed, keyed and online. */
+class Importer(
+    private val fetcher: SafeFetcher,
+    private val rules: RuleParser,
+    private val claude: GuardedClaude?,
+    private val hasKey: suspend () -> Boolean,
+) {
+    suspend fun fromUrl(
+        url: String,
+        fallbackTitle: String?,
+        allowClaude: Boolean,
+        model: ClaudeModel,
+    ): ImportResult {
+        val locale = localeFor(url, emptyList())
+        val page =
+            when (val f = fetcher.fetch(url)) {
+                is FetchResult.Ok -> f
+                is FetchResult.Blocked -> return failed(url, fallbackTitle, locale, ImportError.BLOCKED)
+                is FetchResult.WrongType -> return failed(url, fallbackTitle, locale, ImportError.NOT_HTML)
+                FetchResult.TooLarge -> return failed(url, fallbackTitle, locale, ImportError.TOO_LARGE)
+                is FetchResult.HttpError -> return failed(url, fallbackTitle, locale, ImportError.HTTP)
+                FetchResult.Network -> return failed(url, fallbackTitle, locale, ImportError.OFFLINE)
+            }
+        val e = Extractor.extract(page.body, page.finalUrl)
+        val recipe = e.recipes.firstOrNull()
+        val title = recipe?.title ?: e.pageTitle ?: fallbackTitle
+        val raw = recipe?.lines.orEmpty()
+        val base =
+            ImportResult(
+                url = url,
+                title = title,
+                servings = recipe?.servings,
+                locale = localeFor(url, raw),
+                method = e.method.name,
+                rawLines = raw,
+                pageText = e.pageText,
+            )
+        return parse(base, allowClaude, model)
+    }
+
+    /** Lines typed or pasted (the "Add item" field never comes here; it skips review). */
+    suspend fun fromLines(
+        lines: List<String>,
+        title: String?,
+        allowClaude: Boolean,
+        model: ClaudeModel,
+    ): ImportResult =
+        parse(
+            ImportResult(null, title, null, localeFor(null, lines), Method.MANUAL.name, rawLines = lines),
+            allowClaude,
+            model,
+        )
+
+    /** Parses [base]'s raw lines (or page text): Claude when allowed, else the rule parser marked "Claude pending". */
+    suspend fun parse(
+        base: ImportResult,
+        allowClaude: Boolean,
+        model: ClaudeModel,
+    ): ImportResult {
+        val ruled = base.copy(lines = rules.parseLines(base.rawLines), parsedBy = ParsedBy.RULES)
+        val keyed = claude != null && hasKey()
+        val input =
+            when {
+                base.rawLines.isNotEmpty() -> ClaudeInput.Lines(base.rawLines, base.title, base.servings)
+                !base.pageText.isNullOrBlank() -> ClaudeInput.PageText(base.pageText, base.title)
+                else -> return ruled.copy(error = ImportError.NO_RECIPE)
+            }
+        if (!allowClaude || !keyed) {
+            val noLines = base.rawLines.isEmpty()
+            return ruled.copy(claudePending = keyed, error = if (noLines && !keyed) ImportError.NO_RECIPE else null)
+        }
+        return when (val r = claude!!.parse(input, model)) {
+            is ClaudeResult.Parsed ->
+                when (r.recipe.status) {
+                    RecipeStatus.NOT_A_RECIPE -> ruled.copy(error = if (base.rawLines.isEmpty()) ImportError.NOT_A_RECIPE else null)
+                    RecipeStatus.NO_INGREDIENTS -> ruled.copy(error = if (base.rawLines.isEmpty()) ImportError.NO_RECIPE else null)
+                    RecipeStatus.OK ->
+                        base.copy(
+                            lines = r.recipe.ingredients,
+                            title = base.title ?: r.recipe.title,
+                            servings = base.servings ?: r.recipe.servings,
+                            parsedBy = ParsedBy.CLAUDE,
+                            model = r.recipe.model,
+                            claudePending = false,
+                            sourceUrls = r.recipe.sourceUrls,
+                            locale = localeFor(base.url, r.recipe.ingredients.map { it.raw }),
+                        )
+                }
+            is ClaudeResult.Refused -> ruled.copy(claudePending = true, claudeNote = "Claude declined; parsed offline")
+            is ClaudeResult.Failed ->
+                ruled.copy(
+                    claudePending = true,
+                    claudeNote = r.reason.name,
+                    error = if (base.rawLines.isEmpty()) ImportError.NO_RECIPE else null,
+                )
+        }
+    }
+
+    private fun failed(
+        url: String,
+        title: String?,
+        locale: UnitLocale,
+        error: ImportError,
+    ) = ImportResult(url, title, null, locale, Method.MANUAL.name, error = error)
+
+    companion object {
+        /** R2.2: metric when lines use g/ml; UK for UK sites; else US. */
+        fun localeFor(
+            url: String?,
+            lines: List<String>,
+        ): UnitLocale {
+            val host = url?.substringAfter("://")?.substringBefore('/')?.lowercase().orEmpty()
+            if (host.endsWith(".co.uk") || host.endsWith(".uk") || "bbcgoodfood" in host) return UnitLocale.UK
+            val rp = RuleParser()
+            val metric =
+                lines.take(50).count {
+                        l ->
+                    rp.parse(l).unit.let { it == QtyUnit.G || it == QtyUnit.ML || it == QtyUnit.KG || it == QtyUnit.L }
+                }
+            return if (metric * 3 >= maxOf(1, lines.size)) UnitLocale.METRIC else UnitLocale.US
+        }
+    }
+}

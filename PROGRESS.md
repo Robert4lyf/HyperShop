@@ -57,7 +57,7 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 - [x] 5.2b Repository: apply preview (rev re-check → Stale, LineDecision rows), tick/untick, manual add (one MANUAL use), edit quantity, move aisle (+ "always" override), already-on-list — check: `tools/gradle.sh :data:testDebugUnitTest --tests "*RepositoryTest*"`
 - [x] 5.2c Remove use, Undo of an import (database equal apart from revs, recipe removed when unused), rescale, finish shopping + undo, soft delete + undo + 7-day purge — check: `tools/gradle.sh :data:testDebugUnitTest --tests "*UsesTest*"`
 - [x] 5.2d Catalogue re-key on version change (merge, ItemAlias, override precedence) and watch ops in one transaction (epoch, go-back-N, duplicates re-acked, alias, rejected, partial, untick own tick, WatchOpResult last 64) — check: `tools/gradle.sh :data:testDebugUnitTest --tests "*WatchAndRekeyTest*"`
-- [ ] 5.3 App shell (container, WorkManager, nav, theme, import worker, WatchLink fake)
+- [x] 5.3 App shell: AppContainer (db, repository, Settings DataStore, key store interface, Claude client + GuardedClaude with caps from Settings, usage → ClaudeUsage, importer, jobs, ReviewGate); WorkManager Configuration.Provider with a factory from the container (InitializationProvider merge, WorkManagerInitializer removed); NavHost + 3 tabs + review route; theme (dynamic colour optional); edge-to-edge, predictive back; ImportWorker (Claude only while the review screen is visible); WatchLink + NoWatchLink + FakeWatchLink — check: `tools/gradle.sh :app:testDebugUnitTest --tests "*ImportWorkerTest*"` (Robolectric sdk 34 + 36, SynchronousExecutor, test container)
 - [ ] 5.4 Review screen
 - [ ] 5.5 Review row sheet
 - [ ] 5.6a List

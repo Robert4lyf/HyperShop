@@ -50,7 +50,7 @@ class SpendGuardTest {
         runTest {
             val client = ClaudeClient(apiKey = { error("must not be called") })
             val g =
-                GuardedClaude(client, SpendGuard(dailyCallCap = 0), history = { emptyList() }, today = { today })
+                GuardedClaude(client, { SpendGuard(dailyCallCap = 0) }, history = { emptyList() }, today = { today })
             val r = g.parse(ClaudeInput.Lines(listOf("1 egg")), ClaudeModel.HAIKU) as ClaudeResult.Failed
             assertEquals(ClaudeResult.Reason.CAP_REACHED, r.reason)
         }

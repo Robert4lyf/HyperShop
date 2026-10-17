@@ -32,7 +32,7 @@ enum class KeyCheck { OK, BAD_KEY, OFFLINE, ERROR }
  * `stop_reason` is read before `content`.
  */
 class ClaudeClient(
-    private val apiKey: () -> String?,
+    private val apiKey: suspend () -> String?,
     private val baseUrl: String = "https://api.anthropic.com",
     private val http: OkHttpClient = defaultHttp(),
     private val usageSink: UsageSink = UsageSink { _, _ -> },

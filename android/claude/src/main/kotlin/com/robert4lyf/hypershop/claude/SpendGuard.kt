@@ -82,7 +82,7 @@ class SpendGuard(
 /** The client behind the caps: what the import worker calls. */
 class GuardedClaude(
     private val client: ClaudeClient,
-    private val guard: SpendGuard,
+    private val guard: suspend () -> SpendGuard,
     private val history: suspend () -> List<UsageRecord>,
     private val today: () -> LocalDate = { LocalDate.now() },
 ) {
@@ -95,7 +95,7 @@ class GuardedClaude(
                 is ClaudeInput.Lines -> input.lines.sumOf { it.length + 1 }
                 is ClaudeInput.PageText -> minOf(input.text.length, ClaudeRequest.INPUT_CAP)
             }
-        return when (guard.check(history(), today(), model, chars)) {
+        return when (guard().check(history(), today(), model, chars)) {
             is SpendGuard.Decision.Allowed -> client.parse(input, model)
             else -> ClaudeResult.Failed(ClaudeResult.Reason.CAP_REACHED)
         }

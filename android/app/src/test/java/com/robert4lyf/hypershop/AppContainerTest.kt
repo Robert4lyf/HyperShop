@@ -6,10 +6,12 @@ import org.junit.Assert.assertNotNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.SQLiteMode
 
 /** Step 0.4: the Application builds its AppContainer under Robolectric. */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34, 36])
+@SQLiteMode(SQLiteMode.Mode.LEGACY)
 class AppContainerTest {
     @Test
     fun containerIsBuilt() {

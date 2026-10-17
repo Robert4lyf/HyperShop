@@ -42,9 +42,10 @@ ksp {
 }
 
 dependencies {
-    implementation(project(":core"))
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
+    api(project(":core"))
+    // Room types appear in the repository API (the database is built in :app).
+    api(libs.androidx.room.runtime)
+    api(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
