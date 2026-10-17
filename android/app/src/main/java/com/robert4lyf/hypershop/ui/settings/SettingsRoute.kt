@@ -45,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -70,6 +71,7 @@ data class SettingsActions(
     val onMonthlyCap: (String) -> Boolean = { true },
     val onDailyCalls: (String) -> Boolean = { true },
     val onDebugLog: (Boolean) -> Unit = {},
+    val onRefreshLog: () -> Unit = {},
     /** Debug builds only. */
     val onDebug: (() -> Unit)? = null,
 )
@@ -102,6 +104,7 @@ fun SettingsRoute(
             onMonthlyCap = vm::setMonthlyCap,
             onDailyCalls = vm::setDailyCalls,
             onDebugLog = { vm.setDebugLog(it) },
+            onRefreshLog = { vm.refreshLog() },
             onDebug = onDebug,
         ),
     )
@@ -389,7 +392,21 @@ private fun LazyListScope.advancedGroup(
     actions: SettingsActions,
 ) {
     group("Advanced")
-    item(key = "debug-log") { SwitchRow("Keep a debug log (on this phone only)", ui.debugLog, actions.onDebugLog) }
+    item(key = "debug-log") { SwitchRow("Show the debug log", ui.debugLog, actions.onDebugLog) }
+    if (ui.debugLog) {
+        item(key = "debug-log-lines") {
+            Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    "Kept in memory only, never sent anywhere. Keys and query strings are removed.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (ui.logLines.isEmpty()) Text("Nothing logged yet")
+                for (l in ui.logLines) Text(l, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                TextButton(onClick = actions.onRefreshLog) { Text("Refresh") }
+            }
+        }
+    }
     actions.onDebug?.let { open ->
         item(key = "debug-tools") {
             TextButton(onClick = open, modifier = Modifier.padding(horizontal = 8.dp)) { Text("Debug tools") }

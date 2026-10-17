@@ -70,8 +70,8 @@ class SettingsScreenTest {
         compose.onNodeWithTag("privacy").assertExists()
         list.performScrollToNode(hasTestTag("spend"))
         compose.onNodeWithText("Spent this month: $0.04 of $2.00 · 3 of 50 calls today").assertExists()
-        list.performScrollToNode(hasText("Keep a debug log (on this phone only)"))
-        compose.onNodeWithText("Keep a debug log (on this phone only)").assertIsOff().performClick()
+        list.performScrollToNode(hasText("Show the debug log"))
+        compose.onNodeWithText("Show the debug log").assertIsOff().performClick()
         assertEquals(listOf("staple salt", "aisle ${AisleCode.entries[1]} -1", "key 6", "log true"), events)
     }
 

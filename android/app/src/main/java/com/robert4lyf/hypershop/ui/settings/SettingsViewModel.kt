@@ -34,6 +34,8 @@ data class SettingsUi(
     val spentThisMonthUsd: Double = 0.0,
     val callsToday: Int = 0,
     val debugLog: Boolean = false,
+    /** The in-memory log's last lines (redacted), shown while [debugLog] is on. */
+    val logLines: List<String> = emptyList(),
 )
 
 /** Settings (PLAN §3.5 groups; Claude per §3.7). */
@@ -52,7 +54,7 @@ class SettingsViewModel(
         watch(s.monthlyCapUsd) { copy(monthlyCapUsd = it) }
         watch(s.dailyCalls) { copy(dailyCalls = it) }
         watch(s.watchVibrate) { copy(watchVibrate = it) }
-        watch(s.debugLog) { copy(debugLog = it) }
+        watch(s.debugLog) { copy(debugLog = it, logLines = if (it) c.log.snapshot().takeLast(LOG_LINES) else emptyList()) }
         watch(s.keyLostNotice) { copy(keyLost = it) }
         watch(s.keyWasSet) {
             keyWasSet = it
@@ -164,4 +166,10 @@ class SettingsViewModel(
     // ---- Advanced --------------------------------------------------------------------------
 
     fun setDebugLog(on: Boolean) = viewModelScope.launch { c.settings.setDebugLog(on) }
+
+    fun refreshLog() = _ui.update { it.copy(logLines = c.log.snapshot().takeLast(LOG_LINES)) }
+
+    private companion object {
+        const val LOG_LINES = 100
+    }
 }

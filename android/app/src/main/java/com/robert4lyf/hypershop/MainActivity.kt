@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import com.robert4lyf.hypershop.debug.DebugTools
 import com.robert4lyf.hypershop.ui.HyperShopApp
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
 import kotlinx.coroutines.launch
@@ -19,7 +20,7 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) handle(intent)
         setContent {
             HyperShopTheme {
-                HyperShopApp(container)
+                HyperShopApp(container, debugScreen = DebugTools.screen)
             }
         }
     }
