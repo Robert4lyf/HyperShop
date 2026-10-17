@@ -86,7 +86,10 @@ class ClaudeEvalTest {
         val gold = load("frozen.json") + load("synthetic-uk.json")
         val client = ClaudeClient(apiKey = { key })
         val rows =
-            StringBuilder("| parser | set | lines | name | qty | unit | cost (USD) | output tokens |\n|---|---|---|---|---|---|---|---|\n")
+            StringBuilder(
+                "| parser | set | lines | name | qty | unit | cost (USD) | output tokens | failed batches |\n" +
+                    "|---|---|---|---|---|---|---|---|---|\n",
+            )
 
         fun pct(
             a: Int,
@@ -96,30 +99,39 @@ class ClaudeEvalTest {
         val rules = RuleParser()
         for ((set, g) in gold.groupBy { it.set }) {
             val s = score(g, g.map { rules.parse(it.raw) })
-            rows.append("| rules | $set | ${s.n} | ${pct(s.name, s.n)} | ${pct(s.qty, s.n)} | ${pct(s.unit, s.n)} | 0 | 0 |\n")
+            rows.append("| rules | $set | ${s.n} | ${pct(s.name, s.n)} | ${pct(s.qty, s.n)} | ${pct(s.unit, s.n)} | 0 | 0 | |\n")
         }
-        for (m in ClaudeModel.entries) {
+        // -Deval.models=opus,sonnet limits the run to those models (by id substring).
+        val only = System.getProperty("eval.models")?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+        for (m in ClaudeModel.entries.filter { m -> only == null || only.any { m.id.contains(it) } }) {
             for ((set, g) in gold.groupBy { it.set }) {
                 // One call per batch of 15 lines, as an import would send them.
                 var cost = 0.0
                 var out = 0L
                 val got = ArrayList<ParsedIngredient?>()
+                val failed = ArrayList<String>()
                 for (chunk in g.chunked(15)) {
                     val r = runBlocking { client.parse(ClaudeInput.Lines(chunk.map { it.raw }), m) }
                     r.usage?.let {
                         cost += m.costUsd(it)
                         out += it.outputTokens
                     }
+                    when (r) {
+                        is ClaudeResult.Parsed -> {}
+                        is ClaudeResult.Refused -> failed += "REFUSED"
+                        is ClaudeResult.Failed -> failed += r.reason.name
+                    }
                     val ings = (r as? ClaudeResult.Parsed)?.recipe?.ingredients.orEmpty()
                     // Claude may split "X and Y"; match each golden line by its raw text.
                     got += chunk.map { c -> ings.firstOrNull { it.raw.trim() == c.raw.trim() } }
                 }
                 val s = score(g, got)
+                val fails = failed.groupingBy { it }.eachCount().entries.joinToString { "${it.key} ×${it.value}" }
                 rows.append(
                     "| ${m.id} | $set | ${s.n} | ${pct(
                         s.name,
                         s.n,
-                    )} | ${pct(s.qty, s.n)} | ${pct(s.unit, s.n)} | ${"%.4f".format(cost)} | $out |\n",
+                    )} | ${pct(s.qty, s.n)} | ${pct(s.unit, s.n)} | ${"%.4f".format(cost)} | $out | $fails |\n",
                 )
             }
         }
