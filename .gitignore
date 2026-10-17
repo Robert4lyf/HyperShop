@@ -1,0 +1,56 @@
+# Gradle / Android
+.gradle/
+build/
+local.properties
+*.apk
+*.aab
+*.aar
+*.ap_
+*.dex
+captures/
+.externalNativeBuild/
+.cxx/
+release/
+
+# Kotlin compiler scratch
+.kotlin/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+
+# Connect IQ
+garmin/bin/
+garmin/build/
+*.prg
+*.prg.debug.xml
+*.iq
+developer_key*
+!developer_key.README
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Scratch downloads (NYT snapshot etc.)
+tools/.cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+*.keystore
+*.jks
+keystore.properties
+secrets.properties
+.env
+
+# ...except the debug keystore, committed so every build signs with the same
+# key and installs over the last (personal use; well-known debug password).
+!android/app/debug.keystore
