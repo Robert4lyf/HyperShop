@@ -4,7 +4,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -87,11 +87,19 @@ class ReviewScreenTest {
     fun headerAndActions() {
         show()
         compose.onNodeWithText("Add 4 items").assertIsEnabled().performClick()
-        compose.onNodeWithContentDescription("Cancel").performClick()
+        compose.onNodeWithText("Cancel").performClick()
         compose.onNodeWithText("Claude pending").fetchSemanticsNode()
         compose.onNodeWithText("Retry with Claude").performClick()
         compose.onNodeWithText("Serves 4").fetchSemanticsNode()
         assertEquals(listOf("add", "cancel", "retry"), events)
+    }
+
+    @Test
+    fun theInStockPillTogglesWithoutOpeningTheSheet() {
+        show()
+        compose.onAllNodesWithText("In stock")[0].performClick()
+        compose.onAllNodesWithText("In stock")[3].performClick()
+        assertEquals(listOf("stock cat:onion true", "stock cat:salt false"), events)
     }
 
     @Test

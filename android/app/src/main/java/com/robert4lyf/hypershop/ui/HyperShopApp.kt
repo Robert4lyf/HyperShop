@@ -1,6 +1,11 @@
 package com.robert4lyf.hypershop.ui
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
@@ -14,6 +19,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -23,6 +29,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -73,8 +80,19 @@ fun HyperShopApp(
         }
         container.shares.value = null
     }
+    // The review screens pin their main action to the bottom edge (BottomActionBar pads for
+    // the navigation bar itself), so the snackbar sits above that bar instead of over it.
+    val reviewing = route == Routes.REVIEW
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbar) },
+        contentWindowInsets =
+            if (reviewing) {
+                WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
+            } else {
+                ScaffoldDefaults.contentWindowInsets
+            },
+        snackbarHost = {
+            SnackbarHost(snackbar, if (reviewing) Modifier.navigationBarsPadding().padding(bottom = 80.dp) else Modifier)
+        },
         bottomBar = {
             if (route != Routes.REVIEW) {
                 NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {

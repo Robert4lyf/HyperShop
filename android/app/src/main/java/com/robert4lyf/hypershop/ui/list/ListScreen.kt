@@ -59,7 +59,6 @@ import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.ui.common.AisleBadge
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
-import com.robert4lyf.hypershop.ui.common.SectionPosition
 import com.robert4lyf.hypershop.ui.common.TickMark
 import com.robert4lyf.hypershop.ui.common.sectionItem
 import com.robert4lyf.hypershop.ui.common.sectionPosition
@@ -86,16 +85,33 @@ fun ListScreen(
     empty: @Composable () -> Unit = { Text("Nothing on the list", Modifier.padding(24.dp)) },
 ) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        LazyColumn(Modifier.fillMaxSize().testTag("list"), contentPadding = PaddingValues(bottom = 24.dp)) {
-            item(key = "top") { ListTop(ui, actions) }
-            header()
-            if (ui.isEmpty) item { empty() }
-            for ((aisle, rows) in ui.aisles) {
-                val count = rows.size + 1
-                item(key = "aisle-${aisle.name}") {
-                    AisleTitle(aisle, rows, Modifier.padding(top = 16.dp).sectionItem(sectionPosition(0, count)))
-                }
-                itemsIndexed(rows, key = { _, r -> r.id }) { i, r -> ListRowItem(r, actions, sectionPosition(i + 1, count)) }
+        Column(Modifier.fillMaxSize()) {
+            // Pinned: the count, "Finish shopping" and the menu stay in reach on a long list.
+            ListTop(ui, actions)
+            ListBody(ui, actions, header, empty)
+        }
+    }
+}
+
+@Composable
+private fun ListBody(
+    ui: ListUi,
+    actions: ListActions,
+    header: LazyListScope.() -> Unit,
+    empty: @Composable () -> Unit,
+) {
+    val card = MaterialTheme.colorScheme.card
+    val delete = MaterialTheme.colorScheme.errorContainer
+    LazyColumn(Modifier.fillMaxSize().testTag("list"), contentPadding = PaddingValues(bottom = 24.dp)) {
+        header()
+        if (ui.isEmpty) item { empty() }
+        for ((aisle, rows) in ui.aisles) {
+            val count = rows.size + 1
+            item(key = "aisle-${aisle.name}") {
+                AisleTitle(aisle, rows, Modifier.padding(top = 16.dp).sectionItem(sectionPosition(0, count), card))
+            }
+            itemsIndexed(rows, key = { _, r -> r.id }) { i, r ->
+                ListRowItem(r, actions, Modifier.sectionItem(sectionPosition(i + 1, count), delete))
             }
         }
     }
@@ -118,6 +134,13 @@ private fun ListTop(
                 else -> "${ui.doneCount} of $total ticked"
             },
         actions = {
+            if (ui.doneCount > 0) {
+                FilledTonalButton(onClick = actions.onFinish, contentPadding = PaddingValues(horizontal = 14.dp)) {
+                    Icon(Icons.Rounded.DoneAll, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.size(6.dp))
+                    Text("Finish shopping")
+                }
+            }
             var menu by remember { mutableStateOf(false) }
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
@@ -144,14 +167,6 @@ private fun ListTop(
                     drawStopIndicator = {},
                     trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 )
-            }
-            if (ui.doneCount > 0) {
-                Spacer(Modifier.height(12.dp))
-                FilledTonalButton(onClick = actions.onFinish) {
-                    Icon(Icons.Rounded.DoneAll, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(8.dp))
-                    Text("Finish shopping")
-                }
             }
         },
     )
@@ -195,7 +210,7 @@ private fun AisleTitle(
 private fun ListRowItem(
     row: ListRow,
     actions: ListActions,
-    position: SectionPosition,
+    tile: Modifier,
 ) {
     val swipe =
         rememberSwipeToDismissBoxState(
@@ -214,7 +229,7 @@ private fun ListRowItem(
     SwipeToDismissBox(
         state = swipe,
         enableDismissFromStartToEnd = false,
-        modifier = Modifier.sectionItem(position, MaterialTheme.colorScheme.errorContainer),
+        modifier = tile,
         backgroundContent = {
             Row(
                 Modifier.fillMaxSize().padding(horizontal = 24.dp),

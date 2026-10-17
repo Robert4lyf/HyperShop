@@ -18,11 +18,9 @@ import androidx.compose.material.icons.rounded.RiceBowl
 import androidx.compose.material.icons.rounded.SetMeal
 import androidx.compose.material.icons.rounded.WaterDrop
 import androidx.compose.material.icons.rounded.Whatshot
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.robert4lyf.hypershop.core.model.AisleCode
 
@@ -39,40 +37,44 @@ private data class Hue(
     val saturation: Float,
 )
 
-private val HUES =
-    mapOf(
-        AisleCode.PRODUCE to Hue(Icons.Rounded.Eco, 128f, 0.55f),
-        AisleCode.BAKERY to Hue(Icons.Rounded.BakeryDining, 34f, 0.70f),
-        AisleCode.MEAT_FISH to Hue(Icons.Rounded.SetMeal, 356f, 0.60f),
-        AisleCode.DAIRY_EGGS to Hue(Icons.Rounded.Egg, 46f, 0.75f),
-        AisleCode.CHILLED to Hue(Icons.Rounded.Kitchen, 192f, 0.55f),
-        AisleCode.FROZEN to Hue(Icons.Rounded.AcUnit, 210f, 0.65f),
-        AisleCode.TINS_JARS to Hue(Icons.Rounded.Inventory2, 18f, 0.60f),
-        AisleCode.PASTA_RICE_GRAINS to Hue(Icons.Rounded.RiceBowl, 40f, 0.55f),
-        AisleCode.WORLD_FOODS to Hue(Icons.Rounded.Public, 268f, 0.45f),
-        AisleCode.BAKING to Hue(Icons.Rounded.Cake, 330f, 0.55f),
-        AisleCode.NUTS_DRIED_FRUIT to Hue(Icons.Rounded.Grain, 28f, 0.35f),
-        AisleCode.OILS_VINEGARS to Hue(Icons.Rounded.WaterDrop, 68f, 0.50f),
-        AisleCode.SPICES_CONDIMENTS to Hue(Icons.Rounded.Whatshot, 10f, 0.70f),
-        AisleCode.FREE_FROM to Hue(Icons.Rounded.NoFood, 168f, 0.45f),
-        AisleCode.DRINKS to Hue(Icons.Rounded.LocalDrink, 228f, 0.50f),
-        AisleCode.HOUSEHOLD to Hue(Icons.Rounded.CleaningServices, 200f, 0.15f),
-        AisleCode.OTHER to Hue(Icons.Rounded.Category, 120f, 0.05f),
-    )
+/** Exhaustive, so a new [AisleCode] doesn't compile until it has a style. */
+private fun AisleCode.hue(): Hue =
+    when (this) {
+        AisleCode.PRODUCE -> Hue(Icons.Rounded.Eco, 128f, 0.55f)
+        AisleCode.BAKERY -> Hue(Icons.Rounded.BakeryDining, 34f, 0.70f)
+        AisleCode.MEAT_FISH -> Hue(Icons.Rounded.SetMeal, 356f, 0.60f)
+        AisleCode.DAIRY_EGGS -> Hue(Icons.Rounded.Egg, 46f, 0.75f)
+        AisleCode.CHILLED -> Hue(Icons.Rounded.Kitchen, 192f, 0.55f)
+        AisleCode.FROZEN -> Hue(Icons.Rounded.AcUnit, 210f, 0.65f)
+        AisleCode.TINS_JARS -> Hue(Icons.Rounded.Inventory2, 18f, 0.60f)
+        AisleCode.PASTA_RICE_GRAINS -> Hue(Icons.Rounded.RiceBowl, 40f, 0.55f)
+        AisleCode.WORLD_FOODS -> Hue(Icons.Rounded.Public, 268f, 0.45f)
+        AisleCode.BAKING -> Hue(Icons.Rounded.Cake, 330f, 0.55f)
+        AisleCode.NUTS_DRIED_FRUIT -> Hue(Icons.Rounded.Grain, 28f, 0.35f)
+        AisleCode.OILS_VINEGARS -> Hue(Icons.Rounded.WaterDrop, 68f, 0.50f)
+        AisleCode.SPICES_CONDIMENTS -> Hue(Icons.Rounded.Whatshot, 10f, 0.70f)
+        AisleCode.FREE_FROM -> Hue(Icons.Rounded.NoFood, 168f, 0.45f)
+        AisleCode.DRINKS -> Hue(Icons.Rounded.LocalDrink, 228f, 0.50f)
+        AisleCode.HOUSEHOLD -> Hue(Icons.Rounded.CleaningServices, 200f, 0.15f)
+        AisleCode.OTHER -> Hue(Icons.Rounded.Category, 120f, 0.05f)
+    }
 
-/** The aisle's style in the current theme (light or dark follows the colour scheme). */
+private val LIGHT =
+    AisleCode.entries.associateWith { a ->
+        a.hue().let {
+            AisleStyle(it.icon, Color.hsl(it.hue, it.saturation, 0.90f), Color.hsl(it.hue, it.saturation, 0.28f))
+        }
+    }
+private val DARK =
+    AisleCode.entries.associateWith { a ->
+        a.hue().let { AisleStyle(it.icon, Color.hsl(it.hue, it.saturation * 0.45f, 0.22f), Color.hsl(it.hue, it.saturation, 0.80f)) }
+    }
+
+/** The aisle's style in the current theme (computed once per theme, not per row). */
 val AisleCode.style: AisleStyle
     @Composable
     @ReadOnlyComposable
-    get() {
-        val h = HUES.getValue(this)
-        val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
-        return if (dark) {
-            AisleStyle(h.icon, Color.hsl(h.hue, h.saturation * 0.45f, 0.22f), Color.hsl(h.hue, h.saturation, 0.80f))
-        } else {
-            AisleStyle(h.icon, Color.hsl(h.hue, h.saturation, 0.90f), Color.hsl(h.hue, h.saturation, 0.28f))
-        }
-    }
+    get() = (if (LocalDarkTheme.current) DARK else LIGHT).getValue(this)
 
 /** The aisle's icon, without colours (for chips and menus). */
-val AisleCode.icon: ImageVector get() = HUES.getValue(this).icon
+val AisleCode.icon: ImageVector get() = hue().icon

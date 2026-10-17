@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -17,19 +18,25 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
@@ -81,10 +88,9 @@ fun SectionPosition.shape(): Shape =
  * One piece of a card made of several lazy items: the gutter, the shape for
  * [position] and the card colour. Pieces sit 2 dp apart, like a stack of tiles.
  */
-@Composable
 fun Modifier.sectionItem(
     position: SectionPosition,
-    color: Color = MaterialTheme.colorScheme.card,
+    color: Color,
 ): Modifier =
     this
         .padding(horizontal = 16.dp)
@@ -181,7 +187,6 @@ fun InfoBanner(
     icon: ImageVector,
     modifier: Modifier = Modifier,
     tone: Tone = Tone.NEUTRAL,
-    action: (@Composable () -> Unit)? = null,
 ) {
     val (bg, fg) =
         when (tone) {
@@ -198,7 +203,6 @@ fun InfoBanner(
         ) {
             Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
             Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            action?.invoke()
         }
     }
 }
@@ -231,7 +235,11 @@ fun EmptyHero(
     }
 }
 
-/** A raised bar pinned to the bottom of a screen, for its main action. */
+/**
+ * A raised bar pinned to the bottom of a screen, for its main action. It draws
+ * down to the screen edge and pads its content for the navigation bar, so the
+ * screen using it must not be padded for that inset as well.
+ */
 @Composable
 fun BottomActionBar(
     modifier: Modifier = Modifier,
@@ -241,11 +249,66 @@ fun BottomActionBar(
         Column {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             Row(
-                Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 content = content,
             )
+        }
+    }
+}
+
+/** A sheet's header: the aisle badge, the item's name and its aisle. */
+@Composable
+fun SheetHeader(
+    name: String,
+    aisle: AisleCode,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        AisleBadge(aisle, size = 48.dp)
+        Column {
+            Text(name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.headlineSmall)
+            Text(aisle.displayName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/**
+ * An amount field and its button: "Set" on the item sheet, "Subtract" on the
+ * review sheet. The label stays visible (and spoken) once something is typed;
+ * [onSubmit] returns false when the text has no amount.
+ */
+@Composable
+fun AmountField(
+    heading: String,
+    label: String,
+    button: String,
+    tag: String,
+    onSubmit: (String) -> Boolean,
+) {
+    var amount by remember { mutableStateOf("") }
+    var bad by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionLabel(heading)
+        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = amount,
+                onValueChange = {
+                    amount = it
+                    bad = false
+                },
+                label = { Text(label) },
+                isError = bad,
+                supportingText = if (bad) ({ Text("Enter an amount, like 2 or 200 ml") }) else null,
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.weight(1f).testTag(tag),
+            )
+            FilledTonalButton(
+                onClick = { bad = !onSubmit(amount) },
+                enabled = amount.isNotBlank(),
+                modifier = Modifier.padding(top = 8.dp),
+            ) { Text(button) }
         }
     }
 }

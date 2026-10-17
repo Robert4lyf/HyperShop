@@ -8,24 +8,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.LocalMall
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,9 +30,10 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
-import com.robert4lyf.hypershop.ui.common.AisleBadge
+import com.robert4lyf.hypershop.ui.common.AmountField
 import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.SectionLabel
+import com.robert4lyf.hypershop.ui.common.SheetHeader
 import com.robert4lyf.hypershop.ui.common.rememberOpenLink
 import com.robert4lyf.hypershop.ui.review.MoveAisle
 import com.robert4lyf.hypershop.ui.theme.card
@@ -69,17 +65,7 @@ fun ItemSheetContent(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                AisleBadge(sheet.aisle, size = 48.dp)
-                Column {
-                    Text(sheet.name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.headlineSmall)
-                    Text(
-                        sheet.aisle.displayName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            SheetHeader(sheet.name, sheet.aisle)
             if (sheet.totals.isNotEmpty()) {
                 val amount = sheet.totals.joinToString(" + ")
                 Text(
@@ -94,7 +80,7 @@ fun ItemSheetContent(
             sheet.packNote?.let { InfoBanner("Usually sold as $it", Icons.Rounded.LocalMall) }
             if (sheet.sources.isNotEmpty()) Sources(sheet.sources)
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            EditQuantity(actions.onEditQuantity)
+            AmountField("Change the amount", "Total needed, e.g. 3 or 500 g", "Set", "edit-qty", actions.onEditQuantity)
             MoveAisle(sheet.aisle, actions.onMove)
         }
     }
@@ -105,7 +91,7 @@ private fun Sources(sources: List<ItemSource>) {
     val open = rememberOpenLink()
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionLabel("From")
-        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.card) {
+        Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.card) {
             Column {
                 sources.forEachIndexed { i, s ->
                     if (i > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
@@ -136,35 +122,6 @@ private fun Sources(sources: List<ItemSource>) {
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun EditQuantity(onEdit: (String) -> Boolean) {
-    var amount by remember { mutableStateOf("") }
-    var bad by remember { mutableStateOf(false) }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionLabel("Change the amount")
-        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
-                value = amount,
-                onValueChange = {
-                    amount = it
-                    bad = false
-                },
-                placeholder = { Text("Total needed, e.g. 3 or 500 g") },
-                isError = bad,
-                supportingText = if (bad) ({ Text("Enter an amount, like 2 or 200 ml") }) else null,
-                singleLine = true,
-                shape = RoundedCornerShape(28.dp),
-                modifier = Modifier.weight(1f).testTag("edit-qty"),
-            )
-            FilledTonalButton(
-                onClick = { bad = !onEdit(amount) },
-                enabled = amount.isNotBlank(),
-                modifier = Modifier.padding(top = 4.dp),
-            ) { Text("Set") }
         }
     }
 }

@@ -39,8 +39,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.InputChip
-import androidx.compose.material3.InputChipDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -234,21 +232,26 @@ private fun ListGroup(
     if (ui.staples.isEmpty()) {
         Hint("None yet. Mark something \"Always in stock\" on the review screen.")
     } else {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (s in ui.staples) {
-                InputChip(
-                    selected = false,
-                    onClick = { actions.onRemoveStaple(s) },
-                    label = { Text(s.replaceFirstChar { it.uppercase() }) },
-                    trailingIcon = {
-                        Icon(
-                            Icons.Rounded.Close,
-                            contentDescription = "Remove $s",
-                            Modifier.size(InputChipDefaults.IconSize),
-                        )
-                    },
-                    shape = RoundedCornerShape(50),
-                )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (s in ui.staples) StapleChip(s) { actions.onRemoveStaple(s) }
+        }
+    }
+}
+
+/** A staple: its name, and an × that is the only way to remove it. */
+@Composable
+private fun StapleChip(
+    name: String,
+    onRemove: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 14.dp)) {
+            Text(name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelLarge)
+            IconButton(onClick = onRemove, modifier = Modifier.size(40.dp)) {
+                Icon(Icons.Rounded.Close, contentDescription = "Remove $name", modifier = Modifier.size(18.dp))
             }
         }
     }

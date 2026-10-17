@@ -118,6 +118,19 @@ Shared components (`ui/common/`):
   progress bars (this month, today) plus the existing sentence; caps as pill
   fields.
 
+## Review fixes (code review of the first cut)
+- The list header is pinned, so "Finish shopping" and the menu stay in reach on a long list.
+- Review: "Cancel" is a labelled text button (it discards the import; system Back keeps it ready).
+  The badge row wraps so the busy spinner always shows; long titles show in full; the site link
+  ends in "…" instead of clipping.
+- Snackbars sit above the review screens' bottom bar, never over "Add N items".
+- Fields keep a visible, spoken label once text is typed; the Add-item border is the full outline colour (3:1).
+- Only the × removes a staple; the chip is no longer announced as a checkbox.
+- Recipe card buttons wrap on narrow screens or large text.
+- The launcher leaf sits inside the safe zone, and themed icons get a proper monochrome layer.
+- Aisle styles are an exhaustive `when` (a new aisle won't compile without one); the theme
+  provides `LocalDarkTheme` instead of guessing dark mode from colours.
+
 ## Not changing
 - Navigation, view models, data, strings that tests or TalkBack depend on,
   the one-node-per-row semantics, and swipe-to-delete with its accessible

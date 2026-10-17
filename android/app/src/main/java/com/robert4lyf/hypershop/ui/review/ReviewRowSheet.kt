@@ -38,14 +38,14 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
-import com.robert4lyf.hypershop.ui.common.AisleBadge
+import com.robert4lyf.hypershop.ui.common.AmountField
 import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.SectionLabel
+import com.robert4lyf.hypershop.ui.common.SheetHeader
 import com.robert4lyf.hypershop.ui.common.Tone
 import com.robert4lyf.hypershop.ui.theme.icon
 
@@ -105,23 +105,13 @@ fun ReviewRowSheet(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                AisleBadge(sheet.aisle, size = 48.dp)
-                Column {
-                    Text(sheet.name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.headlineSmall)
-                    Text(
-                        sheet.aisle.displayName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            SheetHeader(sheet.name, sheet.aisle)
             InfoBanner(sheet.effect, Icons.AutoMirrored.Rounded.TrendingFlat, Modifier.testTag("effect"), Tone.PRIMARY)
             sheet.packNote?.let { InfoBanner("Usually sold as $it", Icons.Rounded.LocalMall) }
             SectionLabel(if (sheet.lines.size == 1) "From the recipe" else "From the recipe (${sheet.lines.size} lines)")
             for (line in sheet.lines) key(line.id) { LineEditor(line, actions) }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            HaveSome(actions.onHaveSome)
+            AmountField("Already have some?", "I have some, e.g. 200 ml", "Subtract", "have-some", actions.onHaveSome)
             if (!sheet.isStaple) {
                 FilledTonalButton(onClick = actions.onAlwaysInStock) {
                     Icon(Icons.Rounded.Inventory, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -163,35 +153,6 @@ private fun LineEditor(
                     Text("Use $alt instead")
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun HaveSome(onHaveSome: (String) -> Boolean) {
-    var amount by remember { mutableStateOf("") }
-    var bad by remember { mutableStateOf(false) }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionLabel("Already have some?")
-        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
-                value = amount,
-                onValueChange = {
-                    amount = it
-                    bad = false
-                },
-                placeholder = { Text("I have some, e.g. 200 ml") },
-                isError = bad,
-                supportingText = if (bad) ({ Text("Enter an amount, like 2 or 200 ml") }) else null,
-                singleLine = true,
-                shape = RoundedCornerShape(28.dp),
-                modifier = Modifier.weight(1f).testTag("have-some"),
-            )
-            FilledTonalButton(
-                onClick = { bad = !onHaveSome(amount) },
-                enabled = amount.isNotBlank(),
-                modifier = Modifier.padding(top = 4.dp),
-            ) { Text("Subtract") }
         }
     }
 }

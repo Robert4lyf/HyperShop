@@ -51,9 +51,9 @@ import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.EmptyHero
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
 import com.robert4lyf.hypershop.ui.common.rememberOpenLink
+import com.robert4lyf.hypershop.ui.common.siteName
 import com.robert4lyf.hypershop.ui.common.webLink
 import com.robert4lyf.hypershop.ui.list.show
-import com.robert4lyf.hypershop.ui.review.siteName
 import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.util.factoryFor
 
@@ -90,7 +90,7 @@ fun RecipesScreen(
                     title = "Recipes",
                     subtitle =
                         when {
-                            !ui.loaded || ui.uses.isEmpty() -> null
+                            !ui.loaded || n == 0 -> null
                             n == 1 -> "1 recipe on your list"
                             else -> "$n recipes on your list"
                         },
@@ -137,7 +137,7 @@ private fun UseCard(
     val open = rememberOpenLink()
     Surface(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("use-${use.useId}"),
-        shape = RoundedCornerShape(24.dp),
+        shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.card,
     ) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -165,7 +165,8 @@ private fun UseCard(
                 Fact(Icons.Rounded.ShoppingCart, if (use.itemCount == 1) "1 item" else "${use.itemCount} items")
                 if (use.inStockCount > 0) Fact(Icons.Rounded.Inventory, "${use.inStockCount} in stock")
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Wraps on narrow phones and large text instead of squeezing the second button.
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (url != null) {
                     FilledTonalButton(onClick = { open(url) }, modifier = Modifier.testTag("open-${use.useId}")) {
                         Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))

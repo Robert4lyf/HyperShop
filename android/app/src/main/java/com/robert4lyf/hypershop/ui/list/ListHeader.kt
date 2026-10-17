@@ -89,7 +89,8 @@ fun AddItemField(
                     text = it.replace("\n", "")
                 }
             },
-            placeholder = { Text("Add an item, e.g. 2 lemons") },
+            label = { Text("Add item") },
+            placeholder = { Text("e.g. 2 lemons") },
             leadingIcon = { Icon(Icons.Rounded.Add, contentDescription = null) },
             trailingIcon =
                 if (text.isNotBlank()) {
@@ -98,12 +99,12 @@ fun AddItemField(
                     null
                 },
             singleLine = true,
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(50),
             colors =
                 OutlinedTextFieldDefaults.colors(
                     unfocusedContainerColor = MaterialTheme.colorScheme.card,
                     focusedContainerColor = MaterialTheme.colorScheme.card,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                 ),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { submit() }),
@@ -112,7 +113,7 @@ fun AddItemField(
         if (shown.isNotEmpty()) {
             Surface(
                 Modifier.fillMaxWidth().padding(top = 8.dp),
-                shape = RoundedCornerShape(20.dp),
+                shape = MaterialTheme.shapes.large,
                 color = MaterialTheme.colorScheme.card,
             ) {
                 Column {
@@ -156,10 +157,10 @@ fun ReadyCard(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(24.dp))
+            .clip(MaterialTheme.shapes.large)
             .clickable { onReview(jobs.first()) }
             .testTag("ready-card"),
-        shape = RoundedCornerShape(24.dp),
+        shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.primaryContainer,
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
     ) {
@@ -224,7 +225,7 @@ private fun Step(
     title: String,
     body: String,
 ) {
-    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.card) {
+    Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.card) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Box(
                 Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),

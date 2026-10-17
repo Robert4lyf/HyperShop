@@ -11,8 +11,10 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -148,8 +150,8 @@ val HyperShopShapes =
     )
 
 /**
- * The brand scheme by default, so the app always looks like itself; dynamic
- * (wallpaper) colour is still available to callers that ask for it.
+ * The brand scheme, so the app always looks like itself (docs/design/ui-overhaul.md
+ * turned wallpaper colour off); [dynamicColor] is kept for experiments.
  */
 @Composable
 fun HyperShopTheme(
@@ -164,9 +166,16 @@ fun HyperShopTheme(
             dark -> Dark
             else -> Light
         }
-    MaterialTheme(colorScheme = scheme, typography = HyperShopType, shapes = HyperShopShapes, content = content)
+    CompositionLocalProvider(LocalDarkTheme provides dark) {
+        MaterialTheme(colorScheme = scheme, typography = HyperShopType, shapes = HyperShopShapes, content = content)
+    }
 }
+
+/** Whether [HyperShopTheme] is dark, set once by the theme rather than guessed from colours. */
+val LocalDarkTheme = staticCompositionLocalOf { false }
 
 /** The card colour: white on the light background, a lifted grey on the dark one (never darker than the page). */
 val androidx.compose.material3.ColorScheme.card: Color
-    get() = if (surface.luminance() < 0.5f) surfaceContainerHigh else surfaceContainerLowest
+    @Composable
+    @ReadOnlyComposable
+    get() = if (LocalDarkTheme.current) surfaceContainerHigh else surfaceContainerLowest

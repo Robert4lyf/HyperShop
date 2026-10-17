@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material3.Button
@@ -57,6 +56,7 @@ fun ManualLinesView(
     val count = picked.size + pasted.lines().count { it.isNotBlank() }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
+            val card = MaterialTheme.colorScheme.card
             LazyColumn(
                 Modifier.weight(1f).testTag("manual"),
                 contentPadding = PaddingValues(vertical = 16.dp),
@@ -86,7 +86,7 @@ fun ManualLinesView(
                     val on = i in picked
                     Row(
                         Modifier
-                            .sectionItem(sectionPosition(i, candidates.size))
+                            .sectionItem(sectionPosition(i, candidates.size), card)
                             .fillMaxWidth()
                             .heightIn(min = 52.dp)
                             .toggleable(on, role = Role.Checkbox) { if (it) picked += i else picked -= i }
@@ -103,7 +103,7 @@ fun ManualLinesView(
                         onValueChange = { pasted = it },
                         label = { Text(if (candidates.isEmpty()) "Paste the ingredient lines" else "Or paste lines") },
                         minLines = 4,
-                        shape = RoundedCornerShape(20.dp),
+                        shape = MaterialTheme.shapes.large,
                         colors =
                             OutlinedTextFieldDefaults.colors(
                                 unfocusedContainerColor = MaterialTheme.colorScheme.card,

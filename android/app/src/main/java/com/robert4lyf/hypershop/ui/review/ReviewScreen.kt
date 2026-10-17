@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,12 +52,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.ui.common.AisleBadge
@@ -66,7 +71,8 @@ import com.robert4lyf.hypershop.ui.common.Tone
 import com.robert4lyf.hypershop.ui.common.rememberOpenLink
 import com.robert4lyf.hypershop.ui.common.sectionItem
 import com.robert4lyf.hypershop.ui.common.sectionPosition
-import java.net.URI
+import com.robert4lyf.hypershop.ui.common.siteName
+import com.robert4lyf.hypershop.ui.theme.card
 
 /** The review screen's default view (PLAN §3.1), stateless. */
 @Composable
@@ -84,6 +90,7 @@ fun ReviewScreen(
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
             TopBar(onCancel, onClearInStock)
+            val card = MaterialTheme.colorScheme.card
             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
                 item(key = "hero") { Hero(ui, onServings, onRetryClaude) }
                 ui.notice?.let { n ->
@@ -99,10 +106,10 @@ fun ReviewScreen(
                 for ((aisle, rows) in ui.aisles) {
                     val count = rows.size + 1
                     item(key = "aisle-${aisle.name}") {
-                        AisleHeader(aisle, rows, onAisleInStock, Modifier.padding(top = 12.dp).sectionItem(sectionPosition(0, count)))
+                        AisleHeader(aisle, rows, onAisleInStock, Modifier.padding(top = 12.dp).sectionItem(sectionPosition(0, count), card))
                     }
                     itemsIndexed(rows, key = { _, r -> r.key }) { i, r ->
-                        ReviewRowItem(r, onInStock, onRow, sectionPosition(i + 1, count))
+                        ReviewRowItem(r, onInStock, onRow, sectionPosition(i + 1, count), card)
                     }
                 }
             }
@@ -130,8 +137,18 @@ private fun TopBar(
     onClearInStock: () -> Unit,
 ) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onCancel) { Icon(Icons.Rounded.Close, contentDescription = "Cancel") }
-        Text("Review ingredients", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        // Cancel discards the import, so it says so in words (system Back keeps it ready to review).
+        TextButton(onClick = onCancel) {
+            Icon(Icons.Rounded.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.size(6.dp))
+            Text("Cancel")
+        }
+        Text(
+            "Review ingredients",
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.weight(1f),
+        )
         var menu by remember { mutableStateOf(false) }
         Box {
             IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
@@ -146,6 +163,7 @@ private fun TopBar(
 }
 
 /** The recipe: who read it, its title and site, and how many it serves. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Hero(
     ui: ReviewUi,
@@ -157,7 +175,11 @@ private fun Hero(
         Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Wraps rather than squeezing: the spinner must stay visible on narrow phones.
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             when (ui.badge) {
                 Badge.CLAUDE -> Badge("Parsed by Claude", Icons.Rounded.AutoAwesome)
                 Badge.CLAUDE_PENDING -> {
@@ -172,13 +194,18 @@ private fun Hero(
             }
             if (ui.busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
         }
-        Text(ui.title, style = MaterialTheme.typography.headlineMedium, maxLines = 3)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(ui.title, style = MaterialTheme.typography.headlineMedium)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)) {
             ui.servings?.let { s -> Servings(s, onServings) }
             Spacer(Modifier.weight(1f))
             ui.url?.let { url ->
-                TextButton(onClick = { open(url) }, modifier = Modifier.testTag("open-recipe")) {
-                    Text(siteName(url) ?: "Open recipe", maxLines = 1)
+                TextButton(onClick = { open(url) }, modifier = Modifier.weight(1f, fill = false).testTag("open-recipe")) {
+                    Text(
+                        siteName(url) ?: "Open recipe",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
                     Spacer(Modifier.size(6.dp))
                     Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = "Open recipe", modifier = Modifier.size(18.dp))
                 }
@@ -186,9 +213,6 @@ private fun Hero(
         }
     }
 }
-
-/** "recipetineats.com" from the recipe's address. */
-internal fun siteName(url: String): String? = runCatching { URI(url).host?.removePrefix("www.") }.getOrNull()?.takeIf { it.isNotBlank() }
 
 @Composable
 private fun Badge(
@@ -276,12 +300,13 @@ private fun ReviewRowItem(
     onInStock: (String, Boolean) -> Unit,
     onRow: (String) -> Unit,
     position: SectionPosition,
+    card: Color,
 ) {
     val struck = if (row.inStock) TextDecoration.LineThrough else TextDecoration.None
     val faded = if (row.inStock) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
     Row(
         Modifier
-            .sectionItem(position)
+            .sectionItem(position, card)
             .fillMaxWidth()
             .heightIn(min = 64.dp)
             .clickable(role = Role.Button) { onRow(row.key) }
