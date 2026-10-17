@@ -7,16 +7,18 @@ import org.junit.jupiter.api.Test
 import java.io.File
 
 /**
- * Step 4.5: one real call per model with ANTHROPIC_API_KEY. Skipped when the key
- * is absent. Each parsed result is saved, redacted, as testdata/claude/live-<model>.json.
- * Run: `ANTHROPIC_API_KEY=… tools/gradle.sh :claude:test --tests "*LiveSmokeTest*"`.
+ * Step 4.5: one real call per model with HYPERSHOP_ANTHROPIC_API_KEY. Skipped unless run
+ * with -Deval=true and the key is set. Each parsed result is saved, redacted, as
+ * testdata/claude/live-<model>.json.
+ * Run: `tools/eval-claude/run.sh` (runs this and the eval).
  */
 class LiveSmokeTest {
-    private val key = System.getenv("ANTHROPIC_API_KEY")
+    private val key = System.getenv("HYPERSHOP_ANTHROPIC_API_KEY")
 
     @Test
     fun oneCallPerModel() {
-        assumeTrue(!key.isNullOrBlank(), "ANTHROPIC_API_KEY not set")
+        assumeTrue(System.getProperty("eval") == "true", "run with tools/eval-claude/run.sh")
+        assumeTrue(!key.isNullOrBlank(), "HYPERSHOP_ANTHROPIC_API_KEY not set")
         val client = ClaudeClient(apiKey = { key })
         val input =
             ClaudeInput.Lines(

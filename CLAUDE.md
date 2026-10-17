@@ -43,7 +43,7 @@ and retry; `verify.sh` already does.
 - **Golden data is never edited to make a test pass.** A real fix is its own
   `golden-fix:` commit touching nothing under `android/`, with `CHECKSUM` and
   `testdata/ingredients/CHANGES.md` updated. At most 3 per run.
-- Never print `ANTHROPIC_API_KEY`. `verify.sh` scans for `sk-ant-`.
+- Never print `HYPERSHOP_ANTHROPIC_API_KEY`. `verify.sh` scans for `sk-ant-`.
 
 ## Rules that are easy to get wrong
 

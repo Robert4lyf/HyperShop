@@ -443,7 +443,7 @@ PROGRESS.md
 ### Two runs
 | Run | Delivers | What you need to provide first |
 |---|---|---|
-| **Run 1** | Steps 0–5: the phone app with Claude parsing, merging, the review screen, the list, and the sync codec | **`ANTHROPIC_API_KEY`** as an environment secret on the cloud session: a dedicated key with a spend limit, used for the live smoke test and the eval |
+| **Run 1** | Steps 0–5: the phone app with Claude parsing, merging, the review screen, the list, and the sync codec | **`HYPERSHOP_ANTHROPIC_API_KEY`** as an environment secret on the cloud session: a dedicated key with a spend limit, used for the live smoke test and the eval |
 | **Run 2** | Steps 6–7: the Forerunner 245 app and sync | Hand-off A done, and your BangGym secrets (`CIQ_DEVELOPER_KEY`, `GARMIN_USERNAME`, `GARMIN_PASSWORD`) copied to the HyperShop repo |
 | Later | Steps 8–10 (v1.1) | depends on the step |
 
@@ -463,7 +463,7 @@ PROGRESS.md
 ### Things only you can provide
 | Item | When |
 |---|---|
-| Set `ANTHROPIC_API_KEY` in the cloud environment (a dedicated key with a spend limit) | before Run 1 |
+| Set `HYPERSHOP_ANTHROPIC_API_KEY` in the cloud environment (a dedicated key with a spend limit; not `ANTHROPIC_API_KEY`, which Claude Code would pick up for its own auth) | before Run 1 |
 | Create `main` and merge each run's PR (do this first at each hand-off) | after each run |
 | Install the APK from the rolling release link | Hand-offs A, B |
 | Check the contact sheet, `catalog/REVIEW.md` and the 20 held-out golden lines | Hand-off A |
@@ -484,7 +484,7 @@ PROGRESS.md
     - It's idempotent, and doesn't fail when the network is down.
     - It exports `ANDROID_HOME` through `$CLAUDE_ENV_FILE`.
     - It does not download the Connect IQ SDK.
-  - **Check:** `java -version`, `$ANDROID_HOME`, `sdkmanager --list_installed`, and that `ANTHROPIC_API_KEY` is present (without printing it).
+  - **Check:** `java -version`, `$ANDROID_HOME`, `sdkmanager --list_installed`, and that `HYPERSHOP_ANTHROPIC_API_KEY` is present (without printing it).
 - **0.3** **Copy BangGym's build setup** (§2): the wrapper, root build files, version catalog, `.editorconfig`, ktlint, the workflows (renamed), and the `CLAUDE.md` conventions adapted to HyperShop.
   - Add the HyperShop modules, minSdk 34, the debug keystore, and a new watch UUID.
   - Record the BangGym commit in `docs/decisions/000-template.md`.
@@ -579,7 +579,7 @@ PROGRESS.md
 - **4.2** Request builder (§3.7): model and effort; the fallbacks rule for each model; the strict schema built from `QtyUnit` and `AisleCode`; the prompt rules; wrapping input as untrusted content; the input cap.
 - **4.3** Response handling: `stop_reason`, schema validation, error mapping, usage logged to `ClaudeUsage`, and redaction. Post-processing through the shared normaliser.
 - **4.4** Spend control: the monthly and daily caps, and the cost table for each model.
-- **4.5** **Live smoke test** using `ANTHROPIC_API_KEY`: one call per model. Responses are redacted and saved as `testdata/claude/live-*.json`.
+- **4.5** **Live smoke test** using `HYPERSHOP_ANTHROPIC_API_KEY`: one call per model. Responses are redacted and saved as `testdata/claude/live-*.json`.
 - **4.6** `tools/eval-claude`: compares Haiku 5.5, Sonnet 5.5, Opus 5.5 and the rule parser on the frozen 80, the 25 UK lines and 15 page fixtures. It reports per-field accuracy, cost and `output_tokens`, and is run once. Synthetic fixtures are named `synthetic-*`.
 - **Check:** MockWebServer tests cover every `stop_reason` and every error; the live smoke test passes; the eval report is committed.
 
