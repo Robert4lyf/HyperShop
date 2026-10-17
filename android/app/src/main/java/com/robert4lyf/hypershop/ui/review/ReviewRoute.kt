@@ -94,14 +94,6 @@ fun ReviewRoute(
     sheetKey?.let { key -> ReviewRowSheetHost(vm, key, onDismiss = { sheetKey = null }) }
 }
 
-/** Placeholder until Step 5.5. */
-@Composable
-internal fun ReviewRowSheetHost(
-    vm: ReviewViewModel,
-    key: String,
-    onDismiss: () -> Unit,
-) = Unit
-
 @Composable
 private fun FailedView(
     error: ImportError,

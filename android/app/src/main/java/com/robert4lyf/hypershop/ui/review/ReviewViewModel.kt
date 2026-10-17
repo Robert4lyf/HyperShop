@@ -34,6 +34,28 @@ data class ReviewRow(
 
 enum class Badge { CLAUDE, CLAUDE_PENDING, RULES }
 
+data class SheetLine(
+    val id: Long,
+    val raw: String,
+    /** How the line was read: "2 tbsp olive oil (or butter)". */
+    val parsed: String,
+    /** B in "A or B", when the line has one. */
+    val alternative: String?,
+)
+
+/** The review row's detail sheet (PLAN §3.1). */
+data class RowSheet(
+    val key: String,
+    val name: String,
+    /** "Milk: +200 ml → 700 ml on list" */
+    val effect: String,
+    val packNote: String?,
+    val lines: List<SheetLine>,
+    val aisle: AisleCode,
+    val inStock: Boolean,
+    val isStaple: Boolean,
+)
+
 data class ReviewUi(
     val title: String,
     val servings: Int?,
@@ -83,6 +105,7 @@ class ReviewViewModel(
     private var decisions: MutableMap<String, RowDecision> = mutableMapOf()
     private var servings: Int? = null
     private var units = UnitsSetting.METRIC
+    private val aisleMoves = mutableMapOf<String, AisleCode>()
 
     init {
         viewModelScope.launch { load() }
@@ -112,7 +135,7 @@ class ReviewViewModel(
         stored?.let { c.repository.discardRecipe(it.recipe.id) }
         stored =
             c.repository.storeRecipe(r.url, r.title, r.servings, r.locale, "WEB", r.parsedBy, r.model, r.claudePending, r.lines)
-        preview = c.repository.preview(stored!!, servings, emptyMap())
+        preview = c.repository.preview(stored!!, servings, emptyMap(), aisleMoves)
     }
 
     private fun fail(
@@ -124,7 +147,7 @@ class ReviewViewModel(
 
     private suspend fun recompute(notice: String? = null) {
         val s = stored ?: return
-        val p = c.repository.preview(s, servings, decisions)
+        val p = c.repository.preview(s, servings, decisions, aisleMoves)
         preview = p
         val order = c.repository.aisleOrder()
         val rows = p.rows.map { row(it) }
@@ -233,7 +256,136 @@ class ReviewViewModel(
             _state.value = ReviewState.Cancelled
         }
 
-    /** The row's parse, for the row sheet (Step 5.5). */
+    // ---- the row sheet (Step 5.5) ----------------------------------------------------
+
+    fun sheet(key: String): RowSheet? {
+        val p = preview ?: return null
+        val row = p.rows.firstOrNull { it.target.mergeKey == key } ?: return null
+        val entry = c.catalog.byId[row.target.catalogId ?: ""]
+        val name = entry?.name ?: row.target.displayName
+        val produce = row.target.aisle == AisleCode.PRODUCE
+        val before =
+            row.existing?.let {
+                Display.amount(
+                    row.onListAfter.minusClamped(row.adding),
+                    units,
+                    produce,
+                    null,
+                    entry?.gramsPerCup,
+                )
+            }
+        val adding = Display.amount(row.adding, units, produce, null, entry?.gramsPerCup)
+        val after = Display.amount(row.onListAfter, units, produce, null, entry?.gramsPerCup)
+        val effect =
+            when {
+                row.decision.inStock -> "$name: in stock, nothing added"
+                adding == null && row.existing != null -> "$name: already on the list"
+                adding == null -> "$name: added to the list"
+                row.existing == null || before == null -> "$name: +$adding (new)"
+                else -> "$name: +$adding → $after on list"
+            }
+        val lines =
+            p.incoming.lines.filter { it.target.mergeKey == key }.map { l ->
+                SheetLine(
+                    l.recipeLineId,
+                    l.parsed.raw,
+                    summary(l.parsed),
+                    l.parsed.note?.takeIf { it.startsWith("or ") }?.removePrefix("or ")?.trim(),
+                )
+            }
+        return RowSheet(
+            key,
+            name,
+            effect,
+            entry?.packNote,
+            lines,
+            row.target.aisle,
+            row.decision.inStock,
+            entry != null && row.decision.inStock,
+        )
+    }
+
+    /** Live re-parse of an edited line. */
+    fun reparse(text: String): String = summary(c.ruleParser.parse(text))
+
+    private fun summary(p: com.robert4lyf.hypershop.core.model.ParsedIngredient): String =
+        listOfNotNull(
+            p.quantity?.let { q -> Display.fraction(q) + (p.quantityMax?.let { "–" + Display.fraction(it) } ?: "") },
+            p.unit?.serial,
+            p.name,
+            p.note?.let { "($it)" },
+        ).joinToString(" ")
+
+    /** "I have some": an amount such as "200 ml" or "2". False when it cannot be read. */
+    fun haveSome(
+        key: String,
+        text: String,
+    ): Boolean {
+        val parsed = c.ruleParser.parse(text.trim() + " x")
+        val q = QtyBase.of(parsed.quantity, parsed.unit, preview?.incoming?.locale ?: com.robert4lyf.hypershop.core.model.UnitLocale.METRIC)
+        if (q.isPresence) return false
+        viewModelScope.launch {
+            decisions[key] = (decisions[key] ?: RowDecision()).copy(haveSome = q, inStock = false)
+            recompute()
+        }
+        return true
+    }
+
+    /** "Always in stock": a staple from now on, and ticked here. */
+    fun alwaysInStock(key: String) =
+        viewModelScope.launch {
+            c.repository.setStaple(key, true)
+            decisions[key] = (decisions[key] ?: RowDecision()).copy(inStock = true)
+            recompute()
+        }
+
+    /** "Move aisle": always (a CategoryOverride) or just this time. */
+    fun moveAisle(
+        key: String,
+        aisle: AisleCode,
+        always: Boolean,
+    ) = viewModelScope.launch {
+        if (always) {
+            c.db.dao().putOverride(com.robert4lyf.hypershop.data.CategoryOverrideEntity(key, aisle.name, "USER"))
+        } else {
+            aisleMoves[key] = aisle
+        }
+        recompute()
+    }
+
+    /** "A or B" swap: the line becomes B, with "or A" in its note. */
+    fun swap(lineId: Long) =
+        viewModelScope.launch {
+            replaceLine(lineId) { p ->
+                val alt = p.note?.takeIf { it.startsWith("or ") }?.removePrefix("or ")?.trim() ?: return@replaceLine p
+                p.copy(name = alt.lowercase(), note = "or ${p.name}", unit = p.unit)
+            }
+        }
+
+    /** Edit the source line; it is parsed again with the rule parser. */
+    fun editLine(
+        lineId: Long,
+        text: String,
+    ) = viewModelScope.launch {
+        if (text.isBlank()) return@launch
+        replaceLine(lineId) { old -> c.ruleParser.parse(text).copy(section = old.section) }
+    }
+
+    private suspend fun replaceLine(
+        lineId: Long,
+        f: (com.robert4lyf.hypershop.core.model.ParsedIngredient) -> com.robert4lyf.hypershop.core.model.ParsedIngredient,
+    ) {
+        val s = stored ?: return
+        val r = result ?: return
+        val index = s.lines.indexOfFirst { it.first.id == lineId }.takeIf { it >= 0 } ?: return
+        val lines = r.lines.toMutableList()
+        lines[index] = f(lines[index])
+        result = r.copy(lines = lines)
+        store(result!!)
+        recompute()
+    }
+
+    /** The row's parse. */
     fun previewRow(key: String): PreviewRow? = preview?.rows?.firstOrNull { it.target.mergeKey == key }
 
     internal fun currentPreview(): Preview? = preview

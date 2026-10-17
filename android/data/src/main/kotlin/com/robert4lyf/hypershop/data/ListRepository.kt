@@ -161,6 +161,8 @@ class ListRepository(
         stored: StoredRecipe,
         servings: Int?,
         decisions: Map<String, RowDecision>? = null,
+        /** "Just this time" aisle moves from the review screen. */
+        extraOverrides: Map<String, AisleCode> = emptyMap(),
     ): Preview {
         val incoming =
             merger.incoming(
@@ -169,7 +171,7 @@ class ListRepository(
                 servings ?: stored.recipe.servingsOriginal,
                 UnitLocale.valueOf(stored.recipe.unitLocale),
                 stored.lines.map { (row, p) -> row.id to p },
-                overrides(),
+                overrides() + extraOverrides,
             )
         val d = decisions ?: merger.defaultDecisions(incoming, staples())
         return merger.preview(snapshot(), incoming, d)
