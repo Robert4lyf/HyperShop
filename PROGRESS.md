@@ -14,7 +14,7 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 
 ## Step 1 — Spec, enums, golden data, model, catalogue, sync codec
 - [x] 1.1 docs/parser-spec.md (schema R1, QtyUnit R2, AisleCode R9, prep/identity R4, NYT mapping R10, scoring R11) — check: review the doc
-- [ ] 1.2 Golden data (pick-golden, nyt-to-golden, 80 + 25 lines, CHECKSUM)
+- [x] 1.2 Golden data: 80 NYT lines (seed 20261017; 25/20/15/20 strata; 20 held out, listed in docs/golden-held-out.md; 25 overrides citing spec rules) + 25 UK lines; CHECKSUM + CHANGES.md — check: `python3 tools/pick-golden/pick_golden.py && python3 tools/nyt-to-golden/nyt_to_golden.py && git diff --exit-code testdata`; `sha256sum -c testdata/ingredients/CHECKSUM`
 - [ ] 1.3 :core model (Rational, Dimension, QtyUnit, QtyBase, ParsedIngredient, ADR 002)
 - [ ] 1.4a Top-400 NYT names script
 - [ ] 1.4b Catalogue CSV

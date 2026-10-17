@@ -1,0 +1,427 @@
+[
+  {
+    "id": "uk-01",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "250g plain flour",
+      "name": "plain flour",
+      "quantity": 250,
+      "quantity_max": null,
+      "unit": "g",
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": null,
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-02",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "2 ½ cups (300g) plain flour, sifted",
+      "name": "plain flour",
+      "quantity": 2.5,
+      "quantity_max": null,
+      "unit": "cup",
+      "alt_quantity": 300,
+      "alt_unit": "g",
+      "note": "sifted",
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-03",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "400g tin chopped tomatoes",
+      "name": "chopped tomatoes",
+      "quantity": 1,
+      "quantity_max": null,
+      "unit": "tin",
+      "alt_quantity": 400,
+      "alt_unit": "g",
+      "note": null,
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-04",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "2 x 400g tins chickpeas, drained",
+      "name": "chickpeas",
+      "quantity": 2,
+      "quantity_max": null,
+      "unit": "tin",
+      "alt_quantity": 400,
+      "alt_unit": "g",
+      "note": "drained",
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-05",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "1 tbsp olive oil",
+      "name": "olive oil",
+      "quantity": 1,
+      "quantity_max": null,
+      "unit": "tbsp",
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": null,
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-06",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "1 T soy sauce",
+      "name": "soy sauce",
+      "quantity": 1,
+      "quantity_max": null,
+      "unit": "tbsp",
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": null,
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-07",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "1 t ground cumin",
+      "name": "ground cumin",
+      "quantity": 1,
+      "quantity_max": null,
+      "unit": "tsp",
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": null,
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-08",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "300ml double cream",
+      "name": "double cream",
+      "quantity": 300,
+      "quantity_max": null,
+      "unit": "ml",
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": null,
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-09",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "1.5 litres vegetable stock",
+      "name": "vegetable stock",
+      "quantity": 1.5,
+      "quantity_max": null,
+      "unit": "l",
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": null,
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-10",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "2 garlic cloves, crushed",
+      "name": "garlic",
+      "quantity": 2,
+      "quantity_max": null,
+      "unit": "clove",
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": "crushed",
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-11",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "1 red onion, finely chopped",
+      "name": "red onion",
+      "quantity": 1,
+      "quantity_max": null,
+      "unit": null,
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": "finely chopped",
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-12",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "100g unsalted butter, softened",
+      "name": "unsalted butter",
+      "quantity": 100,
+      "quantity_max": null,
+      "unit": "g",
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": "softened",
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-13",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "1 small bunch coriander, leaves picked",
+      "name": "coriander",
+      "quantity": 1,
+      "quantity_max": null,
+      "unit": "bunch",
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": "small, leaves picked",
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-14",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "2-3 spring onions, sliced",
+      "name": "spring onion",
+      "quantity": 2,
+      "quantity_max": 3,
+      "unit": null,
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": "sliced",
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-15",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "½ tsp smoked paprika",
+      "name": "smoked paprika",
+      "quantity": 0.5,
+      "quantity_max": null,
+      "unit": "tsp",
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": null,
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-16",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "200g caster sugar",
+      "name": "caster sugar",
+      "quantity": 200,
+      "quantity_max": null,
+      "unit": "g",
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": null,
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-17",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "1 courgette, grated",
+      "name": "courgette",
+      "quantity": 1,
+      "quantity_max": null,
+      "unit": null,
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": "grated",
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-18",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "1 aubergine, cut into chunks",
+      "name": "aubergine",
+      "quantity": 1,
+      "quantity_max": null,
+      "unit": null,
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": "cut into chunks",
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-19",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "500g beef mince",
+      "name": "beef mince",
+      "quantity": 500,
+      "quantity_max": null,
+      "unit": "g",
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": null,
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-20",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "1 pint semi-skimmed milk",
+      "name": "semi-skimmed milk",
+      "quantity": 1,
+      "quantity_max": null,
+      "unit": "pint",
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": null,
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-21",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "a pinch of sea salt",
+      "name": "salt",
+      "quantity": 1,
+      "quantity_max": null,
+      "unit": "pinch",
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": null,
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-22",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "3 large free-range eggs, beaten",
+      "name": "free-range egg",
+      "quantity": 3,
+      "quantity_max": null,
+      "unit": null,
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": "large, beaten",
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-23",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "1 tsp bicarbonate of soda",
+      "name": "bicarbonate of soda",
+      "quantity": 1,
+      "quantity_max": null,
+      "unit": "tsp",
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": null,
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-24",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "100g self-raising flour",
+      "name": "self-raising flour",
+      "quantity": 100,
+      "quantity_max": null,
+      "unit": "g",
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": null,
+      "section": null,
+      "optional": false
+    }
+  },
+  {
+    "id": "uk-25",
+    "stratum": "synthetic-uk",
+    "heldOut": false,
+    "expected": {
+      "raw": "handful of rocket, to serve",
+      "name": "rocket",
+      "quantity": null,
+      "quantity_max": null,
+      "unit": null,
+      "alt_quantity": null,
+      "alt_unit": null,
+      "note": "handful, to serve",
+      "section": null,
+      "optional": false
+    }
+  }
+]

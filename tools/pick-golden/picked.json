@@ -1,0 +1,482 @@
+[
+  {
+    "index": 35865,
+    "input": "4 large ears corn",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 1662,
+    "input": "1 tablespoon of salt",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 68140,
+    "input": "2 ounces citrus vodka",
+    "stratum": "simple",
+    "heldOut": true
+  },
+  {
+    "index": 19309,
+    "input": "2 large pieces lime peel",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 120885,
+    "input": "12 ounces dry orecchiette",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 11015,
+    "input": "1 teaspoon red food coloring",
+    "stratum": "simple",
+    "heldOut": true
+  },
+  {
+    "index": 79278,
+    "input": "3 tablespoons Champagne vinegar",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 163210,
+    "input": "1 high-quality maraschino cherry",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 147625,
+    "input": "12 white corn tortillas",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 90042,
+    "input": "1 heaping tablespoon minced fresh parsley",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 174381,
+    "input": "2 heads romaine lettuce",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 91188,
+    "input": "2 slices prosciutto",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 89700,
+    "input": "2 ounces white truffle oil",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 140461,
+    "input": "1 bag baby spinach",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 96731,
+    "input": "4 tablespoons soy oil",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 175427,
+    "input": "3 teaspoons brown sugar",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 96043,
+    "input": "3 ounces amaretti cookies",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 157842,
+    "input": "1 strip of orange zest",
+    "stratum": "simple",
+    "heldOut": true
+  },
+  {
+    "index": 45474,
+    "input": "5 ounces passion-fruit juice",
+    "stratum": "simple",
+    "heldOut": true
+  },
+  {
+    "index": 104460,
+    "input": "4 cups fish stock",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 18149,
+    "input": "2 tablespoons rosewater",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 77735,
+    "input": "3 tablespoons dried currants",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 170203,
+    "input": "2 tablespoons Greek yogurt",
+    "stratum": "simple",
+    "heldOut": true
+  },
+  {
+    "index": 86658,
+    "input": "8 leaves arugula",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 59125,
+    "input": "6 tablespoons soy sauce",
+    "stratum": "simple",
+    "heldOut": false
+  },
+  {
+    "index": 45930,
+    "input": "4 tablespoons safflower or peanut oil",
+    "stratum": "comments_parens",
+    "heldOut": false
+  },
+  {
+    "index": 39982,
+    "input": "10 small sprigs fresh parsley for garnish",
+    "stratum": "comments_parens",
+    "heldOut": false
+  },
+  {
+    "index": 65121,
+    "input": "4 cloves of garlic, peeled",
+    "stratum": "comments_parens",
+    "heldOut": false
+  },
+  {
+    "index": 84272,
+    "input": "2 cans unsweetened coconut milk, 3 to 4 cups",
+    "stratum": "comments_parens",
+    "heldOut": false
+  },
+  {
+    "index": 128471,
+    "input": "1 small cucumber, diced",
+    "stratum": "comments_parens",
+    "heldOut": false
+  },
+  {
+    "index": 167821,
+    "input": "1 tablespoon minced peeled ginger",
+    "stratum": "comments_parens",
+    "heldOut": true
+  },
+  {
+    "index": 32752,
+    "input": "2 ounces semisweet chocolate",
+    "stratum": "comments_parens",
+    "heldOut": false
+  },
+  {
+    "index": 747,
+    "input": "2 medium cloves garlic, smashed, peeled and mashed to a paste",
+    "stratum": "comments_parens",
+    "heldOut": true
+  },
+  {
+    "index": 88406,
+    "input": "44 dumpling skins (also called gyoza skins)",
+    "stratum": "comments_parens",
+    "heldOut": false
+  },
+  {
+    "index": 43857,
+    "input": "24 pitted prunes",
+    "stratum": "comments_parens",
+    "heldOut": true
+  },
+  {
+    "index": 2391,
+    "input": "4 cups cooked rice",
+    "stratum": "comments_parens",
+    "heldOut": true
+  },
+  {
+    "index": 164271,
+    "input": "1 teaspoon finely chopped fresh sage (2 good-size leaves) (optional)",
+    "stratum": "comments_parens",
+    "heldOut": true
+  },
+  {
+    "index": 19921,
+    "input": "6 slices white bread, crusts removed",
+    "stratum": "comments_parens",
+    "heldOut": false
+  },
+  {
+    "index": 100044,
+    "input": "2 tomatoes, peeled and chopped (see note)",
+    "stratum": "comments_parens",
+    "heldOut": false
+  },
+  {
+    "index": 87220,
+    "input": "12 cloves garlic, smashed",
+    "stratum": "comments_parens",
+    "heldOut": false
+  },
+  {
+    "index": 106750,
+    "input": "16 ounces whole green peppers or 14 ounces coarsely chopped ready-cut green peppers (4 cups)",
+    "stratum": "comments_parens",
+    "heldOut": false
+  },
+  {
+    "index": 146839,
+    "input": "2 garlic cloves or 1 small bulb green garlic, minced",
+    "stratum": "comments_parens",
+    "heldOut": false
+  },
+  {
+    "index": 93645,
+    "input": "8 ounces ripe plum tomatoes",
+    "stratum": "comments_parens",
+    "heldOut": false
+  },
+  {
+    "index": 142173,
+    "input": "7 ounces water (70 degrees)",
+    "stratum": "comments_parens",
+    "heldOut": false
+  },
+  {
+    "index": 106030,
+    "input": "1 teaspoon salt, or as desired",
+    "stratum": "comments_parens",
+    "heldOut": false
+  },
+  {
+    "index": 75704,
+    "input": "1/4 cup heavy cream, approximately",
+    "stratum": "fractions_ranges",
+    "heldOut": true
+  },
+  {
+    "index": 167028,
+    "input": "1/2 teaspoon grated fresh ginger root",
+    "stratum": "fractions_ranges",
+    "heldOut": false
+  },
+  {
+    "index": 58703,
+    "input": "1/2 medium carrot, finely shredded",
+    "stratum": "fractions_ranges",
+    "heldOut": false
+  },
+  {
+    "index": 82488,
+    "input": "3 1/2 cups butternut squash, peeled, cleaned and diced small",
+    "stratum": "fractions_ranges",
+    "heldOut": false
+  },
+  {
+    "index": 54780,
+    "input": "1 1/2 teaspoons red-pepper flakes",
+    "stratum": "fractions_ranges",
+    "heldOut": false
+  },
+  {
+    "index": 68117,
+    "input": "4 rectangles thinly sliced cooked ham, about 1/4 pound",
+    "stratum": "fractions_ranges",
+    "heldOut": true
+  },
+  {
+    "index": 10905,
+    "input": "1 1/2 pounds untrimmed French or Italian bread",
+    "stratum": "fractions_ranges",
+    "heldOut": true
+  },
+  {
+    "index": 22087,
+    "input": "2 1/2 cups white flour, approximately",
+    "stratum": "fractions_ranges",
+    "heldOut": false
+  },
+  {
+    "index": 161148,
+    "input": "Pinch of saffron crumbled into 1/4 cup water",
+    "stratum": "fractions_ranges",
+    "heldOut": false
+  },
+  {
+    "index": 164994,
+    "input": "¾ pound sweet cherries, stemmed and pitted",
+    "stratum": "fractions_ranges",
+    "heldOut": false
+  },
+  {
+    "index": 116007,
+    "input": "2 tablespoons grated onion (about 1/2 an onion)",
+    "stratum": "fractions_ranges",
+    "heldOut": false
+  },
+  {
+    "index": 28953,
+    "input": "3/4 cup tomato puree",
+    "stratum": "fractions_ranges",
+    "heldOut": false
+  },
+  {
+    "index": 175708,
+    "input": "1 3/4 cups (one 15-ounce can) cooked chickpeas, drained and rinsed if canned",
+    "stratum": "fractions_ranges",
+    "heldOut": true
+  },
+  {
+    "index": 115128,
+    "input": "1/4 cup pickled herring salad (recipe below).",
+    "stratum": "fractions_ranges",
+    "heldOut": false
+  },
+  {
+    "index": 148279,
+    "input": "1/2 cup chopped parsley or basil",
+    "stratum": "fractions_ranges",
+    "heldOut": true
+  },
+  {
+    "index": 112979,
+    "input": "Corn oil or canola oil for deep frying",
+    "stratum": "no_qty",
+    "heldOut": false
+  },
+  {
+    "index": 114955,
+    "input": "Finely grated zest of 2 limes",
+    "stratum": "no_qty",
+    "heldOut": true
+  },
+  {
+    "index": 115875,
+    "input": "Pinch of cayenne (optional)",
+    "stratum": "no_qty",
+    "heldOut": true
+  },
+  {
+    "index": 49119,
+    "input": "Olive-oil-poached tomatoes",
+    "stratum": "no_qty",
+    "heldOut": false
+  },
+  {
+    "index": 115581,
+    "input": "Capers",
+    "stratum": "no_qty",
+    "heldOut": true
+  },
+  {
+    "index": 137175,
+    "input": "Garlic powder, optional",
+    "stratum": "no_qty",
+    "heldOut": false
+  },
+  {
+    "index": 146673,
+    "input": "Marinara sauce for serving (optional) ",
+    "stratum": "no_qty",
+    "heldOut": false
+  },
+  {
+    "index": 22042,
+    "input": "Sugar, as desired",
+    "stratum": "no_qty",
+    "heldOut": false
+  },
+  {
+    "index": 47079,
+    "input": "Snipped basil or Italian parsley to garnish",
+    "stratum": "no_qty",
+    "heldOut": false
+  },
+  {
+    "index": 135963,
+    "input": "Slivered fresh basil leaves or very small whole basil leaves for garnish",
+    "stratum": "no_qty",
+    "heldOut": false
+  },
+  {
+    "index": 762,
+    "input": "Kosher salt, to taste",
+    "stratum": "no_qty",
+    "heldOut": true
+  },
+  {
+    "index": 113600,
+    "input": "Sourdough starter from above",
+    "stratum": "no_qty",
+    "heldOut": false
+  },
+  {
+    "index": 152928,
+    "input": "food-grade cheesecloth, rinsed and wrung out",
+    "stratum": "no_qty",
+    "heldOut": false
+  },
+  {
+    "index": 152814,
+    "input": "Fresh chopped parsley, for serving",
+    "stratum": "no_qty",
+    "heldOut": false
+  },
+  {
+    "index": 122762,
+    "input": "Quartered limes",
+    "stratum": "no_qty",
+    "heldOut": false
+  },
+  {
+    "index": 37849,
+    "input": "Ice cream or whipped cream (optional)",
+    "stratum": "no_qty",
+    "heldOut": true
+  },
+  {
+    "index": 24267,
+    "input": "Cooking oil spray",
+    "stratum": "no_qty",
+    "heldOut": false
+  },
+  {
+    "index": 36875,
+    "input": "Ground espresso (enough for 2 long shots, about 1/3 cup each)",
+    "stratum": "no_qty",
+    "heldOut": false
+  },
+  {
+    "index": 128353,
+    "input": "Strip of orange peel with pith, one inch wide",
+    "stratum": "no_qty",
+    "heldOut": false
+  },
+  {
+    "index": 57565,
+    "input": "Few sprigs parsley to yield 2 tablespoons chopped",
+    "stratum": "no_qty",
+    "heldOut": false
+  }
+]

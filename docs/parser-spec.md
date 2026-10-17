@@ -57,14 +57,14 @@ Serialised lower case (Claude's enum and the golden JSON use these strings).
 
 - **R3.1** Integers, decimals (`1.5`, `1,5` with a comma before exactly one or two digits), slash fractions (`1/2`), mixed numbers (`1 1/2`, `1-1/2`), unicode vulgar fractions (`½ ⅓ ⅔ ¼ ¾ ⅕ ⅛` …), and a digit glued to a unicode fraction (`1½`).
 - **R3.2 Ranges**: `1-2`, `1 – 2`, `1 to 2`, `1 or 2` (between two numbers) → `quantity` 1, `quantity_max` 2.
-- **R3.3** Number words `a`/`an` before a unit (= 1), `one`…`twelve`, `half`, `dozen` (= 12).
+- **R3.3** Number words `a`/`an` before a unit (= 1), `one`…`twelve`, `half`, `dozen` (= 12). A line that *starts* with a unit word and has no number ("Pinch of cayenne", "Strip of orange peel" is not — strip is not a unit) has quantity 1.
 - **R3.4 Parenthetical alternatives**: a parenthesised amount with a unit right after the primary amount/unit (`2 cups (300g)`, `1 (14-ounce) tin`) is `alt_quantity`/`alt_unit`. For "`N (size-unit) container`" the container is the unit and the size goes to alt: `1 (400g) tin tomatoes` → qty 1 tin, alt 400 g.
 - **R3.5** `x` multipliers (`2 x 400g tins`) → qty 2, unit tin, alt 400 g.
 - **R3.6** "plus 2 tbsp", "and 1 tsp" after the first amount → the extra amount goes into `note` (not added).
 
 ## R4 — Name vs note
 
-- **R4.1 Prep words go to `note`.** Verbs/participles and their adverbs: chopped, diced, minced, sliced, grated, shredded, crushed, sifted, peeled, cored, seeded, deseeded, pitted, halved, quartered, cubed, trimmed, rinsed, drained, beaten, whisked, melted, softened, room-temperature, cooked, toasted (when describing prep of a bought item: "toasted almonds" stays — see R4.2), thawed, defrosted, julienned, torn, squeezed, zested, finely, roughly, coarsely, thinly, lightly, freshly, divided. Sizes: small, medium, large, extra-large, medium-size, big, thick, thin. Qualifiers: fresh (when the dried form is not meant), about, approximately, heaped, level, scant, good, generous, plus more. Everything after the first top-level comma is `note`.
+- **R4.1 Prep words go to `note`.** Verbs/participles and their adverbs: chopped, diced, minced, sliced, grated, shredded, crushed, sifted, peeled, cored, seeded, deseeded, pitted, halved, quartered, cubed, trimmed, rinsed, drained, beaten, whisked, melted, softened, room-temperature, cooked, toasted (when describing prep of a bought item: "toasted almonds" stays — see R4.2), thawed, defrosted, julienned, torn, squeezed, zested, finely, roughly, coarsely, thinly, lightly, freshly, divided. Sizes: small, medium, large, extra-large, medium-size, big, thick, thin. Qualifiers: fresh (when the dried form is not meant), about, approximately, heaped, heaping, level, scant, good, good-quality, high-quality, generous, ripe, plus more. Everything after the first top-level comma is `note`.
 - **R4.2 Identity words stay in `name`.** They change what you buy: ground, smoked, red, green, yellow, white, black, brown, dried, dry (wine), tinned, canned, frozen, powder/powdered, unsalted, salted, low-fat, whole (milk), skimmed, semi-skimmed, double, single (cream), plain, self-raising, strong (flour), caster, icing, granulated, light/dark (sugar, soy), sweet, hot, extra-virgin, virgin, toasted (sesame oil), roasted (peppers in a jar), baby (spinach), spring (onion), boneless, skinless, free-range, kosher (salt, folded per R5.3), sea (salt).
 - **R4.3** A parenthetical that is not an amount (R3.4) goes to `note`: `1 onion (about 200 g)` → note "about 200 g". Exception: `(optional)` sets `optional` and is dropped.
 - **R4.4** "or" between two ingredients ("butter or margarine") keeps one ingredient: `name` is the first, `note` gets "or margarine". Rule parser: R7.
@@ -132,7 +132,10 @@ Every manual change on top of this automatic mapping lives in
 - **unit**: `unit` equal (null = null).
 - **note**: not scored (informational).
 - **Strata** (assigned by `tools/pick-golden`, first match wins):
-  1. `no_qty` — NYT `qty == 0`, or `input` contains "to taste".
+  1. `no_qty` — NYT `qty == 0`, or `input` contains "to taste" and does not start with a digit.
   2. `fractions_ranges` — `input` has a slash or unicode fraction, a decimal point, or `range_end > 0`.
-  3. `comments_parens` — `comment` non-empty or `input` contains `(`.
+  3. `comments_parens` — `comment` non-empty, or `input` contains `(`, `,`, `;`, " or " or " and ".
   4. `simple` — everything else.
+- **Sanity filter** before sampling: input 3–120 characters, no HTML or
+  backslash, NYT name at least 3 characters and appearing verbatim
+  (case-insensitive) in the input, no duplicate inputs.
