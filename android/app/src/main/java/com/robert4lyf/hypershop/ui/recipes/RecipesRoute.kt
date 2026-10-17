@@ -31,6 +31,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.di.AppContainer
+import com.robert4lyf.hypershop.ui.common.rememberOpenLink
+import com.robert4lyf.hypershop.ui.common.webLink
 import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.util.factoryFor
 
@@ -103,8 +105,12 @@ private fun UseCard(
             Text(bits.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onRemove) { Text("Remove from list") }
-                if (use.inStockCount > 0) TextButton(onClick = onAddInStock) { Text("Add the in-stock items now") }
+                webLink(use.url)?.let { url ->
+                    val open = rememberOpenLink()
+                    TextButton(onClick = { open(url) }, modifier = Modifier.testTag("open-${use.useId}")) { Text("Open recipe") }
+                }
             }
+            if (use.inStockCount > 0) TextButton(onClick = onAddInStock) { Text("Add the in-stock items now") }
         }
     }
 }

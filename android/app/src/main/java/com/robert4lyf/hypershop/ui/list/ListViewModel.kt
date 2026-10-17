@@ -11,6 +11,7 @@ import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.UiMessage
+import com.robert4lyf.hypershop.ui.common.webLink
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,6 +53,8 @@ data class ItemSheet(
     val sources: List<String>,
     val packNote: String?,
     val aisle: AisleCode,
+    /** Source title to its recipe page. */
+    val links: Map<String, String> = emptyMap(),
 )
 
 data class ListUi(
@@ -153,8 +156,10 @@ class ListViewModel(
                 }
             val uses = list.contributionsOf(id).map { it.useId }.distinct()
             val titles = c.repository.useTitles(uses)
+            val urls = c.repository.useUrls(uses)
+            val links = uses.mapNotNull { u -> titles[u]?.let { t -> webLink(urls[u])?.let { t to it } } }.toMap()
             _sheet.value =
-                ItemSheet(id, entry?.name ?: item.displayName, totals, uses.mapNotNull { titles[it] }, entry?.packNote, item.aisle)
+                ItemSheet(id, entry?.name ?: item.displayName, totals, uses.mapNotNull { titles[it] }, entry?.packNote, item.aisle, links)
         }
 
     fun closeItem() {

@@ -1,5 +1,8 @@
 package com.robert4lyf.hypershop.ui.list
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -44,6 +47,30 @@ class ItemSheetTest {
                 )
             }
         }
+
+    @Test
+    fun aSourceWithAPageOpensIt() {
+        val opened = mutableListOf<String>()
+        val handler =
+            object : UriHandler {
+                override fun openUri(uri: String) {
+                    opened += uri
+                }
+            }
+        compose.setContent {
+            CompositionLocalProvider(LocalUriHandler provides handler) {
+                HyperShopTheme(dynamicColor = false) {
+                    ItemSheetContent(
+                        SHEET.copy(links = mapOf("Weeknight chilli" to "https://recipes.example/chilli")),
+                        ItemSheetActions(onMove = { _, _ -> }, onEditQuantity = { true }),
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText("Weeknight chilli").performClick()
+        compose.onNodeWithText("Added by hand").performClick()
+        assertEquals(listOf("https://recipes.example/chilli"), opened)
+    }
 
     @Test
     fun totalsSourcesQuantityAndAisle() {

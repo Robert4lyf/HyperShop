@@ -209,6 +209,13 @@ class ListRepository(
             }
         }
 
+    /** Recipe pages behind an item, by use, for the item sheet's links. */
+    suspend fun useUrls(useIds: Collection<Long>): Map<Long, String?> =
+        db.withTransaction {
+            val l = load()
+            useIds.associateWith { id -> l.uses[id]?.recipeId?.let { dao.recipe(it) }?.url }
+        }
+
     /** "Add the in-stock items now": the lines of [useId] that were left out as in stock. */
     suspend fun inStockLines(useId: Long): Pair<RecipeEntity, List<ParsedIngredient>>? =
         db.withTransaction {
