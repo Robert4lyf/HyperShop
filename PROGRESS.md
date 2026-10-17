@@ -17,7 +17,7 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 - [x] 1.2 Golden data: 80 NYT lines (seed 20261017; 25/20/15/20 strata; 20 held out, listed in docs/golden-held-out.md; 25 overrides citing spec rules) + 25 UK lines; CHECKSUM + CHANGES.md — check: `python3 tools/pick-golden/pick_golden.py && python3 tools/nyt-to-golden/nyt_to_golden.py && git diff --exit-code testdata`; `sha256sum -c testdata/ingredients/CHECKSUM`
 - [x] 1.3 :core model: Rational (exact), Dimension, QtyUnit (+ locale factors), UnitLocale, AisleCode, QtyBase (+ presence), ParsedIngredient, RecipeImport, Coverage (ADR 002) — check: `tools/gradle.sh :core:test`
 - [x] 1.4a Top-400 NYT names script (tools/catalog/top_names.py → catalog/top-names.csv; prep/size stripped, salt/pepper folded, compounds split, plurals merged) — check: `python3 tools/catalog/top_names.py && git diff --exit-code catalog/top-names.csv`
-- [ ] 1.4b Catalogue CSV
+- [x] 1.4b Catalogue CSV: catalog/ingredients.csv, 431 rows, 17 aisles, 5 staples (salt, black pepper, olive oil, vegetable oil, water), 20 pack notes, src=agent-estimate; covers 392/400 NYT top names (the 8 misses are non-names like "to taste") — check: validator in 1.4c
 - [ ] 1.4c Validator, generated resource + loader, SOURCES, LICENSE/NOTICE, REVIEW.md
 - [ ] 1.5a Sync codec (envelope, ops, paged snapshot, estimator, WatchProtocol.kt)
 - [ ] 1.5b Protocol rules, testdata/sync vectors, tools/sync-model
