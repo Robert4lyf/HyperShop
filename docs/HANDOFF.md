@@ -46,7 +46,7 @@ Answer each with yes or no; note anything that's a "no".
 - **5. Amounts in ml, and 480 ml instead of 500 ml** (RecipeTin Eats, "One Pot Creamy Tomato Chicken Pasta Bake"). Three causes, all fixed:
   - The recipe's own metric figure ("2 cups milk (500ml)") was parsed but never used; the cups were converted instead. A metric alternative now wins over cups, spoons and ounces.
   - The cup size was guessed as US (240 ml) because most lines start with cups. A line giving both cups and ml now settles it (2 cups = 500 ml means 250 ml cups).
-  - Cups of solids (cheese, chicken, pasta) showed as ml. They now show in grams where the catalogue knows the density (butter), otherwise in cups as written.
+  - Cups of solids (cheese, chicken, pasta) showed as ml. Your rule now applies: **amounts are always metric, and teaspoons and tablespoons are never converted.** Cups of a solid become grams using the catalogue's weight per cup (100 common items now have one: cheeses, cooked chicken, mince, pasta, produce, nuts, dried fruit; agent estimates for a US cup of the grated, shredded or chopped form). An item without one shows in ml.
   Items already on the list keep their old amounts; re-share the recipe to see the fix.
 
 ## Before Run 2

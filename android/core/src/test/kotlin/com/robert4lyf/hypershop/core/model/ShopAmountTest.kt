@@ -49,6 +49,21 @@ class ShopAmountTest {
     }
 
     @Test
+    fun spoonsAreKeptEvenWithAMetricAlternative() {
+        val p =
+            ParsedIngredient(
+                "2 tbsp (30g) butter",
+                "butter",
+                Rational.of(2),
+                unit = QtyUnit.TBSP,
+                altQuantity = Rational.of(30),
+                altUnit = QtyUnit.G,
+            )
+        assertEquals(QtyBase.of(Rational.of(2), QtyUnit.TBSP, UnitLocale.US), p.shopBase(UnitLocale.US))
+        assertEquals(QtyUnit.TBSP, p.shopUnit)
+    }
+
+    @Test
     fun containersAndMetricAmountsAreUnchanged() {
         val tin = rp.parse("1 (400g) tin chopped tomatoes")
         assertEquals(QtyBase.of(Rational.ONE, QtyUnit.TIN, UnitLocale.METRIC), tin.shopBase(UnitLocale.METRIC))

@@ -35,14 +35,15 @@ data class ParsedIngredient(
         get() = quantity == null || NO_SCALE.any { raw.lowercase().contains(it) }
 
     /**
-     * The metric amount the recipe gives for a cup, spoon or ounce amount: the
+     * The metric amount the recipe gives for a cup or ounce amount: the
      * 500 ml in "2 cups (500ml)" or "2 cups milk (500ml)". It is what the author
      * measured, so it wins over converting the cups (whose size varies).
      */
     private val metricAlt: Pair<Rational, QtyUnit>?
         get() {
             val u = unit ?: return null
-            if (quantity == null || u.dimension == Dimension.COUNT || u in METRIC) return null
+            // Spoons are kept as written, and metric amounts need no help.
+            if (quantity == null || u.dimension == Dimension.COUNT || u in METRIC || u == QtyUnit.TSP || u == QtyUnit.TBSP) return null
             if (altQuantity != null && altUnit in METRIC) return altQuantity to altUnit!!
             // The rule parser moves a trailing "(500ml)" into the note as "500ml" (R4.3).
             val m = METRIC_IN_NOTE.find(note.orEmpty()) ?: return null

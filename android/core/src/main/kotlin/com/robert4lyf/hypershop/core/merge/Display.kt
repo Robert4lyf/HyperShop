@@ -37,10 +37,11 @@ object Display {
     ): String? {
         if (q.isPresence) return null
         var parts = q.parts.mapKeys { BaseKey.decode(it.key) }.filterValues { it > Rational.ZERO }
-        // A cup of cheese or chicken is not bought by the ml.
+        // A cup of cheese or chicken is bought by weight, where the catalogue
+        // knows the density. Spoons stay spoons.
         val solid = policy != null && policy != DisplayPolicy.VOLUME
-        // Volume turns into mass only where the catalogue knows the density.
-        if (gramsPerCup != null && parts.containsKey(BaseKey.VOLUME) && (solid || parts.containsKey(BaseKey.MASS))) {
+        val spoons = hint == QtyUnit.TSP || hint == QtyUnit.TBSP
+        if (gramsPerCup != null && !spoons && parts.containsKey(BaseKey.VOLUME) && (solid || parts.containsKey(BaseKey.MASS))) {
             val g = parts.getValue(BaseKey.VOLUME) * gramsPerCup / Rational.of(240)
             parts = parts - BaseKey.VOLUME + (BaseKey.MASS to (parts[BaseKey.MASS] ?: Rational.ZERO) + g)
         }
@@ -52,7 +53,7 @@ object Display {
                 when (k.dimension) {
                     Dimension.COUNT -> count(v, k.countUnit, produce)
                     Dimension.MASS -> mass(v, units, hint)
-                    Dimension.VOLUME -> if (solid) measure(v, hint) else volume(v, units, hint)
+                    Dimension.VOLUME -> volume(v, units, hint)
                 }
             }
     }
@@ -142,8 +143,11 @@ object Display {
         units: UnitsSetting,
         hint: QtyUnit? = null,
     ): String {
+        // Spoons are never converted, whatever the amount.
+        if (hint == QtyUnit.TSP) return "${fraction(roundUp(ml / Rational.of(5), Rational.of(1, 4)))} tsp"
+        if (hint == QtyUnit.TBSP) return "${fraction(roundUp(ml / Rational.of(15), Rational.of(1, 2)))} tbsp"
         val d = ml.toDouble()
-        val spoons = hint == QtyUnit.TSP || hint == QtyUnit.TBSP || (units != UnitsSetting.METRIC && d < 60)
+        val spoons = units != UnitsSetting.METRIC && d < 60
         if (units == UnitsSetting.AS_WRITTEN && hint == QtyUnit.CUP || units == UnitsSetting.IMPERIAL && d >= 60) {
             return "${fraction(roundUp(ml / Rational.of(240), Rational.of(1, 4)))} ${if (ml > Rational.of(240)) "cups" else "cup"}"
         }
@@ -164,20 +168,6 @@ object Display {
         }
     }
 
-    /**
-     * A solid measured by volume, with no density to weigh it: cups or spoons as
-     * the recipe wrote them. Cups round to the nearest ¼, not up, because the
-     * ml were counted at 240 or 250 per cup depending on the recipe.
-     */
-    fun measure(
-        ml: Rational,
-        hint: QtyUnit? = null,
-    ): String {
-        if (hint == QtyUnit.TSP || hint == QtyUnit.TBSP || ml < Rational.of(60)) return volume(ml, UnitsSetting.IMPERIAL, hint)
-        val cups = nearest(ml / Rational.of(240), Rational.of(1, 4)).coerceAtLeast(Rational.of(1, 4))
-        return "${fraction(cups)} ${if (cups > Rational.ONE) "cups" else "cup"}"
-    }
-
     /** Rounds up to a multiple of [step]. */
     fun roundUp(
         v: Rational,
@@ -186,15 +176,6 @@ object Display {
         val n = v / step
         val whole = Math.floorDiv(n.num, n.den) + if (n.num % n.den == 0L) 0 else 1
         return Rational.of(whole) * step
-    }
-
-    /** Rounds to the nearest multiple of [step], halves up. */
-    fun nearest(
-        v: Rational,
-        step: Rational,
-    ): Rational {
-        val n = v / step
-        return Rational.of(Math.floorDiv(2 * n.num + n.den, 2 * n.den)) * step
     }
 
     private fun roundUpD(
