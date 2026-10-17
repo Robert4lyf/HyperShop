@@ -145,6 +145,12 @@ class ListRepository(
             StoredRecipe(r.copy(id = id), rows.zip(ids).zip(lines) { (row, lid), p -> row.copy(id = lid) to p })
         }
 
+    /** Drops a stored recipe that was never confirmed (Cancel, or a re-parse). */
+    suspend fun discardRecipe(id: Long) =
+        db.withTransaction {
+            if (dao.uses().none { it.recipeId == id }) dao.deleteRecipe(id)
+        }
+
     /** "Already on your list — add again?" */
     suspend fun alreadyOnList(url: String): Boolean {
         val recipes = dao.recipesByUrl(url).map { it.id }.toSet()

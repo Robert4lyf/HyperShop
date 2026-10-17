@@ -78,6 +78,9 @@ interface ListDao {
     @Query("SELECT * FROM Recipe WHERE url = :url ORDER BY importedAt DESC")
     suspend fun recipesByUrl(url: String): List<RecipeEntity>
 
+    @Query("DELETE FROM Recipe WHERE id = :id")
+    suspend fun deleteRecipe(id: Long)
+
     @Query("SELECT * FROM RecipeLine WHERE recipeId = :recipeId ORDER BY id")
     suspend fun lines(recipeId: Long): List<RecipeLineEntity>
 
