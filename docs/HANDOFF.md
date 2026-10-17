@@ -49,6 +49,8 @@ Answer each with yes or no; note anything that's a "no".
   - Cups of solids (cheese, chicken, pasta) showed as ml. Your rule now applies: **amounts are always metric, and teaspoons and tablespoons are never converted** (but when a recipe gives grams as well as spoons, the grams win). Cups of a solid become grams using the catalogue's weight per cup (100 common items now have one: cheeses, cooked chicken, mince, pasta, produce, nuts, dried fruit; agent estimates for a US cup of the grated, shredded or chopped form). An item without one shows in ml.
   Items already on the list keep their old amounts; re-share the recipe to see the fix.
 
+- **Items renamed to something else.** Panko was turned into breadcrumbs, and haricot beans (and butter beans) into cannellini beans, because the catalogue listed them as other names for those items. Panko, haricot beans (also navy beans) and butter beans (also lima beans) are now items of their own.
+
 ## Before Run 2
 
 - Hand-off A done (above), with `main` in place.

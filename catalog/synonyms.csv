@@ -164,7 +164,8 @@ buns,burger_bun
 burger buns,burger_bun
 butcher's twine,string
 butter,butter
-butter beans,cannellini_beans
+butter bean,butter_beans
+butter beans,butter_beans
 buttermilk,buttermilk
 butternut squash,butternut_squash
 butternut squashes,butternut_squash
@@ -181,6 +182,7 @@ canned plum tomatoes,chopped_tomatoes
 canned pumpkin,pumpkin_puree
 canned tomatoes,chopped_tomatoes
 canned tuna,tuna_tin
+cannellini bean,cannellini_beans
 cannellini beans,cannellini_beans
 canola oil,vegetable_oil
 cantaloupe,melon
@@ -620,7 +622,8 @@ ham,ham
 ham hock,ham
 hamburger bun,burger_bun
 hard cider,cider
-haricot beans,cannellini_beans
+haricot bean,haricot_beans
+haricot beans,haricot_beans
 haricots verts,green_beans
 harissa,harissa
 harissa paste,harissa
@@ -730,6 +733,8 @@ light cream,single_cream
 light olive oil,olive_oil
 light rum,rum
 light soy sauce,soy_sauce
+lima bean,butter_beans
+lima beans,butter_beans
 lime,lime
 lime juice,lime_juice
 lime wedge,lime
@@ -814,7 +819,8 @@ naan bread,naan
 nam pla,fish_sauce
 natural yogurt,yogurt
 navel orange,orange
-navy beans,cannellini_beans
+navy bean,haricot_beans
+navy beans,haricot_beans
 nectarine,nectarine
 nectarines,nectarine
 neutral oil,vegetable_oil
