@@ -13,6 +13,8 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -24,6 +26,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.robert4lyf.hypershop.di.AppContainer
+import com.robert4lyf.hypershop.di.ShareOutcome
 import com.robert4lyf.hypershop.ui.list.ListRoute
 import com.robert4lyf.hypershop.ui.recipes.RecipesRoute
 import com.robert4lyf.hypershop.ui.review.ReviewRoute
@@ -49,6 +52,15 @@ fun HyperShopApp(
     val snackbar = remember { SnackbarHostState() }
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route
+    val share by container.shares.collectAsState()
+    LaunchedEffect(share) {
+        when (val s = share) {
+            is ShareOutcome.Review -> nav.navigate(Routes.review(s.jobId)) { launchSingleTop = true }
+            ShareOutcome.NoLink -> snackbar.showSnackbar("There was no https link in what you shared")
+            null -> return@LaunchedEffect
+        }
+        container.shares.value = null
+    }
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {

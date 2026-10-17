@@ -1,11 +1,8 @@
 package com.robert4lyf.hypershop.ui.review
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
@@ -21,7 +18,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -72,7 +68,16 @@ fun ReviewRoute(
                 onAisleInStock = vm::aisleInStock,
                 onClearInStock = vm::clearInStock,
             )
-        is ReviewState.Failed -> FailedView(s.error, onDone)
+        is ReviewState.Failed ->
+            ManualLinesView(
+                s.error,
+                s.candidates,
+                onUse = vm::useLines,
+                onBack = {
+                    vm.cancel()
+                    onDone()
+                },
+            )
         is ReviewState.Added ->
             LaunchedEffect(s) {
                 onDone()
@@ -104,24 +109,13 @@ fun ReviewRoute(
     sheetKey?.let { key -> ReviewRowSheetHost(vm, key, onDismiss = { sheetKey = null }) }
 }
 
-@Composable
-private fun FailedView(
-    error: ImportError,
-    onDone: () -> Unit,
-) {
-    Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(errorText(error))
-        Button(onClick = onDone, modifier = Modifier.padding(top = 16.dp)) { Text("Back to the list") }
-    }
-}
-
 fun errorText(e: ImportError): String =
     when (e) {
         ImportError.BLOCKED -> "That address can't be fetched (it isn't a public https page)."
         ImportError.NOT_HTML -> "That link isn't a web page."
         ImportError.TOO_LARGE -> "That page is too large to read."
-        ImportError.HTTP -> "The site refused the request. Select the lines manually instead."
-        ImportError.OFFLINE -> "You're offline. Try again when you're connected."
+        ImportError.HTTP -> "The site refused the request (some sites block apps)."
+        ImportError.OFFLINE -> "You're offline. Share the link again when you're connected, or paste the lines."
         ImportError.NO_RECIPE -> "No ingredient list found on that page."
         ImportError.NOT_A_RECIPE -> "That page doesn't look like a recipe."
     }

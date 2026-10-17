@@ -77,7 +77,8 @@ sealed interface ReviewState {
 
     data class Failed(
         val error: ImportError,
-        val rawLines: List<String>,
+        /** Lines to pick from on "Select lines manually": the recipe's, else the page's text. */
+        val candidates: List<String>,
     ) : ReviewState
 
     data class Added(
@@ -124,11 +125,12 @@ class ReviewViewModel(
             job = c.importJobs.get(jobId)
         }
         var r = job?.result ?: return fail(ImportError.NO_RECIPE, emptyList())
+        failedFrom = r
         if (r.claudePending && c.reviewGate.visible.value) {
             _state.value = ReviewState.Loading
             r = c.importer.parse(r, allowClaude = true, model = c.settings.model.first())
         }
-        if (r.lines.isEmpty()) return fail(r.error ?: ImportError.NO_RECIPE, r.rawLines)
+        if (r.lines.isEmpty()) return fail(r.error ?: ImportError.NO_RECIPE, candidates(r))
         result = r
         val url = r.url
         if (r.preTick && url != null && c.repository.alreadyOnList(url)) {
@@ -155,6 +157,29 @@ class ReviewViewModel(
             c.repository.storeRecipe(r.url, r.title, r.servings, r.locale, "WEB", r.parsedBy, r.model, r.claudePending, r.lines)
         preview = c.repository.preview(stored!!, servings, emptyMap(), aisleMoves)
     }
+
+    private var failedFrom: ImportResult? = null
+
+    private fun candidates(r: ImportResult): List<String> =
+        r.rawLines.ifEmpty {
+            r.pageText.orEmpty().lines().map { it.trim() }.filter { it.length in 2..500 }.distinct().take(300)
+        }
+
+    /** "Select lines manually": the picked or pasted lines, parsed as a recipe and reviewed as usual. */
+    fun useLines(lines: List<String>) =
+        viewModelScope.launch {
+            val picked = lines.flatMap { it.lines() }.map { it.trim() }.filter { it.isNotEmpty() }
+            if (picked.isEmpty()) return@launch
+            _state.value = ReviewState.Loading
+            val from = failedFrom
+            val r =
+                c.importer
+                    .fromLines(picked, from?.title, allowClaude = c.reviewGate.visible.value, model = c.settings.model.first())
+                    .copy(url = from?.url)
+            if (r.lines.isEmpty()) return@launch fail(ImportError.NO_RECIPE, picked)
+            result = r
+            begin(r)
+        }
 
     private fun fail(
         e: ImportError,

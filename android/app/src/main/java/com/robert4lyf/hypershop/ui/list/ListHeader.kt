@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -32,7 +33,7 @@ data class HeaderActions(
     val suggestions: (String) -> List<String>,
     val onReview: (Long) -> Unit,
     val onSample: () -> Unit,
-    /** Null until the share flow lands (Step 5.9). */
+    /** Null unless the clipboard says it holds text (its content is read only on tap). */
     val onPasteLink: (() -> Unit)? = null,
 )
 
@@ -151,6 +152,17 @@ fun androidx.compose.foundation.lazy.LazyListScope.listHeader(
     ui: ListUi,
     actions: HeaderActions,
 ) {
+    actions.onPasteLink?.let { paste ->
+        if (!ui.isEmpty) {
+            item(key = "paste") {
+                AssistChip(
+                    onClick = paste,
+                    label = { Text("Paste link") },
+                    modifier = Modifier.padding(start = 16.dp, top = 8.dp).testTag("paste-chip"),
+                )
+            }
+        }
+    }
     item(key = "add") { AddItemField(actions.onAdd, actions.suggestions) }
     item(key = "ready") { ReadyCard(ui.readyJobs, actions.onReview) }
 }

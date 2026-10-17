@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.ui.list
 
+import android.content.ClipboardManager
 import android.content.Intent
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
@@ -7,7 +8,11 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.di.AppContainer
@@ -26,7 +31,30 @@ fun ListRoute(
     val ui by vm.ui.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
     val context = LocalContext.current
-    val header = HeaderActions(onAdd = vm::addTyped, suggestions = vm::suggestions, onReview = onReview, onSample = vm::addSample)
+    val clipboard = remember(context) { context.getSystemService(ClipboardManager::class.java) }
+    // Only the description is checked here; the clip itself is read when you tap the chip.
+    var clipHasText by remember { mutableStateOf(false) }
+    LifecycleResumeEffect(clipboard) {
+        clipHasText = clipboard?.primaryClipDescription?.hasMimeType("text/*") == true
+        onPauseOrDispose {}
+    }
+    val paste: (() -> Unit)? =
+        if (clipHasText) {
+            {
+                val text = clipboard?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
+                container.applicationScope.launch { container.importShared(text, null) }
+            }
+        } else {
+            null
+        }
+    val header =
+        HeaderActions(
+            onAdd = vm::addTyped,
+            suggestions = vm::suggestions,
+            onReview = onReview,
+            onSample = vm::addSample,
+            onPasteLink = paste,
+        )
     ListScreen(
         ui,
         ListActions(

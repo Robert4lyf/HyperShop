@@ -2,6 +2,10 @@ package com.robert4lyf.hypershop.ui.review
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.robert4lyf.hypershop.core.model.AisleCode
+import com.robert4lyf.hypershop.core.model.UnitLocale
+import com.robert4lyf.hypershop.data.ImportJobEntity
+import com.robert4lyf.hypershop.importing.ImportError
+import com.robert4lyf.hypershop.importing.ImportResult
 import com.robert4lyf.hypershop.testutil.CHILLI
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.testutil.await
@@ -107,11 +111,44 @@ class ReviewViewModelTest {
     @Test
     fun cancelDiscardsTheRecipe() {
         val c = TestContainer.create()
-        val vm = ReviewViewModel(c, runBlocking { c.readyJob("2 onions") })
+        val vm = ReviewViewModel(c, runBlocking { c.readyJob("2 onions", url = "https://example.com/chilli") })
         ready(vm)
         vm.cancel()
         await(vm.state) { it == ReviewState.Cancelled }
         assertTrue(runBlocking { c.db.dao().recipesByUrl("https://example.com/chilli") }.isEmpty())
+    }
+
+    @Test
+    fun noIngredientsGoesToSelectLinesManually() {
+        val c = TestContainer.create()
+        val id =
+            runBlocking {
+                val job =
+                    c.db.dao().insertJob(
+                        ImportJobEntity(0, "RUNNING", """{"url":"https://example.com/blog"}""", null, null, 0),
+                    )
+                c.importJobs.finish(
+                    job,
+                    ImportResult(
+                        url = "https://example.com/blog",
+                        title = "Gran's scones",
+                        servings = null,
+                        locale = UnitLocale.METRIC,
+                        method = "PAGE_TEXT",
+                        pageText = "Gran's scones\n\nThese are lovely.\n225g self-raising flour\n75g butter\n150ml milk\nx",
+                        error = ImportError.NO_RECIPE,
+                    ),
+                )
+                job
+            }
+        val vm = ReviewViewModel(c, id)
+        val failed = await(vm.state) { it is ReviewState.Failed } as ReviewState.Failed
+        assertEquals(ImportError.NO_RECIPE, failed.error)
+        assertEquals(listOf("Gran's scones", "These are lovely.", "225g self-raising flour", "75g butter", "150ml milk"), failed.candidates)
+        vm.useLines(listOf("225g self-raising flour", "75g butter\n150ml milk\n"))
+        val ui = ready(vm)
+        assertEquals("Gran's scones", ui.title)
+        assertEquals(3, ui.addCount)
     }
 }
 

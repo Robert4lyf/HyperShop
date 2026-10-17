@@ -22,6 +22,7 @@ import com.robert4lyf.hypershop.importing.HyperShopWorkerFactory
 import com.robert4lyf.hypershop.importing.ImportJobs
 import com.robert4lyf.hypershop.importing.Importer
 import com.robert4lyf.hypershop.importing.ReviewGate
+import com.robert4lyf.hypershop.importing.SharedText
 import com.robert4lyf.hypershop.secrets.ApiKeyStore
 import com.robert4lyf.hypershop.secrets.InMemoryApiKeyStore
 import com.robert4lyf.hypershop.settings.Settings
@@ -37,6 +38,14 @@ import timber.log.Timber
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+
+sealed interface ShareOutcome {
+    data class Review(
+        val jobId: Long,
+    ) : ShareOutcome
+
+    data object NoLink : ShareOutcome
+}
 
 /**
  * Hand-rolled dependency graph (the BangGym pattern): one object on the
@@ -94,6 +103,24 @@ class AppContainer(
     val importJobs = ImportJobs(db.dao(), workManager, clock)
 
     val workerFactory = HyperShopWorkerFactory { this }
+
+    /** Shares and pastes waiting for the UI: a job to review, or "no link". */
+    val shares = kotlinx.coroutines.flow.MutableStateFlow<ShareOutcome?>(null)
+
+    /** A share or a paste: queue the import, or say there was no link. Returns the job, if any. */
+    suspend fun importShared(
+        text: String?,
+        subject: String?,
+    ): Long? {
+        val input = SharedText.parse(text, subject)
+        if (input == null) {
+            shares.value = ShareOutcome.NoLink
+            return null
+        }
+        val id = importJobs.enqueue(input)
+        shares.value = ShareOutcome.Review(id)
+        return id
+    }
 
     fun today(): LocalDate = Instant.ofEpochMilli(clock()).atZone(ZoneOffset.UTC).toLocalDate()
 
