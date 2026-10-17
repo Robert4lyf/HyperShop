@@ -141,19 +141,157 @@ testdata/       saved recipe HTML pages + ingredient-line golden files
 
 The parser, merge and catalog code lives in pure Kotlin/JVM modules with no Android imports. That keeps them fast to test, and they can be reused later in a server or KMP iOS build.
 
-## 6. Milestones
+## 6. Build plan (step by step)
 
-1. **Core logic.** Parser, unit conversion, merge and categoriser, with golden tests. This is the hardest part and should be built first.
-2. **Recipe extraction.** JSON-LD/microdata/heuristics, tested against about 30 saved pages from popular sites.
-3. **Android app.** Room, list UI, import + preview, share intent, aisle editing and store profiles.
-4. **Claude integration.**
-   - Start with a short test confirming the Anthropic Java SDK runs on Android (dependency size, desugaring). If it doesn't, call the same API over OkHttp.
-   - Then build the API key settings, the structured-output extractor for text, the fallback mode, and the cost counter.
-   - Evaluate on the golden set: rule parser vs Claude.
-5. **Instagram import.** Caption fetch, screenshot import, video frame and transcript import.
-6. **Garmin app.** List view and ticking on the simulator, using hard-coded data.
-7. **Sync.** Connect IQ SDK integration, the event queue and conflict handling; test on a real watch.
-8. **Polish.** Dark mode, empty states, error messages for blocked sites, and app icons. Then Play Store internal testing and Connect IQ Store submission.
+Each sub-step ends in a check that can be run. A step is finished only when its **Done when** check passes. Commit after every sub-step, so a failed run can pick up from the last good commit.
+
+### What the build machine can do
+- The cloud container has Java and Gradle. It does **not** have the Android SDK or the Connect IQ SDK, and it has no emulator, phone or watch.
+- The Android SDK can be installed (Step 0). The Connect IQ SDK may be blocked, because Garmin's download needs an account and a licence acceptance.
+- Anything that needs real hardware or your accounts is marked **[YOU]** and can't be done by the agent.
+
+### Things only you can provide
+| Item | Needed for |
+|---|---|
+| Anthropic API key, to test Claude parsing | Step 5.6 |
+| Android phone with developer mode on, for installing test builds | Steps 4.9, 6.6, 8.6 |
+| Garmin watch, Garmin Connect app, and a Connect IQ developer key | Steps 7–8 |
+| A few Instagram reel links and saved videos to test with | Step 6.6 |
+| Play Console and Connect IQ Store accounts, to publish | Step 9.5 |
+
+---
+
+### Step 0 — Repo and toolchain
+- **0.1** Create a `main` branch from this branch, so pull requests have something to merge into.
+- **0.2** Add `.gitignore` (Android, Gradle, IDE, `local.properties`, `*.prg`, `developer_key*`), `README.md` and `LICENSE`.
+- **0.3** Install the Android command-line tools: platform 35, build-tools 35, `ANDROID_HOME`. Add a SessionStart hook so future cloud sessions install them too.
+- **0.4** Create the Gradle project in `android/` with a version catalog (`libs.versions.toml`), Kotlin 2.x, AGP 8.x and JDK 17. Modules: `:app`, `:core:model`, `:core:parser`, `:core:merge`, `:core:catalog`, `:core:extract`, `:core:claude`. The `core` modules are pure Kotlin/JVM.
+- **0.5** Add ktlint/detekt and a CI workflow (`.github/workflows/android.yml`) running lint, unit tests and `assembleDebug`.
+- **Done when:** `./gradlew build` passes in the container and on CI.
+
+### Step 1 — Shared model (`:core:model`)
+- **1.1** `Quantity` (amount: `Rational`; unit: `Unit?`), `Unit` (enum with dimension MASS/VOLUME/COUNT/OTHER and a factor to the base unit), and `CompoundQuantity` (a list of quantities that can't be combined).
+- **1.2** `ParsedIngredient(raw, name, normName, quantity, altQuantity, note, optional, confidence)`.
+- **1.3** `RecipeImport(title, servings, sourceUrl, source, parsedBy, ingredients)`.
+- **1.4** `Aisle` enum with default order.
+- **Done when:** the model compiles and the unit tests for `Rational` arithmetic and unit conversion pass.
+
+### Step 2 — Ingredient parser (`:core:parser`)
+- **2.1** Build the golden data set: `testdata/ingredients/*.tsv` with at least 300 real lines and their expected output. Include UK and US units, unicode fractions, ranges, "x 400g tin", "(300g)", "to taste" and "optional".
+- **2.2** Tokenizer that handles numbers, fractions, unicode fractions, ranges, units (with aliases: tbsp/Tbsp/T/tablespoon(s)…) and parentheses.
+- **2.3** Grammar: `[qty] [unit] [(alt qty unit)] name [, note]`, with sizing words (large/small), container words (tin/can/packet/clove/bunch) and "of".
+- **2.4** Normaliser: lowercase, strip prep words, singularise (inflector plus an exceptions list), synonym map from `catalog/synonyms.csv`.
+- **2.5** Confidence score: below 0.6 if any words go unparsed, there's no name, or the unit is unknown. Claude fallback (Step 5) uses this score.
+- **Done when:** at least 95% of golden lines match exactly, and the failures are listed in a report file.
+
+### Step 3 — Catalogue, categoriser and merge (`:core:catalog`, `:core:merge`)
+- **3.1** `catalog/ingredients.csv` with about 1,500 rows (`name, synonyms, aisle`). Generate a first draft, then review it by hand for UK supermarket aisles.
+- **3.2** Gradle task that turns the CSV into a Kotlin map at build time.
+- **3.3** `Categoriser.categorise(normName, overrides)`: override → exact match → head noun → keyword rules → Other.
+- **3.4** `Merger.merge(list, incoming, recipeId)`:
+  - Group by `normName`, sum within each unit dimension, and pick a display unit.
+  - Keep per-recipe contributions, so a recipe can be removed by subtraction.
+  - Merging into a ticked item un-ticks it.
+- **3.5** Property tests: merging then removing a recipe returns the original list, and merging is order-independent.
+- **Done when:** all tests pass, and at least 98% of golden ingredient names get a category other than Other.
+
+### Step 4 — Android app, no Claude yet (`:app`, `:core:extract`)
+- **4.1** `:core:extract`: an OkHttp fetcher with a realistic User-Agent, a 10s timeout and redirect handling. Then a JSON-LD `Recipe` extractor (handles `@graph`, arrays and `HowToSection`), a microdata extractor and a heading-based fallback.
+- **4.2** Save about 30 recipe pages into `testdata/pages/`, from BBC Good Food, AllRecipes, NYT, Serious Eats, Delicious, Jamie Oliver, RecipeTin Eats, blogs that use WPRM or Tasty plugins, and others. Write an extractor test for each page.
+- **4.3** Room database:
+  - Entities from §4, DAOs, migrations scaffold, and Hilt modules.
+  - A `ListRepository` that wraps the merge and categorise logic in transactions.
+- **4.4** Screens, built in Compose with Material 3, dark mode and dynamic colour:
+  - **List**: grouped by aisle, tick, swipe to delete, add manually, clear ticked/all, undo.
+  - **Import preview**: title, servings scaler, ingredient checkboxes, staples unticked, and editing a line before adding.
+  - **Recipes**: list, open source link, remove from list.
+  - **Settings**: store profiles and aisle order (drag to reorder), staples list, Claude section (placeholder until Step 5).
+- **4.5** Share intent: the `ACTION_SEND` filter routes into the import flow. The paste field detects a URL on the clipboard.
+- **4.6** Error states: no network, page blocked, no recipe found. Each offers "Select lines manually" (shows the page text with checkboxes).
+- **4.7** WebView fallback for blocked or JavaScript-heavy pages: render the page off-screen, grab the DOM, then run the same extractors.
+- **4.8** Tests: ViewModel unit tests, Room tests (Robolectric), and Compose UI tests for list ticking and the import preview.
+- **4.9 [YOU]** Install the debug APK from CI on your phone. Share 5 recipes from Chrome and report anything that goes wrong.
+- **Done when:** CI is green, the debug APK is produced, and 4.9 shows no blocking problems.
+
+### Step 5 — Claude integration (`:core:claude`)
+- **5.1** Feasibility test: add the Anthropic Java SDK to `:core:claude` and to a throwaway Android build. Check the APK size increase, minSdk 26 desugaring and R8 rules.
+  - If it fails or adds more than about 5 MB, call the same Messages API over OkHttp plus kotlinx.serialization instead.
+  - Record the decision in `docs/decisions/001-claude-client.md`.
+- **5.2** Interface `ClaudeExtractor.extract(input: ClaudeInput): RecipeImport`. `ClaudeInput` is a text block plus images (JPEG, longest side 1568 px or less) plus a transcript.
+- **5.3** Request:
+  - Model and effort come from settings (default `claude-opus-5-5`, `effort: low`), with `max_tokens` around 8000.
+  - A structured-output JSON schema (§3.7), a server-side fallbacks beta, and a fixed system prompt for prompt caching.
+  - The prompt says to split combined lines, flag estimated quantities and leave out non-ingredients.
+- **5.4** Response handling:
+  - Check `stop_reason`, including `refusal` and `max_tokens`, then validate against the schema.
+  - Map typed SDK errors: 401 bad key, 429 retry with back-off, 5xx retry once, network error.
+  - Record `usage` into `ClaudeUsage`.
+- **5.5** App wiring:
+  - The settings screen gets an API key field (EncryptedSharedPreferences) with a "Test key" button, the mode (Off/Fallback/Always), a model picker, and a cost counter.
+  - In Fallback mode, Claude runs when extraction fails or any line's confidence is below 0.6. It re-parses only those lines, or the whole page text if extraction failed.
+  - The preview screen shows a "Parsed by Claude" badge and marks estimated lines.
+  - A first-time privacy dialog explains what gets sent.
+- **5.6 [YOU] Evaluation:** with your key, run a script (`tools/eval-claude`) over the golden lines and 30 pages. Compare accuracy and cost against the rule parser, then pick the default mode.
+- **Done when:**
+  - Unit tests pass against recorded API responses (MockWebServer).
+  - A live call works on a test page.
+  - The eval report is committed.
+
+### Step 6 — Instagram import
+- **6.1** Recognise share URLs from `instagram.com/reel/…`, `/p/…` and `instagr.am`.
+- **6.2** Caption fetch: try the page's `og:description`, then the `/embed/captioned` page, through OkHttp, falling back to the off-screen WebView. Parse out the caption and any URLs.
+- **6.3** Routing:
+  - If the caption has a recipe URL, run the web import on it.
+  - Otherwise, if the caption looks like an ingredient list, send it to Claude as text.
+  - Otherwise, show the "Add media" screen.
+- **6.4** Media inputs, on the "Add media" screen:
+  - Pick screenshots (photo picker, up to 10).
+  - Pick a video: `MediaMetadataRetriever` takes 10 frames evenly spaced over the video, skipping near-duplicates (perceptual hash), and resizes and compresses them.
+  - A transcript from the audio track via `SpeechRecognizer` (on-device where the phone supports it; skip if not).
+  - A "Paste caption" field.
+- **6.5** Send everything as one Claude call: frames + transcript + caption. Same schema; any quantity Claude infers from video or speech is marked estimated.
+- **6.6 [YOU]** Test 10 reels: a caption containing the recipe, a caption with a link, a voice-over only, and on-screen text only.
+- **Done when:** the routing and frame-extraction unit tests pass, and 6.6 shows that the ingredients come through for the reel types that can work.
+
+### Step 7 — Garmin watch app (`garmin/`)
+- **7.1** Install the Connect IQ SDK and generate a developer key.
+  - **Risk:** this may not be possible in the container. If so, the agent writes the code, and you build and run the simulator locally with the instructions in `garmin/README.md`.
+- **7.2** `manifest.xml`: `watch-app` type, target devices (§3.6), the Communications permission.
+- **7.3** Data layer: a list model saved to `Application.Storage`, a compact payload decoder `{v, items:[[id,name,qty,aisle,ticked]], aisles:[...]}`, and an outbox queue of tick events.
+- **7.4** UI:
+  - A `WatchUi.Menu2`/`CheckboxMenu` with aisle headers, and ticked items dimmed or moved to the end of their aisle.
+  - Works with both touch and buttons.
+  - A "Last synced" footer, and an empty state.
+- **7.5** Test in the simulator with sample data, on the round and rectangular targets. Check memory use is under each device's limit.
+- **Done when:** builds with `monkeyc` for every target device (in CI if the SDK can be installed there), and the list works in the simulator.
+
+### Step 8 — Phone ↔ watch sync
+- **8.1** Android `WatchSync` service: set up the ConnectIQ SDK, find the paired device and the installed app, and register for app events.
+- **8.2** Phone → watch:
+  - Whenever the list changes, wait 1 s, build the payload (trimmed to 8 KB) and send it.
+  - Track delivery, and resend when the watch next connects.
+- **8.3** Watch → phone: apply tick events by latest timestamp, send an acknowledgement, and remove acknowledged events from the outbox on the watch.
+- **8.4** Edge cases:
+  - The phone is out of range.
+  - The Garmin Connect app isn't installed: show an install prompt.
+  - The watch app isn't installed: link to the store page.
+  - The same item is ticked on both devices.
+- **8.5** Unit tests: payload builder and size limits, conflict resolution, outbox replay.
+- **8.6 [YOU]** Real-device test:
+  - Import a recipe and check it appears on the watch within 10 s.
+  - Tick items on the watch while out of range, reconnect, and check the phone matches.
+- **Done when:** the 8.6 checks pass.
+
+### Step 9 — Polish and release
+- **9.1** App icon, splash screen and watch launcher icon. Accessibility pass: content descriptions, touch target sizes, font scaling.
+- **9.2** Performance: a list of 200 items scrolls smoothly, and import takes under 3 s (not counting Claude).
+- **9.3** Privacy policy page, Play Data Safety answers, and a crash reporter (opt-in, or none).
+- **9.4** Signed release builds in CI. Play internal testing track. Connect IQ beta app.
+- **9.5 [YOU]** Store listings and submissions.
+- **Done when:** the app is live on Play internal testing and the Connect IQ beta.
+
+### Doing this "in one shot"
+The agent can build and test Steps 0–6, plus most of 7 and 8, without stopping, if it works in order and commits after each sub-step. It can't finish the **[YOU]** checks: real devices, your API key, Garmin's SDK and the store accounts. Plan on 3 hand-offs, after Steps 4, 6 and 8, where you install the build, test it and report back.
 
 ## 7. Risks and honest caveats
 
