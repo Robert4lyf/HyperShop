@@ -8,7 +8,9 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 - [x] 0.2 Android SDK + SessionStart hook — check: `java -version; echo $ANDROID_HOME; sdkmanager --list_installed` (36 platform, build-tools 36.0.0, platform-tools installed). Note: `ANTHROPIC_API_KEY` is absent in this container (see KNOWN_ISSUES #1)
 - [x] 0.3 BangGym build setup copied (ADR 000, BangGym @6a4b9d1); modules :app :core :data :extract :claude; minSdk 34; debug keystore; watch UUID 41c79afd24ac47168df768ef92d1bac0 — check: `cd android && ./gradlew --max-workers=1 assembleDebug`
 - [x] 0.4 HyperShop libraries + hello tests (JUnit5+kotest, Robolectric Compose semantics, Roborazzi NATIVE, AppContainer sdk 34+36, MockWebServer); versions frozen (ADR 000 addendum; Robolectric 4.16.1 for SDK 36) — check: `tools/gradle.sh test`
-- [ ] 0.5 tools/verify.sh + CI workflows
+- [x] 0.5 tools/verify.sh (ktlint, all tests, assembleDebug, merged-manifest check, sk-ant- scan, golden CHECKSUM, parity + sync-model when present) + CI workflows (pushed OK in 0.3) — check: `tools/verify.sh` (cold build dirs: green)
+
+**Step 0 check:** cold `tools/verify.sh` passes.
 
 ## Step 1 — Spec, enums, golden data, model, catalogue, sync codec
 - [ ] 1.1 docs/parser-spec.md
