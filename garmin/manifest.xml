@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<!--
+  Generated from the Connect IQ app wizard and then edited by hand.
+  The application id is the app's identity in the store and the phone's way of
+  finding it (WatchProtocol.WATCH_APP_ID). Keep it: changed after the
+  first store upload, it is a different app. Generated fresh for HyperShop in
+  Step 0.3 (it is not BangGym's id).
+-->
+<iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
+    <iq:application
+        id="41c79afd24ac47168df768ef92d1bac0"
+        type="watch-app"
+        name="@Strings.AppName"
+        entry="HyperShopApp"
+        launcherIcon="@Drawables.LauncherIcon"
+        minApiLevel="3.2.0">
+
+        <!--
+          One watch: the Forerunner 245, in both editions. Ids are Garmin's
+          device ids (fr245, not forerunner245); monkeyc rejects anything else
+          and the build fails before a line of Monkey C is read.
+        -->
+        <iq:products>
+            <iq:product id="fr245"/>
+            <iq:product id="fr245m"/>
+        </iq:products>
+
+        <!-- Communications only: the list comes from the phone. -->
+        <iq:permissions>
+            <iq:uses-permission id="Communications"/>
+        </iq:permissions>
+
+        <iq:languages>
+            <iq:language>eng</iq:language>
+        </iq:languages>
+
+        <iq:barrels/>
+    </iq:application>
+</iq:manifest>

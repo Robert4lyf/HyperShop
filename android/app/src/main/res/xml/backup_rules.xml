@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The database directory travels (WAL included). The Claude key file never
+  does: it is encrypted with a Keystore key that a restore cannot bring along.
+-->
+<full-backup-content>
+    <include domain="database" path="." />
+    <include domain="file" path="datastore" />
+    <exclude domain="file" path="datastore/claude_key.preferences_pb" />
+    <exclude domain="database" path="hypershop.db-shm" />
+</full-backup-content>

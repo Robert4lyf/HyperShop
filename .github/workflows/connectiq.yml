@@ -1,0 +1,107 @@
+name: Connect IQ
+
+# The watch app is compiled here. It was not, for a long time, on the belief
+# that the SDK needed a Garmin login and the developer key needed a secret;
+# neither is true. The SDK zip is an unauthenticated download and a developer
+# key is an ordinary RSA key, generated per run — it signs a sideload, and
+# nothing checks who made it. See tools/build_watch.sh.
+#
+# Device definitions *are* gated behind a login, so this is a device-independent
+# build: it type checks every line and cannot render a layout. That is still the
+# difference between "never compiled" and "compiled", which is where the five
+# bugs the first real session found came from.
+#
+# Protocol parity is NOT checked here: this workflow is path-filtered on
+# garmin/**, and parity can be broken from the Kotlin side alone. It runs in
+# android.yml, which has no paths filter.
+
+on:
+  pull_request:
+    paths:
+      - 'garmin/**'
+      - '.github/workflows/connectiq.yml'
+  workflow_dispatch:
+
+# The one place the pinned version is written for both the script and the
+# cache key; the script's own default matches it.
+env:
+  CIQ_SDK_VERSION: '9.2.0'
+
+jobs:
+  check:
+    name: Manifest and resource check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # find rather than a glob: bash's ** is not recursive without globstar,
+      # so the old loop only worked because the resources happen to be exactly
+      # one directory deep.
+      - name: Validate XML is well formed
+        run: |
+          find garmin -name '*.xml' -print0 \
+            | xargs -0 -n1 python3 -c 'import sys, xml.dom.minidom as m; m.parse(sys.argv[1]); print("ok", sys.argv[1])'
+
+      # The compile below cannot catch this one: the nine-argument limit is
+      # enforced only when monkeyc targets a device, and this build cannot.
+      # A ten-argument method went green here and failed on the one machine
+      # that can produce a sideload.
+      - name: Monkey C argument limits
+        run: if [ -d garmin/source ]; then python3 tools/check_monkeyc_limits.py; fi
+
+  build:
+    name: Compile the watch app
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # monkeyc is a Java program; the SDK ships no runtime of its own.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # 200MB a run otherwise. Keyed on the version the script pins, so bumping
+      # CIQ_SDK_VERSION fetches a fresh one rather than reusing a stale cache.
+      #
+      # The SDK directory only, not the whole cache: the developer key lives
+      # beside it, and a private key — however inconsequential this one is —
+      # does not belong in a shared cache. It is regenerated each run.
+      - name: Cache the Connect IQ SDK
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/connectiq/sdk-${{ env.CIQ_SDK_VERSION }}
+          key: connectiq-sdk-${{ env.CIQ_SDK_VERSION }}-${{ runner.os }}
+
+      # Run 1 ships only the manifest skeleton; the watch sources arrive in
+      # Step 6. Until then there is nothing to compile.
+      - name: Check for watch sources
+        id: src
+        run: |
+          if [ -d garmin/source ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "::notice::garmin/source not present yet (Run 2)."; fi
+
+      - name: Compile
+        if: steps.src.outputs.present == 'true'
+        run: ./tools/build_watch.sh
+
+      # The tests are compiled and type checked against the code they describe,
+      # so a rename in source/ breaks the build rather than leaving an
+      # assertion quietly pointing at nothing. They are not *run*: executing
+      # Monkey C needs the simulator, which needs the device definitions the
+      # SDK Manager installs through a desktop GUI. See tools/build_watch.sh
+      # for the command that runs them on a machine that has one.
+      - name: Compile the unit tests
+        if: steps.src.outputs.present == 'true'
+        run: ./tools/build_watch.sh --test
+
+      - name: Upload the built app
+        if: success() && steps.src.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: hypershop-prg
+          path: garmin/build/hypershop.prg
+          if-no-files-found: error
+          retention-days: 3

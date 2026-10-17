@@ -1,0 +1,7 @@
+project.manifest = manifest.xml
+
+# The app plus its tests, for `monkeyc --unit-test`. Kept separate from
+# monkey.jungle rather than annotated out of it: an annotation the release
+# build has to strip is one more thing that can be got wrong, and the tests
+# have no business being parsed for a build that ships.
+base.sourcePath = source;test

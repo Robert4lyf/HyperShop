@@ -1,0 +1,10 @@
+# ktlint configuration.
+#
+# Only one rule is adjusted, and only where it contradicts a convention the
+# Compose compiler itself enforces: @Composable functions are PascalCase, so
+# ktlint's function-naming rule flags every screen and component in the app.
+# ktlint ships this exact opt-out for that reason. No other rule is relaxed.
+root = true
+
+[*.{kt,kts}]
+ktlint_function_naming_ignore_when_annotated_with = Composable

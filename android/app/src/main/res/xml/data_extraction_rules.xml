@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- See backup_rules.xml, which this mirrors. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="database" path="." />
+        <include domain="file" path="datastore" />
+        <exclude domain="file" path="datastore/claude_key.preferences_pb" />
+        <exclude domain="database" path="hypershop.db-shm" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="database" path="." />
+        <include domain="file" path="datastore" />
+        <exclude domain="file" path="datastore/claude_key.preferences_pb" />
+        <exclude domain="database" path="hypershop.db-shm" />
+    </device-transfer>
+</data-extraction-rules>

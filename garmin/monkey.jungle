@@ -1,0 +1,5 @@
+project.manifest = manifest.xml
+
+# The app only. Tests live in test/ and are built by test.jungle, so nothing
+# written for a test can reach a watch.
+base.sourcePath = source

@@ -1,0 +1,75 @@
+name: Android
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  # The repository has no long-lived integration branch yet, so this is the only
+  # way to run the build on demand until one exists.
+  workflow_dispatch:
+
+# Nothing here writes to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+
+    steps:
+      # The whole history: versionCode is the commit count, and a shallow
+      # clone answers 1 for every build, so no debug APK could be told from
+      # another by its badge.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 21, not 17: AGP 9 and Gradle 9 are only exercised on 21 here and in
+      # Android Studio, whose bundled runtime is 21. The app still compiles to
+      # JVM 17 bytecode — that is set in app/build.gradle.kts, not here.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-36 build-tools;36.0.0 platform-tools'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          build-root-directory: android
+
+      # One invocation rather than five: Gradle re-configures the whole build
+      # on each, and the failure is identical either way.
+      # tools/verify.sh is the same gate the agent runs locally: ktlint, every
+      # unit test, assembleDebug and the repo checks (manifest, secrets scan,
+      # golden checksum, protocol parity once both sides exist).
+      - name: Verify
+        run: tools/verify.sh
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: android/*/build/reports/tests
+          if-no-files-found: ignore
+          retention-days: 3
+
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hypershop-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: ignore
+          retention-days: 3
