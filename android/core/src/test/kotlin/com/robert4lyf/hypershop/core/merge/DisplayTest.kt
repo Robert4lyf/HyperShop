@@ -37,6 +37,26 @@ class DisplayTest {
     }
 
     @Test
+    fun cupsBecomeMetricAndSpoonsStaySpoons() {
+        fun amount(
+            q: QtyBase,
+            id: String,
+            hint: QtyUnit? = null,
+        ) = cat.byId.getValue(id).let { Display.amount(q, hint = hint, gramsPerCup = it.gramsPerCup, policy = it.displayPolicy) }
+        // Cups of a solid: weighed with the catalogue's density (250 ml or 240 ml cups).
+        assertEquals("120 g", amount(QtyBase.of(Rational.ONE, QtyUnit.CUP, UnitLocale.METRIC), "cheddar", QtyUnit.CUP))
+        assertEquals("85 g", amount(QtyBase.of(Rational.of(3, 4), QtyUnit.CUP, UnitLocale.US), "mozzarella", QtyUnit.CUP))
+        assertEquals("300 g", amount(QtyBase.of(Rational.of(2), QtyUnit.CUP, UnitLocale.METRIC), "chicken", QtyUnit.CUP))
+        // No density known: still metric, in ml.
+        assertEquals("240 ml", amount(QtyBase.of(Rational.ONE, QtyUnit.CUP, UnitLocale.US), "okra", QtyUnit.CUP))
+        // Liquids in ml; spoons as written, even large amounts of a solid.
+        assertEquals("500 ml", amount(QtyBase.of(Rational.of(500), QtyUnit.ML, UnitLocale.METRIC), "milk", QtyUnit.ML))
+        assertEquals("4 tbsp", amount(QtyBase.of(Rational.of(4), QtyUnit.TBSP, UnitLocale.US), "butter", QtyUnit.TBSP))
+        assertEquals("6 tbsp", Display.volume(Rational.of(90), UnitsSetting.METRIC, QtyUnit.TBSP))
+        assertEquals("½ tbsp", Display.volume(Rational.of(15, 2), UnitsSetting.METRIC, QtyUnit.TBSP))
+    }
+
+    @Test
     fun rowsShowPluralsPackNotesAndPartialTicks() {
         var (l, _) = add(ShoppingList(), listOf("2 onions", "250g butter"))
         val onion = l.itemByKey("cat:onion")!!

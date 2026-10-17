@@ -19,6 +19,13 @@ class CatalogTest {
     }
 
     @Test
+    fun pankoIsNotRenamedToBreadcrumbs() {
+        assertEquals("panko", catalog.lookup("panko breadcrumbs")?.id)
+        assertEquals("panko", catalog.lookup("panko")?.id)
+        assertEquals("breadcrumbs", catalog.lookup("dried breadcrumbs")?.id)
+    }
+
+    @Test
     fun idsAndKeysAreUnique() {
         assertEquals(catalog.entries.size, catalog.byId.size)
         val owners = HashMap<String, String>()

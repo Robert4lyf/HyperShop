@@ -33,13 +33,17 @@ object Display {
         produce: Boolean = false,
         hint: QtyUnit? = null,
         gramsPerCup: Rational? = null,
+        policy: DisplayPolicy? = null,
     ): String? {
         if (q.isPresence) return null
         var parts = q.parts.mapKeys { BaseKey.decode(it.key) }.filterValues { it > Rational.ZERO }
-        // Volume and mass combine only where the catalogue knows the density.
-        if (gramsPerCup != null && parts.containsKey(BaseKey.MASS) && parts.containsKey(BaseKey.VOLUME)) {
+        // A cup of cheese or chicken is bought by weight, where the catalogue
+        // knows the density. Spoons stay spoons.
+        val solid = policy != null && policy != DisplayPolicy.VOLUME
+        val spoons = hint == QtyUnit.TSP || hint == QtyUnit.TBSP
+        if (gramsPerCup != null && !spoons && parts.containsKey(BaseKey.VOLUME) && (solid || parts.containsKey(BaseKey.MASS))) {
             val g = parts.getValue(BaseKey.VOLUME) * gramsPerCup / Rational.of(240)
-            parts = parts - BaseKey.VOLUME + (BaseKey.MASS to parts.getValue(BaseKey.MASS) + g)
+            parts = parts - BaseKey.VOLUME + (BaseKey.MASS to (parts[BaseKey.MASS] ?: Rational.ZERO) + g)
         }
         if (parts.isEmpty()) return null
         val order = listOf(Dimension.COUNT, Dimension.MASS, Dimension.VOLUME)
@@ -66,7 +70,7 @@ object Display {
         val produce = item.aisle == AisleCode.PRODUCE
         val hint = list.contributionsOf(item.id).mapNotNull { it.unitHint }.distinct().singleOrNull()
         val presence = entry?.displayPolicy == DisplayPolicy.PRESENCE && units != UnitsSetting.AS_WRITTEN
-        val amount = if (presence) null else amount(shownQty, units, produce, hint, entry?.gramsPerCup)
+        val amount = if (presence) null else amount(shownQty, units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy)
         val itemsOnly = shownQty.keys.singleOrNull() == BaseKey.ITEMS
         val name =
             if (itemsOnly && entry != null && (shownQty[BaseKey.ITEMS] > Rational.ONE)) entry.plural else item.displayName
@@ -80,7 +84,15 @@ object Display {
             }
         val sub =
             when {
-                partial -> amount(list.covered(item.id), units, produce, hint)?.let { "$it already ticked" }
+                partial ->
+                    amount(
+                        list.covered(item.id),
+                        units,
+                        produce,
+                        hint,
+                        entry?.gramsPerCup,
+                        entry?.displayPolicy,
+                    )?.let { "$it already ticked" }
                 else -> entry?.packNote
             }
         return RowText(main, sub)
@@ -131,8 +143,11 @@ object Display {
         units: UnitsSetting,
         hint: QtyUnit? = null,
     ): String {
+        // Spoons are never converted, whatever the amount.
+        if (hint == QtyUnit.TSP) return "${fraction(roundUp(ml / Rational.of(5), Rational.of(1, 4)))} tsp"
+        if (hint == QtyUnit.TBSP) return "${fraction(roundUp(ml / Rational.of(15), Rational.of(1, 2)))} tbsp"
         val d = ml.toDouble()
-        val spoons = hint == QtyUnit.TSP || hint == QtyUnit.TBSP || (units != UnitsSetting.METRIC && d < 60)
+        val spoons = units != UnitsSetting.METRIC && d < 60
         if (units == UnitsSetting.AS_WRITTEN && hint == QtyUnit.CUP || units == UnitsSetting.IMPERIAL && d >= 60) {
             return "${fraction(roundUp(ml / Rational.of(240), Rational.of(1, 4)))} ${if (ml > Rational.of(240)) "cups" else "cup"}"
         }

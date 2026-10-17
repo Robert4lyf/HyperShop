@@ -57,7 +57,7 @@ object ClaudeRequest {
         - quantity / quantity_max: numbers (a range "2-3" is 2 and 3; ½ is 0.5). null when there is no amount ("salt, to taste").
         - quantity_text: the amount as written, or null.
         - unit: one of the enum values, "other" for a unit word not in the list (handful, bottle), or null for a plain count ("2 onions").
-        - alt_quantity / alt_unit: a parenthesised alternative amount, e.g. the 300 g in "2 cups (300g)", or the 400 g in "400g tin".
+        - alt_quantity / alt_unit: a parenthesised alternative amount, e.g. the 300 g in "2 cups (300g)", the 500 ml in "2 cups milk (500ml)" (also at the end of the line), or the 400 g in "400g tin".
         - section: the heading the line sits under ("For the sauce"), or null.
         - optional: true for "optional", "if desired".
         - estimated: true only if you inferred an amount that is not written.

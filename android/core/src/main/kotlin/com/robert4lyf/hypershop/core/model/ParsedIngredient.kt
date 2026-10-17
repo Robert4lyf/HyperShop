@@ -34,11 +34,44 @@ data class ParsedIngredient(
     val noScale: Boolean
         get() = quantity == null || NO_SCALE.any { raw.lowercase().contains(it) }
 
+    /**
+     * The metric amount the recipe gives alongside a cup or ounce amount (the
+     * 500 ml in "2 cups (500ml)" or "2 cups milk (500ml)"), or the grams alongside
+     * spoons ("2 tbsp (30g)"). It is what the author measured, so it wins over
+     * converting; spoons with only an ml alternative stay spoons.
+     */
+    private val metricAlt: Pair<Rational, QtyUnit>?
+        get() {
+            val u = unit ?: return null
+            if (quantity == null || u.dimension == Dimension.COUNT || u in METRIC) return null
+            val accepts = if (u == QtyUnit.TSP || u == QtyUnit.TBSP) GRAMS else METRIC
+            if (altQuantity != null && altUnit in accepts) return altQuantity to altUnit!!
+            // The rule parser moves a trailing "(500ml)" into the note as "500ml" (R4.3).
+            val m = METRIC_IN_NOTE.find(note.orEmpty()) ?: return null
+            val v = m.groupValues[1].replace(',', '.').toDoubleOrNull() ?: return null
+            val mu = QtyUnit.entries.firstOrNull { it.serial == m.groupValues[2].lowercase() }?.takeIf { it in accepts } ?: return null
+            return Rational.fromDouble(v) to mu
+        }
+
+    /** The unit to shop by: [unit], or the metric one from [metricAlt]. */
+    val shopUnit: QtyUnit?
+        get() = metricAlt?.second ?: unit
+
+    /** The amount to shop by, using the upper end of a range. */
+    fun shopBase(locale: UnitLocale): QtyBase {
+        val alt = metricAlt ?: return QtyBase.of(quantityMax ?: quantity, unit, locale)
+        val amount = quantityMax?.let { alt.first * it / quantity!! } ?: alt.first
+        return QtyBase.of(amount, alt.second, locale)
+    }
+
     fun base(locale: UnitLocale): QtyBase = QtyBase.of(quantity, unit, locale)
 
     companion object {
         private val GARNISH = listOf("garnish", "to serve", "for serving", "to decorate")
         private val NO_SCALE = listOf("to taste", "for frying", "for greasing", "for dusting", "as needed")
+        private val METRIC = setOf(QtyUnit.G, QtyUnit.KG, QtyUnit.ML, QtyUnit.L)
+        private val GRAMS = setOf(QtyUnit.G, QtyUnit.KG)
+        private val METRIC_IN_NOTE = Regex("""(?<![\d.,])(\d+(?:[.,]\d+)?)\s*(ml|g|kg|l)\b""", RegexOption.IGNORE_CASE)
     }
 }
 

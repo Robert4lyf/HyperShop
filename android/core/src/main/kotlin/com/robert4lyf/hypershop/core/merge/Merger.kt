@@ -155,8 +155,7 @@ class Merger(
                     continue
                 }
                 val noScale = l.parsed.noScale
-                val amount = l.parsed.quantityMax ?: l.parsed.quantity
-                var q = QtyBase.of(amount, l.parsed.unit, incoming.locale)
+                var q = l.parsed.shopBase(incoming.locale)
                 if (!noScale) q = q.times(scale)
                 var lineStatus = LineStatus.ADDED
                 if (!have.isPresence && !q.isPresence) {
@@ -171,7 +170,7 @@ class Merger(
                     }
                 }
                 status[l.recipeLineId] = lineStatus
-                contributions += PreviewContribution(l.recipeLineId, key, q, noScale || q.isPresence, l.parsed.unit)
+                contributions += PreviewContribution(l.recipeLineId, key, q, noScale || q.isPresence, l.parsed.shopUnit)
                 adding += q
             }
             val onList = (existing?.let { list.total(it.id) } ?: QtyBase.PRESENCE) + adding

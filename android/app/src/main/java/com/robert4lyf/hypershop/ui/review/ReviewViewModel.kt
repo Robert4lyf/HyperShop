@@ -221,12 +221,12 @@ class ReviewViewModel(
         val inc = preview!!.incoming
         val needed = if (d.inStock) lines.fold(QtyBase.PRESENCE) { acc, l -> acc + lineQty(l, inc) } else r.adding
         val produce = r.target.aisle == AisleCode.PRODUCE
-        val hint = lines.mapNotNull { it.parsed.unit }.distinct().singleOrNull()
+        val hint = lines.mapNotNull { it.parsed.shopUnit }.distinct().singleOrNull()
         val entry = c.catalog.byId[r.target.catalogId ?: ""]
         return ReviewRow(
             key = r.target.mergeKey,
             name = entry?.name ?: r.target.displayName,
-            quantity = Display.amount(needed, units, produce, hint, entry?.gramsPerCup),
+            quantity = Display.amount(needed, units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy),
             inStock = d.inStock,
             check = lines.any { it.parsed.check },
             aisle = r.target.aisle,
@@ -236,7 +236,7 @@ class ReviewViewModel(
     private fun lineQty(
         l: com.robert4lyf.hypershop.core.merge.IncomingLine,
         inc: com.robert4lyf.hypershop.core.merge.Incoming,
-    ): QtyBase = QtyBase.of(l.parsed.quantityMax ?: l.parsed.quantity, l.parsed.unit, inc.locale).times(inc.scale)
+    ): QtyBase = l.parsed.shopBase(inc.locale).times(inc.scale)
 
     fun setInStock(
         key: String,
@@ -315,10 +315,11 @@ class ReviewViewModel(
                     produce,
                     null,
                     entry?.gramsPerCup,
+                    entry?.displayPolicy,
                 )
             }
-        val adding = Display.amount(row.adding, units, produce, null, entry?.gramsPerCup)
-        val after = Display.amount(row.onListAfter, units, produce, null, entry?.gramsPerCup)
+        val adding = Display.amount(row.adding, units, produce, null, entry?.gramsPerCup, entry?.displayPolicy)
+        val after = Display.amount(row.onListAfter, units, produce, null, entry?.gramsPerCup, entry?.displayPolicy)
         val effect =
             when {
                 row.decision.inStock -> "$name: in stock, nothing added"

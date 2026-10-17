@@ -149,7 +149,7 @@ class ListViewModel(
             val hint = list.contributionsOf(id).mapNotNull { it.unitHint }.distinct().singleOrNull()
             val totals =
                 list.total(id).parts.filterValues { it > Rational.ZERO }.mapNotNull { (k, v) ->
-                    Display.amount(QtyBase(mapOf(k to v)), units, produce, hint)
+                    Display.amount(QtyBase(mapOf(k to v)), units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy)
                 }
             val uses = list.contributionsOf(id).map { it.useId }.distinct()
             val titles = c.repository.useTitles(uses)
@@ -176,7 +176,7 @@ class ListViewModel(
         text: String,
     ): Boolean {
         val parsed = c.ruleParser.parse(text.trim() + " x")
-        val q = QtyBase.of(parsed.quantityMax ?: parsed.quantity, parsed.unit, UnitLocale.METRIC)
+        val q = parsed.shopBase(UnitLocale.METRIC)
         if (q.isPresence) return false
         viewModelScope.launch {
             c.repository.editQuantity(id, q)
@@ -222,7 +222,7 @@ class ListViewModel(
     private suspend fun addLine(line: String) {
         val p = c.ruleParser.parse(line)
         if (p.name.isBlank()) return
-        c.repository.manualAdd(p.name, QtyBase.of(p.quantityMax ?: p.quantity, p.unit, UnitLocale.METRIC), p.unit)
+        c.repository.manualAdd(p.name, p.shopBase(UnitLocale.METRIC), p.shopUnit)
     }
 
     /** "+1?" accepted: the typed amount (or one more) goes on as a manual contribution. */
