@@ -20,6 +20,8 @@ kotlin {
 tasks.test {
     useJUnitPlatform()
     maxHeapSize = "2g"
+    // tools/eval-claude/run.sh passes -Deval=true through to the eval test.
+    System.getProperty("eval")?.let { systemProperty("eval", it) }
 }
 
 dependencies {
