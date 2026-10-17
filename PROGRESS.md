@@ -54,7 +54,7 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 - [x] 5.1 :extract: SafeFetcher (https only, DNS filter for loopback/RFC1918/link-local/CGNAT/ULA/multicast, raw IPs and non-443 refused, manual redirects ≤5 re-checked, no cookies, 10 s/30 s, html or ld+json only, 3 MB after gunzip); Extractor (WPRM → Tasty → JSON-LD → microdata → heading → page text → manual) with every JSON-LD quirk tested; 12 live fixtures + 4 synthetic + 3 hostile (testdata/pages/SOURCES.md) — check: `tools/gradle.sh :extract:test`
 - [x] 5.2a Schema v1 (§4, exported to android/data/schemas/1.json; enums by name; Meta.nextId added; mergeKey unique among live items via a partial index; RecipeUse CHECK via triggers), Callback.onCreate seeds aisles, store 1 + AisleOrder, 5 staples, Meta; EpochMarker (noBackupFilesDir) → new epoch + watch installs cleared on mismatch. The repository (ListRepository, one transaction per op over the pure ShoppingList) lands here too — check: `tools/gradle.sh :data:testDebugUnitTest --tests "*SchemaTest*"`
 - [x] 5.2b Repository: apply preview (rev re-check → Stale, LineDecision rows), tick/untick, manual add (one MANUAL use), edit quantity, move aisle (+ "always" override), already-on-list — check: `tools/gradle.sh :data:testDebugUnitTest --tests "*RepositoryTest*"`
-- [ ] 5.2c Remove use, undo import, rescale, finish shopping, soft delete
+- [x] 5.2c Remove use, Undo of an import (database equal apart from revs, recipe removed when unused), rescale, finish shopping + undo, soft delete + undo + 7-day purge — check: `tools/gradle.sh :data:testDebugUnitTest --tests "*UsesTest*"`
 - [ ] 5.2d Re-key, apply watch ops
 - [ ] 5.3 App shell (container, WorkManager, nav, theme, import worker, WatchLink fake)
 - [ ] 5.4 Review screen
