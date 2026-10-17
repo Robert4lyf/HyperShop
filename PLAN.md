@@ -89,6 +89,7 @@ Recipe URL or Instagram reel → parsed ingredients → merged, aisle-sorted sho
     - Staples (salt, pepper, oil…) and optional or garnish lines start ticked as in stock.
     - A long press offers **"I have some"**, so you can set how much you already have; only the rest is added.
     - **"Always in stock"** adds the item to your staples list, so future imports pre-tick it.
+    - **It learns what you usually have.** Each review records, per item, whether you marked it in stock (`StockStat`). An item marked in stock in **3 of your last 4** reviews where it came up is pre-ticked with a small "usually in stock" label. Unticking it twice in a row stops the pre-ticking. Settings has "Forget stock habits" and a per-item reset. Pre-ticked items are always visible on the screen, never hidden.
   - **Bulk actions:** "Mark all in stock" for an aisle (e.g. Spices) and "Clear in-stock".
   - **Line details:** tapping a row shows the original recipe line(s), with editable raw text that is re-parsed live and structured fields underneath. "A or B" lines show the alternative and let you swap to it.
   - **Buttons:** "Add 12 items" (the count updates as you tick), and "Cancel" to throw the import away.
@@ -123,6 +124,12 @@ Recipe URL or Instagram reel → parsed ingredients → merged, aisle-sorted sho
   - Spoon or pinch amounts of pantry and liquid items show as just the name ("milk", "soy sauce").
   - Container conversions: clove → bulb (about 10), tin = 400 g, bunch.
   - The exact total is in the item's detail view.
+- **Pack sizes** (catalogue `packSizes`, e.g. `500g|1kg|1.5kg`; on by default, can be turned off):
+  - Shows what to buy: "Plain flour — 1 × 500 g pack (350 g needed)".
+  - Uses the fewest packs that cover the need, with the least left over. The leftover shows in the item's detail view.
+  - Items with no pack data show the rounded quantity as before.
+  - Pack sizes start as typical UK supermarket sizes (~150 most common items). You can edit them per item in the item's detail view. Your edits are stored in `PackOverride` and win.
+  - The pack line is display only. Contributions still hold the exact amount needed, so merging and removing a recipe stay exact.
 - **Rounding:**
   - Counts round up to a whole item, or to the nearest ½ for produce like lemons.
   - Mass and volume round to friendly steps (5 g / 25 g / ¼ cup).
@@ -136,6 +143,14 @@ Recipe URL or Instagram reel → parsed ingredients → merged, aisle-sorted sho
 - **Aisles are a table** seeded from defaults and keyed by a stable `code`. Users can rename, hide or add aisles. The defaults are Produce, Bakery, Meat & Fish, Dairy & Eggs, Chilled, Frozen, Tins & Jars, Pasta/Rice/Grains, World Foods, Baking, Nuts & Dried Fruit, Oils & Vinegars, Spices & Condiments, Free-from, Drinks, Household and Other.
 - **Lookup order:** user override → identity words (frozen → Frozen, tinned → Tins) → catalogue ID → head noun → keyword rules → Other.
 - Overrides survive renames because they are keyed by catalogue ID.
+- **Learned aisle order** (per store profile, v1.1):
+  - Every tick on the phone or watch is logged as `TickEvent(storeId, aisleCode, tickedAt, source)`. Watch ticks carry the watch's timestamp; it's only used to compare ticks within the same trip, so clock drift doesn't matter.
+  - A **shopping trip** is a run of ticks with gaps under 20 minutes and at least 5 ticks.
+  - Trips are thrown out as "ticked at home" when 80% or more of the ticks fall within 3 s of each other, or when "Clear ticked" or a bulk action did the ticking.
+  - For each trip, aisles are ranked by when you first ticked something in them. Across the last 5 trips, aisles are ordered by their median rank. An aisle needs to have appeared in 2 or more trips.
+  - After 2 trips that qualify, the app suggests: "Reorder aisles to match how you shop at Tesco Extra?" It shows the new order and asks you to accept. It never reorders silently.
+  - Aisles you've **pinned** by dragging them keep their place.
+  - "Auto-apply learned order" is a setting, off by default.
 - **The catalogue starts at about 400 common UK items**, built from the most frequent names in an openly licensed recipe corpus, with the source and licence recorded. It grows from "Other" hits that the app logs locally. It is a CSV, generated into a resource file loaded lazily, not a giant Kotlin map literal, which would hit the JVM's 64 KB method limit. The Gradle task checks for duplicates and unknown aisles.
 
 ### 3.5 List UI
@@ -149,6 +164,9 @@ Recipe URL or Instagram reel → parsed ingredients → merged, aisle-sorted sho
 - **Watch UI:**
   - The first screen lists aisles, showing how many items are left in each. Selecting an aisle opens a `CheckboxMenu` for that aisle. Alternatively a `CustomMenu` with header rows; 5.4 prototypes both and measures memory.
   - Works with touch and buttons. Has "Last synced" and an empty state.
+  - **Undo last tick:** a "↶ Undo" item at the top of each aisle menu, plus a long press on Back (where the device supports it). It undoes up to the last 5 ticks by queuing a reverse op; the outbox collapses the pair.
+  - **Next aisle:** when every item in an aisle is ticked, the watch jumps to the next aisle with items left. An "Next aisle ▸" item at the end of each aisle does the same by hand.
+  - **Feedback:** a short vibration on each tick, and a double pulse when an aisle is finished, using `Attention.vibrate` where the device has it. Vibration can be turned off in the watch app's settings.
 - **Glance:** "Shopping: 14 left · Produce next", read from a small `glanceSummary` storage key.
 - **Message format:** native Monkey C objects (Lists, Dictionaries, numbers, strings), not JSON strings. The watch has no JSON parser. Every message is `{v:1, t:"hello"|"snap"|"ops"|"ack"|"resync", ...}`. A version the watch doesn't know shows "Update watch app" (and the same on the phone).
 - **Protocol:**
@@ -231,17 +249,44 @@ Sharing from the Instagram app sends **only the URL**. The app tries these tiers
    - **Paste caption.**
 4. The result goes to the preview. Amounts inferred from video or speech are marked "estimated".
 
+### 3.9 Cookbook photo import (v1.1)
+- **Entry points:** "Scan a cookbook page" in the import menu, which uses the system camera through `ActivityResultContracts.TakePicture` (no camera permission needed), the Photo Picker, or a shared image.
+- **Crop step:** you drag a box around the ingredient list. It's pre-filled by finding an "Ingredients" heading, or the block of text with the most lines that start with a quantity.
+- **Text recognition:**
+  - ML Kit OCR runs on the phone.
+  - Recognised text blocks are read in column order (by x position, then y), so two-column layouts aren't scrambled.
+  - Lines that wrap are joined when the next line doesn't start with a quantity or a capital letter.
+- **Parsing:** the rule parser runs first. Claude, if enabled, gets the OCR text plus the cropped image when OCR confidence is low.
+- **Recipe details:** you type the title; the servings field suggests numbers it finds near "Serves" or "Makes". The recipe is saved with `source: PHOTO`, and only the text is kept — the photo is deleted after import.
+- Everything then goes to the usual review screen.
+
+### 3.10 Meal planner (v1.1)
+- **Recipe library:** every imported recipe is saved, whether or not it's on the list right now. The Recipes tab becomes a library with search, "on list" and "planned" filters, and favourites.
+- **Week view:** 7 days, each with optional Breakfast, Lunch and Dinner slots. You add a recipe from the library, or straight from an import ("Plan for…" on the review screen), and pick servings for each meal.
+- **"Shop for this week":** sends every planned meal not yet added into **one combined review screen**, with ingredients merged across meals. Each row can show which meals need it ("Onion — 3 · Mon, Wed").
+  - The in-stock ticks, "I have some" and stock learning all work the same as for a single recipe.
+- **Linking meals to the list:**
+  - Contributions record the `plannedMealId` as well as the `recipeId`.
+  - Removing a planned meal removes only its contributions. If the same recipe is planned twice, each copy counts separately.
+  - Moving a meal to another day doesn't change the list.
+- **Extras:** copy last week's plan, and clear a week. A day shows a "Shopped" badge once its meals are on the list.
+- **Watch:** no planner on the watch. It just sees the merged list.
+
 ## 4. Data model (Room, `:core:data`)
 - `Item(id AUTOINCREMENT, catalogId?, normName UNIQUE, displayName, aisleCode, position, rev, tickedAt?, updatedAt)`
-- `Contribution(id, itemId FK CASCADE, recipeId FK CASCADE nullable, qtyBase (rational + dimension, per dimension), purchased)`
+- `Contribution(id, itemId FK CASCADE, recipeId FK CASCADE nullable, plannedMealId FK CASCADE nullable, qtyBase (rational + dimension, per dimension), purchased)`
 - `ManualAdjustment(itemId, kind: DELTA|OVERRIDE, qty)`
-- `Recipe(id, url, title, servingsOriginal, servingsChosen, unitLocale, importedAt, source: WEB|INSTAGRAM|MANUAL, parsedBy: RULES|CLAUDE, claudePending)`
+- `Recipe(id, url, title, servingsOriginal, servingsChosen, unitLocale, importedAt, source: WEB|INSTAGRAM|PHOTO|MANUAL, parsedBy: RULES|CLAUDE, claudePending, favourite, onList)`. Recipes stay in the library after they leave the list.
 - `RecipeLine(id, recipeId, section, raw, parsedJson, status: ADDED|IN_STOCK|PARTIAL|EXCLUDED, haveQty?)`: keeps the parse results, so re-scaling or retrying doesn't parse or pay twice. It also records what you marked as in stock. Removing a recipe touches only lines that were actually added, and the recipe can later offer "Add the in-stock items now".
 - `ImportJob(id, state, inputRefs, resultJson, error, createdAt)`
 - `Aisle(code PK, name, hidden, defaultOrder)`, `StoreProfile(id, name)`, `AisleOrder(storeId, aisleCode, position)`. The active store is kept in DataStore.
 - `CategoryOverride(catalogId | normName, aisleCode)`, `UserCorrection(rawPattern, parsedJson)`
 - `ClaudeUsage(date, model, inputTokens, outputTokens, cacheWrite, cacheRead)`
 - `DeletedItem(id, deletedAt)`: kept for 7 days, so late watch ops are dropped.
+- `StockStat(key = catalogId | normName, history (last 4 outcomes as a bitfield), suppressed)`: stock learning.
+- `PackOverride(key, packSizes)`: your own pack sizes.
+- `TickEvent(id, storeId, itemId, aisleCode, tickedAt, source: PHONE|WATCH, bulk)` (v1.1): kept for 90 days. `AisleOrder` gains `pinned`.
+- `PlannedMeal(id, date, slot: BREAKFAST|LUNCH|DINNER|OTHER, recipeId FK, servings, addedToList)` (v1.1)
 - Schemas are exported to `android/app/schemas/` and covered by `MigrationTestHelper` tests.
 
 ## 5. Repo layout and project constants
@@ -287,7 +332,8 @@ PROGRESS.md   live checklist
 
 ### MVP cut line
 - **The one-shot run delivers:** Steps 0–7, i.e. phone app, watch app and sync, and Claude for text.
-- **v1.1:** Step 8 (Instagram and media) and Step 9 (polish).
+- **v1.1:** Step 8 (Instagram and media), Step 9 (smart shopping: learned aisle order, cookbook photos, meal planner) and Step 10 (polish).
+- **Inside the MVP:** pack sizes (Steps 1 and 3), stock learning (Step 4.6) and the watch extras (Step 5) — each is small and needs no extra hardware.
 - **Deferred:**
   - Shopping-mode service.
   - Multiple store profiles in the UI (the tables exist, with one store).
@@ -313,7 +359,7 @@ PROGRESS.md   live checklist
   - `ParsedIngredient` (with flags, alternative, section and confidence) and `RecipeImport`.
 - **1.2** Write the stored form of contributions, purchases, manual adjustments and `rev` rules down in `docs/decisions/002-quantities.md`.
 - **1.3** `catalog/`:
-  - CSV schema `id, name, plural, synonyms, aisleCode, shoppingUnit, displayPolicy, gramsPerCup`, with about 400 seed rows, `synonyms.csv` and `SOURCES.md`.
+  - CSV schema `id, name, plural, synonyms, aisleCode, shoppingUnit, displayPolicy, gramsPerCup, packSizes`, with about 400 seed rows (pack sizes for about 150 of them), `synonyms.csv` and `SOURCES.md`.
   - A Gradle task that validates the CSV and generates a resource file. A lazy loader in `:core:catalog`.
 - **1.4** `:core:sync`:
   - Message types (§3.6) and a codec to and from `List`/`Map` objects.
@@ -336,7 +382,8 @@ PROGRESS.md   live checklist
 - **3.1** `Categoriser` with the lookup order in §3.4.
 - **3.2** `Merger`: catalogue-ID keys, sums per dimension, density conversion, shopping display policy, rounding and fraction display.
 - **3.3** Scaling and `noScale`. Purchased contributions. `ManualAdjustment`.
-- **3.3a** `Merger.preview` dry-run diff, covering in stock, partly in stock ("I have some") and items already ticked. Property test: applying the preview gives the same list as a direct merge with the in-stock items removed.
+- **3.3a** `PackPlanner`: picks the fewest packs that cover the need, with the least left over, and honours your overrides. Tests cover exact fits, combinations of sizes (e.g. 1 kg + 500 g vs 2 × 1 kg), items with no pack data, and turning the feature off.
+- **3.3b** `Merger.preview` dry-run diff, covering in stock, partly in stock ("I have some") and items already ticked. Property test: applying the preview gives the same list as a direct merge with the in-stock items removed.
 - **3.4** Tests:
   - Property tests: merging then removing returns the original list; merge order doesn't matter; tick, then merge, then remove gets back the ticked state.
   - Golden **must-not-merge** pairs (red onion/onion, garlic/garlic powder, fresh/tinned tomatoes, chicken breast/thigh).
@@ -355,6 +402,7 @@ PROGRESS.md   live checklist
   - **4.6** "Review before adding" (§3.1): aisle-grouped merge preview, In stock checkboxes, "I have some", "Always in stock", bulk actions, the live "Add N items" count, line details and editing. Robolectric tests:
     - Ticking In stock means the item isn't added.
     - "I have some" adds only the rest.
+    - Stock learning: pre-ticks after 3 of the last 4, stops pre-ticking after two untick-overrides in a row, and "Forget" resets it.
     - Cancel leaves the list unchanged.
   - **4.7** Recipes (source link, servings, remove, "Add the in-stock items now").
   - **4.8** Settings (aisle order and rename/hide for one store, staples, display units, export/import, debug log). The Claude section is a placeholder.
@@ -372,9 +420,9 @@ PROGRESS.md   live checklist
   - The real developer key for signing is **[YOU]**.
 - **5.2** `manifest.xml`: watch-app, minApiLevel 3.2, the exact product IDs (§3.6), the Communications permission, the UUID from 0.4.
 - **5.3** Data layer: message decode/encode mirroring `:core:sync`; chunked storage; the outbox (capped and collapsed); re-applying pending ops on a new snapshot; `glanceSummary`.
-- **5.4** UI: the aisle list, then a per-aisle `CheckboxMenu`. A `CustomMenu` prototype for comparison, with the choice recorded in an ADR. The glance view, empty state, "Last synced" and "Update watch app".
+- **5.4** UI: the aisle list, then a per-aisle `CheckboxMenu`, with undo (last 5 ticks), "Next aisle" (by hand and automatic), and vibration feedback (with a setting). A `CustomMenu` prototype for comparison, with the choice recorded in an ADR. The glance view, empty state, "Last synced" and "Update watch app".
 - **5.5** A `:debug` build with embedded sample data.
-- **5.6** Monkey C `(:test)` unit tests for the decoder, the outbox and the re-apply rule.
+- **5.6** Monkey C `(:test)` unit tests for the decoder, the outbox, the re-apply rule, and an undo pair collapsing in the outbox.
 - **Check:**
   - `monkeyc` builds for every available target.
   - The unit tests pass where they can run.
@@ -425,10 +473,26 @@ PROGRESS.md   live checklist
 - **Check:** unit tests for routing, the frame sampler (on test videos) and the OCR text merge.
 - **[YOU]:** test the 10 reels.
 
-### Step 9 — Polish (v1.1)
-- **9.1** Icons (app, splash, watch launcher), an accessibility pass, font scaling.
-- **9.2** A JVM benchmark: parsing and merging 20 recipes takes under 200 ms. A Robolectric list with 200 items.
-- **9.3** Optional "Shopping mode" foreground service. Multiple store profiles in the UI.
+### Step 9 — Smart shopping (v1.1)
+- **9.1** Learned aisle order (§3.4):
+  - `TickEvent` logging on the phone. Watch ops bring their timestamps along (protocol v2: ops gain `ts`; the phone still accepts v1 ops without it).
+  - A pure-Kotlin `TripDetector` and `AisleOrderLearner` in `:core:merge`.
+  - The suggestion card, pinned aisles, and the auto-apply setting.
+  - Multiple store profiles in the UI, which this feature needs, are pulled forward from 10.3.
+  - **Check:** tests on made-up trip logs — bulk "ticked at home" trips are ignored, the median order is computed correctly, pinned aisles are kept, and no suggestion appears before 2 trips.
+- **9.2** Cookbook photo import (§3.9):
+  - Camera and picker entry points, the crop UI with a pre-filled box, OCR column ordering and joining wrapped lines.
+  - **Check:** OCR post-processing tests on recorded ML Kit outputs from 5 photographed pages (single-column, two-column, wrapped lines).
+  - **[YOU]:** scan 5 pages from your own books.
+- **9.3** Meal planner (§3.10):
+  - Database migration (`PlannedMeal`, `Contribution.plannedMealId`, `Recipe.onList`/`favourite`), with a `MigrationTestHelper` test from the MVP schema.
+  - The library, the week view, "Plan for…" on the review screen, and the "Shop for this week" combined review.
+  - **Check:** repository tests — removing a meal removes only its contributions, a recipe planned twice counts twice, and moving a meal doesn't change the list — plus Roborazzi snapshots.
+
+### Step 10 — Polish (v1.1)
+- **10.1** Icons (app, splash, watch launcher), an accessibility pass, font scaling.
+- **10.2** A JVM benchmark: parsing and merging 20 recipes takes under 200 ms. A Robolectric list with 200 items.
+- **10.3** Optional "Shopping mode" foreground service. (Multiple store profiles in the UI now arrive in 9.1.)
 - **Separate release checklist [YOU]:**
   - Privacy policy and Play Data Safety: content is shared with Anthropic at the user's request, and the key is stored on the device only.
   - Store listings, with no third-party logos.
@@ -450,12 +514,13 @@ PROGRESS.md   live checklist
   - The watch app has to be open to receive. That's why sync is pull-based, with an outbox.
   - Background message events and the glance have tight memory limits, so both are kept tiny.
 - **Connect IQ device files** may need a Garmin login, which would block CI builds for some devices.
+- **Learned aisle order can be wrong** when you tick items at home or out of order. Mitigations: the trip filter, the app only *suggests* changes, and pinned aisles stay put.
 - **Out of scope:** iPhone (KMP later) and shared lists (v2; "Share as text" for now).
 - **Copyright:** test fixtures contain only trimmed structured data, and the golden lines come from openly licensed sources.
 
 ## 8. Later ideas (v2+)
 - Shared lists via a sync backend, and a backend proxy for Claude.
-- Meal planner, and pantry tracking.
+- Full pantry tracking (stock levels and expiry dates), beyond the stock learning in v1.
 - Wear OS tile and home-screen widget.
 - whisper.cpp transcripts.
 - Claude-assisted substitutions and scaling.
