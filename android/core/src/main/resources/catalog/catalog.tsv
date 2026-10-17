@@ -1,4 +1,4 @@
-#version	bbe1b299c71a
+#version	505f4ec3bb1b
 #id	name	plural	synonyms	aisleCode	staple	shoppingUnit	displayPolicy	gramsPerCup	packNote
 onion	onion	onions	yellow onion|brown onion|white onion|spanish onion	PRODUCE	false	each	count	160	
 red_onion	red onion	red onions	purple onion	PRODUCE	false	each	count	160	
@@ -116,7 +116,8 @@ pitta	pitta bread	pitta bread	pita|pita bread|pitta	BAKERY	false	pack	count
 naan	naan bread	naan bread	naan	BAKERY	false	pack	count		
 tortilla_wrap	tortilla wraps	tortilla wraps	flour tortilla|tortilla|wrap|wraps	BAKERY	false	pack	count		
 burger_bun	burger buns	burger buns	hamburger bun|bun|buns|brioche bun	BAKERY	false	pack	count		
-breadcrumbs	breadcrumbs	breadcrumbs	bread crumbs|panko|panko breadcrumbs|dried breadcrumbs|fresh breadcrumbs	BAKERY	false	pack	mass	100	
+breadcrumbs	breadcrumbs	breadcrumbs	bread crumbs|dried breadcrumbs|fresh breadcrumbs	BAKERY	false	pack	mass	100	
+panko	panko	panko	panko breadcrumbs|panko bread crumbs|japanese breadcrumbs	BAKERY	false	pack	mass	60	
 croissant	croissant	croissants		BAKERY	false	pack	count		
 english_muffin	english muffins	english muffins	muffin	BAKERY	false	pack	count		
 bagel	bagel	bagels		BAKERY	false	pack	count		

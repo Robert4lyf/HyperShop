@@ -115,7 +115,8 @@ pitta,pitta bread,pitta bread,pita|pita bread|pitta,BAKERY,false,pack,count,,,ag
 naan,naan bread,naan bread,naan,BAKERY,false,pack,count,,,agent-estimate
 tortilla_wrap,tortilla wraps,tortilla wraps,flour tortilla|tortilla|wrap|wraps,BAKERY,false,pack,count,,,agent-estimate
 burger_bun,burger buns,burger buns,hamburger bun|bun|buns|brioche bun,BAKERY,false,pack,count,,,agent-estimate
-breadcrumbs,breadcrumbs,breadcrumbs,bread crumbs|panko|panko breadcrumbs|dried breadcrumbs|fresh breadcrumbs,BAKERY,false,pack,mass,100,,agent-estimate
+breadcrumbs,breadcrumbs,breadcrumbs,bread crumbs|dried breadcrumbs|fresh breadcrumbs,BAKERY,false,pack,mass,100,,agent-estimate
+panko,panko,panko,panko breadcrumbs|panko bread crumbs|japanese breadcrumbs,BAKERY,false,pack,mass,60,,agent-estimate
 croissant,croissant,croissants,,BAKERY,false,pack,count,,,agent-estimate
 english_muffin,english muffins,english muffins,muffin,BAKERY,false,pack,count,,,agent-estimate
 bagel,bagel,bagels,,BAKERY,false,pack,count,,,agent-estimate
