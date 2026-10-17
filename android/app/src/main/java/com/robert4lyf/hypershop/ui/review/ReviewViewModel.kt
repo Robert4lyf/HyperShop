@@ -16,6 +16,7 @@ import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.importing.ImportError
 import com.robert4lyf.hypershop.importing.ImportResult
 import com.robert4lyf.hypershop.importing.JobState
+import com.robert4lyf.hypershop.ui.common.webLink
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -64,6 +65,8 @@ data class ReviewUi(
     val busy: Boolean = false,
     /** "List changed — review updated" */
     val notice: String? = null,
+    /** The recipe's page, to open in the browser. */
+    val url: String? = null,
 ) {
     val addCount: Int get() = aisles.sumOf { (_, rows) -> rows.count { !it.inStock } }
 }
@@ -210,6 +213,7 @@ class ReviewViewModel(
                             else -> Badge.RULES
                         },
                     notice = notice,
+                    url = webLink(r.url),
                 ),
             )
     }

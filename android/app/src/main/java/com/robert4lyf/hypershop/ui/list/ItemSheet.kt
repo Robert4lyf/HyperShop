@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.ui.list
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,8 +24,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
+import com.robert4lyf.hypershop.ui.common.rememberOpenLink
 import com.robert4lyf.hypershop.ui.review.MoveAisle
 
 data class ItemSheetActions(
@@ -61,7 +64,20 @@ fun ItemSheetContent(
             sheet.packNote?.let { Text("Usually sold as $it", style = MaterialTheme.typography.bodyMedium) }
             if (sheet.sources.isNotEmpty()) {
                 Text("From", style = MaterialTheme.typography.labelLarge)
-                for (s in sheet.sources) Text(s, style = MaterialTheme.typography.bodyMedium)
+                val open = rememberOpenLink()
+                for (s in sheet.sources) {
+                    val url = sheet.links[s]
+                    if (url == null) {
+                        Text(s, style = MaterialTheme.typography.bodyMedium)
+                    } else {
+                        Text(
+                            s,
+                            style = MaterialTheme.typography.bodyMedium.copy(textDecoration = TextDecoration.Underline),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.clickable { open(url) }.testTag("source-link"),
+                        )
+                    }
+                }
             }
             HorizontalDivider()
             EditQuantity(actions.onEditQuantity)

@@ -45,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
+import com.robert4lyf.hypershop.ui.common.rememberOpenLink
 
 /** The review screen's default view (PLAN §3.1), stateless. */
 @Composable
@@ -123,7 +124,8 @@ private fun BadgeRow(
     ui: ReviewUi,
     onRetryClaude: () -> Unit,
 ) {
-    Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+    val open = rememberOpenLink()
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         when (ui.badge) {
             Badge.CLAUDE -> AssistChip(onClick = {}, label = { Text("Parsed by Claude") })
             Badge.CLAUDE_PENDING -> {
@@ -134,6 +136,10 @@ private fun BadgeRow(
             Badge.RULES -> AssistChip(onClick = {}, label = { Text("Parsed offline") })
         }
         if (ui.busy) CircularProgressIndicator(Modifier.padding(start = 8.dp).width(20.dp))
+        ui.url?.let { url ->
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = { open(url) }, modifier = Modifier.testTag("open-recipe")) { Text("Open recipe") }
+        }
     }
 }
 
