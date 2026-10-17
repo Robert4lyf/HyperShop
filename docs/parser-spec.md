@@ -47,10 +47,11 @@ Serialised lower case (Claude's enum and the golden JSON use these strings).
 | volume | `ml`: ml, millilitre(s), milliliter(s) · `l`: l, litre(s), liter(s) · `tsp`: tsp, t, teaspoon(s) · `tbsp`: tbsp, tbs, tbl, T, tablespoon(s) · `cup`: cup(s), c · `fl_oz`: fl oz, fl. oz., fluid ounce(s) · `pint`: pint(s), pt · `quart`: quart(s), qt |
 | count | `clove`, `bunch`, `tin` (tin, can), `packet` (packet, package, pack, sachet, envelope), `sprig`, `slice`, `head`, `stalk` (stalk, stick of celery when followed by celery), `fillet`, `piece`, `stick` (butter, cinnamon) |
 | small | `pinch`, `dash` |
-| — | `other`: a unit word that is none of the above (handful, bottle, ear, leaf…). Claude only; the rule parser leaves such words in the name and marks `check`. |
+| — | `other`: a unit word that is none of the above (handful, bottle, ear, leaf…). The rule parser knows a fixed list (R2.4) and marks those lines `check`. |
 
 - **R2.1 Case-sensitive spoons.** `T` and `Tbsp`-like capital T alone = tbsp; lower-case `t` alone = tsp. All other unit words are case-insensitive.
 - **R2.2 Locale factors** (for `QtyBase`, PLAN §3.3): cup = 240 ml (US) or 250 ml (metric); pint = 473 ml (US) or 568 ml (UK); quart = 946 ml (US) or 1137 ml (UK); fl oz = 29.57 ml (US) or 28.41 ml (UK); tbsp = 15 ml; tsp = 5 ml; oz = 28.35 g; lb = 453.6 g. A recipe's `unitLocale` is `US` unless it uses metric masses/volumes (g, kg, ml, l), or the source is a UK site, in which case `METRIC`/`UK`.
+- **R2.4 Other units (rule parser):** ear, leaf/leaves, bag, strip, rectangle, handful, bottle, jar, sheet, drop, loaf, bulb, splash, cube, square, wedge, stem, branch, pod, punnet, knob, rasher, sachet-like containers not in R2. Size words between the number and the unit go to `note` ("2 medium cloves garlic" → 2 clove, note medium). With no number, a leading unit word (and a following "of") goes to `note` and the quantity stays `null` — except R3.3's pinch, dash, bunch, sprig and head.
 - **R2.3 Dimensions.** `MASS` (base g), `VOLUME` (base ml), `COUNT` (base: one of the unit, or one item when `unit == null`). Pinch and dash are `COUNT` (never converted).
 
 ## R3 — Quantities

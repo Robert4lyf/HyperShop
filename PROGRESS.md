@@ -26,7 +26,7 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 
 ## Step 2 — Rule parser
 - [x] 2.1 Tokeniser: one pass, no regex (ints, decimals, 1,000, slash and unicode fractions, glued 1½, letter/digit split); 10 KB pathological lines < 50 ms — check: `tools/gradle.sh :core:test --tests "*TokeniserTest*"`
-- [ ] 2.2 Grammar
+- [x] 2.2 Grammar: qty (mixed, ranges, number words), sizes, units (R2.1 T/t, fl oz, R2.4 other), alt amounts (parens, container, x, slash), name/note (prep vs identity backed by the catalogue, postnominal phrases), flags, section headers; check on R7 lines — check: `tools/gradle.sh :core:test --tests "*RuleParserTest*"`
 - [ ] 2.3 Normaliser, synonyms, mergeKey
 - [ ] 2 Check: name ≥90%, qty ≥95% on simple+parentheses strata
 
