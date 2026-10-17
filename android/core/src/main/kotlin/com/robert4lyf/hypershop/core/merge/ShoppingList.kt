@@ -168,7 +168,11 @@ data class ShoppingList(
     fun undoDelete(stamp: Long): ShoppingList {
         val liveKeys = liveItems.map { it.mergeKey }.toSet()
         val back = items.values.filter { it.deletedAt == stamp && it.mergeKey !in liveKeys }.map { it.id }.toSet()
-        return copy(items = items.mapValues { (id, i) -> if (id in back) i.copy(deletedAt = null) else i }).bumped(back)
+        // "Finish shopping" also archived uses with the same stamp.
+        return copy(
+            items = items.mapValues { (id, i) -> if (id in back) i.copy(deletedAt = null) else i },
+            uses = uses.mapValues { (_, u) -> if (u.archivedAt == stamp) u.copy(archivedAt = null) else u },
+        ).bumped(back)
     }
 
     // ---- watch ops (PLAN §3.6, docs/garmin-protocol.md) ----------------------------
@@ -277,34 +281,53 @@ data class ShoppingList(
     }
 
     /**
-     * Sets the item's total to [newTotal] per dimension by changing its MANUAL
-     * contribution (which may go negative). The shown total is clamped at 0.
+     * Sets the item's total to [newTotal] per dimension. An increase is a new
+     * MANUAL contribution created at the new listRev, so a tick from before the
+     * edit never covers it. A decrease comes off the existing contributions,
+     * uncovered ones first (then covered ones, so a DONE item stays DONE), the
+     * MANUAL use's before recipes', newest first; nothing goes below zero.
      */
     fun editQuantity(
         itemId: Long,
         newTotal: QtyBase,
         now: Long,
     ): ShoppingList {
-        val (l, useId) = manualUse(now)
-        val current = l.total(itemId)
-        val keys = (current.parts.keys + newTotal.parts.keys)
+        val current = total(itemId)
         val delta =
-            QtyBase(
-                keys.associateWith {
-                        k ->
-                    (newTotal.parts[k] ?: Rational.ZERO) - (current.parts[k] ?: Rational.ZERO)
-                }.filterValues { !it.isZero },
-            )
-        if (delta.isPresence) return l
-        val existing = l.contributions.firstOrNull { it.itemId == itemId && it.useId == useId && it.coveredBy == null }
-        val rev = l.listRev + 1
-        val cs =
-            if (existing != null) {
-                l.contributions.map { if (it.id == existing.id) it.copy(qty = it.qty + delta) else it }
-            } else {
-                l.contributions + Contribution(l.nextId, useId, null, itemId, delta, noScale = false, createdListRev = rev)
+            (current.parts.keys + newTotal.parts.keys)
+                .associateWith { k -> (newTotal.parts[k] ?: Rational.ZERO) - (current.parts[k] ?: Rational.ZERO) }
+                .filterValues { !it.isZero }
+        if (delta.isEmpty()) return this
+        val manualId = uses.values.firstOrNull { it.kind == UseKind.MANUAL }?.id
+        var cs = contributions
+        val emptied = HashSet<Long>()
+        for ((k, d) in delta) {
+            if (d > Rational.ZERO) continue
+            var left = Rational.ZERO - d
+            val order =
+                cs.filter { it.itemId == itemId && (it.qty.parts[k] ?: Rational.ZERO) > Rational.ZERO }
+                    .sortedWith(compareBy<Contribution>({ it.coveredBy != null }, { it.useId != manualId }).thenByDescending { it.id })
+            for (c in order) {
+                if (left.isZero) break
+                val take = minOf(c.qty.parts.getValue(k), left)
+                left -= take
+                val qty = c.qty.minusClamped(QtyBase(mapOf(k to take)))
+                if (qty.isPresence && c.coveredBy == null) emptied += c.id
+                cs = cs.map { if (it.id == c.id) it.copy(qty = qty) else it }
             }
-        return l.copy(contributions = cs, nextId = if (existing == null) l.nextId + 1 else l.nextId).bumped(setOf(itemId))
+        }
+        var l = copy(contributions = cs)
+        val increase = QtyBase(delta.filterValues { it > Rational.ZERO })
+        if (!increase.isPresence) {
+            val (withUse, useId) = l.manualUse(now)
+            val c = Contribution(withUse.nextId, useId, null, itemId, increase, noScale = false, createdListRev = withUse.listRev + 1)
+            l = withUse.copy(contributions = withUse.contributions + c, nextId = withUse.nextId + 1)
+        }
+        // An uncovered contribution brought down to nothing goes, unless it is all the item has.
+        if (emptied.isNotEmpty() && l.contributions.any { it.itemId == itemId && it.id !in emptied }) {
+            l = l.copy(contributions = l.contributions.filter { it.id !in emptied })
+        }
+        return l.bumped(setOf(itemId))
     }
 
     fun moveAisle(
@@ -314,6 +337,9 @@ data class ShoppingList(
         val i = items[itemId] ?: return this
         return copy(items = items + (itemId to i.copy(aisle = aisle, position = nextPosition(aisle)))).bumped(setOf(itemId))
     }
+
+    /** The units setting changed: every live item's shown amount did, so every live rev bumps. */
+    fun unitsChanged(): ShoppingList = bumped(liveItems.map { it.id }.toSet())
 
     // ---- helpers ----------------------------------------------------------------
 

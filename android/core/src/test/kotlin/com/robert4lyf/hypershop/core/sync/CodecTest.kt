@@ -161,6 +161,22 @@ class PagerTest {
     }
 
     @Test
+    fun manyAckExceptionsNeverBreakTheCap() {
+        val ax = (1..64).map { it to if (it % 2 == 0) OpResult.REJECTED else OpResult.STILL_DONE }
+        val items = List(20) { item(it + 1) }
+        val pages = SnapshotPager.build(SnapshotInput(9, 12, 64, ax, aisles, items, nowMs = 0), PayloadCap())
+        assertTrue(pages.isNotEmpty())
+        for (p in pages) {
+            assertTrue(PayloadSize.of(WatchCodec.encodePage(p)) <= PayloadCap.DEFAULT_BYTES)
+            assertTrue(p.ackExceptions.isNotEmpty())
+            // The newest ones, in order.
+            assertEquals(ax.takeLast(p.ackExceptions.size), p.ackExceptions)
+            assertEquals(pages[0].ackExceptions, p.ackExceptions)
+        }
+        assertTrue(assembled(pages).second.isNotEmpty(), "acks do not crowd out the list")
+    }
+
+    @Test
     fun truncationDropsOldDoneItemsFirst() {
         val now = 100 * 60_000L
         // 1: old DONE, dropped first. 2: recent DONE, kept. 3: DONE in the current aisle, kept.

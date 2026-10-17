@@ -54,6 +54,7 @@ object SnapshotPager {
         input: SnapshotInput,
         cap: PayloadCap = PayloadCap(),
     ): List<SnapshotPage> {
+        val input = input.copy(ackExceptions = fittingAcks(input, cap))
         var items = input.items
         var dropped = 0
         paginate(input, items, dropped, cap)?.let { return it }
@@ -85,6 +86,28 @@ object SnapshotPager {
         }
         return paginate(input, emptyList(), dropped, cap)
             ?: error("payload cap ${cap.bytes} cannot hold even the envelope and acks")
+    }
+
+    /**
+     * The newest ack exceptions that fit in half of the room a page has left
+     * after the bare envelope, so acks can never crowd out the list (or make
+     * the envelope itself too big). Older ones stay stored on the phone and
+     * are no longer needed by the watch once it has moved past them.
+     */
+    private fun fittingAcks(
+        input: SnapshotInput,
+        cap: PayloadCap,
+    ): List<Pair<Int, OpResult>> {
+        val ax = input.ackExceptions.takeLast(MAX_AX)
+        if (ax.isEmpty()) return ax
+
+        fun envelope(acks: List<Pair<Int, OpResult>>) =
+            size(SnapshotPage(input.epoch, input.listRev, input.ackedThrough, acks, 0, cap.maxPages, emptyList(), 0, emptyList(), 0))
+        val bare = envelope(emptyList())
+        val budget = (cap.bytes - bare) / 2
+        var n = ax.size
+        while (n > 0 && envelope(ax.takeLast(n)) - bare > budget) n--
+        return ax.takeLast(n)
     }
 
     /** Pages for exactly these items, or null when more than maxPages would be needed. */
