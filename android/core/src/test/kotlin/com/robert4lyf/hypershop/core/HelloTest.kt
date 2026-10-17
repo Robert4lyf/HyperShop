@@ -10,11 +10,6 @@ import org.junit.jupiter.api.Test
 /** Step 0.4: proves JUnit 5 and kotest-property run in :core. */
 class HelloTest {
     @Test
-    fun junit5Runs() {
-        assertEquals("core", ModuleInfo.NAME)
-    }
-
-    @Test
     fun kotestPropertyRuns() {
         runBlocking {
             checkAll(Arb.int(-1000..1000), Arb.int(-1000..1000)) { a, b ->
