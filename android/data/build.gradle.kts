@@ -54,4 +54,5 @@ dependencies {
     testImplementation(libs.androidx.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.kotest.property)
+    testImplementation(libs.androidx.room.testing)
 }

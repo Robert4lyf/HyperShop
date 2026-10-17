@@ -161,10 +161,57 @@ data class ShoppingList(
         now: Long,
     ): ShoppingList = copy(items = items.mapValues { (id, i) -> if (id == itemId) i.copy(deletedAt = now) else i }).bumped(setOf(itemId))
 
-    /** Undoes a soft delete, a "Finish shopping" or a "Clear all" stamped [stamp]. */
+    /**
+     * Undoes a soft delete, a "Finish shopping" or a "Clear all" stamped [stamp].
+     * An item whose key is live again (re-added since) stays deleted.
+     */
     fun undoDelete(stamp: Long): ShoppingList {
-        val back = items.values.filter { it.deletedAt == stamp }.map { it.id }.toSet()
+        val liveKeys = liveItems.map { it.mergeKey }.toSet()
+        val back = items.values.filter { it.deletedAt == stamp && it.mergeKey !in liveKeys }.map { it.id }.toSet()
         return copy(items = items.mapValues { (id, i) -> if (id in back) i.copy(deletedAt = null) else i }).bumped(back)
+    }
+
+    // ---- watch ops (PLAN §3.6, docs/garmin-protocol.md) ----------------------------
+
+    /**
+     * A watch tick: covers the uncovered contributions created at or before
+     * [seenListRev]. Returns the new list (or null when nothing changed) and the result.
+     */
+    fun watchTick(
+        itemId: Long,
+        seenListRev: Long,
+        at: Long,
+        installId: Int,
+        seq: Int,
+    ): Pair<ShoppingList?, WatchTickResult> {
+        val open = contributionsOf(itemId).filter { it.coveredBy == null }
+        val toCover = open.filter { it.createdListRev <= seenListRev }.map { it.id }.toSet()
+        val later = open.size - toCover.size
+        if (toCover.isEmpty()) return null to if (later > 0) WatchTickResult.PARTIAL else WatchTickResult.NOOP
+        val t = Tick(nextId, itemId, at, TickSource.WATCH, installId, seq)
+        val l =
+            copy(
+                ticks = ticks + t,
+                contributions = contributions.map { if (it.id in toCover) it.copy(coveredBy = t.id) else it },
+                nextId = nextId + 1,
+            ).bumped(setOf(itemId))
+        return l to if (later > 0) WatchTickResult.PARTIAL else WatchTickResult.OK
+    }
+
+    /** A watch untick: undoes this install's most recent watch tick on the item. */
+    fun watchUntick(
+        itemId: Long,
+        installId: Int,
+    ): Pair<ShoppingList?, WatchTickResult> {
+        val t =
+            ticks.lastOrNull { it.itemId == itemId && it.source == TickSource.WATCH && it.installId == installId }
+                ?: return null to WatchTickResult.NOOP
+        val l =
+            copy(
+                ticks = ticks - t,
+                contributions = contributions.map { if (it.coveredBy == t.id) it.copy(coveredBy = null) else it },
+            ).bumped(setOf(itemId))
+        return l to if (l.isDone(itemId)) WatchTickResult.STILL_DONE else WatchTickResult.OK
     }
 
     // ---- uses (3.2a, 5.2c) ------------------------------------------------------
@@ -289,6 +336,8 @@ data class ShoppingList(
         const val SEVEN_DAYS = 7L * 24 * 60 * 60 * 1000
     }
 }
+
+enum class WatchTickResult { OK, NOOP, PARTIAL, STILL_DONE }
 
 /** What an incoming line needs to become an item. */
 data class NewItem(

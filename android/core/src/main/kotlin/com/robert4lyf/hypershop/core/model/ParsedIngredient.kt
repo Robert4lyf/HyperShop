@@ -36,9 +36,9 @@ data class ParsedIngredient(
 
     fun base(locale: UnitLocale): QtyBase = QtyBase.of(quantity, unit, locale)
 
-    private companion object {
-        val GARNISH = listOf("garnish", "to serve", "for serving", "to decorate")
-        val NO_SCALE = listOf("to taste", "for frying", "for greasing", "for dusting", "as needed")
+    companion object {
+        private val GARNISH = listOf("garnish", "to serve", "for serving", "to decorate")
+        private val NO_SCALE = listOf("to taste", "for frying", "for greasing", "for dusting", "as needed")
     }
 }
 

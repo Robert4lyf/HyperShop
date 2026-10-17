@@ -1,0 +1,399 @@
+package com.robert4lyf.hypershop.data
+
+import androidx.room.withTransaction
+import com.robert4lyf.hypershop.core.catalog.Catalog
+import com.robert4lyf.hypershop.core.catalog.CatalogLoader
+import com.robert4lyf.hypershop.core.merge.ApplyResult
+import com.robert4lyf.hypershop.core.merge.LineStatus
+import com.robert4lyf.hypershop.core.merge.Merger
+import com.robert4lyf.hypershop.core.merge.NewItem
+import com.robert4lyf.hypershop.core.merge.Preview
+import com.robert4lyf.hypershop.core.merge.Rekey
+import com.robert4lyf.hypershop.core.merge.RowDecision
+import com.robert4lyf.hypershop.core.merge.ShoppingList
+import com.robert4lyf.hypershop.core.merge.TickSource
+import com.robert4lyf.hypershop.core.merge.WatchTickResult
+import com.robert4lyf.hypershop.core.model.AisleCode
+import com.robert4lyf.hypershop.core.model.ParsedBy
+import com.robert4lyf.hypershop.core.model.ParsedIngredient
+import com.robert4lyf.hypershop.core.model.QtyBase
+import com.robert4lyf.hypershop.core.model.QtyUnit
+import com.robert4lyf.hypershop.core.model.UnitLocale
+import com.robert4lyf.hypershop.core.parse.Normaliser
+import com.robert4lyf.hypershop.core.sync.OpResult
+import com.robert4lyf.hypershop.core.sync.WatchMessage
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
+import kotlinx.serialization.json.Json
+
+/** A stored import: the recipe and its line ids, in line order. */
+data class StoredRecipe(
+    val recipe: RecipeEntity,
+    val lines: List<Pair<RecipeLineEntity, ParsedIngredient>>,
+)
+
+/** The phone's answer to a watch message (PLAN §3.6): always sent. */
+data class WatchReply(
+    val ackedThrough: Int,
+    val ackExceptions: List<Pair<Int, OpResult>>,
+    val fullSnapshot: Boolean,
+)
+
+/**
+ * Every list write goes through here (BangGym's rule): one Room transaction
+ * that loads the list, applies a pure [ShoppingList] operation from `:core`,
+ * and writes the difference. The UI and the watch bridge share it.
+ */
+class ListRepository(
+    private val db: HyperShopDatabase,
+    private val catalog: Catalog = CatalogLoader.default,
+    private val clock: () -> Long = System::currentTimeMillis,
+) {
+    private val dao = db.dao()
+    private val normaliser = Normaliser(catalog)
+    val merger = Merger(catalog, normaliser)
+    private val json = Json { ignoreUnknownKeys = true }
+
+    // ---- reading ------------------------------------------------------------------
+
+    suspend fun snapshot(): ShoppingList = db.withTransaction { load() }
+
+    /** The list, re-read whenever listRev changes. */
+    fun observe(): Flow<ShoppingList> = dao.observeListRev().filterNotNull().distinctUntilChanged().map { snapshot() }
+
+    suspend fun aisleOrder(): List<AisleCode> {
+        val hidden = dao.aisles().filter { it.hidden }.map { it.code }.toSet()
+        return dao.aisleOrder().map { AisleCode.valueOf(it.aisleCode) }.filter { it.name !in hidden }
+    }
+
+    suspend fun staples(): Set<String> = dao.staples().map { it.key }.toSet()
+
+    suspend fun overrides(): Map<String, AisleCode> = dao.overrides().associate { it.key to AisleCode.valueOf(it.aisleCode) }
+
+    private suspend fun load(): ShoppingList {
+        val meta = requireNotNull(dao.meta()) { "Meta row missing" }
+        return ShoppingList(
+            items = dao.items().map(Mapping::item).associateBy { it.id },
+            uses = dao.uses().map(Mapping::use).associateBy { it.id },
+            contributions = dao.contributions().map(Mapping::contribution),
+            ticks = dao.ticks().map(Mapping::tick),
+            aliases = dao.aliases().associate { it.oldId to it.newId },
+            listRev = meta.listRev,
+            nextId = meta.nextId,
+        )
+    }
+
+    /** Writes [new] over [old]: inserts and updates parents first, deletes children first. */
+    private suspend fun persist(
+        old: ShoppingList,
+        new: ShoppingList,
+    ) {
+        val now = clock()
+        val changedItems = new.items.values.filter { old.items[it.id] != it }
+        dao.upsertItems(changedItems.map { Mapping.item(it, now) })
+        val newlyDeleted = changedItems.filter { it.deletedAt != null && old.items[it.id]?.deletedAt == null }
+        dao.putDeleted(newlyDeleted.map { DeletedItemEntity(it.id, it.deletedAt!!) })
+        val undeleted = changedItems.filter { it.deletedAt == null && old.items[it.id]?.deletedAt != null }.map { it.id }
+        if (undeleted.isNotEmpty()) dao.undelete(undeleted)
+        dao.upsertUses(new.uses.values.filter { old.uses[it.id] != it }.map(Mapping::use))
+        val oldTicks = old.ticks.associateBy { it.id }
+        dao.upsertTicks(new.ticks.filter { oldTicks[it.id] != it }.map(Mapping::tick))
+        val oldCs = old.contributions.associateBy { it.id }
+        dao.upsertContributions(new.contributions.filter { oldCs[it.id] != it }.map(Mapping::contribution))
+        dao.upsertAliases(new.aliases.filter { old.aliases[it.key] != it.value }.map { ItemAliasEntity(it.key, it.value) })
+
+        val newCs = new.contributions.map { it.id }.toSet()
+        old.contributions.map { it.id }.filter { it !in newCs }.takeIf { it.isNotEmpty() }?.let { dao.deleteContributions(it) }
+        val newTicks = new.ticks.map { it.id }.toSet()
+        old.ticks.map { it.id }.filter { it !in newTicks }.takeIf { it.isNotEmpty() }?.let { dao.deleteTicks(it) }
+        (old.uses.keys - new.uses.keys).toList().takeIf { it.isNotEmpty() }?.let { dao.deleteUses(it) }
+        (old.items.keys - new.items.keys).toList().takeIf { it.isNotEmpty() }?.let { dao.deleteItems(it) }
+
+        val meta = dao.meta()!!
+        dao.putMeta(meta.copy(listRev = new.listRev, nextId = new.nextId))
+    }
+
+    /** One transaction: load, apply [op], persist. Null from [op] means no change. */
+    private suspend fun <T> write(op: suspend (ShoppingList) -> Pair<ShoppingList, T>?): T? =
+        db.withTransaction {
+            val old = load()
+            val r = op(old) ?: return@withTransaction null
+            persist(old, r.first)
+            r.second
+        }
+
+    // ---- imports (5.2b, 5.2c) ----------------------------------------------------------
+
+    suspend fun storeRecipe(
+        url: String?,
+        title: String?,
+        servings: Int?,
+        locale: UnitLocale,
+        source: String,
+        parsedBy: ParsedBy,
+        model: String?,
+        claudePending: Boolean,
+        lines: List<ParsedIngredient>,
+    ): StoredRecipe =
+        db.withTransaction {
+            val r = RecipeEntity(0, url, title, servings, locale.name, clock(), source, parsedBy.name, model, claudePending)
+            val id = dao.insertRecipe(r)
+            val rows = lines.map { RecipeLineEntity(0, id, it.section, it.raw, json.encodeToString(ParsedIngredient.serializer(), it)) }
+            val ids = dao.insertLines(rows)
+            StoredRecipe(r.copy(id = id), rows.zip(ids).zip(lines) { (row, lid), p -> row.copy(id = lid) to p })
+        }
+
+    /** "Already on your list — add again?" */
+    suspend fun alreadyOnList(url: String): Boolean {
+        val recipes = dao.recipesByUrl(url).map { it.id }.toSet()
+        return recipes.isNotEmpty() && dao.uses().any { it.recipeId in recipes && it.archivedAt == null }
+    }
+
+    suspend fun preview(
+        stored: StoredRecipe,
+        servings: Int?,
+        decisions: Map<String, RowDecision>? = null,
+    ): Preview {
+        val incoming =
+            merger.incoming(
+                stored.recipe.id,
+                stored.recipe.servingsOriginal,
+                servings ?: stored.recipe.servingsOriginal,
+                UnitLocale.valueOf(stored.recipe.unitLocale),
+                stored.lines.map { (row, p) -> row.id to p },
+                overrides(),
+            )
+        val d = decisions ?: merger.defaultDecisions(incoming, staples())
+        return merger.preview(snapshot(), incoming, d)
+    }
+
+    /** Confirm on the review screen. Stale → "List changed — review updated". */
+    suspend fun apply(preview: Preview): ApplyResult =
+        db.withTransaction {
+            val old = load()
+            when (val r = merger.apply(old, preview, clock())) {
+                is ApplyResult.Applied -> {
+                    persist(old, r.list)
+                    dao.putDecisions(preview.lineStatus.map { (line, s) -> LineDecisionEntity(r.useId, line, s.name) })
+                    r
+                }
+                ApplyResult.Stale -> r
+            }
+        }
+
+    /** Undo of an import: the use and everything that cascades, and the recipe if nothing else uses it. */
+    suspend fun undoImport(useId: Long) {
+        db.withTransaction {
+            val old = load()
+            val recipeId = old.uses[useId]?.recipeId
+            persist(old, old.removeUse(useId))
+            if (recipeId != null && dao.uses().none { it.recipeId == recipeId }) {
+                db.openHelper.writableDatabase.execSQL("DELETE FROM Recipe WHERE id = ?", arrayOf(recipeId))
+            }
+        }
+    }
+
+    suspend fun removeUse(useId: Long) = write { it.removeUse(useId) to Unit }
+
+    suspend fun rescaleUse(
+        useId: Long,
+        servings: Int,
+    ) = write { it.rescaleUse(useId, servings) to Unit }
+
+    suspend fun lineStatuses(useId: Long): Map<Long, LineStatus> =
+        dao.decisions(useId).associate {
+            it.recipeLineId to LineStatus.valueOf(it.status)
+        }
+
+    // ---- ticking and manual changes (5.2b, 5.2c) -----------------------------------------
+
+    suspend fun tick(itemId: Long): Boolean = write { l -> l.tick(itemId, clock(), TickSource.PHONE)?.let { it to true } } ?: false
+
+    suspend fun untick(itemId: Long): Boolean = write { l -> l.untick(itemId)?.let { it to true } } ?: false
+
+    suspend fun manualAdd(
+        name: String,
+        qty: QtyBase,
+        unitHint: QtyUnit?,
+    ): Long =
+        write { l ->
+            val target = merger.target(name, null, overrides())
+            l.manualAdd(target, qty, unitHint, clock())
+        }!!
+
+    fun target(name: String): NewItem = merger.target(name)
+
+    suspend fun editQuantity(
+        itemId: Long,
+        total: QtyBase,
+    ) = write { it.editQuantity(itemId, total, clock()) to Unit }
+
+    /** Soft-deletes; returns the stamp for Undo. */
+    suspend fun softDelete(itemId: Long): Long {
+        val stamp = clock()
+        write { it.softDelete(itemId, stamp) to Unit }
+        return stamp
+    }
+
+    suspend fun finishShopping(): Long {
+        val stamp = clock()
+        write { it.finishShopping(stamp) to Unit }
+        return stamp
+    }
+
+    suspend fun clearAll(): Long {
+        val stamp = clock()
+        write { it.clearAll(stamp) to Unit }
+        return stamp
+    }
+
+    suspend fun undoDelete(stamp: Long) = write { it.undoDelete(stamp) to Unit }
+
+    /** Purges soft deletes older than 7 days. */
+    suspend fun purgeDeleted() =
+        db.withTransaction {
+            val ids = dao.deletedBefore(clock() - ShoppingList.SEVEN_DAYS)
+            if (ids.isNotEmpty()) {
+                val old = load()
+                persist(old, old.copy(items = old.items - ids.toSet(), contributions = old.contributions.filter { it.itemId !in ids }))
+                dao.undelete(ids)
+            }
+        }
+
+    /** Move to another aisle; "Always put X in Y?" yes → a user override. */
+    suspend fun moveAisle(
+        itemId: Long,
+        aisle: AisleCode,
+        always: Boolean,
+    ) = db.withTransaction {
+        val old = load()
+        val item = old.items[itemId] ?: return@withTransaction
+        persist(old, old.moveAisle(itemId, aisle))
+        if (always) dao.putOverride(CategoryOverrideEntity(item.mergeKey, aisle.name, "USER"))
+    }
+
+    suspend fun setStaple(
+        mergeKey: String,
+        staple: Boolean,
+    ) = if (staple) dao.putStaple(StapleEntity(mergeKey, "USER")) else dao.deleteStaple(mergeKey)
+
+    // ---- catalogue re-key (5.2d) ---------------------------------------------------------
+
+    /** Run when the catalogue version changed. Overrides you set win over seeded ones. */
+    suspend fun rekeyIfCatalogChanged(): Boolean =
+        db.withTransaction {
+            val meta = dao.meta()!!
+            if (meta.catalogVersion == catalog.version) return@withTransaction false
+            val old = load()
+            val r = Rekey.rekey(old, normaliser)
+            persist(old, r.list)
+            val overrides = dao.overrides().associateBy { it.key }
+            for ((from, to) in r.renamed) {
+                val o = overrides[from] ?: continue
+                val existing = overrides[to]
+                if (existing == null || (existing.source != "USER" && o.source == "USER")) dao.putOverride(o.copy(key = to))
+                dao.deleteOverride(from)
+            }
+            dao.putMeta(dao.meta()!!.copy(catalogVersion = catalog.version))
+            true
+        }
+
+    // ---- watch ops (5.2d) ---------------------------------------------------------------
+
+    /**
+     * The phone's protocol rules (docs/garmin-protocol.md), in one transaction:
+     * epoch, sequence (go-back-N), ItemAlias, coverage by seenListRev, untick of
+     * this install's own tick. Results are kept, the last 64 per install.
+     */
+    suspend fun applyWatch(m: WatchMessage): WatchReply =
+        db.withTransaction {
+            val meta = dao.meta()!!
+            val epoch = meta.listEpoch.toInt()
+            when (m) {
+                is WatchMessage.Hello -> {
+                    val i = dao.install(m.installId)
+                    val last = maxOf(i?.lastSeq ?: m.ackedThrough, m.ackedThrough)
+                    val offset = clock() - m.watchNow * 1000
+                    dao.putInstall(WatchInstallEntity(m.installId, last, offset))
+                    reply(m.installId, last, full = true)
+                }
+                is WatchMessage.Bye -> reply(m.installId, dao.install(m.installId)?.lastSeq ?: 0, full = false)
+                is WatchMessage.Ops -> {
+                    val inst = dao.install(m.installId) ?: WatchInstallEntity(m.installId, m.ops.first().seq - 1, 0)
+                    var last = inst.lastSeq
+                    var list = load()
+                    val start = list
+                    for (op in m.ops) {
+                        if (op.seq <= last) continue
+                        if (op.seq != last + 1) break
+                        val result: OpResult =
+                            if (m.epoch != epoch) {
+                                OpResult.EPOCH
+                            } else {
+                                val item = list.resolve(op.itemId.toLong())
+                                if (item == null) {
+                                    OpResult.REJECTED
+                                } else {
+                                    val at = op.ts * 1000 + inst.clockOffsetMs
+                                    val (next, r) =
+                                        if (op.done) {
+                                            list.watchTick(item.id, op.seenListRev.toLong(), at, m.installId, op.seq)
+                                        } else {
+                                            list.watchUntick(item.id, m.installId)
+                                        }
+                                    if (next != null) list = next
+                                    when (r) {
+                                        WatchTickResult.OK -> OpResult.OK
+                                        WatchTickResult.NOOP -> OpResult.NOOP
+                                        WatchTickResult.PARTIAL -> OpResult.PARTIAL
+                                        WatchTickResult.STILL_DONE -> OpResult.STILL_DONE
+                                    }
+                                }
+                            }
+                        last = op.seq
+                        dao.putOpResult(WatchOpResultEntity(m.installId, op.seq, result.name))
+                    }
+                    if (list !== start) persist(start, list)
+                    dao.putInstall(inst.copy(lastSeq = last))
+                    dao.trimOpResults(m.installId, last - RESULT_HISTORY)
+                    reply(m.installId, last, full = list !== start)
+                }
+            }
+        }
+
+    private suspend fun reply(
+        installId: Int,
+        last: Int,
+        full: Boolean,
+    ): WatchReply {
+        val ax = dao.opResults(installId).filter { it.result != OpResult.OK.name }.map { it.seq to OpResult.valueOf(it.result) }
+        return WatchReply(last, ax, full)
+    }
+
+    // ---- epoch (PLAN §3.6) --------------------------------------------------------------
+
+    /**
+     * Called at start-up. A missing or different marker file (a restore, or a
+     * first launch) starts a new list epoch and forgets every watch install.
+     */
+    suspend fun checkEpoch(marker: EpochMarker): Boolean =
+        db.withTransaction {
+            val meta = dao.meta()!!
+            val file = marker.read()
+            if (file != null && file == meta.epochMarker) return@withTransaction false
+            val fresh = EpochMarker.newMarker()
+            dao.putMeta(meta.copy(listEpoch = EpochMarker.newEpoch(), epochMarker = fresh, listRev = meta.listRev + 1))
+            dao.clearInstalls()
+            dao.clearOpResults()
+            marker.write(fresh)
+            true
+        }
+
+    suspend fun listEpoch(): Long = dao.meta()!!.listEpoch
+
+    companion object {
+        const val RESULT_HISTORY = 64
+    }
+}
