@@ -4,6 +4,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -76,7 +77,7 @@ class ReviewScreenTest {
         val texts = node.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text }
         val toggle = node.children.count { it.config.getOrNull(SemanticsProperties.ToggleableState) != null }
         // name, quantity and the in-stock box.
-        assertTrue("texts $texts", texts.containsAll(listOf("onion", "2")))
+        assertTrue("texts $texts", texts.containsAll(listOf("Onion", "2")))
         assertTrue(texts.size + toggle <= 4) // "In stock" label + name + quantity + box, read as one node
         compose.onNodeWithTag("row-cat:onion").performClick()
         assertEquals("row cat:onion", events.last())
@@ -91,6 +92,14 @@ class ReviewScreenTest {
         compose.onNodeWithText("Retry with Claude").performClick()
         compose.onNodeWithText("Serves 4").fetchSemanticsNode()
         assertEquals(listOf("add", "cancel", "retry"), events)
+    }
+
+    @Test
+    fun theInStockPillTogglesWithoutOpeningTheSheet() {
+        show()
+        compose.onAllNodesWithText("In stock")[0].performClick()
+        compose.onAllNodesWithText("In stock")[3].performClick()
+        assertEquals(listOf("stock cat:onion true", "stock cat:salt false"), events)
     }
 
     @Test

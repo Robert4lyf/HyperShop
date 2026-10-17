@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.ui.review
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,10 +11,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,6 +33,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.importing.ImportError
+import com.robert4lyf.hypershop.ui.common.BottomActionBar
+import com.robert4lyf.hypershop.ui.common.InfoBanner
+import com.robert4lyf.hypershop.ui.common.Tone
+import com.robert4lyf.hypershop.ui.common.sectionItem
+import com.robert4lyf.hypershop.ui.common.sectionPosition
+import com.robert4lyf.hypershop.ui.theme.card
 
 /**
  * An import that found no ingredients: what went wrong, then "Select lines
@@ -45,45 +55,71 @@ fun ManualLinesView(
     var pasted by remember { mutableStateOf("") }
     val count = picked.size + pasted.lines().count { it.isNotBlank() }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        LazyColumn(Modifier.fillMaxSize().testTag("manual"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(errorText(error), style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag("error"))
-                    Text("Select lines manually", style = MaterialTheme.typography.titleLarge)
-                    if (candidates.isNotEmpty()) Text("Tick the ingredient lines from the page:")
+        Column(Modifier.fillMaxSize()) {
+            val card = MaterialTheme.colorScheme.card
+            LazyColumn(
+                Modifier.weight(1f).testTag("manual"),
+                contentPadding = PaddingValues(vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
+            ) {
+                item {
+                    Column(
+                        Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        InfoBanner(errorText(error), Icons.Rounded.ErrorOutline, Modifier.testTag("error"), Tone.WARNING)
+                        Column(Modifier.padding(horizontal = 4.dp)) {
+                            Text("Select lines manually", style = MaterialTheme.typography.headlineSmall)
+                            Text(
+                                if (candidates.isNotEmpty()) {
+                                    "Tick the ingredient lines from the page:"
+                                } else {
+                                    "Paste the recipe's ingredients below."
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
-            }
-            itemsIndexed(candidates) { i, line ->
-                val on = i in picked
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 48.dp)
-                        .toggleable(on, role = Role.Checkbox) { if (it) picked += i else picked -= i }
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Checkbox(checked = on, onCheckedChange = null)
-                    Text(line, Modifier.padding(start = 12.dp))
+                itemsIndexed(candidates) { i, line ->
+                    val on = i in picked
+                    Row(
+                        Modifier
+                            .sectionItem(sectionPosition(i, candidates.size), card)
+                            .fillMaxWidth()
+                            .heightIn(min = 52.dp)
+                            .toggleable(on, role = Role.Checkbox) { if (it) picked += i else picked -= i }
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(checked = on, onCheckedChange = null)
+                        Text(line, Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodyLarge)
+                    }
                 }
-            }
-            item {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item {
                     OutlinedTextField(
                         value = pasted,
                         onValueChange = { pasted = it },
                         label = { Text(if (candidates.isEmpty()) "Paste the ingredient lines" else "Or paste lines") },
-                        minLines = 3,
-                        modifier = Modifier.fillMaxWidth().testTag("paste-lines"),
+                        minLines = 4,
+                        shape = MaterialTheme.shapes.large,
+                        colors =
+                            OutlinedTextFieldDefaults.colors(
+                                unfocusedContainerColor = MaterialTheme.colorScheme.card,
+                                focusedContainerColor = MaterialTheme.colorScheme.card,
+                            ),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 16.dp).testTag("paste-lines"),
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = { onUse(picked.sorted().map { candidates[it] } + pasted) },
-                            enabled = count > 0,
-                        ) { Text(if (count == 1) "Use 1 line" else "Use $count lines") }
-                        TextButton(onClick = onBack) { Text("Back to the list") }
-                    }
                 }
+            }
+            BottomActionBar {
+                TextButton(onClick = onBack) { Text("Back to the list") }
+                Button(
+                    onClick = { onUse(picked.sorted().map { candidates[it] } + pasted) },
+                    enabled = count > 0,
+                    modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+                ) { Text(if (count == 1) "Use 1 line" else "Use $count lines", style = MaterialTheme.typography.titleSmall) }
             }
         }
     }

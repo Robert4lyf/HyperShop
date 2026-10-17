@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="window_light">#FFFBFE</color>
-    <color name="window_dark">#1C1B1F</color>
-    <color name="ic_launcher_background">#2E7D32</color>
+    <!-- The Compose theme's backgrounds (ui/theme/Theme.kt), so launch has no flash. -->
+    <color name="window_light">#F6F7F2</color>
+    <color name="window_dark">#0F1411</color>
+    <color name="ic_launcher_background">#1E6B3C</color>
 </resources>

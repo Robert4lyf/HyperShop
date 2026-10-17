@@ -1,14 +1,25 @@
 package com.robert4lyf.hypershop.ui
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -18,6 +29,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -42,6 +54,13 @@ object Routes {
     fun review(job: Long) = "review/$job"
 }
 
+private data class Tab(
+    val route: String,
+    val label: String,
+    val on: androidx.compose.ui.graphics.vector.ImageVector,
+    val off: androidx.compose.ui.graphics.vector.ImageVector,
+)
+
 /** The app's navigation: three tabs, plus the review screen opened by an import. */
 @Composable
 fun HyperShopApp(
@@ -61,26 +80,44 @@ fun HyperShopApp(
         }
         container.shares.value = null
     }
+    // The review screens pin their main action to the bottom edge (BottomActionBar pads for
+    // the navigation bar itself), so the snackbar sits above that bar instead of over it.
+    val reviewing = route == Routes.REVIEW
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbar) },
+        contentWindowInsets =
+            if (reviewing) {
+                WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
+            } else {
+                ScaffoldDefaults.contentWindowInsets
+            },
+        snackbarHost = {
+            SnackbarHost(snackbar, if (reviewing) Modifier.navigationBarsPadding().padding(bottom = 80.dp) else Modifier)
+        },
         bottomBar = {
             if (route != Routes.REVIEW) {
-                NavigationBar {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
                     listOf(
-                        Triple(Routes.LIST, "List", Icons.AutoMirrored.Filled.List),
-                        Triple(Routes.RECIPES, "Recipes", Icons.Filled.MenuBook),
-                        Triple(Routes.SETTINGS, "Settings", Icons.Filled.Settings),
-                    ).forEach { (r, label, icon) ->
+                        Tab(Routes.LIST, "List", Icons.Rounded.ShoppingCart, Icons.Outlined.ShoppingCart),
+                        Tab(Routes.RECIPES, "Recipes", Icons.AutoMirrored.Rounded.MenuBook, Icons.AutoMirrored.Outlined.MenuBook),
+                        Tab(Routes.SETTINGS, "Settings", Icons.Rounded.Settings, Icons.Outlined.Settings),
+                    ).forEach { (r, label, on, off) ->
+                        val selected = route == r
                         NavigationBarItem(
-                            selected = route == r,
+                            selected = selected,
                             onClick = {
                                 nav.navigate(r) {
                                     popUpTo(Routes.LIST)
                                     launchSingleTop = true
                                 }
                             },
-                            icon = { Icon(icon, contentDescription = null) },
+                            icon = { Icon(if (selected) on else off, contentDescription = null) },
                             label = { Text(label) },
+                            colors =
+                                NavigationBarItemDefaults.colors(
+                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                ),
                         )
                     }
                 }

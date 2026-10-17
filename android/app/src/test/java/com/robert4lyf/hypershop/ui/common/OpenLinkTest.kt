@@ -15,4 +15,13 @@ class OpenLinkTest {
         assertNull(webLink("file:///data/data/x"))
         assertNull(webLink("intent://x#Intent;end"))
     }
+
+    @Test
+    fun siteNamesAreShortLowerCaseHosts() {
+        assertEquals("bbcgoodfood.com", siteName("https://WWW.BBCGoodFood.com/recipes/x"))
+        assertEquals("cooking.nytimes.com", siteName("https://cooking.nytimes.com/recipes/1"))
+        assertEquals("example.com", siteName("http://example.com:8080/r"))
+        assertNull(siteName("not a url"))
+        assertNull(siteName("https:///nohost"))
+    }
 }
