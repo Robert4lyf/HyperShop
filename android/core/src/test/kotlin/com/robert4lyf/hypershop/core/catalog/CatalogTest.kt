@@ -26,6 +26,16 @@ class CatalogTest {
     }
 
     @Test
+    fun whiteBeansAreDifferentTins() {
+        assertEquals("haricot_beans", catalog.lookup("haricot beans")?.id)
+        assertEquals("haricot_beans", catalog.lookup("navy beans")?.id)
+        assertEquals("butter_beans", catalog.lookup("butter beans")?.id)
+        assertEquals("butter_beans", catalog.lookup("lima beans")?.id)
+        assertEquals("cannellini_beans", catalog.lookup("cannellini beans")?.id)
+        assertEquals("cannellini_beans", catalog.lookup("white beans")?.id)
+    }
+
+    @Test
     fun idsAndKeysAreUnique() {
         assertEquals(catalog.entries.size, catalog.byId.size)
         val owners = HashMap<String, String>()

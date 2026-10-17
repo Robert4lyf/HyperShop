@@ -211,7 +211,9 @@ sundried_tomato,sun-dried tomatoes,sun-dried tomatoes,sundried tomatoes|sun drie
 chickpeas,chickpeas,chickpeas,chickpea|garbanzo beans|garbanzo bean|canned chickpeas,TINS_JARS,false,tin,count,,1 × 400 g tin,agent-estimate
 kidney_beans,kidney beans,kidney beans,red kidney beans,TINS_JARS,false,tin,count,,,agent-estimate
 black_beans,black beans,black beans,black bean,TINS_JARS,false,tin,count,,,agent-estimate
-cannellini_beans,cannellini beans,cannellini beans,white beans|white bean|navy beans|great northern beans|butter beans|haricot beans,TINS_JARS,false,tin,count,,,agent-estimate
+cannellini_beans,cannellini beans,cannellini beans,white beans|white bean|great northern beans|cannellini bean,TINS_JARS,false,tin,count,,,agent-estimate
+haricot_beans,haricot beans,haricot beans,haricot bean|navy beans|navy bean,TINS_JARS,false,tin,count,,,agent-estimate
+butter_beans,butter beans,butter beans,butter bean|lima beans|lima bean,TINS_JARS,false,tin,count,,,agent-estimate
 baked_beans,baked beans,baked beans,,TINS_JARS,false,tin,count,,,agent-estimate
 lentils_tin,tinned lentils,tinned lentils,,TINS_JARS,false,tin,count,,,agent-estimate
 coconut_milk,coconut milk,coconut milk,unsweetened coconut milk|light coconut milk,TINS_JARS,false,tin,count,,1 × 400 ml tin,agent-estimate
