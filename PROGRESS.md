@@ -38,6 +38,8 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 - [x] 3.3 Merger.preview (pure) + apply re-checks every shown rev (and that new items are still new) → Stale; property tests: add then remove a use is identity, preview+apply equals merging directly — check: `tools/gradle.sh :core:test --tests "*Preview*"`
 - [x] 3.4 Catalogue re-key: name: → cat: keys; clashes merge into the lower id (survivor aisle/position win, rev = max + 1, contributions and ticks move, ItemAlias) — check: `tools/gradle.sh :core:test --tests "*RekeyTest*"`
 
+**Step 3 check:** property tests (add/remove identity, tick → DONE, later recipe uncovered, untick restores, preview = direct merge), must-not-merge pairs, 97% golden names categorised — all in `tools/gradle.sh :core:test`.
+
 ## Step 4 — Claude client
 - [ ] 4.1 ADR 001
 - [ ] 4.2 Request builder
