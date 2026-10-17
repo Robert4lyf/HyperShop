@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+"""Puts every Roborazzi PNG into one contact-sheet image (PLAN Step 5.11).
+
+Usage: tools/contact-sheet [SCREENSHOT_DIR] [OUT_PNG]
+Defaults: docs/screenshots -> docs/contact-sheet.png
+
+Light and dark recordings of a screen sit side by side. Uses Pillow; falls
+back to ImageMagick `montage` when Pillow is missing.
+"""
+
+from __future__ import annotations
+
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+THUMB_W = 300
+COLS = 4
+PAD = 16
+LABEL_H = 28
+
+
+def ordered(paths: list[Path]) -> list[Path]:
+    """Groups `x-light.png` next to `x-dark.png`; others follow by name."""
+
+    def key(p: Path) -> tuple[str, int]:
+        stem = p.stem
+        for i, suffix in enumerate(("-light", "-dark")):
+            if stem.endswith(suffix):
+                return stem[: -len(suffix)], i
+        return stem, 2
+
+    return sorted(paths, key=key)
+
+
+def with_pillow(paths: list[Path], out: Path) -> None:
+    from PIL import Image, ImageDraw, ImageFont
+
+    thumbs = []
+    for p in paths:
+        im = Image.open(p).convert("RGB")
+        h = round(im.height * THUMB_W / im.width)
+        thumbs.append((p.stem, im.resize((THUMB_W, h), Image.LANCZOS)))
+    rows = [thumbs[i : i + COLS] for i in range(0, len(thumbs), COLS)]
+    row_h = [max(t.height for _, t in r) + LABEL_H + PAD for r in rows]
+    sheet = Image.new("RGB", (COLS * (THUMB_W + PAD) + PAD, sum(row_h) + PAD), "#d0d0d0")
+    draw = ImageDraw.Draw(sheet)
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", 16)
+    except OSError:
+        font = ImageFont.load_default()
+    y = PAD
+    for r, h in zip(rows, row_h):
+        for i, (name, t) in enumerate(r):
+            x = PAD + i * (THUMB_W + PAD)
+            draw.text((x, y), name, fill="black", font=font)
+            sheet.paste(t, (x, y + LABEL_H))
+        y += h
+    sheet.save(out, optimize=True)
+
+
+def with_montage(paths: list[Path], out: Path) -> None:
+    subprocess.run(
+        ["montage", "-label", "%t", *map(str, paths), "-geometry", f"{THUMB_W}x+{PAD}+{PAD}", "-tile", f"{COLS}x", str(out)],
+        check=True,
+    )
+
+
+def main() -> int:
+    src = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "docs/screenshots"
+    out = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "docs/contact-sheet.png"
+    paths = ordered([p for p in src.glob("*.png") if p.resolve() != out.resolve()])
+    if not paths:
+        print(f"contact-sheet: no PNGs in {src}", file=sys.stderr)
+        return 1
+    try:
+        import PIL  # noqa: F401
+
+        with_pillow(paths, out)
+    except ImportError:
+        if not shutil.which("montage"):
+            print("contact-sheet: needs Pillow or ImageMagick montage", file=sys.stderr)
+            return 1
+        with_montage(paths, out)
+    print(f"contact-sheet: {len(paths)} screenshots -> {out.relative_to(ROOT) if out.is_relative_to(ROOT) else out}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
