@@ -2,6 +2,7 @@
 # The gate (PLAN.md §6 rule 3). Must pass before every commit.
 #
 #   1. ktlint, every unit test, :app:assembleDebug
+#   1b. the catalogue is valid and its generated files are fresh
 #   2. the merged manifest: no CAMERA; only the launcher and share activities exported
 #   3. no Anthropic key committed (sk-ant- scan)
 #   4. the golden CHECKSUM
@@ -26,6 +27,9 @@ tools/gradle.sh \
   :core:test :extract:test :claude:test \
   :data:testDebugUnitTest :app:testDebugUnitTest \
   :app:assembleDebug
+
+step "Catalogue"
+python3 tools/catalog/build_catalog.py --check
 
 step "Merged manifest"
 python3 tools/check_manifest.py

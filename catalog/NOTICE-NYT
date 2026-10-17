@@ -1,0 +1,15 @@
+This catalogue's ingredient names, and the golden test lines in
+testdata/ingredients/frozen.json, are derived from the New York Times
+ingredient-phrase-tagger training snapshot (nyt-ingredients-snapshot-2015.csv,
+https://github.com/nytimes/ingredient-phrase-tagger, commit
+e414c2ca279f23c99c8338ceba00653d88d40dfe).
+
+Copyright (c) 2016 The New York Times Company.
+Licensed under the Apache License, Version 2.0 (see LICENSE-NYT).
+
+Modifications: names were normalised, merged and counted by
+tools/catalog/top_names.py; UK names, aisles, staples, pack notes and synonyms
+were added by hand (src=agent-estimate). Golden lines were selected by
+tools/pick-golden and relabelled per docs/parser-spec.md by
+tools/nyt-to-golden. The upstream repository ships no NOTICE file; this file
+records the attribution and the changes.
