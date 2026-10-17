@@ -79,11 +79,19 @@ Recipe URL or Instagram reel → parsed ingredients → merged, aisle-sorted sho
   5. "Select lines manually".
 - **JSON-LD quirks handled, each with a test:** `@graph`; `@type` as an array; several Recipe objects; `recipeIngredient` as a single string or under legacy `ingredients`; nested arrays; HTML entities, including double-encoded ones; tags inside strings; lenient JSON (trailing commas, raw newlines); `recipeYield` written as "4", "4 servings", an array, or "Makes 12".
 - **Blocked or JavaScript-only pages** open in a *visible* in-app WebView sheet with an "Extract recipe" button. The user solves any challenge themselves. The sheet uses a separate WebView profile, cookies are cleared afterwards, and file access is off. **It is never used for Instagram.**
-- **Preview screen:**
-  - Shows the title, a servings scaler, section labels, and line checkboxes.
-  - Staples, optional and garnish lines start unchecked.
-  - Tapping a line edits its raw text, which is re-parsed live, with structured fields underneath.
-  - "A or B" lines show the alternative.
+- **"Review before adding" screen.** Nothing is added to the list until you confirm here. Every import goes through it, whether from a link, Instagram, Claude or several recipes at once.
+  - **Header:** the recipe title(s), a servings scaler, and a summary line: "14 items · 9 new · 3 added to existing · 2 in stock".
+  - **Items grouped by aisle**, in your store order, showing what each will look like *after merging* with the current list:
+    - **New** items: "Red onion — 2"
+    - **Existing** items, with a merge badge: "Milk — +200 ml → 700 ml total"
+    - **Already on the list and ticked:** "Butter — need 50 g more (100 g bought)"
+  - **An "In stock" checkbox on every row.** Ticking it means the item won't be added. In-stock rows sink to the bottom of their aisle and are greyed out, and stay there so you can untick them.
+    - Staples (salt, pepper, oil…) and optional or garnish lines start ticked as in stock.
+    - A long press offers **"I have some"**, so you can set how much you already have; only the rest is added.
+    - **"Always in stock"** adds the item to your staples list, so future imports pre-tick it.
+  - **Bulk actions:** "Mark all in stock" for an aisle (e.g. Spices) and "Clear in-stock".
+  - **Line details:** tapping a row shows the original recipe line(s), with editable raw text that is re-parsed live and structured fields underneath. "A or B" lines show the alternative and let you swap to it.
+  - **Buttons:** "Add 12 items" (the count updates as you tick), and "Cancel" to throw the import away.
 
 ### 3.2 Ingredient parser
 `"2 ½ cups (300g) plain flour, sifted"` → `{qty 5/2, unit CUP(locale), alt 300 g, name "plain flour", note "sifted"}`.
@@ -121,6 +129,7 @@ Recipe URL or Instagram reel → parsed ingredients → merged, aisle-sorted sho
   - Fractions show as ½ ⅓ ¼. There's a display setting for metric, imperial, or as written.
 - **Scaling:** contributions are stored already scaled, and `Recipe.servings` remembers the chosen servings. Changing servings later recalculates that recipe's contributions. `noScale` lines are never scaled.
 - **Ticking = purchased:** ticking marks all of an item's contributions as purchased. A later merge adds an unpurchased contribution, so the item shows "need 1 more (2 bought)". Removing that recipe goes back to the ticked state.
+- **Dry run for the review screen.** `Merger.preview(currentList, incoming, inStock)` is a pure function that returns a diff (new / added to existing / still needed after purchases / skipped as in stock) without changing anything. The review screen shows that diff. Confirming applies the same diff in one Room transaction, so what you saw is exactly what gets added.
 - **Manual edits** are stored as a `ManualAdjustment` (a change or an override) alongside the contributions. If a recipe is removed while an override exists, the override stays and the user is told.
 
 ### 3.4 Aisle categorisation
@@ -227,7 +236,7 @@ Sharing from the Instagram app sends **only the URL**. The app tries these tiers
 - `Contribution(id, itemId FK CASCADE, recipeId FK CASCADE nullable, qtyBase (rational + dimension, per dimension), purchased)`
 - `ManualAdjustment(itemId, kind: DELTA|OVERRIDE, qty)`
 - `Recipe(id, url, title, servingsOriginal, servingsChosen, unitLocale, importedAt, source: WEB|INSTAGRAM|MANUAL, parsedBy: RULES|CLAUDE, claudePending)`
-- `RecipeLine(id, recipeId, section, raw, parsedJson, included)`: keeps the parse results, so re-scaling or retrying doesn't parse or pay twice.
+- `RecipeLine(id, recipeId, section, raw, parsedJson, status: ADDED|IN_STOCK|PARTIAL|EXCLUDED, haveQty?)`: keeps the parse results, so re-scaling or retrying doesn't parse or pay twice. It also records what you marked as in stock. Removing a recipe touches only lines that were actually added, and the recipe can later offer "Add the in-stock items now".
 - `ImportJob(id, state, inputRefs, resultJson, error, createdAt)`
 - `Aisle(code PK, name, hidden, defaultOrder)`, `StoreProfile(id, name)`, `AisleOrder(storeId, aisleCode, position)`. The active store is kept in DataStore.
 - `CategoryOverride(catalogId | normName, aisleCode)`, `UserCorrection(rawPattern, parsedJson)`
@@ -327,6 +336,7 @@ PROGRESS.md   live checklist
 - **3.1** `Categoriser` with the lookup order in §3.4.
 - **3.2** `Merger`: catalogue-ID keys, sums per dimension, density conversion, shopping display policy, rounding and fraction display.
 - **3.3** Scaling and `noScale`. Purchased contributions. `ManualAdjustment`.
+- **3.3a** `Merger.preview` dry-run diff, covering in stock, partly in stock ("I have some") and items already ticked. Property test: applying the preview gives the same list as a direct merge with the in-stock items removed.
 - **3.4** Tests:
   - Property tests: merging then removing returns the original list; merge order doesn't matter; tick, then merge, then remove gets back the ticked state.
   - Golden **must-not-merge** pairs (red onion/onion, garlic/garlic powder, fresh/tinned tomatoes, chicken breast/thigh).
@@ -342,8 +352,11 @@ PROGRESS.md   live checklist
 - **4.4** App shell: Hilt, navigation, theme (dynamic colour, dark mode), edge-to-edge and predictive back. A `ClaudeExtractor` interface with a `Noop` implementation. A `WatchLink` interface with a fake.
 - **4.5–4.8** One screen per sub-step. Each has a ViewModel test, a Robolectric Compose test and a Roborazzi snapshot:
   - **4.5** List (aisle grouping, tick, swipe or accessibility delete, add manually, clear, undo, share as text).
-  - **4.6** Import preview (servings, sections, flags, alternatives, editing a line).
-  - **4.7** Recipes (source link, servings, remove).
+  - **4.6** "Review before adding" (§3.1): aisle-grouped merge preview, In stock checkboxes, "I have some", "Always in stock", bulk actions, the live "Add N items" count, line details and editing. Robolectric tests:
+    - Ticking In stock means the item isn't added.
+    - "I have some" adds only the rest.
+    - Cancel leaves the list unchanged.
+  - **4.7** Recipes (source link, servings, remove, "Add the in-stock items now").
   - **4.8** Settings (aisle order and rename/hide for one store, staples, display units, export/import, debug log). The Claude section is a placeholder.
 - **4.9** Share intents (text, image, video), the paste chip, WorkManager `ImportJob`, error states (offline, blocked, not found → "Select lines manually"). Unit tests use real share payloads from Chrome, Instagram, Firefox, Samsung Internet and YouTube.
 - **4.10** Debug-only "Load sample list" (3 recipes, about 40 items across every aisle) and "Fake watch" toggle. Backup rules.
