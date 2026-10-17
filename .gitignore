@@ -54,3 +54,4 @@ secrets.properties
 # ...except the debug keystore, committed so every build signs with the same
 # key and installs over the last (personal use; well-known debug password).
 !android/app/debug.keystore
+hs_err_pid*.log
