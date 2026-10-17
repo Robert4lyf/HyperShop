@@ -155,7 +155,7 @@ class ListViewModelTest {
         vm.openItem(ui.row("onion").id)
         val sheet = await(vm.sheet) { it != null }!!
         assertEquals(listOf("2", "200 g"), sheet.totals)
-        assertEquals(listOf("Weeknight chilli"), sheet.sources)
+        assertEquals(listOf("Weeknight chilli" to "2 + 200 g"), sheet.sources.map { it.title to it.amount })
         assertEquals(AisleCode.PRODUCE, sheet.aisle)
         assertTrue(!vm.editQuantity(sheet.id, "lots"))
         assertTrue(vm.editQuantity(sheet.id, "5"))
