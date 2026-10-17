@@ -41,7 +41,7 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 **Step 3 check:** property tests (add/remove identity, tick → DONE, later recipe uncovered, untick restores, preview = direct merge), must-not-merge pairs, 97% golden names categorised — all in `tools/gradle.sh :core:test`.
 
 ## Step 4 — Claude client
-- [ ] 4.1 ADR 001
+- [x] 4.1 ADR 001: OkHttp + kotlinx.serialization, no SDK (docs/decisions/001-claude-http.md) — check: read the ADR
 - [ ] 4.2 Request builder
 - [ ] 4.3 Response handling
 - [ ] 4.4 Spend control
