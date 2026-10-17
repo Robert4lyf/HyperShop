@@ -51,6 +51,18 @@ Answer each with yes or no; note anything that's a "no".
 
 - **Items renamed to something else.** Panko was turned into breadcrumbs, and haricot beans (and butter beans) into cannellini beans, because the catalogue listed them as other names for those items. Panko, haricot beans (also navy beans) and butter beans (also lima beans) are now items of their own.
 
+## UI overhaul (after Hand-off A)
+
+A ground-up visual refresh, planned in `docs/design/ui-overhaul.md`; behaviour is unchanged. Screenshots: `docs/contact-sheet.png`.
+- Own brand colours (basil green, warm neutrals, tomato for "check this"), with dynamic wallpaper colour off. Plus Jakarta Sans throughout.
+- Every aisle has a colour and icon, used on the list, the review screen, the sheets and Settings.
+- List: a large "N left" with a progress bar, aisle cards, round ticks, a pill-shaped "Add item" field, and a softer swipe-to-delete.
+- Review: a recipe card (title, site link, parser badge, servings stepper), "In stock" pills, and "Add N items" pinned to the bottom.
+- Recipes and Settings: cards with icons, chips, a segmented units switch, model radio rows and spending bars.
+- A new launcher icon: a basket with a leaf.
+
+To check on the phone: everything reads well in daylight and at night, and nothing you used before is harder to find.
+
 ## Before Run 2
 
 - Hand-off A done (above), with `main` in place.
