@@ -114,6 +114,11 @@ object Tokeniser {
             value = value * Rational.of(1000) + Rational.of(s.substring(j + 1, j + 4).toLong())
             j += 4
         }
+        // The cap again, now that the groups are in: "999999999,999,999.9999" would overflow below.
+        if (j - start - groups > 9) {
+            out += Token(Kind.OTHER, s.substring(start, j), start, j)
+            return j
+        }
         // Decimal: 1.5, or 1,5 (one or two digits, then no more digits).
         if (j + 1 < s.length && (s[j] == '.' || s[j] == ',') && s[j + 1].isDigit()) {
             val k = digits(s, j + 1)

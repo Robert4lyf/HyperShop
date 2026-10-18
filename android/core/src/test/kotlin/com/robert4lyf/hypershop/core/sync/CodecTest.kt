@@ -8,9 +8,11 @@ import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 
 class CodecTest {
     private val hello = WatchMessage.Hello(epoch = 7, installId = 42, listRev = 3, watchNow = 1_760_000_000, ackedThrough = 5)
@@ -202,6 +204,13 @@ class PagerTest {
     }
 
     @Test
+    fun anItemWhoseAisleIsNotListedCountsAsLeftOff() {
+        val pages = SnapshotPager.build(input(listOf(item(1), item(2, aisle = "OTHER"))), PayloadCap())
+        assertEquals(listOf(1), assembled(pages).second.map { it.id })
+        assertEquals(1, pages[0].more, "it is not shown, so the watch must say '+1 on phone'")
+    }
+
+    @Test
     fun thenShortensNamesThenDropsFromTheEnd() {
         val items = List(12) { item(it + 1, if (it < 6) "PRODUCE" else "BAKING") }
         val pages = SnapshotPager.build(input(items), PayloadCap(500, 2))
@@ -229,5 +238,43 @@ class PagerTest {
                 for (p in pages) assertTrue(PayloadSize.of(WatchCodec.encodePage(p)) <= 300)
             }
         }
+    }
+}
+
+class PageValidationTest {
+    private fun page(
+        page: Int = 0,
+        pages: Int = 1,
+        more: Any? = null,
+    ): Map<String, Any?> =
+        mutableMapOf<String, Any?>(
+            WatchProtocol.Key.VERSION to WatchProtocol.VERSION,
+            WatchProtocol.Key.TYPE to WatchProtocol.Outbound.SNAPSHOT,
+            WatchProtocol.Key.EPOCH to 7,
+            WatchProtocol.Key.LIST_REV to 3,
+            WatchProtocol.Key.ACKED_THROUGH to 0,
+            WatchProtocol.Key.PAGE to page,
+            WatchProtocol.Key.PAGES to pages,
+            WatchProtocol.Key.ITEMS to emptyList<Any>(),
+        ).apply { if (more != null) put(WatchProtocol.Key.MORE, more) }
+
+    @Test
+    fun aPageIndexOutsideItsCountIsMalformed() {
+        assertNotNull(WatchCodec.decodePage(page(page = 1, pages = 2)))
+        assertNotNull(WatchCodec.decodePage(page(page = 0, pages = 0)), "ack-only")
+        assertNull(WatchCodec.decodePage(page(page = 2, pages = 2)), "it could never complete a snapshot")
+        assertNull(WatchCodec.decodePage(page(page = -1, pages = 1)))
+    }
+
+    @Test
+    fun aWrongTypedMoreIsMalformedNotZero() {
+        assertEquals(3, WatchCodec.decodePage(page(more = 3))!!.more)
+        assertNull(WatchCodec.decodePage(page(more = "3")))
+        assertNull(WatchCodec.decodePage(page(more = -1)))
+    }
+
+    @Test
+    fun anEmptyBatchCannotBeBuilt() {
+        assertThrows<IllegalArgumentException> { WatchMessage.Ops(1, 1, emptyList()) }
     }
 }

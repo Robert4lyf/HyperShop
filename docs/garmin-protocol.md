@@ -48,8 +48,13 @@ otherwise. It also pushes a snapshot when the list changes
    `firstSeq − 1` for a batch. A `hello` whose `at` exceeds `lastSeq`
    fast-forwards it (the watch voided seqs when it adopted a new epoch).
 2. **Sequence.** For each op: `seq ≤ lastSeq` → duplicate, ignored (its result
-   is re-sent from the last 64 kept per install); `seq ≠ lastSeq + 1` → stop,
+   is re-sent from the results kept per install); `seq ≠ lastSeq + 1` → stop,
    the watch goes back to `at + 1`; else apply, record the result, `lastSeq = seq`.
+   Results are kept until the watch reports the seq settled (`hello.at`, or a
+   batch's `firstSeq − 1`; a batch with a gap is ignored, claim included), at
+   most 64 per install, and `ax` carries only those:
+   sending every non-`ok` result ever recorded could not fit the payload cap
+   once a handful of `noop`s had piled up, and the watch then resent for ever.
 3. **Wrong epoch.** The op's result is `epoch`; nothing changes, but the seq is
    consumed.
 4. **Unknown item.** Resolve through `ItemAlias`. Still unknown or deleted →

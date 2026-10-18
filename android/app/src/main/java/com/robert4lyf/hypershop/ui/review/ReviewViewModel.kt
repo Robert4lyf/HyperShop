@@ -16,7 +16,6 @@ import com.robert4lyf.hypershop.data.StoredRecipe
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.importing.ImportError
 import com.robert4lyf.hypershop.importing.ImportResult
-import com.robert4lyf.hypershop.importing.JobState
 import com.robert4lyf.hypershop.importing.PhotoStore
 import com.robert4lyf.hypershop.ui.common.webLink
 import kotlinx.coroutines.Dispatchers
@@ -171,11 +170,8 @@ class ReviewViewModel(
     private suspend fun load() {
         units = c.settings.units.first()
         c.importJobs.ensureScheduled(jobId)
-        var job = c.importJobs.get(jobId)
-        while (job != null && (job.state == JobState.QUEUED || job.state == JobState.RUNNING)) {
-            kotlinx.coroutines.delay(100)
-            job = c.importJobs.get(jobId)
-        }
+        // Woken by the row changing, not by polling it ten times a second while the page is fetched.
+        val job = c.importJobs.awaitFinished(jobId)
         var r = job?.result ?: return fail(ImportError.NO_RECIPE, emptyList())
         failedFrom = r
         // Once per import: a failure or refusal in the worker isn't retried on open ("Retry with Claude" is).

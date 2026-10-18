@@ -132,17 +132,23 @@ object WatchCodec {
                     int(a.getOrNull(5)) ?: return null,
                 )
             }
+        val page = int(payload[Key.PAGE])?.takeIf { it >= 0 } ?: return null
+        val pages = int(payload[Key.PAGES])?.takeIf { it >= 0 } ?: return null
+        // An ack-only page has pages = 0; any other page's index lies inside its count.
+        if (pages > 0 && page >= pages) return null
+        if (aisleBase < 0 || items.any { it.aisleIdx < 0 }) return null
+        val more = if (Key.MORE in payload) int(payload[Key.MORE])?.takeIf { it >= 0 } ?: return null else 0
         return SnapshotPage(
             epoch = int(payload[Key.EPOCH]) ?: return null,
-            listRev = int(payload[Key.LIST_REV]) ?: return null,
-            ackedThrough = int(payload[Key.ACKED_THROUGH]) ?: return null,
+            listRev = int(payload[Key.LIST_REV])?.takeIf { it >= 0 } ?: return null,
+            ackedThrough = int(payload[Key.ACKED_THROUGH])?.takeIf { it >= 0 } ?: return null,
             ackExceptions = ax,
-            page = int(payload[Key.PAGE]) ?: return null,
-            pages = int(payload[Key.PAGES]) ?: return null,
+            page = page,
+            pages = pages,
             aisles = aisles,
             aisleBase = aisleBase,
             items = items,
-            more = int(payload[Key.MORE]) ?: 0,
+            more = more,
         )
     }
 

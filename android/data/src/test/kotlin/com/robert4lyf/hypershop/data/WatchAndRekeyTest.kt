@@ -62,7 +62,9 @@ class WatchAndRekeyTest {
             assertEquals(3, ops(WatchOp(3, id, true, s, 0)).ackedThrough)
             val gap = ops(WatchOp(9, id, true, s, 0))
             assertEquals(3, gap.ackedThrough)
-            val partial = r.repo.applyWatch(WatchMessage.Hello(epoch(), install, 0, 0, 3))
+            // A hello from a watch that has not settled seq 3 yet (its ack was lost) gets the result again.
+            val partial = r.repo.applyWatch(WatchMessage.Hello(epoch(), install, 0, 0, 2))
+            assertEquals(3, partial.ackedThrough)
             assertEquals(listOf(3 to OpResult.PARTIAL), partial.ackExceptions)
             val l = r.repo.snapshot()
             assertFalse(l.isDone(id.toLong()))
@@ -101,5 +103,27 @@ class WatchAndRekeyTest {
             // A watch op on the old id lands on the survivor.
             ops(WatchOp(1, 900, true, seen(), 0))
             assertTrue(r.repo.snapshot().isDone(zId))
+        }
+
+    @Test
+    fun onlyUnsettledResultsAreResent() =
+        runBlocking {
+            r.import("2 onions")
+            val id = r.repo.snapshot().itemByKey("cat:onion")!!.id.toInt()
+            r.repo.applyWatch(WatchMessage.Hello(epoch(), install, 0, 1_760_000_000, 0))
+            val s = seen()
+            // One tick, then two more on the same item: ok, noop, noop.
+            val first = ops(WatchOp(1, id, true, s, 1), WatchOp(2, id, true, s, 2), WatchOp(3, id, true, s, 3))
+            assertEquals(3, first.ackedThrough)
+            assertEquals(listOf(2 to OpResult.NOOP, 3 to OpResult.NOOP), first.ackExceptions)
+            // The watch settled 1 and 2 (its batch starts at 3): the reply carries only what it still asks about.
+            val resend = ops(WatchOp(3, id, true, s, 3))
+            assertEquals(3, resend.ackedThrough)
+            assertEquals(listOf(3 to OpResult.NOOP), resend.ackExceptions)
+            // A hello that reports everything settled leaves nothing to resend.
+            val hello = r.repo.applyWatch(WatchMessage.Hello(epoch(), install, s, 1_760_000_100, 3))
+            assertEquals(3, hello.ackedThrough)
+            assertTrue(hello.ackExceptions.isEmpty())
+            assertTrue(r.db.dao().opResults(install).isEmpty())
         }
 }

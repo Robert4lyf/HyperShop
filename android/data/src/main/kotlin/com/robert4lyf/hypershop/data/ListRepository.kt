@@ -647,12 +647,21 @@ class ListRepository(
                     val last = maxOf(i?.lastSeq ?: m.ackedThrough, m.ackedThrough)
                     val offset = clock() - m.watchNow * 1000
                     dao.putInstall(WatchInstallEntity(m.installId, last, offset))
+                    // Results the watch has settled are never asked for again.
+                    dao.trimOpResults(m.installId, m.ackedThrough)
                     reply(m.installId, last, full = true)
                 }
                 is WatchMessage.Bye -> reply(m.installId, dao.install(m.installId)?.lastSeq ?: 0, full = false)
                 is WatchMessage.Ops -> {
-                    val inst = dao.install(m.installId) ?: WatchInstallEntity(m.installId, m.ops.first().seq - 1, 0)
+                    val inst = dao.install(m.installId) ?: WatchInstallEntity(m.installId, m.watchAckedThrough, 0)
                     var last = inst.lastSeq
+                    // The batch starts right after what the watch has settled, so only results
+                    // from there on can still be asked for (a duplicate after a lost ack). The
+                    // reply then carries just those exceptions: sending every non-ok result in
+                    // the 64-deep history could not fit the payload cap once a handful of noops
+                    // had piled up, and the watch then resent the same batch for ever. A batch
+                    // with a gap is ignored below, and its claim is ignored with it.
+                    if (m.watchAckedThrough <= last) dao.trimOpResults(m.installId, m.watchAckedThrough)
                     var list = load()
                     val start = list
                     for (op in m.ops) {

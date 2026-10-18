@@ -52,7 +52,9 @@ class Importer(
                 is FetchResult.HttpError -> return failed(url, fallbackTitle, locale, ImportError.HTTP)
                 FetchResult.Network -> return failed(url, fallbackTitle, locale, ImportError.OFFLINE)
             }
-        val e = Extractor.extract(page.body, page.finalUrl)
+        // A bare JSON-LD document (the fetcher allows the type) is read as if it were a page's script block.
+        val html = if (page.contentType == "application/ld+json") Extractor.wrapLdJson(page.body) else page.body
+        val e = Extractor.extract(html, page.finalUrl)
         val recipe = e.recipes.firstOrNull()
         val title = recipe?.title ?: e.pageTitle ?: fallbackTitle
         val raw = recipe?.lines.orEmpty()
@@ -180,9 +182,9 @@ class Importer(
                     .orEmpty()
             if (host.endsWith(".co.uk") || host.endsWith(".uk") || "bbcgoodfood" in host) return UnitLocale.UK
             val rp = RuleParser()
-            val sample = lines.take(50)
-            for (l in sample) {
-                val p = rp.parse(l)
+            // Each line is parsed once, for both the cup check and the metric count.
+            val sample = lines.take(50).map { it to rp.parse(it) }
+            for ((l, p) in sample) {
                 val cups = p.quantity?.toDouble()?.takeIf { p.unit == QtyUnit.CUP && it > 0 } ?: continue
                 val m = ML_IN_LINE.find(l) ?: continue
                 val digits = m.groupValues[1]
@@ -193,10 +195,7 @@ class Importer(
                 if (perCup in 230.0..242.0) return UnitLocale.US
             }
             val metric =
-                sample.count {
-                        l ->
-                    rp.parse(l).unit.let { it == QtyUnit.G || it == QtyUnit.ML || it == QtyUnit.KG || it == QtyUnit.L }
-                }
+                sample.count { (_, p) -> p.unit.let { it == QtyUnit.G || it == QtyUnit.ML || it == QtyUnit.KG || it == QtyUnit.L } }
             return if (metric * 3 >= maxOf(1, sample.size)) UnitLocale.METRIC else UnitLocale.US
         }
     }

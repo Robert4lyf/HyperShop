@@ -174,6 +174,33 @@ class ReviewViewModelTest {
     }
 
     @Test
+    fun theReviewWakesWhenTheWorkerFinishesTheJob() {
+        val c = TestContainer.create()
+        val job =
+            runBlocking {
+                c.db.dao().insertJob(ImportJobEntity(0, "RUNNING", """{"url":"https://example.com/soup"}""", null, null, 0))
+            }
+        val vm = ReviewViewModel(c, job)
+        Thread.sleep(200)
+        assertTrue("still loading while the worker runs", vm.state.value == ReviewState.Loading)
+        runBlocking {
+            c.importJobs.finish(
+                job,
+                ImportResult(
+                    url = "https://example.com/soup",
+                    title = "Soup",
+                    servings = 2,
+                    locale = UnitLocale.METRIC,
+                    method = "JSON_LD",
+                    lines = listOf(c.ruleParser.parse("2 onions")),
+                    rawLines = listOf("2 onions"),
+                ),
+            )
+        }
+        assertEquals("Soup", ready(vm).title)
+    }
+
+    @Test
     fun noIngredientsGoesToSelectLinesManually() {
         val c = TestContainer.create()
         val id =

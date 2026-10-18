@@ -93,4 +93,26 @@ class DisplayTest {
         val salt = add(ShoppingList(), listOf("1 tsp salt")).first
         assertEquals("salt", Display.row(salt, salt.liveItems.single(), cat.byId["salt"]).main)
     }
+
+    @Test
+    fun threeTeaspoonsCarryIntoATablespoon() {
+        // "1 tbsp" scaled by 1.95 servings: 29.25 ml is two tablespoons, not "1tbsp + 3tsp".
+        assertEquals("2tbsp", Display.volume(Rational.of(117, 4), UnitsSetting.METRIC, QtyUnit.TBSP))
+        assertEquals("1tbsp", Display.volume(Rational.of(14), UnitsSetting.METRIC, QtyUnit.TBSP))
+        assertEquals("3tbsp", Display.volume(Rational.of(44), UnitsSetting.METRIC, QtyUnit.TBSP))
+        assertEquals("1tbsp", Display.volume(Rational.of(14), UnitsSetting.IMPERIAL))
+        assertEquals("2¾tsp", Display.volume(Rational.of(27, 2), UnitsSetting.METRIC, QtyUnit.TBSP))
+    }
+
+    @Test
+    fun decimalsUseAPointWhateverTheLocale() {
+        val before = java.util.Locale.getDefault()
+        java.util.Locale.setDefault(java.util.Locale.GERMANY)
+        try {
+            assertEquals("1.1kg", Display.mass(Rational.of(1050), UnitsSetting.METRIC))
+            assertEquals("0.1", Display.fraction(Rational.of(1, 8)))
+        } finally {
+            java.util.Locale.setDefault(before)
+        }
+    }
 }
