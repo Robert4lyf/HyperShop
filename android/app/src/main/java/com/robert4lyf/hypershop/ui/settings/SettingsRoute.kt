@@ -110,6 +110,8 @@ data class SettingsActions(
     val onDebugLog: (Boolean) -> Unit = {},
     val onRefreshLog: () -> Unit = {},
     val onLibrary: () -> Unit = {},
+    /** Advanced › Voice test. */
+    val onVoiceTest: () -> Unit = {},
     /** Debug builds only. */
     val onDebug: (() -> Unit)? = null,
 )
@@ -119,6 +121,7 @@ fun SettingsRoute(
     container: AppContainer,
     onDebug: (() -> Unit)?,
     onLibrary: () -> Unit = {},
+    onVoiceTest: () -> Unit = {},
 ) {
     val vm: SettingsViewModel = viewModel(factory = factoryFor { SettingsViewModel(container) })
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -141,6 +144,7 @@ fun SettingsRoute(
             onRefreshLog = { vm.refreshLog() },
             onDebug = onDebug,
             onLibrary = onLibrary,
+            onVoiceTest = onVoiceTest,
         ),
     )
 }
@@ -560,5 +564,6 @@ private fun AdvancedGroup(
             TextButton(onClick = actions.onRefreshLog) { Text("Refresh") }
         }
     }
+    OutlinedButton(onClick = actions.onVoiceTest, modifier = Modifier.testTag("open-voice-test")) { Text("Voice test") }
     actions.onDebug?.let { open -> OutlinedButton(onClick = open) { Text("Debug tools") } }
 }

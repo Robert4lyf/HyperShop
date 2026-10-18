@@ -63,6 +63,7 @@ import com.robert4lyf.hypershop.ui.list.ListRoute
 import com.robert4lyf.hypershop.ui.recipes.RecipesRoute
 import com.robert4lyf.hypershop.ui.review.ReviewRoute
 import com.robert4lyf.hypershop.ui.settings.SettingsRoute
+import com.robert4lyf.hypershop.ui.voicetest.VoiceTestRoute
 
 object Routes {
     const val LIST = "list"
@@ -71,6 +72,7 @@ object Routes {
     const val REVIEW = "review/{job}"
     const val DEBUG = "debug"
     const val LIBRARY = "library"
+    const val VOICE_TEST = "voice-test"
 
     fun review(job: Long) = "review/$job"
 }
@@ -153,8 +155,10 @@ fun HyperShopApp(
                     container,
                     onDebug = debugScreen?.let { { nav.navigate(Routes.DEBUG) } },
                     onLibrary = { nav.navigate(Routes.LIBRARY) { launchSingleTop = true } },
+                    onVoiceTest = { nav.navigate(Routes.VOICE_TEST) { launchSingleTop = true } },
                 )
             }
+            composable(Routes.VOICE_TEST) { VoiceTestRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.LIBRARY) { LibraryRoute(container, snackbar, onBack = { nav.popBackStack() }) }
             composable(Routes.REVIEW, arguments = listOf(navArgument("job") { type = NavType.LongType })) { e ->
                 ReviewRoute(
@@ -189,8 +193,8 @@ private fun CompactNavBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             for ((r, label, on, off) in tabs) {
-                // The library is part of Settings, so the Settings tab stays lit there.
-                val selected = route == r || (r == Routes.SETTINGS && route == Routes.LIBRARY)
+                // The library and the voice test are part of Settings, so the Settings tab stays lit there.
+                val selected = route == r || (r == Routes.SETTINGS && (route == Routes.LIBRARY || route == Routes.VOICE_TEST))
                 Column(
                     Modifier
                         .weight(1f)

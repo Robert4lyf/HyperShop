@@ -5,6 +5,18 @@
     <!-- Fetching recipe pages and calling Claude with your key. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!--
+      Settings › Voice test (the voice mode device spike): the microphone, a
+      microphone foreground service so it keeps listening with the screen locked,
+      its notification, and routing the mic to a headset. No Bluetooth permission:
+      whether the headset mic works without one is one of the things it tests.
+    -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
     <application
         android:name=".HyperShopApplication"
         android:allowBackup="true"
@@ -33,6 +45,11 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".voice.VoiceTestService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
 
         <!--
           Hands the camera app a file to save "Take a photo" in (TakePicture: no CAMERA
