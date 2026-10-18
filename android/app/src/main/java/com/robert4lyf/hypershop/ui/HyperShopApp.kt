@@ -58,6 +58,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.di.ShareOutcome
+import com.robert4lyf.hypershop.ui.library.LibraryRoute
 import com.robert4lyf.hypershop.ui.list.ListRoute
 import com.robert4lyf.hypershop.ui.recipes.RecipesRoute
 import com.robert4lyf.hypershop.ui.review.ReviewRoute
@@ -69,6 +70,7 @@ object Routes {
     const val SETTINGS = "settings"
     const val REVIEW = "review/{job}"
     const val DEBUG = "debug"
+    const val LIBRARY = "library"
 
     fun review(job: Long) = "review/$job"
 }
@@ -146,7 +148,14 @@ fun HyperShopApp(
         ) {
             composable(Routes.LIST) { ListRoute(container, snackbar, onReview = openReview) }
             composable(Routes.RECIPES) { RecipesRoute(container, snackbar, onReview = openReview) }
-            composable(Routes.SETTINGS) { SettingsRoute(container, onDebug = debugScreen?.let { { nav.navigate(Routes.DEBUG) } }) }
+            composable(Routes.SETTINGS) {
+                SettingsRoute(
+                    container,
+                    onDebug = debugScreen?.let { { nav.navigate(Routes.DEBUG) } },
+                    onLibrary = { nav.navigate(Routes.LIBRARY) { launchSingleTop = true } },
+                )
+            }
+            composable(Routes.LIBRARY) { LibraryRoute(container, snackbar, onBack = { nav.popBackStack() }) }
             composable(Routes.REVIEW, arguments = listOf(navArgument("job") { type = NavType.LongType })) { e ->
                 ReviewRoute(
                     container,
@@ -180,7 +189,8 @@ private fun CompactNavBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             for ((r, label, on, off) in tabs) {
-                val selected = route == r
+                // The library is part of Settings, so the Settings tab stays lit there.
+                val selected = route == r || (r == Routes.SETTINGS && route == Routes.LIBRARY)
                 Column(
                     Modifier
                         .weight(1f)

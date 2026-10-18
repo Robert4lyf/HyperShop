@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.work.WorkManager
+import com.robert4lyf.hypershop.catalog.IngredientLibrary
 import com.robert4lyf.hypershop.claude.ClaudeClient
 import com.robert4lyf.hypershop.claude.GuardedClaude
 import com.robert4lyf.hypershop.claude.RingLog
@@ -35,6 +36,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.io.File
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -69,7 +71,11 @@ class AppContainer(
                 CoroutineExceptionHandler { _, error -> Timber.e(error, "Uncaught in applicationScope") },
         )
 
-    val catalog: Catalog = CatalogLoader.default
+    /** The bundled catalogue with your library edits applied (see [library]). */
+    val catalog: Catalog = CatalogLoader.default.copy()
+
+    /** Read before the repository and parsers are built, so they never see the catalogue without your edits. */
+    val library = IngredientLibrary(File(context.filesDir, "library/edits.json"), catalog)
     val repository = ListRepository(db, catalog, clock)
     val settings = Settings(dataStore)
     val log = RingLog()
