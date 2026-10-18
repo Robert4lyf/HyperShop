@@ -11,6 +11,9 @@ interface ApiKeyStore {
     /** The key, or null when none is stored or it could not be decrypted. */
     suspend fun get(): String?
 
+    /** Whether a key is stored, read now without decrypting it (hasKey may not have caught up yet). */
+    suspend fun isSaved(): Boolean = hasKey.value
+
     /** False when the key could not be stored (the keystore failed); nothing changes then. */
     suspend fun set(key: String): Boolean
 

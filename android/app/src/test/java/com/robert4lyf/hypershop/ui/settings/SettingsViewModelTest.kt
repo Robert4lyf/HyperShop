@@ -22,6 +22,17 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34])
 class SettingsViewModelTest {
     @Test
+    fun theFirstStateShownIsTheSavedOne() {
+        val c = TestContainer.create(key = "sk-ant-test")
+        runBlocking { c.settings.setTheme(com.robert4lyf.hypershop.settings.ThemeMode.DARK) }
+        val vm = SettingsViewModel(c)
+        val first = await(vm.ui) { it.loaded }
+        // Already right when the screen first draws: nothing jumps from the defaults.
+        assertTrue(first.hasKey)
+        assertEquals(com.robert4lyf.hypershop.settings.ThemeMode.DARK, first.theme)
+    }
+
+    @Test
     fun saveTestAndRemoveKey() {
         val claude = MockWebServer().apply { start() }
         try {

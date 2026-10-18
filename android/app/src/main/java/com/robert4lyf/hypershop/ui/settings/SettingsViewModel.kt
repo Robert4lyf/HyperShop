@@ -12,6 +12,7 @@ import com.robert4lyf.hypershop.settings.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -38,6 +39,8 @@ data class SettingsUi(
     val debugLog: Boolean = false,
     /** The in-memory log's last lines (redacted), shown while [debugLog] is on. */
     val logLines: List<String> = emptyList(),
+    /** False until the saved settings are read, so the screen never shows defaults and then jumps. */
+    val loaded: Boolean = false,
 )
 
 /** Settings (PLAN §3.5 groups; Claude per §3.7). */
@@ -51,6 +54,34 @@ class SettingsViewModel(
 
     init {
         val s = c.settings
+        // Everything the screen shows first, read once before anything is drawn; the
+        // watchers below keep it current afterwards.
+        viewModelScope.launch {
+            val first =
+                SettingsUi(
+                    units = s.units.first(),
+                    theme = s.theme.first(),
+                    model = s.model.first(),
+                    monthlyCapUsd = s.monthlyCapUsd.first(),
+                    dailyCalls = s.dailyCalls.first(),
+                    watchVibrate = s.watchVibrate.first(),
+                    hasKey = c.apiKeyStore.isSaved(),
+                    aisles = c.repository.aisleOrder(),
+                )
+            _ui.update {
+                it.copy(
+                    units = first.units,
+                    theme = first.theme,
+                    model = first.model,
+                    monthlyCapUsd = first.monthlyCapUsd,
+                    dailyCalls = first.dailyCalls,
+                    watchVibrate = first.watchVibrate,
+                    hasKey = first.hasKey,
+                    aisles = first.aisles,
+                    loaded = true,
+                )
+            }
+        }
         watch(s.units) { copy(units = it) }
         watch(s.theme) { copy(theme = it) }
         watch(s.model) { copy(model = it) }

@@ -117,12 +117,6 @@ fun SettingsRoute(
 ) {
     val vm: SettingsViewModel = viewModel(factory = factoryFor { SettingsViewModel(container) })
     val ui by vm.ui.collectAsStateWithLifecycle()
-    // The key field is on this screen: no screenshots, no recents thumbnail.
-    val activity = LocalContext.current as? Activity
-    DisposableEffect(activity) {
-        activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        onDispose { activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
-    }
     SettingsScreen(
         ui,
         SettingsActions(
@@ -158,6 +152,8 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item(key = "top") { ScreenHeader(title = "Settings", subtitle = "Your list, your shop, your watch") }
+            // Nothing below the header until the saved settings are in, so no control jumps.
+            if (!ui.loaded) return@LazyColumn
             card("Appearance", Icons.Rounded.Palette, hue = 300f) { AppearanceGroup(ui, actions) }
             card("List", Icons.Rounded.Tune, hue = 140f) { ListGroup(ui, actions) }
             card("Aisles", Icons.Rounded.Route, hue = 30f) { AislesGroup(ui, actions) }
@@ -361,6 +357,13 @@ private fun KeySection(
                 OutlinedButton(onClick = actions.onRemoveKey) { Text("Remove key") }
             }
         } else {
+            // While the key field is on screen: no screenshots, no recents thumbnail. (Only
+            // then: toggling the window flag on every visit to Settings made the tab janky.)
+            val activity = LocalContext.current as? Activity
+            DisposableEffect(activity) {
+                activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                onDispose { activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+            }
             var key by remember { mutableStateOf("") }
             OutlinedTextField(
                 value = key,
