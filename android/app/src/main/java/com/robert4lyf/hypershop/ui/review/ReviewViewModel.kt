@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.ui.review
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.robert4lyf.hypershop.core.catalog.DisplayPolicy
 import com.robert4lyf.hypershop.core.merge.ApplyResult
 import com.robert4lyf.hypershop.core.merge.Display
 import com.robert4lyf.hypershop.core.merge.Preview
@@ -281,7 +282,12 @@ class ReviewViewModel(
         return ReviewRow(
             key = r.target.mergeKey,
             name = entry?.name ?: r.target.displayName,
-            quantity = Display.amount(needed, units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy),
+            quantity =
+                if (entry?.displayPolicy == DisplayPolicy.PRESENCE && units != UnitsSetting.AS_WRITTEN) {
+                    Display.packs(needed, entry.shoppingUnit)
+                } else {
+                    Display.amount(needed, units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy)
+                },
             inStock = d.inStock,
             check = lines.any { it.parsed.check },
             aisle = r.target.aisle,

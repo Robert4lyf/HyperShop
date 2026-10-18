@@ -62,6 +62,15 @@ class DisplayTest {
         // Mixed spoons stay spoons: 1 tbsp + 1 tsp of maple syrup isn't 20ml.
         assertEquals(QtyUnit.TBSP, Display.hintOf(listOf(QtyUnit.TBSP, QtyUnit.TSP, null)))
         assertEquals(null, Display.hintOf(listOf(QtyUnit.TBSP, QtyUnit.ML)))
+        // Grams from one recipe and spoons from another: the spoons stay spoons.
+        assertEquals(QtyUnit.TBSP, Display.hintOf(listOf(QtyUnit.G, QtyUnit.TBSP)))
+        val mixed = QtyBase.of(Rational.of(75), QtyUnit.G, UnitLocale.METRIC) + QtyBase.of(Rational.of(4), QtyUnit.TBSP, UnitLocale.METRIC)
+        assertEquals("75g + 4tbsp", Display.amount(mixed, hint = Display.hintOf(listOf(QtyUnit.G, QtyUnit.TBSP))))
+        // Bought by the pack: "a handful" or "2 tbsp" is one pack; a count of two is two.
+        assertEquals("1 pack", Display.packs(QtyBase.of(Rational.ONE, null, UnitLocale.METRIC), "pack"))
+        assertEquals("1 pack", Display.packs(QtyBase.of(Rational.of(2), QtyUnit.TBSP, UnitLocale.METRIC), "pack"))
+        assertEquals("2 bunches", Display.packs(QtyBase.of(Rational.of(2), null, UnitLocale.METRIC), "bunch"))
+        assertEquals("1", Display.packs(QtyBase.of(Rational.ONE, null, UnitLocale.METRIC), "each"))
         assertEquals("1tbsp + 1tsp", Display.volume(Rational.of(20), UnitsSetting.METRIC, QtyUnit.TBSP))
         assertEquals("1½tbsp", Display.volume(Rational.of(45, 2), UnitsSetting.METRIC, QtyUnit.TBSP))
         assertEquals("2tsp", Display.volume(Rational.of(10), UnitsSetting.METRIC, QtyUnit.TBSP))

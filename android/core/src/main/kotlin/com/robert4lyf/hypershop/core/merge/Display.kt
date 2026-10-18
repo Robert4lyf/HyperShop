@@ -113,11 +113,30 @@ object Display {
      */
     fun hintOf(units: Iterable<QtyUnit?>): QtyUnit? {
         val u = units.filterNotNull().distinct()
+        if (u.size == 1) return u.single()
+        // Spoons stay spoons even beside another dimension ("75g" from one recipe,
+        // "4 tbsp" from another): the hint only shapes the volume part.
+        val volume = u.filter { it.dimension == Dimension.VOLUME }
         return when {
-            u.size == 1 -> u.single()
-            u.isNotEmpty() && u.all { it == QtyUnit.TSP || it == QtyUnit.TBSP } -> QtyUnit.TBSP
+            volume.isNotEmpty() && volume.all { it == QtyUnit.TSP || it == QtyUnit.TBSP } ->
+                if (volume.size == 1) volume.single() else QtyUnit.TBSP
             else -> null
         }
+    }
+
+    /**
+     * An ingredient bought by the pack (herbs, a jar of spice): whatever the recipe
+     * asks for, you buy packs. "1 pack", or "2 packs" when the recipes count two;
+     * just the number when the catalogue has no pack word ("each").
+     */
+    fun packs(
+        q: QtyBase,
+        shoppingUnit: String?,
+    ): String {
+        val n = q.parts[BaseKey.ITEMS.encode()]?.takeIf { q.parts.size == 1 }?.let { roundUp(it, Rational.ONE) } ?: Rational.ONE
+        val word = shoppingUnit?.trim()?.takeIf { it.isNotEmpty() && it != "each" } ?: return fraction(n)
+        val plural = if (word.endsWith("ch") || word.endsWith("sh") || word.endsWith("x") || word.endsWith("s")) word + "es" else word + "s"
+        return "${fraction(n)} ${if (n > Rational.ONE) plural else word}"
     }
 
     /** Tablespoons, to the half; what doesn't fit goes in teaspoons: "1½tbsp", "1tbsp + 1tsp", "2tsp". */
