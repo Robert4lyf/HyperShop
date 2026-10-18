@@ -128,4 +128,30 @@ if [[ -n "${unexpected}" ]]; then
     exit 1
 fi
 
+# The app is also compiled --release: (:debug) and (:release) code differ
+# (garmin/source/Debug.mc), and each half must type check on its own.
+if [[ ${#UNIT_TEST[@]} -eq 0 ]]; then
+    set +e
+    (cd "${ROOT}/garmin" && "${SDK_DIR}/bin/monkeyc" \
+        --output "${ROOT}/garmin/build/hypershop-release.prg" \
+        --jungles "${JUNGLE}" \
+        --private-key "${KEY}" \
+        --release \
+        --typecheck 3 \
+        --warn) >"${log}" 2>&1
+    status=$?
+    set -e
+    grep -v '^Picked up JAVA_TOOL_OPTIONS' "${log}" | grep -v 'Invalid device id found' || true
+    if [[ ${status} -ne 0 ]]; then
+        echo "monkeyc --release failed (${status})" >&2
+        exit "${status}"
+    fi
+    unexpected="$(grep '^WARNING' "${log}" | grep -v 'Invalid device id found in the application manifest' || true)"
+    if [[ -n "${unexpected}" ]]; then
+        echo "Unexpected warnings (release):" >&2
+        echo "${unexpected}" >&2
+        exit 1
+    fi
+fi
+
 echo "Built ${OUT}"

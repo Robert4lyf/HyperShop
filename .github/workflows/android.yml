@@ -53,7 +53,10 @@ jobs:
       # tools/verify.sh is the same gate the agent runs locally: ktlint, every
       # unit test, assembleDebug and the repo checks (manifest, secrets scan,
       # golden checksum, protocol parity once both sides exist).
+      # The watch compile is connectiq.yml's job; this one has no SDK cache.
       - name: Verify
+        env:
+          HYPERSHOP_SKIP_WATCH: '1'
         run: tools/verify.sh
 
       # Only when something failed, and kept for a day: artifacts count against

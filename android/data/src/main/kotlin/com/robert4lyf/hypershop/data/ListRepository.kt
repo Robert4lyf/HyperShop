@@ -110,6 +110,20 @@ data class WatchReply(
     val fullSnapshot: Boolean,
 )
 
+/** One aisle as the watch sees it, in walking order. */
+data class WatchAisle(
+    val code: AisleCode,
+    val name: String,
+    val hidden: Boolean,
+)
+
+/** What a watch snapshot is built from, read in one transaction. */
+data class WatchListView(
+    val list: ShoppingList,
+    val aisles: List<WatchAisle>,
+    val epoch: Int,
+)
+
 /**
  * Every list write goes through here (BangGym's rule): one Room transaction
  * that loads the list, applies a pure [ShoppingList] operation from `:core`,
@@ -817,6 +831,29 @@ class ListRepository(
                 }
             }
         }
+
+    /** The list, the aisles in walking order (hidden ones flagged) and the epoch, for a snapshot. */
+    suspend fun watchView(): WatchListView =
+        db.withTransaction {
+            val byCode = dao.aisles().associateBy { it.code }
+            val ordered = dao.aisleOrder().map { it.aisleCode }
+            val rest = byCode.values.sortedBy { it.defaultOrder }.map { it.code }.filter { it !in ordered }
+            val aisles =
+                (ordered + rest).mapNotNull { code ->
+                    val a = AisleCode.entries.firstOrNull { it.name == code } ?: return@mapNotNull null
+                    val e = byCode[code]
+                    WatchAisle(a, e?.name ?: a.displayName, e?.hidden ?: false)
+                }
+            WatchListView(load(), aisles, dao.meta()!!.listEpoch.toInt())
+        }
+
+    /**
+     * An unsolicited snapshot's acks for [installId]: everything applied, with
+     * the results the watch has not settled. A push without them would let a
+     * watch with a batch in flight read every op in it as ok.
+     */
+    suspend fun watchAck(installId: Int): WatchReply =
+        db.withTransaction { reply(installId, dao.install(installId)?.lastSeq ?: 0, full = true) }
 
     private suspend fun reply(
         installId: Int,

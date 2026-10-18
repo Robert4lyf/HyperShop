@@ -30,6 +30,7 @@ import com.robert4lyf.hypershop.settings.Settings
 import com.robert4lyf.hypershop.settings.settingsDataStore
 import com.robert4lyf.hypershop.watch.NoWatchLink
 import com.robert4lyf.hypershop.watch.WatchLink
+import com.robert4lyf.hypershop.watch.WatchSyncCoordinator
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -112,6 +113,18 @@ class AppContainer(
 
     val workerFactory = HyperShopWorkerFactory { this }
 
+    /** Answers the watch and keeps it up to date (step 7.2). */
+    val watchSync =
+        WatchSyncCoordinator(
+            link = watchLink,
+            repository = repository,
+            catalog = catalog,
+            units = { settings.units.first() },
+            scope = applicationScope,
+            log = log::log,
+            clock = clock,
+        )
+
     /**
      * The share or paste waiting for the UI: a job to review, or "no link". One at
      * a time: the UI calls [shareHandled] once it has acted on it, and the next
@@ -188,6 +201,8 @@ class AppContainer(
             repository.rekeyIfCatalogChanged()
             repository.purgeDeleted()
         }
+        // The receiver first, so nothing the link hears is missed.
+        watchSync.start()
         watchLink.start()
     }
 }

@@ -1,7 +1,6 @@
 package com.robert4lyf.hypershop.ui.settings
 
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -118,15 +117,13 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun metersReadAsOneSentenceAndTheWatchSwitchWaits() {
+    fun metersReadAsOneSentence() {
         show()
         val list = compose.onNodeWithTag("settings")
         list.performScrollToNode(hasTestTag("spend"))
         compose.onNodeWithContentDescription("This month: $0.04 of $2.00").assertExists()
         compose.onNodeWithContentDescription("Today: 3 of 50 calls").assertExists()
         compose.onNodeWithText("Between $0 and $100").assertExists()
-        list.performScrollToNode(hasText("Vibrate on the watch when an aisle is done (coming with the watch app)"))
-        compose.onNodeWithText("Vibrate on the watch when an aisle is done (coming with the watch app)").assertIsNotEnabled()
     }
 
     @Test

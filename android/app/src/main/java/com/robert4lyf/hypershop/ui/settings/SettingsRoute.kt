@@ -422,13 +422,11 @@ private fun WatchGroup(
     ui: SettingsUi,
     actions: SettingsActions,
 ) {
-    InfoBanner("Forerunner 245: not connected. The watch app comes in a later update.", Icons.Rounded.Watch)
-    // Nothing reads it yet: shown so the setting is known, off until the watch app lands.
-    SwitchRow(
-        "Vibrate on the watch when an aisle is done (coming with the watch app)",
-        ui.watchVibrate,
-        actions.onWatchVibrate,
-        enabled = false,
+    InfoBanner(ui.watchStatus, Icons.Rounded.Watch, Modifier.testTag("watch-status"))
+    Text(
+        "Vibration and the rest of the watch's settings are on the watch: Settings at the bottom of its aisle list.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 

@@ -153,7 +153,8 @@ fun DebugScreen(c: AppContainer) {
                 item { Section("Payload probe") }
                 item {
                     Text(
-                        "Placeholder: measures snapshot pages against the 245's message limit once the watch link lands (Run 2).",
+                        "Runs on the watch: the debug watch build's Settings › Payload probe. The phone answers it; " +
+                            "each request shows in the log below as \"watch: probe in … B, reply … B\".",
                         Modifier.padding(horizontal = 16.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

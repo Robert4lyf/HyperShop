@@ -37,6 +37,17 @@ and Map cross the wire.
 |---|---|
 | `snap` | `lr`, `at` ackedThrough, `ax` `[[seq, result]…]` for acked seqs whose result is not `ok`, `pg`, `pgs`, `ai` `[base, [code, name, left, hidden]…]`, `it` `[[id, name, sub, aisleIdx, done, rev]…]`, `mo` items left off |
 
+**Payload probe** (debug watch builds; additive, so no version bump)
+
+| `t` | Direction | Keys |
+|---|---|---|
+| `prb` | watch → phone | `n` reply size wanted (≤ 8192), `pd` padding (≤ 8192 chars, optional) |
+| `prb` | phone → watch | `n` the request's size as the phone counted it, `sd` this reply's size, `pd` padding up to `n` asked |
+
+Sizes are `PayloadSize` estimates, the measure `PayloadCap` is in. The watch
+asks for growing replies (phone → watch), then sends growing padding (watch →
+phone), and shows the largest that got through each way.
+
 A page with `pgs = 0` is **ack-only**. The phone **always** replies: a full
 snapshot to `hello` and to a batch that changed the list, an ack-only page
 otherwise. It also pushes a snapshot when the list changes

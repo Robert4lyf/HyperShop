@@ -34,6 +34,11 @@ object WatchProtocol {
         const val AISLES = "ai"
         const val MORE = "mo"
         const val OPS = "op"
+
+        /** Payload probe (debug): padding, a size asked for or measured, the reply's own size. */
+        const val PAD = "pd"
+        const val PROBE_SIZE = "n"
+        const val SIZE_DOWN = "sd"
     }
 
     /** Watch → phone. */
@@ -41,11 +46,15 @@ object WatchProtocol {
         const val HELLO = "hello"
         const val OPS = "ops"
         const val BYE = "bye"
+
+        /** The debug payload probe; answered with [Outbound.PROBE]. Additive: no version bump. */
+        const val PROBE = "prb"
     }
 
     /** Phone → watch. */
     object Outbound {
         const val SNAPSHOT = "snap"
+        const val PROBE = "prb"
     }
 
     /** Op results, carried in `ax` for every acked seq whose result is not `ok`. */
