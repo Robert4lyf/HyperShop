@@ -99,12 +99,27 @@ class ExtractorTest {
     }
 
     @Test
+    fun wprmNotesAreSetApartFromTheName() {
+        fun li(notes: String) =
+            """<li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-amount">500</span>
+               <span class="wprm-recipe-ingredient-unit">g</span><span class="wprm-recipe-ingredient-name">chicken</span>
+               <span class="wprm-recipe-ingredient-notes">$notes</span></li>"""
+        val html =
+            """<html><body><div class="wprm-recipe-container"><div class="wprm-recipe-ingredients-container">
+               <ul>${li("cut into chunks")}${li(", diced")}${li("(about 2)")}</ul></div></div></body></html>"""
+        assertEquals(
+            listOf("500 g chicken, cut into chunks", "500 g chicken, diced", "500 g chicken (about 2)"),
+            Extractor.extract(html).recipes.single().lines,
+        )
+    }
+
+    @Test
     fun sectionsInsideIngredientsKeepTheirLines() {
         val json =
             """{"@type":"Recipe","recipeIngredient":[
               {"@type":"HowToSection","name":"For the sauce","itemListElement":["400 g tomatoes",{"@type":"HowToStep","text":"1 onion"}]},
               "2 eggs"]}"""
-        assertEquals(listOf("400 g tomatoes", "1 onion", "2 eggs"), ld(json).recipes.single().lines)
+        assertEquals(listOf("For the sauce:", "400 g tomatoes", "1 onion", "2 eggs"), ld(json).recipes.single().lines)
     }
 
     @Test

@@ -86,8 +86,9 @@ class SafeFetcher(
         if (u.username.isNotEmpty() || u.password.isNotEmpty()) return "credentials in URL"
         if (u.port !in policy.allowedPorts) return "port ${u.port}"
         if (isIpLiteral(u.host)) {
-            val loop = runCatching { InetAddress.getByName(u.host).isLoopbackAddress }.getOrDefault(false)
-            if (!(policy.allowLoopback && loop)) return "raw IP address"
+            // Resolved only when loopback is allowed (tests): strict never looks the literal up.
+            val loop = policy.allowLoopback && runCatching { InetAddress.getByName(u.host).isLoopbackAddress }.getOrDefault(false)
+            if (!loop) return "raw IP address"
         }
         return null
     }

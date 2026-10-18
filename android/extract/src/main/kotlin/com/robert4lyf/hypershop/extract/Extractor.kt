@@ -107,11 +107,19 @@ object Extractor {
                 ".wprm-recipe-group-name",
             )?.text()?.let { clean(it) }?.takeIf { it.isNotEmpty() }?.let { lines += "${it.trimEnd(':')}:" }
             for (li in g.select("li.wprm-recipe-ingredient")) {
-                val parts =
-                    listOf("amount", "unit", "name", "notes").mapNotNull { cls ->
-                        li.selectFirst(".wprm-recipe-ingredient-$cls")?.text()?.trim()?.ifEmpty { null }
+                fun part(cls: String) = li.selectFirst(".wprm-recipe-ingredient-$cls")?.text()?.trim()?.ifEmpty { null }
+                val parts = listOfNotNull(part("amount"), part("unit"), part("name"))
+                // A note is set apart from the name ("chicken, cut into chunks"), not glued on
+                // ("chicken cut into chunks" would read as a "chicken cut").
+                val notes =
+                    part("notes")?.let {
+                        when {
+                            it.startsWith(",") -> it
+                            it.startsWith("(") -> " $it"
+                            else -> ", $it"
+                        }
                     }
-                val text = if (parts.isEmpty()) li.text() else parts.joinToString(" ")
+                val text = if (parts.isEmpty() && notes == null) li.text() else parts.joinToString(" ") + notes.orEmpty()
                 clean(text).takeIf { it.isNotEmpty() }?.let { lines += it }
             }
         }
@@ -194,9 +202,15 @@ object Extractor {
                 is JsonArray -> e.forEach { walk(it, d + 1) }
                 is JsonPrimitive -> e.contentOrNull?.let { s -> s.split('\n').forEach { flat += it } }
                 is JsonObject -> {
-                    // A section ("For the sauce") holds its lines in itemListElement; its name is a heading.
+                    // A section ("For the sauce") holds its lines in itemListElement; its name is a
+                    // "Header:" line (R8), as for WPRM and Tasty.
                     val items = e["itemListElement"]
-                    if (items != null) walk(items, d + 1) else str(e["text"] ?: e["name"])?.let { flat += it }
+                    if (items != null) {
+                        str(e["name"])?.let { clean(it).trimEnd(':').trim() }?.takeIf { it.isNotEmpty() }?.let { flat += "$it:" }
+                        walk(items, d + 1)
+                    } else {
+                        str(e["text"] ?: e["name"])?.let { flat += it }
+                    }
                 }
                 else -> Unit
             }

@@ -241,7 +241,6 @@ class RuleParserTest {
         assertFalse(chicken.check)
     }
 
-
     @Test
     fun adjectivesBeforeACommaStayWithTheName() {
         val chicken = p.parse("1 lb boneless, skinless chicken breasts")
@@ -255,7 +254,6 @@ class RuleParserTest {
         // A catalogue name before the comma still ends the name.
         assertEquals("salt", p.parse("Salt, to taste").name)
     }
-
 
     @Test
     fun compoundImperialAltAfterASlash() {
@@ -272,7 +270,6 @@ class RuleParserTest {
         assertFalse(big.check)
     }
 
-
     @Test
     fun juiceOfAFractionOrHalf() {
         for (line in listOf("Juice of ½ lemon", "juice of 1/2 lemon", "Juice of half a lemon")) {
@@ -282,7 +279,6 @@ class RuleParserTest {
             assertEquals("juice", r.note, line)
         }
     }
-
 
     @Test
     fun hostileLinesDoNotThrowAndStayFast() {
