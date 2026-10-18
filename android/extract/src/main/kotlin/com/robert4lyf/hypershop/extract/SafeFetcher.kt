@@ -9,6 +9,7 @@ import java.io.IOException
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
+import java.net.Proxy
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 
@@ -55,7 +56,8 @@ sealed interface FetchResult {
  * Safe fetch (PLAN §3.1): https only, re-checked after every redirect (at most
  * 5); a DNS lookup that refuses loopback, private, link-local, CGNAT, ULA and
  * multicast addresses; raw IP hosts and ports other than 443 refused; no cookies;
- * a browser user agent; 10 s to connect and 30 s for the call; `text/html` or
+ * a browser user agent; no proxy (it would resolve names past the DNS check);
+ * 10 s to connect and 30 s for the whole fetch, redirects included; `text/html` or
  * `application/ld+json` only, at most 3 MB after decompression.
  */
 class SafeFetcher(
@@ -65,11 +67,12 @@ class SafeFetcher(
     private val client: OkHttpClient =
         base.newBuilder()
             .dns(SafeDns(policy))
+            .proxy(Proxy.NO_PROXY)
             .followRedirects(false)
             .followSslRedirects(false)
             .cookieJar(okhttp3.CookieJar.NO_COOKIES)
             .connectTimeout(10, TimeUnit.SECONDS)
-            .callTimeout(30, TimeUnit.SECONDS)
+            .callTimeout(CALL_TIMEOUT_S, TimeUnit.SECONDS)
             .build()
 
     /** Null when [url] may be fetched, else why not. `file:`, `content:` and `intent:` never get this far. */
@@ -91,6 +94,8 @@ class SafeFetcher(
 
     fun fetch(url: String): FetchResult {
         var current = url.toHttpUrlOrNull() ?: return FetchResult.Blocked("not an http(s) URL")
+        // One clock for the whole chain, so redirects can't stretch it to 6 × 30 s.
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(CALL_TIMEOUT_S)
         repeat(MAX_REDIRECTS + 1) {
             check(current)?.let { return FetchResult.Blocked(it) }
             val req =
@@ -100,8 +105,12 @@ class SafeFetcher(
                     .header("Accept", "text/html,application/ld+json;q=0.9,*/*;q=0.1")
                     .get()
                     .build()
+            val left = deadline - System.nanoTime()
+            if (left <= 0) return FetchResult.Network
+            val call = client.newCall(req)
+            call.timeout().timeout(left, TimeUnit.NANOSECONDS)
             try {
-                client.newCall(req).execute().use { r ->
+                call.execute().use { r ->
                     if (r.isRedirect) {
                         val next = r.header("Location")?.let { current.resolve(it) } ?: return FetchResult.HttpError(r.code)
                         current = next
@@ -147,12 +156,23 @@ class SafeFetcher(
 
     companion object {
         const val MAX_REDIRECTS = 5
+        const val CALL_TIMEOUT_S = 30L
         const val MAX_BYTES = 3L * 1024 * 1024
         const val USER_AGENT =
             "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Mobile Safari/537.36"
 
-        fun isIpLiteral(host: String): Boolean =
-            host.contains(':') || (host.isNotEmpty() && host.all { it.isDigit() || it == '.' } && host.count { it == '.' } == 3)
+        /**
+         * IPv6, or any host whose last label is a number: that covers dotted
+         * quads and the forms resolvers also accept (2130706433, 0x7f.1,
+         * 127.1, 0177.0.0.1). No real top-level domain is numeric.
+         */
+        fun isIpLiteral(host: String): Boolean {
+            if (host.contains(':')) return true
+            val last = host.trimEnd('.').substringAfterLast('.')
+            return NUMERIC_LABEL.matches(last)
+        }
+
+        private val NUMERIC_LABEL = Regex("(?i)\\d+|0x[0-9a-f]*")
 
         /** Public unicast only: not loopback, RFC1918, link-local, CGNAT, ULA, multicast, unspecified or reserved. */
         fun isPublic(a: InetAddress): Boolean {
@@ -162,10 +182,14 @@ class SafeFetcher(
             return when (a) {
                 is Inet4Address -> isPublicV4(b)
                 is Inet6Address -> {
-                    // IPv4-mapped (::ffff:a.b.c.d) and NAT64 well-known prefix carry a v4 address.
+                    // IPv4-mapped (::ffff:a.b.c.d), NAT64 (64:ff9b::/96) and 6to4 (2002::/16) carry a v4 address.
                     val mapped = b.subList(0, 10).all { it == 0 } && b[10] == 0xff && b[11] == 0xff
                     if (mapped) return isPublicV4(b.subList(12, 16))
+                    val nat64 = b[0] == 0 && b[1] == 0x64 && b[2] == 0xff && b[3] == 0x9b
+                    if (nat64 && b.subList(4, 12).all { it == 0 }) return isPublicV4(b.subList(12, 16))
+                    if (b[0] == 0x20 && b[1] == 0x02) return isPublicV4(b.subList(2, 6))
                     when {
+                        nat64 -> false // local-use NAT64 64:ff9b:1::/48
                         (b[0] and 0xfe) == 0xfc -> false // ULA fc00::/7
                         b[0] == 0xfe && (b[1] and 0xc0) == 0x80 -> false // fe80::/10
                         b[0] == 0x20 && b[1] == 0x01 && b[2] == 0x0d && b[3] == 0xb8 -> false // documentation

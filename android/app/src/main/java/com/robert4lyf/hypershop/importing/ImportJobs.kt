@@ -68,19 +68,16 @@ class ImportJobs(
         id: Long,
         state: JobState,
     ) {
-        val j = dao.job(id) ?: return
-        dao.putJob(j.copy(state = state.name))
+        dao.setJobState(id, state.name)
     }
 
     suspend fun finish(
         id: Long,
         result: ImportResult,
     ) {
-        val j = dao.job(id) ?: return
         val state = if (result.error != null && result.lines.isEmpty() && result.pageText == null) JobState.FAILED else JobState.READY
-        dao.putJob(
-            j.copy(state = state.name, resultJson = json.encodeToString(ImportResult.serializer(), result), error = result.error?.name),
-        )
+        // One UPDATE, not a read then a write that could undo a concurrent change.
+        dao.finishJob(id, state.name, json.encodeToString(ImportResult.serializer(), result), result.error?.name)
     }
 
     suspend fun done(id: Long) = setState(id, JobState.DONE)

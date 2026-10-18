@@ -78,7 +78,8 @@ data class ListUi(
 class ListViewModel(
     private val c: AppContainer,
 ) : ViewModel() {
-    private val order = MutableStateFlow(AisleCode.entries.toList())
+    /** Re-read on every list change, so a new walking order from Settings shows straight away. */
+    private val order = c.repository.observeAisleOrder()
     private val messages = Channel<UiMessage>(Channel.BUFFERED)
     val events: Flow<UiMessage> = messages.receiveAsFlow()
 
@@ -92,10 +93,6 @@ class ListViewModel(
             lastList = list
             build(list, units, ord).copy(readyJobs = ready.map { it.id }, plusOne = p)
         }.stateIn(viewModelScope, SharingStarted.Eagerly, ListUi())
-
-    init {
-        viewModelScope.launch { order.value = c.repository.aisleOrder() }
-    }
 
     private fun build(
         list: ShoppingList,
@@ -247,8 +244,10 @@ class ListViewModel(
             val p = plusOne.value ?: return@launch
             plusOne.value = null
             val parsed = c.ruleParser.parse(p.line)
-            val q = QtyBase.of(parsed.quantity ?: Rational.ONE, parsed.unit.takeIf { parsed.quantity != null }, UnitLocale.METRIC)
-            c.repository.manualAdd(parsed.name, q, parsed.unit)
+            // As a typed add would: grams over spoons, the top of a range; one more when no amount was typed.
+            val typed = parsed.shopBase(UnitLocale.METRIC)
+            val q = if (parsed.quantity == null || typed.isPresence) QtyBase.of(Rational.ONE, null, UnitLocale.METRIC) else typed
+            c.repository.manualAdd(parsed.name, q, parsed.shopUnit.takeIf { parsed.quantity != null })
         }
 
     fun dismissPlusOne() {

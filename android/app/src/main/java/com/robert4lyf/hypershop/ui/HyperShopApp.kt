@@ -124,9 +124,10 @@ fun HyperShopApp(
             }
         },
     ) { padding ->
+        val openReview: (Long) -> Unit = { nav.navigate(Routes.review(it)) { launchSingleTop = true } }
         NavHost(nav, startDestination = Routes.LIST, modifier = Modifier.padding(padding)) {
-            composable(Routes.LIST) { ListRoute(container, snackbar, onReview = { nav.navigate(Routes.review(it)) }) }
-            composable(Routes.RECIPES) { RecipesRoute(container, snackbar, onReview = { nav.navigate(Routes.review(it)) }) }
+            composable(Routes.LIST) { ListRoute(container, snackbar, onReview = openReview) }
+            composable(Routes.RECIPES) { RecipesRoute(container, snackbar, onReview = openReview) }
             composable(Routes.SETTINGS) { SettingsRoute(container, onDebug = debugScreen?.let { { nav.navigate(Routes.DEBUG) } }) }
             composable(Routes.REVIEW, arguments = listOf(navArgument("job") { type = NavType.LongType })) { e ->
                 ReviewRoute(

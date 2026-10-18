@@ -54,7 +54,8 @@ class RecipesViewModel(
                 ImportResult(
                     url = recipe.url,
                     title = recipe.title,
-                    servings = use.servings,
+                    servings = recipe.servingsOriginal,
+                    targetServings = use.servings,
                     locale = UnitLocale.valueOf(recipe.unitLocale),
                     method = "IN_STOCK",
                     lines = lines,

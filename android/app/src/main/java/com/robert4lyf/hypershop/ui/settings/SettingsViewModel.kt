@@ -83,7 +83,11 @@ class SettingsViewModel(
 
     // ---- List ------------------------------------------------------------------------------
 
-    fun setUnits(u: UnitsSetting) = viewModelScope.launch { c.settings.setUnits(u) }
+    fun setUnits(u: UnitsSetting) =
+        viewModelScope.launch {
+            c.settings.setUnits(u)
+            c.repository.unitsChanged()
+        }
 
     fun removeStaple(name: String) =
         viewModelScope.launch {
@@ -116,9 +120,17 @@ class SettingsViewModel(
     /** Saves the key and tests it straight away. */
     fun saveKey(text: String) =
         viewModelScope.launch {
-            val key = text.trim()
+            // Pasted keys can carry invisible characters (zero-width spaces, line breaks).
+            val key = cleanKey(text)
             if (key.isEmpty()) return@launch
-            c.apiKeyStore.set(key)
+            if (!KEY_CHARS.matches(key)) {
+                _ui.update { it.copy(keyStatus = KeyStatus.BAD_KEY) }
+                return@launch
+            }
+            if (!c.apiKeyStore.set(key)) {
+                _ui.update { it.copy(keyStatus = KeyStatus.ERROR) }
+                return@launch
+            }
             c.settings.setKeyWasSet(true)
             c.settings.setKeyLostNotice(false)
             test(key)
@@ -173,3 +185,9 @@ class SettingsViewModel(
         const val LOG_LINES = 100
     }
 }
+
+/** A key as typed or pasted, without whitespace or invisible format characters. */
+internal fun cleanKey(text: String): String = text.replace(Regex("[\\s\\p{Cf}]"), "")
+
+/** Printable ASCII only; anything else can't go in an HTTP header. */
+private val KEY_CHARS = Regex("[\\x21-\\x7e]+")

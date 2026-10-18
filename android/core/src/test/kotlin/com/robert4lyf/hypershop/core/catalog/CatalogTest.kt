@@ -36,6 +36,55 @@ class CatalogTest {
     }
 
     @Test
+    fun synonymsDoNotRenameOneProductIntoAnother() {
+        val own =
+            mapOf(
+                "pecorino" to "pecorino",
+                "pecorino romano" to "pecorino",
+                "emmental" to "emmental",
+                "swiss cheese" to "emmental",
+                "dry vermouth" to "vermouth",
+                "vermouth" to "vermouth",
+                "marsala" to "marsala",
+                "malt vinegar" to "malt_vinegar",
+                "orange blossom water" to "orange_blossom_water",
+                "orange flower water" to "orange_blossom_water",
+                "soda water" to "soda_water",
+                "club soda" to "soda_water",
+                "sparkling water" to "soda_water",
+                "tortilla chips" to "tortilla_chips",
+                "corn syrup" to "corn_syrup",
+                "light corn syrup" to "corn_syrup",
+                "dry mustard" to "mustard_powder",
+                "mustard powder" to "mustard_powder",
+                "sake" to "sake",
+                "chicken stock cube" to "stock_cube",
+                "cumin seeds" to "cumin_seed",
+                "coriander seeds" to "coriander_seed",
+                "ground cardamom" to "cardamom_ground",
+                "ground caraway" to "caraway_ground",
+                "ham hock" to "ham_hock",
+                "smoked mackerel" to "smoked_mackerel",
+                "porcini" to "porcini",
+                "dried porcini" to "porcini",
+                "peppers" to "bell_pepper",
+                "sweet peppers" to "bell_pepper",
+                "padron peppers" to "padron_pepper",
+                "ground red pepper" to "cayenne",
+            )
+        for ((name, id) in own) assertEquals(id, catalog.lookup(name)?.id, name)
+        // Removed: these stay as typed rather than becoming something else.
+        assertNull(catalog.lookup("apple cider"))
+        assertNull(catalog.lookup("clam juice"))
+        assertEquals(AisleCode.MEAT_FISH, catalog.lookup("ham hock")?.aisle)
+        assertEquals(AisleCode.CHILLED, catalog.lookup("smoked mackerel")?.aisle)
+        assertEquals(AisleCode.SPICES_CONDIMENTS, catalog.lookup("mustard powder")?.aisle)
+        // Generic buckets that are fine as they are.
+        assertEquals("blue_cheese", catalog.lookup("stilton")?.id)
+        assertEquals("parmesan", catalog.lookup("parmigiano reggiano")?.id)
+    }
+
+    @Test
     fun idsAndKeysAreUnique() {
         assertEquals(catalog.entries.size, catalog.byId.size)
         val owners = HashMap<String, String>()

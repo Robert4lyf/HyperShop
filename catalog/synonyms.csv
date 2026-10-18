@@ -24,7 +24,6 @@ angel hair,spaghetti
 angostura bitters,bitters
 ap flour,flour
 apple,apple
-apple cider,cider
 apple cider vinegar,cider_vinegar
 apple juice,apple_juice
 apples,apple
@@ -192,6 +191,7 @@ capsicum,bell_pepper
 caraway,caraway
 caraway seed,caraway
 caraway seeds,caraway
+carbonated water,soda_water
 cardamom,cardamom
 cardamom pods,cardamom
 carnaroli rice,risotto_rice
@@ -215,6 +215,7 @@ celery rib,celery
 celery root,celeriac
 celery stalk,celery
 celery stick,celery
+ceps,porcini
 champagne vinegar,white_wine_vinegar
 chanterelle,wild_mushroom
 chanterelle mushroom,wild_mushroom
@@ -234,6 +235,7 @@ chestnuts,chestnut
 chevre,goat_cheese
 chia seeds,chia_seed
 chicken,chicken
+chicken bouillon cube,stock_cube
 chicken breast,chicken_breast
 chicken breasts,chicken_breast
 chicken broth,chicken_stock
@@ -243,7 +245,8 @@ chicken legs,chicken_leg
 chicken liver,chicken_liver
 chicken livers,chicken_liver
 chicken stock,chicken_stock
-chicken stock cube,chicken_stock
+chicken stock cube,stock_cube
+chicken stock cubes,stock_cube
 chicken thigh,chicken_thigh
 chicken thighs,chicken_thigh
 chicken wing,chicken_wing
@@ -287,14 +290,13 @@ cinnamon stick,cinnamon_stick
 cinnamon sticks,cinnamon_stick
 citrus vodka,vodka
 clam,clam
-clam juice,fish_stock
 clams,clam
 clarified butter,ghee
 clear honey,honey
 cling film,cling_film
 clove,clove_spice
 cloves,clove_spice
-club soda,tonic
+club soda,soda_water
 coarse salt,salt
 cocoa,cocoa
 cocoa powder,cocoa
@@ -325,15 +327,16 @@ cooking oil spray,cooking_spray
 cooking spray,cooking_spray
 coriander,coriander
 coriander leaves,coriander
-coriander seed,coriander_ground
-coriander seeds,coriander_ground
+coriander seed,coriander_seed
+coriander seeds,coriander_seed
 corn,sweetcorn_cob
+corn chips,tortilla_chips
 corn cob,sweetcorn_cob
 corn kernels,frozen_sweetcorn
 corn oil,vegetable_oil
 corn on the cob,sweetcorn_cob
 corn starch,cornflour
-corn syrup,golden_syrup
+corn syrup,corn_syrup
 corn tortilla,corn_tortilla
 corn tortillas,corn_tortilla
 cornflour,cornflour
@@ -369,8 +372,8 @@ cubed pancetta,pancetta
 cucumber,cucumber
 cucumbers,cucumber
 cumin,cumin
-cumin seed,cumin
-cumin seeds,cumin
+cumin seed,cumin_seed
+cumin seeds,cumin_seed
 curly parsley,parsley
 currant,currant
 currants,currant
@@ -380,6 +383,7 @@ dairy-free spread,vegan_butter
 dark brown sugar,dark_brown_sugar
 dark chocolate,dark_chocolate
 dark chocolate chips,dark_chocolate
+dark corn syrup,corn_syrup
 dark muscovado sugar,dark_brown_sugar
 dark rum,rum
 dark soy sauce,soy_sauce
@@ -403,20 +407,30 @@ dried apricot,dried_apricot
 dried apricots,dried_apricot
 dried beans,dried_beans
 dried breadcrumbs,breadcrumbs
+dried ceps,porcini
 dried cranberries,dried_cranberry
 dried currants,currant
 dried figs,dried_fig
 dried mixed herbs,dried_mixed_herbs
+dried mushroom,dried_mushroom
+dried mushrooms,dried_mushroom
 dried oregano,dried_oregano
 dried pasta,pasta
+dried porcini,porcini
+dried porcini mushroom,porcini
+dried porcini mushrooms,porcini
+dried shiitake,dried_mushroom
+dried shiitake mushrooms,dried_mushroom
 dried thyme,dried_thyme
+dried wild mushrooms,dried_mushroom
 dried yeast,yeast
 drumsticks,chicken_leg
-dry mustard,mustard
+dry marsala,marsala
+dry mustard,mustard_powder
 dry pasta,pasta
 dry red wine,red_wine
 dry sherry,sherry
-dry vermouth,white_wine
+dry vermouth,vermouth
 dry white wine,white_wine
 dry yeast,yeast
 duck,duck
@@ -437,11 +451,14 @@ egg yolk,egg
 egg yolks,egg
 eggplant,aubergine
 eggs,egg
-emmental,gruyere
+emmental,emmental
+emmentaler,emmental
+emmenthal,emmental
 endive,endive
 english cucumber,cucumber
 english muffins,english_muffin
 english mustard,mustard
+english mustard powder,mustard_powder
 eschalot,shallot
 espresso,coffee
 evaporated milk,evaporated_milk
@@ -524,6 +541,7 @@ frozen spinach,frozen_spinach
 frozen sweetcorn,frozen_sweetcorn
 full-fat milk,milk
 fusilli,penne
+gammon hock,ham_hock
 garam masala,garam_masala
 garbanzo bean,chickpeas
 garbanzo beans,chickpeas
@@ -588,8 +606,8 @@ ground allspice,allspice
 ground almonds,ground_almonds
 ground beef,beef_mince
 ground black pepper,black_pepper
-ground caraway,caraway
-ground cardamom,cardamom
+ground caraway,caraway_ground
+ground cardamom,cardamom_ground
 ground chuck,beef_mince
 ground cinnamon,cinnamon
 ground cloves,clove_spice
@@ -601,9 +619,11 @@ ground flaxseed,flaxseed
 ground ginger,ginger_ground
 ground lamb,lamb_mince
 ground mace,mace
+ground mustard,mustard_powder
 ground nutmeg,nutmeg
 ground pepper,black_pepper
 ground pork,pork_mince
+ground red pepper,cayenne
 ground turkey,turkey_mince
 ground turmeric,turmeric
 ground white pepper,white_pepper
@@ -619,7 +639,8 @@ half-and-half,single_cream
 halibut,white_fish
 halloumi,halloumi
 ham,ham
-ham hock,ham
+ham hock,ham_hock
+ham hocks,ham_hock
 hamburger bun,burger_bun
 hard cider,cider
 haricot bean,haricot_beans
@@ -728,7 +749,7 @@ lettuces,lettuce
 light brown soft sugar,brown_sugar
 light brown sugar,brown_sugar
 light coconut milk,coconut_milk
-light corn syrup,golden_syrup
+light corn syrup,corn_syrup
 light cream,single_cream
 light olive oil,olive_oil
 light rum,rum
@@ -760,7 +781,7 @@ mace,mace
 mackerel,mackerel
 madras curry powder,curry_powder
 maldon salt,salt
-malt vinegar,white_vinegar
+malt vinegar,malt_vinegar
 mangetout,mangetout
 mango,mango
 mango chutney,chutney
@@ -770,7 +791,8 @@ margarine,vegan_butter
 marinated artichokes,artichoke_hearts
 maris piper,potato
 marjoram,marjoram
-marsala,sherry
+marsala,marsala
+marsala wine,marsala
 mascarpone,mascarpone
 mature cheddar,cheddar
 mayo,mayonnaise
@@ -811,7 +833,7 @@ muslin cloth,cheesecloth
 mussel,mussel
 mussels,mussel
 mustard,mustard
-mustard powder,mustard
+mustard powder,mustard_powder
 mustard seed,mustard_seed
 mustard seeds,mustard_seed
 naan,naan
@@ -825,6 +847,7 @@ nectarine,nectarine
 nectarines,nectarine
 neutral oil,vegetable_oil
 new potato,potato
+noilly prat,vermouth
 nonstick cooking spray,cooking_spray
 noodle,egg_noodles
 noodles,egg_noodles
@@ -846,8 +869,8 @@ onion,onion
 onion powder,onion_powder
 onions,onion
 orange,orange
-orange blossom water,rosewater
-orange flower water,rosewater
+orange blossom water,orange_blossom_water
+orange flower water,orange_blossom_water
 orange juice,orange_juice
 orange liqueur,orange_liqueur
 orange peel,orange
@@ -861,6 +884,9 @@ oyster mushroom,wild_mushroom
 oyster sauce,oyster_sauce
 oysters,oyster
 packed brown sugar,brown_sugar
+padron,padron_pepper
+padron pepper,padron_pepper
+padron peppers,padron_pepper
 pak choi,pak_choi
 pancetta,pancetta
 panko,panko
@@ -897,12 +923,16 @@ peas in the pod,peas_fresh
 pecan,pecan
 pecan halves,pecan
 pecans,pecan
-pecorino,parmesan
-pecorino romano,parmesan
+pecorino,pecorino
+pecorino cheese,pecorino
+pecorino romano,pecorino
+pecorino romano cheese,pecorino
 penne,penne
 pepitas,pumpkin_seed
 pepper,black_pepper
 peppercorns,black_pepper
+peppered smoked mackerel,smoked_mackerel
+peppers,bell_pepper
 pesto,pesto
 petits pois,frozen_peas
 philadelphia,cream_cheese
@@ -913,6 +943,7 @@ pie crust,shortcrust_pastry
 pie dough,shortcrust_pastry
 pignoli,pine_nut
 pimenton,smoked_paprika
+pimientos de padron,padron_pepper
 pine nut,pine_nut
 pine nuts,pine_nut
 pineapple,pineapple
@@ -938,7 +969,8 @@ pollock,white_fish
 pomegranate,pomegranate
 pomegranate seeds,pomegranate
 pomegranates,pomegranate
-porcini,wild_mushroom
+porcini,porcini
+porcini mushrooms,porcini
 pork,pork
 pork belly,pork_belly
 pork butt,pork_shoulder
@@ -1053,7 +1085,7 @@ saffron,saffron
 saffron threads,saffron
 sage,sage
 sage leaves,sage
-sake,rice_wine
+sake,sake
 salad greens,salad_leaves
 salad leaves,salad_leaves
 salad onion,spring_onion
@@ -1079,6 +1111,7 @@ seasoned rice vinegar,rice_vinegar
 seaweed,nori
 self-raising flour,self_raising_flour
 self-rising flour,self_raising_flour
+seltzer,soda_water
 semi-skimmed milk,milk
 semisweet chocolate,dark_chocolate
 semisweet chocolate chips,dark_chocolate
@@ -1119,13 +1152,16 @@ slab bacon,bacon
 sliced bacon,bacon
 slivered almonds,almond
 smoked ham,ham
-smoked mackerel,mackerel
+smoked ham hock,ham_hock
+smoked ham hocks,ham_hock
+smoked mackerel,smoked_mackerel
+smoked mackerel fillets,smoked_mackerel
 smoked paprika,smoked_paprika
 smoked salmon,smoked_salmon
 smooth peanut butter,peanut_butter
 snow pea,mangetout
 snow peas,mangetout
-soda water,tonic
+soda water,soda_water
 sodium bicarbonate,bicarb
 soft brown sugar,brown_sugar
 soft cheese,cream_cheese
@@ -1144,7 +1180,7 @@ soya milk,soy_milk
 spaghetti,spaghetti
 spanish onion,onion
 spanish smoked paprika,smoked_paprika
-sparkling water,tonic
+sparkling water,soda_water
 spelt grain,farro
 spinach,spinach
 spinach leaves,spinach
@@ -1196,13 +1232,16 @@ sweet cherry,cherry
 sweet chili sauce,sweet_chilli
 sweet chilli sauce,sweet_chilli
 sweet corn,sweetcorn_cob
+sweet marsala,marsala
 sweet paprika,paprika
+sweet pepper,bell_pepper
+sweet peppers,bell_pepper
 sweet potato,sweet_potato
 sweet potatoes,sweet_potato
 sweet red pepper,bell_pepper
 sweetened condensed milk,condensed_milk
 swiss chard,chard
-swiss cheese,gruyere
+swiss cheese,emmental
 swordfish,white_fish
 tabasco,hot_sauce
 tabasco sauce,hot_sauce
@@ -1246,7 +1285,7 @@ tomato sauce,passata
 tomatoes,tomato
 tonic water,tonic
 tortilla,tortilla_wrap
-tortilla chips,corn_tortilla
+tortilla chips,tortilla_chips
 tortilla wraps,tortilla_wrap
 treacle,molasses
 triple sec,orange_liqueur
@@ -1283,7 +1322,7 @@ vegetable broth,vegetable_stock
 vegetable oil,vegetable_oil
 vegetable stock,vegetable_stock
 vermicelli rice noodles,rice_noodles
-vermouth,white_wine
+vermouth,vermouth
 vine tomato,tomato
 vinegar,white_vinegar
 vodka,vodka
@@ -1320,12 +1359,15 @@ white rice,rice
 white rum,rum
 white sugar,caster_sugar
 white truffle oil,truffle_oil
+white vermouth,vermouth
 white vinegar,white_vinegar
 white wine,white_wine
 white wine vinegar,white_wine_vinegar
 white-wine vinegar,white_wine_vinegar
 whole chicken,chicken
 whole cloves,clove_spice
+whole coriander seeds,coriander_seed
+whole cumin seeds,cumin_seed
 whole milk,milk
 whole nutmeg,nutmeg
 whole peeled tomatoes,chopped_tomatoes

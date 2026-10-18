@@ -164,8 +164,8 @@ object Extractor {
                 val type = el["@type"]
                 val isRecipe =
                     when (type) {
-                        is JsonPrimitive -> type.contentOrNull == "Recipe"
-                        is JsonArray -> type.any { (it as? JsonPrimitive)?.contentOrNull == "Recipe" }
+                        is JsonPrimitive -> isRecipeType(type.contentOrNull)
+                        is JsonArray -> type.any { isRecipeType((it as? JsonPrimitive)?.contentOrNull) }
                         else -> false
                     }
                 if (isRecipe) {
@@ -177,6 +177,9 @@ object Extractor {
             else -> emptyList()
         }
     }
+
+    /** "Recipe", "schema:Recipe" or a full schema.org IRI. */
+    private fun isRecipeType(t: String?): Boolean = t != null && t.substringAfterLast('/').substringAfterLast(':') == "Recipe"
 
     private fun ingredientsOf(r: JsonObject): List<String> {
         val v = r["recipeIngredient"] ?: r["ingredients"] ?: return emptyList()
@@ -190,7 +193,11 @@ object Extractor {
             when (e) {
                 is JsonArray -> e.forEach { walk(it, d + 1) }
                 is JsonPrimitive -> e.contentOrNull?.let { s -> s.split('\n').forEach { flat += it } }
-                is JsonObject -> str(e["text"] ?: e["name"])?.let { flat += it }
+                is JsonObject -> {
+                    // A section ("For the sauce") holds its lines in itemListElement; its name is a heading.
+                    val items = e["itemListElement"]
+                    if (items != null) walk(items, d + 1) else str(e["text"] ?: e["name"])?.let { flat += it }
+                }
                 else -> Unit
             }
         }

@@ -65,8 +65,11 @@ data class Preview(
     val rows: List<PreviewRow>,
     val contributions: List<PreviewContribution>,
     val lineStatus: Map<Long, LineStatus>,
-    /** The rev of every item shown (null: not on the list yet), re-checked on confirm. */
-    val shownRevs: Map<String, Long?>,
+    /**
+     * The id and rev of every item shown (null: not on the list yet), re-checked
+     * on confirm. The id matters: a deleted and re-added item can carry the same rev.
+     */
+    val shownRevs: Map<String, Pair<Long, Long>?>,
 )
 
 sealed interface ApplyResult {
@@ -103,18 +106,19 @@ class Merger(
             servingsOriginal,
             servings,
             locale,
-            lines.map { (id, p) -> IncomingLine(id, p, target(p.name, p.aisleSuggestion, overrides)) },
+            lines.map { (id, p) -> IncomingLine(id, p, target(p.name, p.aisleSuggestion, overrides, p.raw)) },
         )
 
     fun target(
         name: String,
         claudeAisle: com.robert4lyf.hypershop.core.model.AisleCode? = null,
         overrides: Map<String, com.robert4lyf.hypershop.core.model.AisleCode> = emptyMap(),
+        raw: String = name,
     ): NewItem {
         val entry = normaliser.entry(name)
         val norm = normaliser.normName(name)
         return NewItem(
-            mergeKey = normaliser.mergeKey(name),
+            mergeKey = normaliser.mergeKey(name, raw),
             catalogId = entry?.id,
             normName = norm,
             displayName = entry?.name ?: norm,
@@ -162,7 +166,8 @@ class Merger(
                     // Subtract what you have from this line, earliest line first.
                     val after = q.minusClamped(have)
                     have = have.minusClamped(q)
-                    lineStatus = LineStatus.PARTIAL
+                    // Only PARTIAL when something was actually subtracted (not "I have 50 g" of 200 ml).
+                    if (after != q) lineStatus = LineStatus.PARTIAL
                     q = after
                     if (q.isPresence) {
                         status[l.recipeLineId] = LineStatus.PARTIAL
@@ -176,7 +181,7 @@ class Merger(
             val onList = (existing?.let { list.total(it.id) } ?: QtyBase.PRESENCE) + adding
             rows += PreviewRow(lines.first().target, existing, lines.map { it.recipeLineId }, adding, onList, d)
         }
-        val shown = rows.associate { it.target.mergeKey to it.existing?.rev }
+        val shown = rows.associate { it.target.mergeKey to it.existing?.let { e -> e.id to e.rev } }
         return Preview(incoming, rows, contributions, status, shown)
     }
 
@@ -186,8 +191,8 @@ class Merger(
         preview: Preview,
         now: Long,
     ): ApplyResult {
-        for ((key, rev) in preview.shownRevs) {
-            if (list.itemByKey(key)?.rev != rev) return ApplyResult.Stale
+        for ((key, shown) in preview.shownRevs) {
+            if (list.itemByKey(key)?.let { it.id to it.rev } != shown) return ApplyResult.Stale
         }
         val use = RecipeUse(list.nextId, preview.incoming.recipeId, UseKind.RECIPE, preview.incoming.servings ?: 1, now)
         var l = list.copy(uses = list.uses + (use.id to use), nextId = list.nextId + 1)

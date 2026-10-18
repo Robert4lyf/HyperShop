@@ -60,7 +60,9 @@ data class ParsedIngredient(
     /** The amount to shop by, using the upper end of a range. */
     fun shopBase(locale: UnitLocale): QtyBase {
         val alt = metricAlt ?: return QtyBase.of(quantityMax ?: quantity, unit, locale)
-        val amount = quantityMax?.let { alt.first * it / quantity!! } ?: alt.first
+        // Scale the alternative by max/quantity; a zero lower bound ("0-2 cups") has no ratio.
+        val q = quantity!!
+        val amount = quantityMax?.takeIf { !q.isZero }?.let { alt.first * it / q } ?: alt.first
         return QtyBase.of(amount, alt.second, locale)
     }
 

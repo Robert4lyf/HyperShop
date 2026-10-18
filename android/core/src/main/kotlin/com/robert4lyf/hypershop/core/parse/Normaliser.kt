@@ -30,13 +30,39 @@ class Normaliser(
         return if (s != k && CatalogKey.of(e.name) == s || CatalogKey.of(e.plural) == k) CatalogKey.of(e.name) else k
     }
 
-    /** R5.5. */
-    fun mergeKey(name: String): String = entry(name)?.mergeKey ?: "name:${CatalogKey.of(name)}"
+    /**
+     * R5.5. A blank name (a line the parser could not read) is keyed on its [raw]
+     * line in parentheses, which no real name's key contains, so unreadable lines
+     * do not all merge into one item.
+     */
+    fun mergeKey(
+        name: String,
+        raw: String = name,
+    ): String {
+        entry(name)?.let { return it.mergeKey }
+        val k = CatalogKey.of(name)
+        if (k.isNotEmpty()) return "name:$k"
+        return "name:(${CatalogKey.of(raw).ifEmpty { raw.trim() }})"
+    }
 
     /** R11 name comparison key: normalised, folded through the catalogue, head noun singular. */
     fun compareKey(name: String): String = entry(name)?.mergeKey ?: "name:${singularKey(CatalogKey.of(name))}"
 
     companion object {
+        /** "-ves" plurals whose singular ends in f/fe; every other "-ves" just drops the s (cloves, olives, chives). */
+        private val F_PLURALS =
+            mapOf(
+                "leaves" to "leaf",
+                "loaves" to "loaf",
+                "halves" to "half",
+                "calves" to "calf",
+                "shelves" to "shelf",
+                "wolves" to "wolf",
+                "knives" to "knife",
+                "wives" to "wife",
+                "scarves" to "scarf",
+            )
+
         /** Singularises the last word of a key (R5.4); mirrors tools/catalog/top_names.py. */
         fun singularKey(key: String): String {
             val words = key.split(' ')
@@ -45,7 +71,7 @@ class Normaliser(
                 when {
                     last.length > 4 && last.endsWith("ies") -> last.dropLast(3) + "y"
                     last.endsWith("oes") -> last.dropLast(2)
-                    last.endsWith("ves") && last.length > 4 -> last.dropLast(3) + "f"
+                    last in F_PLURALS -> F_PLURALS.getValue(last)
                     last.endsWith("ches") || last.endsWith("shes") || last.endsWith("sses") || last.endsWith("xes") -> last.dropLast(2)
                     last.endsWith("s") && !last.endsWith("ss") && !last.endsWith("us") && !last.endsWith("is") -> last.dropLast(1)
                     else -> last

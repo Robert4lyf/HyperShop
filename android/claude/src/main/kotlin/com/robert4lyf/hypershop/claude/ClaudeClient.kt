@@ -47,6 +47,8 @@ class ClaudeClient(
         model: ClaudeModel,
     ): ClaudeResult {
         val key = apiKey()?.takeIf { it.isNotBlank() } ?: return ClaudeResult.Failed(ClaudeResult.Reason.NO_KEY)
+        // OkHttp rejects such a header with an exception that quotes the value, i.e. the key.
+        if (!headerSafe(key)) return ClaudeResult.Failed(ClaudeResult.Reason.BAD_KEY)
         val body = ClaudeRequest.body(input, model).toString()
         var backoffs = 0
         var serverRetries = 0
@@ -80,6 +82,7 @@ class ClaudeClient(
     /** "Test key": `GET /v1/models` costs nothing. */
     suspend fun testKey(key: String): KeyCheck =
         withContext(io) {
+            if (!headerSafe(key)) return@withContext KeyCheck.BAD_KEY
             val req =
                 Request.Builder()
                     .url("$baseUrl/v1/models")
@@ -100,6 +103,9 @@ class ClaudeClient(
                 KeyCheck.OFFLINE
             }
         }
+
+    /** Printable ASCII, the only thing an HTTP header value can hold. */
+    private fun headerSafe(key: String) = key.all { it in '\u0021'..'\u007e' }
 
     private sealed interface Outcome {
         data object Offline : Outcome

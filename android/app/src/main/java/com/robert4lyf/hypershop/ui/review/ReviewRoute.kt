@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
@@ -25,6 +24,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.importing.ImportError
+import com.robert4lyf.hypershop.ui.list.showTimed
 import com.robert4lyf.hypershop.ui.util.factoryFor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -83,17 +83,8 @@ fun ReviewRoute(
                 onDone()
                 // Outlives this screen: the snackbar and its Undo belong to the list.
                 container.applicationScope.launch(Dispatchers.Main) {
-                    val r =
-                        snackbar.showSnackbar(
-                            "Added ${s.count} items",
-                            actionLabel = "Undo",
-                            duration = SnackbarDuration.Indefinite,
-                        ).let { it }
+                    val r = snackbar.showTimed("Added ${s.count} items", "Undo", 10)
                     if (r == SnackbarResult.ActionPerformed) container.repository.undoImport(s.useId)
-                }
-                container.applicationScope.launch(Dispatchers.Main) {
-                    kotlinx.coroutines.delay(10_000)
-                    snackbar.currentSnackbarData?.dismiss()
                 }
             }
         ReviewState.Cancelled -> LaunchedEffect(Unit) { onDone() }

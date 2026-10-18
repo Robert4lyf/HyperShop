@@ -29,4 +29,23 @@ class LocaleForTest {
         assertEquals(UnitLocale.METRIC, Importer.localeFor(null, listOf("200g flour", "100 ml milk", "1 egg")))
         assertEquals(UnitLocale.UK, Importer.localeFor("https://www.bbcgoodfood.com/r", listOf("2 cups flour")))
     }
+
+    @Test
+    fun theHostIgnoresThePort() {
+        assertEquals(UnitLocale.UK, Importer.localeFor("https://www.bbc.co.uk:443/food/recipes/x", listOf("2 cups flour")))
+        assertEquals(UnitLocale.UK, Importer.localeFor("https://user@example.co.uk./r?x=1", listOf("2 cups flour")))
+    }
+
+    @Test
+    fun thousandsInMlAreRead() {
+        // 4 cups = 1,000 ml is a 250 ml cup; read as "1 ml" it settled nothing.
+        assertEquals(UnitLocale.METRIC, Importer.localeFor(null, listOf("4 cups stock (1,000ml)", "1 cup rice", "2 cups peas")))
+    }
+
+    @Test
+    fun theMetricShareIsOfTheLinesLookedAt() {
+        // 20 metric lines in the first 50, then 60 more lines in cups: 20 of 50 is metric.
+        val lines = List(20) { "100 g flour $it" } + List(30) { "1 egg $it" } + List(60) { "1 cup milk $it" }
+        assertEquals(UnitLocale.METRIC, Importer.localeFor(null, lines))
+    }
 }

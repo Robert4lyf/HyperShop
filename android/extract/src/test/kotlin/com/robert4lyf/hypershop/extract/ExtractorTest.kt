@@ -92,6 +92,22 @@ class ExtractorTest {
     fun typeAsArray() = assertEquals(1, ld("""{"@type":["Recipe","NewsArticle"],"recipeIngredient":["1 egg"]}""").recipes.size)
 
     @Test
+    fun typeAsSchemaIri() {
+        assertEquals(1, ld("""{"@type":"http://schema.org/Recipe","recipeIngredient":["1 egg"]}""").recipes.size)
+        assertEquals(1, ld("""{"@type":"https://schema.org/Recipe","recipeIngredient":["1 egg"]}""").recipes.size)
+        assertEquals(0, ld("""{"@type":"http://schema.org/NotRecipe","recipeIngredient":["1 egg"]}""").recipes.size)
+    }
+
+    @Test
+    fun sectionsInsideIngredientsKeepTheirLines() {
+        val json =
+            """{"@type":"Recipe","recipeIngredient":[
+              {"@type":"HowToSection","name":"For the sauce","itemListElement":["400 g tomatoes",{"@type":"HowToStep","text":"1 onion"}]},
+              "2 eggs"]}"""
+        assertEquals(listOf("400 g tomatoes", "1 onion", "2 eggs"), ld(json).recipes.single().lines)
+    }
+
+    @Test
     fun severalRecipesOnOnePage() {
         val e =
             ld(
