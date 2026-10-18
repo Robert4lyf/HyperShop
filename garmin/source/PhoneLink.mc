@@ -86,6 +86,14 @@ class PhoneLink {
         return _offline;
     }
 
+    //! Asks the phone for the list now, whatever the back-off says.
+    function refresh() as Void {
+        _awaiting = false;
+        _backoff = 0;
+        _notBefore = 0;
+        sendHello();
+    }
+
     //! A tick or untick from the screen. False when it was refused.
     function toggle(itemId as Lang.Number) as Lang.Boolean {
         if (!sync.toggle(itemId, Time.now().value())) {

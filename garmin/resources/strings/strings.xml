@@ -1,5 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Format strings rather than fragments: a resource compiler may trim leading
+  and trailing whitespace, so "$1$ left" is one string, not "left" plus a
+  number (BangGym). Sub-labels stay within 18 characters.
+-->
 <strings>
     <string id="AppName">HyperShop</string>
-    <string id="WaitingForPhone">Waiting for phone...</string>
+
+    <!-- Status row -->
+    <string id="WaitingForPhone">Waiting for phone</string>
+    <string id="OpenPhoneApp">Open HyperShop on phone</string>
+    <string id="UpdateBoth">Update HyperShop on the phone and watch</string>
+    <string id="ListEmpty">List empty</string>
+    <string id="AddOnPhone">Add items on phone</string>
+    <string id="Unsynced">$1$ unsynced</string>
+    <string id="SyncedNow">Synced just now</string>
+    <string id="SyncedAgo">Synced $1$m ago</string>
+    <string id="FromLastSync">From last sync</string>
+    <string id="SampleList">Sample list</string>
+    <string id="NoticeMore">1 more on phone</string>
+    <string id="NoticeChanged">Changed on phone</string>
+    <string id="NoticeDiscarded">$1$ ticks discarded</string>
+
+    <!-- Aisles -->
+    <string id="Left">$1$ left</string>
+    <string id="LeftOnPhone">$1$ left (+$2$ phone)</string>
+    <string id="AisleDone">Done</string>
+    <string id="OneMore">1 more</string>
+    <string id="SyncWithPhone">Sync with phone</string>
+
+    <!-- Aisle done -->
+    <string id="AisleDoneTitle">$1$ done</string>
+    <string id="NextAisle">Next: $1$</string>
+    <string id="UndoItem">Undo $1$</string>
+    <string id="AllAisles">All aisles</string>
+    <string id="AllDone">All done</string>
+
+    <!-- Settings -->
+    <string id="Settings">Settings</string>
+    <string id="Vibration">Vibration</string>
+    <string id="Refresh">Refresh from phone</string>
 </strings>
