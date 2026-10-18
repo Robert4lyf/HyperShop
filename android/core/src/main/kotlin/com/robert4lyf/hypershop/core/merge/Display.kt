@@ -68,7 +68,7 @@ object Display {
         val done = list.isDone(item.id)
         val shownQty = if (done) list.total(item.id) else list.uncovered(item.id)
         val produce = item.aisle == AisleCode.PRODUCE
-        val hint = list.contributionsOf(item.id).mapNotNull { it.unitHint }.distinct().singleOrNull()
+        val hint = hintOf(list.contributionsOf(item.id).map { it.unitHint })
         val presence = entry?.displayPolicy == DisplayPolicy.PRESENCE && units != UnitsSetting.AS_WRITTEN
         val amount = if (presence) null else amount(shownQty, units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy)
         val itemsOnly = shownQty.keys.singleOrNull() == BaseKey.ITEMS
@@ -93,9 +93,41 @@ object Display {
                         entry?.gramsPerCup,
                         entry?.displayPolicy,
                     )?.let { "$it already ticked" }
-                else -> entry?.packNote
+                else -> entry?.packNote?.let(::compactUnits)
             }
         return RowText(main, sub)
+    }
+
+    /**
+     * "1 × 30 g pack" → "1 × 30g pack": abbreviated units sit right after their
+     * number, as amounts are shown; words ("2 cups", "1 pint") keep their space.
+     */
+    fun compactUnits(text: String): String = COMPACT.replace(text) { "${it.groupValues[1]}${it.groupValues[2]}" }
+
+    private val COMPACT = Regex("""(\d|[½⅓⅔¼¾⅛])\s+(kg|g|ml|l|cl|oz|lb|tsp|tbsp)\b""")
+
+    /**
+     * The unit to show an amount in: the one its lines share, or tablespoons when
+     * they mix teaspoons and tablespoons ("1 tbsp" + "1 tsp" of maple syrup), so
+     * spoons stay spoons rather than becoming 20ml. Null when the lines disagree.
+     */
+    fun hintOf(units: Iterable<QtyUnit?>): QtyUnit? {
+        val u = units.filterNotNull().distinct()
+        return when {
+            u.size == 1 -> u.single()
+            u.isNotEmpty() && u.all { it == QtyUnit.TSP || it == QtyUnit.TBSP } -> QtyUnit.TBSP
+            else -> null
+        }
+    }
+
+    /** Tablespoons, to the half; what doesn't fit goes in teaspoons: "1½tbsp", "1tbsp + 1tsp", "2tsp". */
+    private fun tablespoons(ml: Rational): String {
+        val half = Rational.of(15, 2)
+        if ((ml / half).den == 1L) return "${fraction(ml / Rational.of(15))}tbsp"
+        val whole = Math.floorDiv((ml / Rational.of(15)).num, (ml / Rational.of(15)).den)
+        val rest = ml - Rational.of(whole * 15)
+        val tsp = "${fraction(roundUp(rest / Rational.of(5), Rational.of(1, 4)))}tsp"
+        return if (whole == 0L) tsp else "${whole}tbsp + $tsp"
     }
 
     // ---- per dimension ------------------------------------------------------------
@@ -124,17 +156,17 @@ object Display {
             return if (oz >= Rational.of(16)) {
                 "${fraction(
                     roundUp(oz / Rational.of(16), Rational.of(1, 4)),
-                )} lb"
+                )}lb"
             } else {
-                "${fraction(roundUp(oz, Rational.of(1, 4)))} oz"
+                "${fraction(roundUp(oz, Rational.of(1, 4)))}oz"
             }
         }
         val d = g.toDouble()
         return when {
-            d >= 1000 -> "${trim(roundUpD(d / 1000, 0.1))} kg"
-            d >= 100 -> "${trim(roundUpD(d, 10.0))} g"
-            d >= 10 -> "${trim(roundUpD(d, 5.0))} g"
-            else -> "${trim(roundUpD(d, 1.0))} g"
+            d >= 1000 -> "${trim(roundUpD(d / 1000, 0.1))}kg"
+            d >= 100 -> "${trim(roundUpD(d, 10.0))}g"
+            d >= 10 -> "${trim(roundUpD(d, 5.0))}g"
+            else -> "${trim(roundUpD(d, 1.0))}g"
         }
     }
 
@@ -144,8 +176,8 @@ object Display {
         hint: QtyUnit? = null,
     ): String {
         // Spoons are never converted, whatever the amount.
-        if (hint == QtyUnit.TSP) return "${fraction(roundUp(ml / Rational.of(5), Rational.of(1, 4)))} tsp"
-        if (hint == QtyUnit.TBSP) return "${fraction(roundUp(ml / Rational.of(15), Rational.of(1, 2)))} tbsp"
+        if (hint == QtyUnit.TSP) return "${fraction(roundUp(ml / Rational.of(5), Rational.of(1, 4)))}tsp"
+        if (hint == QtyUnit.TBSP) return tablespoons(ml)
         val d = ml.toDouble()
         // Small amounts become spoons in imperial, and "as written" unless they were written in ml or l.
         val writtenMetric = hint == QtyUnit.ML || hint == QtyUnit.L
@@ -157,16 +189,16 @@ object Display {
             return if (d < 15) {
                 "${fraction(
                     roundUp(ml / Rational.of(5), Rational.of(1, 4)),
-                )} tsp"
+                )}tsp"
             } else {
-                "${fraction(roundUp(ml / Rational.of(15), Rational.of(1, 2)))} tbsp"
+                "${fraction(roundUp(ml / Rational.of(15), Rational.of(1, 2)))}tbsp"
             }
         }
         return when {
-            d >= 1000 -> "${trim(roundUpD(d / 1000, 0.1))} l"
-            d >= 100 -> "${trim(roundUpD(d, 10.0))} ml"
-            d >= 10 -> "${trim(roundUpD(d, 5.0))} ml"
-            else -> "${trim(roundUpD(d, 1.0))} ml"
+            d >= 1000 -> "${trim(roundUpD(d / 1000, 0.1))}l"
+            d >= 100 -> "${trim(roundUpD(d, 10.0))}ml"
+            d >= 10 -> "${trim(roundUpD(d, 5.0))}ml"
+            else -> "${trim(roundUpD(d, 1.0))}ml"
         }
     }
 

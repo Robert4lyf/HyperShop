@@ -7,6 +7,7 @@ import com.robert4lyf.hypershop.catalog.SaveResult
 import com.robert4lyf.hypershop.core.catalog.CatalogEntry
 import com.robert4lyf.hypershop.core.catalog.CatalogKey
 import com.robert4lyf.hypershop.core.catalog.DisplayPolicy
+import com.robert4lyf.hypershop.core.merge.Display
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.UiMessage
@@ -27,7 +28,7 @@ data class LibraryRow(
     val id: String,
     val name: String,
     val aisle: AisleCode,
-    /** "Also: scallion, green onion · 1 × 30 g pack". */
+    /** "Also: scallion, green onion · 1 × 30g pack". */
     val detail: String?,
     /** You changed a bundled ingredient. */
     val edited: Boolean,
@@ -54,6 +55,10 @@ data class EntryForm(
     val packNote: String = "",
     val gramsPerCup: String = "",
     val alwaysInStock: Boolean = false,
+    /** Ingredient names, comma-separated. */
+    val swaps: String = "",
+    /** An ingredient name, or blank. */
+    val replaceWith: String = "",
     val edited: Boolean = false,
     val custom: Boolean = false,
 ) {
@@ -94,7 +99,7 @@ class LibraryViewModel(
         val bits =
             listOfNotNull(
                 e.synonyms.takeIf { it.isNotEmpty() }?.let { "Also: " + it.take(3).joinToString(", ") + if (it.size > 3) "…" else "" },
-                e.packNote?.let { "1 × $it" },
+                e.packNote?.let(Display::compactUnits),
             )
         return LibraryRow(
             e.id,
@@ -120,6 +125,8 @@ class LibraryViewModel(
             packNote = e.packNote.orEmpty(),
             gramsPerCup = e.gramsPerCup?.toDouble()?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() }.orEmpty(),
             alwaysInStock = staple,
+            swaps = e.swaps.mapNotNull { c.catalog.byId[it]?.name }.joinToString(", "),
+            replaceWith = e.replaceWith?.let { c.catalog.byId[it]?.name }.orEmpty(),
             edited = e.id in c.library.edits.value && c.library.isBundled(e.id),
             custom = !c.library.isBundled(e.id),
         )
@@ -135,6 +142,18 @@ class LibraryViewModel(
         val grams = f.gramsPerCup.trim().replace(',', '.').takeIf { it.isNotEmpty() }?.toDoubleOrNull()
         if (f.gramsPerCup.isNotBlank() && (grams == null || grams <= 0 || grams > 2000)) return "Grams per cup must be a number up to 2000"
         val before = f.id.takeIf { it.isNotBlank() }?.let { c.catalog.byId[it] }
+        // Swaps name other ingredients: each must be in the library (add it first if not).
+        val swapNames = f.swaps.split(',', '\n').map { it.trim() }.filter { it.isNotEmpty() }
+        val swapIds = ArrayList<String>()
+        for (n in swapNames) {
+            val e = c.catalog.lookup(n) ?: return "No ingredient called \"$n\" — add it to the library first"
+            if (e.id != f.id && e.id !in swapIds) swapIds += e.id
+        }
+        val replacement =
+            f.replaceWith.trim().takeIf { it.isNotEmpty() }?.let { n ->
+                c.catalog.lookup(n) ?: return "No ingredient called \"$n\" — add it to the library first"
+            }
+        if (replacement != null && replacement.id == f.id) return "It can't be used instead of itself"
         val edit =
             EntryEdit(
                 id = f.id,
@@ -146,12 +165,16 @@ class LibraryViewModel(
                 displayPolicy = f.policy.name,
                 gramsPerCup = grams,
                 packNote = f.packNote,
+                swaps = swapIds,
+                replaceWith = replacement?.id,
             )
         return when (val r = c.library.save(edit)) {
             SaveResult.NoName -> "Give it a name"
             is SaveResult.Taken -> "\"${r.name}\" is already ${r.by}"
             is SaveResult.Saved -> {
                 apply(r.id, f.aisle.takeIf { before == null || before.aisle != it }, f.alwaysInStock)
+                // "Always use instead": one already on the list is swapped now, too.
+                replacement?.let { c.repository.swapKey("cat:${r.id}", it.name) }
                 messages.send(UiMessage(if (before == null) "Added ${f.name.trim()}" else "Saved ${f.name.trim()}"))
                 null
             }

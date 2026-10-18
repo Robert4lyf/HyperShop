@@ -33,6 +33,10 @@ data class EntryEdit(
     val packNote: String? = null,
     /** Added by you rather than an edit of a bundled ingredient. */
     val custom: Boolean = false,
+    /** Ingredient ids it can be swapped for. */
+    val swaps: List<String> = emptyList(),
+    /** Always use this ingredient id instead. */
+    val replaceWith: String? = null,
 ) {
     fun toEntry(): CatalogEntry =
         CatalogEntry(
@@ -46,6 +50,8 @@ data class EntryEdit(
             displayPolicy = runCatching { DisplayPolicy.valueOf(displayPolicy) }.getOrDefault(DisplayPolicy.COUNT),
             gramsPerCup = gramsPerCup?.let { Rational.fromDouble(it) },
             packNote = packNote?.takeIf { it.isNotBlank() },
+            swaps = swaps,
+            replaceWith = replaceWith,
         )
 
     companion object {
@@ -63,6 +69,8 @@ data class EntryEdit(
             e.gramsPerCup?.toDouble(),
             e.packNote,
             custom,
+            e.swaps,
+            e.replaceWith,
         )
     }
 }

@@ -276,7 +276,7 @@ class ReviewViewModel(
         val inc = preview!!.incoming
         val needed = if (d.inStock) lines.fold(QtyBase.PRESENCE) { acc, l -> acc + lineQty(l, inc) } else r.adding
         val produce = r.target.aisle == AisleCode.PRODUCE
-        val hint = lines.mapNotNull { it.parsed.shopUnit }.distinct().singleOrNull()
+        val hint = Display.hintOf(lines.map { it.parsed.shopUnit })
         val entry = c.catalog.byId[r.target.catalogId ?: ""]
         return ReviewRow(
             key = r.target.mergeKey,
@@ -430,7 +430,7 @@ class ReviewViewModel(
             key,
             name,
             effect,
-            entry?.packNote,
+            entry?.packNote?.let(Display::compactUnits),
             lines,
             row.target.aisle,
             row.decision.inStock,

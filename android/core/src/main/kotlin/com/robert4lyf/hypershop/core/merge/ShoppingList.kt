@@ -353,6 +353,42 @@ data class ShoppingList(
     /** The units setting changed: every live item's shown amount did, so every live rev bumps. */
     fun unitsChanged(): ShoppingList = bumped(liveItems.map { it.id }.toSet())
 
+    /**
+     * "Swap for maple syrup": the item becomes [target]. When [target] is already
+     * on the list, this item's contributions and ticks move to it (it keeps its
+     * aisle and place) and this one is merged away, as in a catalogue re-key;
+     * otherwise this item is renamed in place (moving to the target's aisle).
+     * Amounts carry over as written. Null when nothing would change.
+     */
+    fun swapItem(
+        itemId: Long,
+        target: NewItem,
+    ): ShoppingList? {
+        val item = items[itemId]?.takeIf { it.deletedAt == null } ?: return null
+        if (item.mergeKey == target.mergeKey) return null
+        val existing = itemByKey(target.mergeKey)
+        if (existing == null) {
+            val position = if (target.aisle == item.aisle) item.position else nextPosition(target.aisle)
+            val renamed =
+                item.copy(
+                    mergeKey = target.mergeKey,
+                    catalogId = target.catalogId,
+                    normName = target.normName,
+                    displayName = target.displayName,
+                    aisle = target.aisle,
+                    position = position,
+                )
+            return copy(items = items + (itemId to renamed)).bumped(setOf(itemId))
+        }
+        val rev = maxOf(existing.rev, item.rev) + 1
+        return copy(
+            items = items - itemId + (existing.id to existing.copy(rev = rev - 1)),
+            contributions = contributions.map { if (it.itemId == itemId) it.copy(itemId = existing.id) else it },
+            ticks = ticks.map { if (it.itemId == itemId) it.copy(itemId = existing.id) else it },
+            aliases = aliases + (itemId to existing.id),
+        ).bumped(setOf(existing.id))
+    }
+
     /** A new catalogue version: every live item's text may change, so all are bumped. */
     fun catalogueChanged(): ShoppingList = bumped(liveItems.map { it.id }.toSet())
 

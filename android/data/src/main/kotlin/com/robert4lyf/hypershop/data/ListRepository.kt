@@ -436,6 +436,31 @@ class ListRepository(
 
     suspend fun undoDelete(stamp: Long) = write { it.undoDelete(stamp) to Unit }
 
+    /**
+     * Swaps the item for [name] (an ingredient, or anything typed): it merges into
+     * that item if it is already on the list. The new item's name, or null when
+     * nothing changed (no such item, or it already is that).
+     */
+    suspend fun swapItem(
+        itemId: Long,
+        name: String,
+    ): String? =
+        write { l ->
+            val target = merger.target(name, null, overrides())
+            l.swapItem(itemId, target)?.let { it to target.displayName }
+        }
+
+    /** [swapItem] for the item with this key, if one is on the list ("always use instead" set in the library). */
+    suspend fun swapKey(
+        mergeKey: String,
+        name: String,
+    ): String? =
+        write { l ->
+            val item = l.itemByKey(mergeKey) ?: return@write null
+            val target = merger.target(name, null, overrides())
+            l.swapItem(item.id, target)?.let { it to target.displayName }
+        }
+
     /** Purges soft deletes older than 7 days. */
     suspend fun purgeDeleted() =
         db.withTransaction {

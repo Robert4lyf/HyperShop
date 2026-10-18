@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -26,10 +27,12 @@ private val SHEET =
     ItemSheet(
         1,
         "onion",
-        listOf("2", "200 g"),
-        listOf(ItemSource("Weeknight chilli", "2"), ItemSource("Added by hand", "200 g")),
-        "1 × 1 kg bag",
+        listOf("2", "200g"),
+        listOf(ItemSource("Weeknight chilli", "2"), ItemSource("Added by hand", "200g")),
+        "1 × 1kg bag",
         AisleCode.PRODUCE,
+        swaps = listOf("shallot", "red onion"),
+        canAlways = true,
     )
 
 @RunWith(AndroidJUnit4::class)
@@ -52,6 +55,7 @@ class ItemSheetTest {
                             t != "lots"
                         },
                         onDelete = { events += "delete" },
+                        onSwap = { to, always -> events += "swap $to $always" },
                     ),
                 )
             }
@@ -91,10 +95,10 @@ class ItemSheetTest {
     fun totalsSourcesQuantityAndAisle() {
         show()
         compose.onNodeWithTag("totals").assertExists()
-        compose.onNodeWithText("On the list: 2 + 200 g").assertExists()
-        compose.onNodeWithText("Usually sold as 1 × 1 kg bag").assertExists()
+        compose.onNodeWithText("On the list: 2 + 200g").assertExists()
+        compose.onNodeWithText("Usually sold as 1 × 1kg bag").assertExists()
         compose.onNodeWithText("Added by hand").assertExists()
-        compose.onNodeWithText("200 g").assertExists()
+        compose.onNodeWithText("200g").assertExists()
         compose.onNodeWithTag("edit-qty").performTextInput("lots")
         compose.onNodeWithText("Set").performClick()
         compose.onNodeWithText("Enter an amount, like 2 or 200 ml").assertExists()
@@ -114,5 +118,18 @@ class ItemSheetTest {
     fun recordDark() {
         show(dark = true)
         compose.onRoot().captureRoboImage(Shots.path("item-sheet-dark.png"))
+    }
+
+    @Test
+    fun swapsAskJustThisTimeOrAlways() {
+        show()
+        compose.onNodeWithTag("swap-shallot").performScrollTo().performClick()
+        compose.onNodeWithText("Always").performClick()
+        compose.onNodeWithTag("swap-other").performScrollTo().performTextInput("leek")
+        compose.onNodeWithText("Swap").performScrollTo().performClick()
+        // Something typed isn't in the swaps, so only "Just this time" is offered.
+        compose.onNodeWithText("Always").assertDoesNotExist()
+        compose.onNodeWithText("Just this time").performClick()
+        assertEquals(listOf("swap shallot true", "swap leek false"), events)
     }
 }

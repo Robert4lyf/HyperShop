@@ -46,8 +46,8 @@ class ReviewRowSheetViewModelTest {
         await(vm0.state) { it is ReviewState.Added }
         val vm = ReviewViewModel(c, runBlocking { c.readyJob("200 ml milk") })
         await(vm.state) { it is ReviewState.Ready }
-        assertEquals("milk: +200 ml → 700 ml on list", vm.sheet("cat:milk")!!.effect)
-        assertEquals("1 × 4 pint (2.27 l) bottle", vm.sheet("cat:milk")!!.packNote)
+        assertEquals("milk: +200ml → 700ml on list", vm.sheet("cat:milk")!!.effect)
+        assertEquals("1 × 4 pint (2.27l) bottle", vm.sheet("cat:milk")!!.packNote)
         assertEquals("200 ml milk", vm.sheet("cat:milk")!!.lines.single().raw)
     }
 
@@ -55,9 +55,9 @@ class ReviewRowSheetViewModelTest {
     fun iHaveSomeSubtracts() {
         val (_, vm) = vm("500 ml milk")
         assertFalse(vm.haveSome("cat:milk", "lots"))
-        assertTrue(vm.haveSome("cat:milk", "200 ml"))
-        val ui = await(vm.state) { it is ReviewState.Ready && it.ui().row("cat:milk").quantity == "300 ml" }.ui()
-        assertEquals("300 ml", ui.row("cat:milk").quantity)
+        assertTrue(vm.haveSome("cat:milk", "200ml"))
+        val ui = await(vm.state) { it is ReviewState.Ready && it.ui().row("cat:milk").quantity == "300ml" }.ui()
+        assertEquals("300ml", ui.row("cat:milk").quantity)
     }
 
     @Test
@@ -110,7 +110,7 @@ class ReviewRowSheetScreenTest {
         RowSheet(
             key = "cat:milk",
             name = "milk",
-            effect = "milk: +200 ml → 700 ml on list",
+            effect = "milk: +200ml → 700ml on list",
             packNote = "1 × 4 pint (2.27 l) bottle",
             lines = listOf(SheetLine(7, "200ml whole milk or oat milk", "200 ml whole milk (or oat milk)", "oat milk")),
             aisle = AisleCode.DAIRY_EGGS,
@@ -137,7 +137,7 @@ class ReviewRowSheetScreenTest {
     @Test
     fun actions() {
         show()
-        compose.onNodeWithText("milk: +200 ml → 700 ml on list").fetchSemanticsNode()
+        compose.onNodeWithText("milk: +200ml → 700ml on list").fetchSemanticsNode()
         compose.onNodeWithText("Usually sold as 1 × 4 pint (2.27 l) bottle").fetchSemanticsNode()
         compose.onNodeWithText("Use oat milk instead").performClick()
         compose.onNodeWithText("Always in stock").performClick()

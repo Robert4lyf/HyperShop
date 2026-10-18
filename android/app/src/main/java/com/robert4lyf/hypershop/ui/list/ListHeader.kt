@@ -18,19 +18,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.ShoppingBasket
 import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -60,8 +56,6 @@ data class HeaderActions(
     val suggestions: (String) -> List<String>,
     val onReview: (Long) -> Unit,
     val onSample: () -> Unit,
-    /** Null unless the clipboard says it holds text (its content is read only on tap). */
-    val onPasteLink: (() -> Unit)? = null,
 )
 
 /**
@@ -192,33 +186,21 @@ fun ReadyCard(
 
 /** First run: what the app does, in two steps, and a sample list to try. */
 @Composable
-fun EmptyState(
-    onSample: () -> Unit,
-    onPasteLink: (() -> Unit)?,
-) {
+fun EmptyState(onSample: () -> Unit) {
     EmptyHero(
         icon = Icons.Rounded.ShoppingBasket,
         title = "Your list is empty",
         modifier = Modifier.padding(top = 8.dp).testTag("empty"),
     ) {
         Spacer(Modifier.size(4.dp))
-        Step(Icons.Rounded.IosShare, "Share a recipe", "From your browser, share any recipe page to HyperShop.")
+        Step(Icons.Rounded.IosShare, "Share a recipe", "From your browser, share any recipe page, or paste its link on the Recipes tab.")
         Step(Icons.Rounded.Storefront, "Shop aisle by aisle", "Check the ingredients, then tick them off as you go.")
         Text(
             "Or type items into the field above.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = onSample) { Text("Try a sample list") }
-            onPasteLink?.let {
-                OutlinedButton(onClick = it) {
-                    Icon(Icons.Rounded.ContentPaste, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(8.dp))
-                    Text("Paste link")
-                }
-            }
-        }
+        Button(onClick = onSample) { Text("Try a sample list") }
     }
 }
 
@@ -271,24 +253,5 @@ fun androidx.compose.foundation.lazy.LazyListScope.listHeader(
     actions: HeaderActions,
 ) {
     item(key = "add") { AddItemField(actions.onAdd, actions.suggestions) }
-    actions.onPasteLink?.let { paste ->
-        if (!ui.isEmpty) {
-            item(key = "paste") {
-                AssistChip(
-                    onClick = paste,
-                    label = { Text("Paste link") },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Rounded.ContentPaste,
-                            contentDescription = null,
-                            Modifier.size(AssistChipDefaults.IconSize),
-                        )
-                    },
-                    shape = RoundedCornerShape(50),
-                    modifier = Modifier.padding(start = 16.dp).testTag("paste-chip"),
-                )
-            }
-        }
-    }
     item(key = "ready") { ReadyCard(ui.readyJobs, actions.onReview) }
 }

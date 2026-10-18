@@ -1,4 +1,4 @@
-#version	3310f03a969e
+#version	488f58e5db49
 #id	name	plural	synonyms	aisleCode	staple	shoppingUnit	displayPolicy	gramsPerCup	packNote
 onion	onion	onions	yellow onion|brown onion|white onion|spanish onion	PRODUCE	false	each	count	160	
 red_onion	red onion	red onions	purple onion	PRODUCE	false	each	count	160	
@@ -238,6 +238,7 @@ pumpkin_puree	pumpkin purée	pumpkin purée	canned pumpkin	WORLD_FOODS	false	tin
 jam	jam	jam	apricot jam|raspberry jam|strawberry jam|preserves	TINS_JARS	false	jar	count		
 honey	honey	honey	mild honey|runny honey|clear honey	TINS_JARS	false	jar	presence		
 maple_syrup	maple syrup	maple syrup	pure maple syrup	TINS_JARS	false	bottle	presence		
+agave_syrup	agave syrup	agave syrup	agave|agave nectar|agave sweetener	TINS_JARS	false	bottle	presence		
 golden_syrup	golden syrup	golden syrup		BAKING	false	tin	presence		
 corn_syrup	corn syrup	corn syrup	light corn syrup|dark corn syrup	BAKING	false	bottle	presence		
 peanut_butter	peanut butter	peanut butter	smooth peanut butter|crunchy peanut butter	TINS_JARS	false	jar	presence		
