@@ -274,6 +274,7 @@ chive,chives
 chives,chives
 chocolate,dark_chocolate
 chocolate chips,dark_chocolate
+chopped frozen onion,frozen_diced_onion
 chopped tomatoes,chopped_tomatoes
 chorizo,chorizo
 chorizo sausage,chorizo
@@ -391,6 +392,7 @@ date,date
 dates,date
 demerara sugar,demerara
 desiccated coconut,coconut_flakes
+diced frozen onion,frozen_diced_onion
 diced lamb,lamb
 diced tomatoes,chopped_tomatoes
 dijon,dijon
@@ -534,8 +536,14 @@ fresh tuna,tuna_steak
 freshly grated nutmeg,nutmeg
 freshly ground black pepper,black_pepper
 frozen berries,frozen_berries
+frozen chopped onion,frozen_diced_onion
+frozen chopped onions,frozen_diced_onion
 frozen corn,frozen_sweetcorn
+frozen diced onion,frozen_diced_onion
+frozen diced onions,frozen_diced_onion
 frozen mixed berries,frozen_berries
+frozen onion,frozen_diced_onion
+frozen onions,frozen_diced_onion
 frozen peas,frozen_peas
 frozen spinach,frozen_spinach
 frozen sweetcorn,frozen_sweetcorn

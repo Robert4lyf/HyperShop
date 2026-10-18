@@ -206,6 +206,7 @@ fresh_stock,fresh stock,fresh stock,,CHILLED,false,pot,volume,,,agent-estimate
 frozen_peas,frozen peas,frozen peas,peas|petits pois|garden peas,FROZEN,false,bag,mass,145,,agent-estimate
 frozen_sweetcorn,frozen sweetcorn,frozen sweetcorn,corn kernels|frozen corn,FROZEN,false,bag,mass,165,,agent-estimate
 frozen_spinach,frozen spinach,frozen spinach,,FROZEN,false,bag,mass,190,,agent-estimate
+frozen_diced_onion,frozen diced onion,frozen diced onions,frozen chopped onion|frozen chopped onions|frozen onion|frozen onions|diced frozen onion|chopped frozen onion,FROZEN,false,bag,mass,115,,agent-estimate
 frozen_berries,frozen berries,frozen berries,frozen mixed berries,FROZEN,false,bag,mass,140,,agent-estimate
 edamame,edamame beans,edamame beans,edamame|soya beans,FROZEN,false,bag,mass,155,,agent-estimate
 broad_beans,broad beans,broad beans,fava beans|fava bean|broad bean,FROZEN,false,bag,mass,150,,agent-estimate
