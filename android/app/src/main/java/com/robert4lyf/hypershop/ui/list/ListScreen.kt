@@ -17,27 +17,23 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,15 +42,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
@@ -62,15 +59,17 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.ui.common.AisleBadge
+import com.robert4lyf.hypershop.ui.common.HeroButton
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
 import com.robert4lyf.hypershop.ui.common.TickMark
 import com.robert4lyf.hypershop.ui.common.sectionItem
 import com.robert4lyf.hypershop.ui.common.sectionPosition
+import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.card
+import com.robert4lyf.hypershop.ui.theme.style
 
 data class ListActions(
     val onToggle: (ListRow) -> Unit,
-    val onDelete: (ListRow) -> Unit,
     val onFinish: () -> Unit,
     val onClearAll: () -> Unit,
     val onOpenItem: (ListRow) -> Unit = {},
@@ -105,7 +104,6 @@ private fun ListBody(
     empty: @Composable () -> Unit,
 ) {
     val card = MaterialTheme.colorScheme.card
-    val delete = MaterialTheme.colorScheme.errorContainer
     // Collapsed aisles, by name: kept across tab switches and rotation.
     var collapsed by rememberSaveable { mutableStateOf(emptyList<String>()) }
     LazyColumn(Modifier.fillMaxSize().testTag("list"), contentPadding = PaddingValues(bottom = 24.dp)) {
@@ -120,12 +118,12 @@ private fun ListBody(
                     rows,
                     open,
                     onToggle = { collapsed = if (open) collapsed + aisle.name else collapsed - aisle.name },
-                    modifier = Modifier.padding(top = 16.dp).sectionItem(sectionPosition(0, count), card),
+                    modifier = Modifier.padding(top = 16.dp).sectionItem(sectionPosition(0, count), aisle.style.container),
                 )
             }
             if (open) {
                 itemsIndexed(rows, key = { _, r -> r.id }) { i, r ->
-                    ListRowItem(r, actions, Modifier.sectionItem(sectionPosition(i + 1, count), delete))
+                    ListRowItem(r, actions, Modifier.sectionItem(sectionPosition(i + 1, count), card))
                 }
             }
         }
@@ -150,7 +148,7 @@ private fun ListTop(
             },
         actions = {
             if (ui.doneCount > 0) {
-                FilledTonalButton(onClick = actions.onFinish, contentPadding = PaddingValues(horizontal = 14.dp)) {
+                HeroButton(onClick = actions.onFinish) {
                     Icon(Icons.Rounded.DoneAll, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(6.dp))
                     Text("Finish shopping")
@@ -180,7 +178,8 @@ private fun ListTop(
                     strokeCap = StrokeCap.Round,
                     gapSize = 4.dp,
                     drawStopIndicator = {},
-                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    color = Brand.Citrus,
+                    trackColor = Color.White.copy(alpha = 0.22f),
                 )
             }
         },
@@ -231,24 +230,17 @@ private fun AisleTitle(
 }
 
 /**
- * One row is one TalkBack node: tapping ticks or unticks; "Delete" and "Open"
- * are custom actions, so swipe-to-delete has an accessible equivalent. DONE
- * rows are greyed, struck through and carry a tick (not colour alone).
+ * One row, two targets: only the round tick ticks or unticks (so a stray tap on
+ * the row can't); the rest of the row opens the item card, where Delete lives.
+ * TalkBack reads the tick as a checkbox named after the item, then the row.
+ * DONE rows are greyed, struck through and carry a tick (not colour alone).
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ListRowItem(
     row: ListRow,
     actions: ListActions,
     tile: Modifier,
 ) {
-    val swipe =
-        rememberSwipeToDismissBoxState(
-            confirmValueChange = {
-                if (it == SwipeToDismissBoxValue.EndToStart) actions.onDelete(row)
-                false
-            },
-        )
     val state =
         when (row.state) {
             TickState.DONE -> "Ticked"
@@ -256,51 +248,51 @@ private fun ListRowItem(
             TickState.OPEN -> "Not ticked"
         }
     val done = row.state == TickState.DONE
-    SwipeToDismissBox(
-        state = swipe,
-        enableDismissFromStartToEnd = false,
-        modifier = tile,
-        backgroundContent = {
-            Row(
-                Modifier.fillMaxSize().padding(horizontal = 24.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-            ) {
-                Text("Delete", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onErrorContainer)
-                Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
-            }
-        },
+    Row(
+        tile
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.card)
+            .heightIn(min = 64.dp)
+            .padding(start = 4.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
+        val tint = row.aisle.style
+        Box(
             Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.card)
-                .heightIn(min = 64.dp)
-                .clickable { actions.onToggle(row) }
+                .size(56.dp)
+                .clip(CircleShape)
+                .toggleable(value = done, role = Role.Checkbox, onValueChange = { actions.onToggle(row) })
                 .clearAndSetSemantics {
-                    testTag = "item-${row.id}"
-                    contentDescription = listOfNotNull(row.main, row.sub).joinToString(", ")
+                    testTag = "tick-${row.id}"
+                    contentDescription = row.main
                     stateDescription = state
+                    role = Role.Checkbox
                     onClick(label = if (done) "Untick" else "Tick") {
                         actions.onToggle(row)
                         true
                     }
-                    customActions =
-                        listOf(
-                            CustomAccessibilityAction("Delete") {
-                                actions.onDelete(row)
-                                true
-                            },
-                            CustomAccessibilityAction("Details") {
-                                actions.onOpenItem(row)
-                                true
-                            },
-                        )
-                }.padding(start = 16.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                },
+            contentAlignment = Alignment.Center,
         ) {
-            TickMark(done = done, partial = row.state == TickState.PARTIAL)
+            TickMark(
+                done = done,
+                partial = row.state == TickState.PARTIAL,
+                color = tint.content,
+                onColor = tint.container,
+                softColor = tint.container,
+            )
+        }
+        Row(
+            Modifier
+                .weight(1f)
+                .heightIn(min = 64.dp)
+                .clickable(onClickLabel = "Details") { actions.onOpenItem(row) }
+                .semantics(mergeDescendants = true) {
+                    testTag = "item-${row.id}"
+                    stateDescription = state
+                }.padding(start = 6.dp, top = 10.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Column(Modifier.weight(1f)) {
                 Text(
                     row.main.replaceFirstChar { it.uppercase() },
@@ -310,9 +302,12 @@ private fun ListRowItem(
                 )
                 row.sub?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
-            IconButton(onClick = { actions.onOpenItem(row) }) {
-                Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            Icon(
+                Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 12.dp),
+            )
         }
     }
 }

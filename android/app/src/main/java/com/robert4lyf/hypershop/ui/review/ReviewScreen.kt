@@ -1,6 +1,7 @@
 package com.robert4lyf.hypershop.ui.review
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,16 +36,19 @@ import androidx.compose.material.icons.rounded.ReportProblem
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,7 +76,10 @@ import com.robert4lyf.hypershop.ui.common.rememberOpenLink
 import com.robert4lyf.hypershop.ui.common.sectionItem
 import com.robert4lyf.hypershop.ui.common.sectionPosition
 import com.robert4lyf.hypershop.ui.common.siteName
+import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.card
+import com.robert4lyf.hypershop.ui.theme.heroGlow
+import com.robert4lyf.hypershop.ui.theme.style
 
 /** The review screen's default view (PLAN §3.1), stateless. */
 @Composable
@@ -106,7 +113,12 @@ fun ReviewScreen(
                 for ((aisle, rows) in ui.aisles) {
                     val count = rows.size + 1
                     item(key = "aisle-${aisle.name}") {
-                        AisleHeader(aisle, rows, onAisleInStock, Modifier.padding(top = 12.dp).sectionItem(sectionPosition(0, count), card))
+                        AisleHeader(
+                            aisle,
+                            rows,
+                            onAisleInStock,
+                            Modifier.padding(top = 12.dp).sectionItem(sectionPosition(0, count), aisle.style.container),
+                        )
                     }
                     itemsIndexed(rows, key = { _, r -> r.key }) { i, r ->
                         ReviewRowItem(r, onInStock, onRow, sectionPosition(i + 1, count), card)
@@ -171,43 +183,56 @@ private fun Hero(
     onRetryClaude: () -> Unit,
 ) {
     val open = rememberOpenLink()
-    Column(
-        Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        // Wraps rather than squeezing: the spinner must stay visible on narrow phones.
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+    val onHero = ButtonDefaults.textButtonColors(contentColor = Brand.OnHero)
+    CompositionLocalProvider(LocalContentColor provides Brand.OnHero) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .clip(RoundedCornerShape(28.dp))
+                .background(Brand.recipeBrush(ui.title))
+                .heroGlow()
+                .padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            when (ui.badge) {
-                Badge.CLAUDE -> Badge("Parsed by Claude", Icons.Rounded.AutoAwesome)
-                Badge.CLAUDE_PENDING -> {
-                    Badge("Claude pending", Icons.Rounded.HourglassTop)
-                    TextButton(onClick = onRetryClaude, enabled = !ui.busy) {
-                        Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.size(6.dp))
-                        Text("Retry with Claude")
+            // Wraps rather than squeezing: the spinner must stay visible on narrow phones.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                when (ui.badge) {
+                    Badge.CLAUDE -> Badge("Parsed by Claude", Icons.Rounded.AutoAwesome)
+                    Badge.CLAUDE_PENDING -> {
+                        Badge("Claude pending", Icons.Rounded.HourglassTop)
+                        TextButton(onClick = onRetryClaude, enabled = !ui.busy, colors = onHero) {
+                            Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.size(6.dp))
+                            Text("Retry with Claude")
+                        }
                     }
+                    Badge.RULES -> Badge("Parsed offline", Icons.Rounded.CloudOff)
                 }
-                Badge.RULES -> Badge("Parsed offline", Icons.Rounded.CloudOff)
+                if (ui.busy) CircularProgressIndicator(Modifier.size(20.dp), color = Brand.OnHero, strokeWidth = 2.dp)
             }
-            if (ui.busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-        }
-        Text(ui.title, style = MaterialTheme.typography.headlineMedium)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)) {
-            ui.servings?.let { s -> Servings(s, onServings) }
-            Spacer(Modifier.weight(1f))
-            ui.url?.let { url ->
-                TextButton(onClick = { open(url) }, modifier = Modifier.weight(1f, fill = false).testTag("open-recipe")) {
-                    Text(
-                        siteName(url) ?: "Open recipe",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    Spacer(Modifier.size(6.dp))
-                    Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = "Open recipe", modifier = Modifier.size(18.dp))
+            Text(ui.title, style = MaterialTheme.typography.headlineMedium, color = Brand.OnHero)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)) {
+                ui.servings?.let { s -> Servings(s, onServings) }
+                Spacer(Modifier.weight(1f))
+                ui.url?.let { url ->
+                    TextButton(
+                        onClick = { open(url) },
+                        modifier = Modifier.weight(1f, fill = false).testTag("open-recipe"),
+                        colors = onHero,
+                    ) {
+                        Text(
+                            siteName(url) ?: "Open recipe",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        Spacer(Modifier.size(6.dp))
+                        Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = "Open recipe", modifier = Modifier.size(18.dp))
+                    }
                 }
             }
         }
@@ -226,9 +251,9 @@ private fun Badge(
         shape = RoundedCornerShape(50),
         colors =
             AssistChipDefaults.assistChipColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                leadingIconContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                containerColor = Color.White,
+                labelColor = HERO_INK,
+                leadingIconContentColor = HERO_INK,
             ),
         border = null,
     )
@@ -240,7 +265,7 @@ private fun Servings(
     s: Int,
     onServings: (Int) -> Unit,
 ) {
-    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+    Surface(shape = RoundedCornerShape(50), color = Color.White, contentColor = HERO_INK) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(
                 onClick = { onServings(s - 1) },
@@ -370,3 +395,6 @@ private fun InStockPill(
         }
     }
 }
+
+/** Text on the hero's white chips: near-black green, readable on white whatever the recipe's hue. */
+private val HERO_INK = Color(0xFF12301F)

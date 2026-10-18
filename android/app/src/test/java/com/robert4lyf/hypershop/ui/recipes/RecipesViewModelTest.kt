@@ -79,4 +79,19 @@ class RecipesViewModelTest {
         val l = runBlocking { c.repository.snapshot() }
         assertEquals(com.robert4lyf.hypershop.core.model.Rational.of(4), l.total(l.itemByKey("cat:onion")!!.id).parts["count"])
     }
+
+    @Test
+    fun aTypedRecipeIsReviewedLikeAShare() {
+        val c = TestContainer.create()
+        val vm = RecipesViewModel(c)
+        vm.addManual("  Gran's soup ", 6, "2 onions\n\n400 g chopped tomatoes\n")
+        val review = ReviewViewModel(c, nextReview(vm))
+        val ready = await(review.state) { it is ReviewState.Ready } as ReviewState.Ready
+        assertEquals("Gran's soup", ready.ui.title)
+        assertEquals(6, ready.ui.servings)
+        assertEquals(setOf("cat:onion", "cat:chopped_tomatoes"), ready.ui.aisles.flatMap { it.second }.map { it.key }.toSet())
+        review.confirm()
+        await(review.state) { it is ReviewState.Added }
+        assertEquals("Gran's soup", await(vm.ui) { it.uses.isNotEmpty() }.uses.single().title)
+    }
 }

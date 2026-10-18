@@ -56,20 +56,15 @@ jobs:
       - name: Verify
         run: tools/verify.sh
 
+      # Only when something failed, and kept for a day: artifacts count against
+      # the account's 0.5 GB of Actions storage. The APK is not uploaded here;
+      # release.yml publishes it as a release asset, which that quota excludes
+      # (a ~60 MB APK per run filled it within a day of pushes).
       - name: Upload test report
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-report
           path: android/*/build/reports/tests
           if-no-files-found: ignore
-          retention-days: 3
-
-      - name: Upload debug APK
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: hypershop-debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: ignore
-          retention-days: 3
+          retention-days: 1

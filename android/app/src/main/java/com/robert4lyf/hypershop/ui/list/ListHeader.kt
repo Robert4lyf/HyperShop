@@ -44,12 +44,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.ui.common.EmptyHero
+import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.card
+import com.robert4lyf.hypershop.ui.theme.heroGlow
 
 /** Callbacks of the list header (Step 5.6b). */
 data class HeaderActions(
@@ -161,19 +164,19 @@ fun ReadyCard(
             .clickable { onReview(jobs.first()) }
             .testTag("ready-card"),
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        color = Color.Transparent,
+        contentColor = Brand.OnHero,
     ) {
         Row(
-            Modifier.padding(16.dp),
+            Modifier.background(Brand.WarmCall).heroGlow().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Box(
-                Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                Modifier.size(44.dp).clip(CircleShape).background(Color.White),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.AutoMirrored.Rounded.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
+                Icon(Icons.AutoMirrored.Rounded.MenuBook, contentDescription = null, tint = Color(0xFFB4471F))
             }
             Column(Modifier.weight(1f)) {
                 Text(

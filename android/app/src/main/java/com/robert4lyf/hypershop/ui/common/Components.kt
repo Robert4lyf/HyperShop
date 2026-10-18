@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,14 +19,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,7 +45,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
+import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.card
+import com.robert4lyf.hypershop.ui.theme.heroBrush
+import com.robert4lyf.hypershop.ui.theme.heroGlow
 import com.robert4lyf.hypershop.ui.theme.style
 
 /** The aisle's icon on its colour: the same mark on every screen. */
@@ -52,10 +60,10 @@ fun AisleBadge(
 ) {
     val s = aisle.style
     Box(
-        modifier.size(size).clip(RoundedCornerShape(size * 0.32f)).background(s.container),
+        modifier.size(size).clip(RoundedCornerShape(size * 0.32f)).background(s.content),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(s.icon, contentDescription = null, tint = s.content, modifier = Modifier.size(size * 0.56f))
+        Icon(s.icon, contentDescription = null, tint = s.container, modifier = Modifier.size(size * 0.56f))
     }
 }
 
@@ -123,7 +131,11 @@ fun SectionLabel(
     }
 }
 
-/** A screen's large title, with an overline and subtitle and room for actions and more below. */
+/**
+ * A screen's hero: the large title on the basil gradient, with an overline and
+ * subtitle and room for actions and more below. Content inside is white
+ * ([LocalContentColor]), so icon buttons in [actions] need no colours.
+ */
 @Composable
 fun ScreenHeader(
     title: String,
@@ -133,21 +145,48 @@ fun ScreenHeader(
     actions: @Composable RowScope.() -> Unit = {},
     below: @Composable ColumnScope.() -> Unit = {},
 ) {
-    Column(modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 20.dp, bottom = 12.dp)) {
-        Row(verticalAlignment = Alignment.Top) {
-            Column(Modifier.weight(1f).padding(top = 4.dp)) {
-                overline?.let {
-                    Text(it.uppercase(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+    Box(
+        modifier
+            .fillMaxWidth()
+            .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
+            .clip(RoundedCornerShape(28.dp))
+            .background(heroBrush)
+            .heroGlow(),
+    ) {
+        CompositionLocalProvider(LocalContentColor provides Brand.OnHero) {
+            Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 18.dp, bottom = 18.dp)) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Column(Modifier.weight(1f).padding(top = 4.dp)) {
+                        overline?.let {
+                            Text(it.uppercase(), style = MaterialTheme.typography.labelMedium, color = Brand.Citrus)
+                        }
+                        Text(title, style = MaterialTheme.typography.headlineLarge, color = Brand.OnHero)
+                        subtitle?.let {
+                            Text(it, style = MaterialTheme.typography.bodyMedium, color = Brand.OnHeroSoft)
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, content = actions)
                 }
-                Text(title, style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onSurface)
-                subtitle?.let {
-                    Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                Column(Modifier.padding(end = 12.dp), content = below)
             }
-            Row(verticalAlignment = Alignment.CenterVertically, content = actions)
         }
-        Column(Modifier.padding(end = 12.dp), content = below)
     }
+}
+
+/** A white pill button for a hero, basil text on it. */
+@Composable
+fun HeroButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier,
+        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF0B6B3E)),
+        contentPadding = PaddingValues(horizontal = 14.dp),
+        content = content,
+    )
 }
 
 /** The round tick: open (ring), partly ticked (half-filled with a dash), done (filled with a check). */
@@ -157,23 +196,26 @@ fun TickMark(
     partial: Boolean = false,
     modifier: Modifier = Modifier,
     size: Dp = 28.dp,
+    color: Color = MaterialTheme.colorScheme.primary,
+    onColor: Color = MaterialTheme.colorScheme.onPrimary,
+    softColor: Color = MaterialTheme.colorScheme.primaryContainer,
 ) {
     val fill by animateColorAsState(
         when {
-            done -> MaterialTheme.colorScheme.primary
-            partial -> MaterialTheme.colorScheme.primaryContainer
+            done -> color
+            partial -> softColor
             else -> Color.Transparent
         },
         label = "tick",
     )
-    val ring = if (done || partial) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+    val ring = if (done || partial) color else MaterialTheme.colorScheme.outline
     Box(
         modifier.size(size).clip(CircleShape).background(fill).border(2.dp, ring, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         when {
-            done -> Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(size * 0.7f))
-            partial -> Icon(Icons.Rounded.Remove, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(size * 0.7f))
+            done -> Icon(Icons.Rounded.Check, null, tint = onColor, modifier = Modifier.size(size * 0.7f))
+            partial -> Icon(Icons.Rounded.Remove, null, tint = color, modifier = Modifier.size(size * 0.7f))
         }
     }
 }
@@ -222,10 +264,10 @@ fun EmptyHero(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(
-            Modifier.size(96.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+            Modifier.size(104.dp).clip(CircleShape).background(heroBrush).heroGlow(),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(48.dp))
+            Icon(icon, contentDescription = null, tint = Brand.OnHero, modifier = Modifier.size(52.dp))
         }
         Text(title, style = MaterialTheme.typography.headlineSmall)
         body?.let {

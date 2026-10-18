@@ -2,7 +2,9 @@ package com.robert4lyf.hypershop.ui.settings
 
 import android.app.Activity
 import android.view.WindowManager
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -60,11 +62,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -80,8 +85,9 @@ import com.robert4lyf.hypershop.ui.common.AisleBadge
 import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
 import com.robert4lyf.hypershop.ui.common.SectionCard
-import com.robert4lyf.hypershop.ui.common.SectionLabel
 import com.robert4lyf.hypershop.ui.common.Tone
+import com.robert4lyf.hypershop.ui.theme.Brand
+import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.util.factoryFor
 import java.util.Locale
 
@@ -152,18 +158,18 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item(key = "top") { ScreenHeader(title = "Settings", subtitle = "Your list, your shop, your watch") }
-            card("Appearance", Icons.Rounded.Palette) { AppearanceGroup(ui, actions) }
-            card("List", Icons.Rounded.Tune) { ListGroup(ui, actions) }
-            card("Aisles", Icons.Rounded.Route) { AislesGroup(ui, actions) }
-            card("Watch", Icons.Rounded.Watch) { WatchGroup(ui, actions) }
-            card("Claude", Icons.Rounded.AutoAwesome) {
+            card("Appearance", Icons.Rounded.Palette, hue = 300f) { AppearanceGroup(ui, actions) }
+            card("List", Icons.Rounded.Tune, hue = 140f) { ListGroup(ui, actions) }
+            card("Aisles", Icons.Rounded.Route, hue = 30f) { AislesGroup(ui, actions) }
+            card("Watch", Icons.Rounded.Watch, hue = 205f) { WatchGroup(ui, actions) }
+            card("Claude", Icons.Rounded.AutoAwesome, hue = 265f) {
                 KeySection(ui, actions)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 ModelSection(ui, actions)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 CapsSection(ui, actions)
             }
-            card("Advanced", Icons.Rounded.Code) { AdvancedGroup(ui, actions) }
+            card("Advanced", Icons.Rounded.Code, hue = 180f) { AdvancedGroup(ui, actions) }
         }
     }
     if (ui.keyLost) {
@@ -185,10 +191,19 @@ fun SettingsScreen(
 private fun LazyListScope.card(
     title: String,
     icon: ImageVector,
+    hue: Float,
     content: @Composable () -> Unit,
 ) = item(key = "group-$title") {
     SectionCard {
-        SectionLabel(title, icon = icon)
+        // Each group has its own colour, so the page reads as sections at a glance.
+        val dark = LocalDarkTheme.current
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(
+                Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(Brand.tint(hue, dark)),
+                contentAlignment = Alignment.Center,
+            ) { Icon(icon, contentDescription = null, tint = Brand.strong(hue, dark), modifier = Modifier.size(20.dp)) }
+            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+        }
         content()
     }
 }

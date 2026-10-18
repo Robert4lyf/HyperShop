@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.ui.list
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,10 +12,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.LocalMall
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -42,6 +45,8 @@ data class ItemSheetActions(
     val onMove: (AisleCode, Boolean) -> Unit,
     /** False when the text has no amount. */
     val onEditQuantity: (String) -> Boolean,
+    /** Takes the item off the list (with Undo on the list). */
+    val onDelete: () -> Unit = {},
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,7 +70,16 @@ fun ItemSheetContent(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            SheetHeader(sheet.name, sheet.aisle)
+            Row(verticalAlignment = Alignment.Top) {
+                Box(Modifier.weight(1f)) { SheetHeader(sheet.name, sheet.aisle) }
+                IconButton(onClick = actions.onDelete, modifier = Modifier.testTag("delete-item")) {
+                    Icon(
+                        Icons.Rounded.DeleteOutline,
+                        contentDescription = "Delete ${sheet.name}",
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
             if (sheet.totals.isNotEmpty()) {
                 val amount = sheet.totals.joinToString(" + ")
                 Text(

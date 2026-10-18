@@ -131,6 +131,23 @@ Shared components (`ui/common/`):
 - Aisle styles are an exhaustive `when` (a new aisle won't compile without one); the theme
   provides `LocalDarkTheme` instead of guessing dark mode from colours.
 
+## Colour pass (after phone testing: "sleek but dull")
+- **Hero headers:** every tab's title sits on a basil-to-lagoon gradient card with two soft light circles. The text is white, and the overline and progress bar are citrus. "Finish shopping" is a white pill.
+- **Aisles carry their colour:** the aisle header is tinted, the badge is solid with a light icon, and ticks fill in the aisle's colour.
+- **Recipes have a hue:** each recipe gets a colour band picked from its title, and its review header uses the same gradient. Its fact chips are tinted to match.
+- **Other screens:** "Ready to review" is a warm tomato-to-berry card. Each settings group has its own coloured icon tile. The empty state's circle uses the hero gradient.
+- **Contrast:** white text on every gradient clears 4.5:1, and the gradients are darker in dark mode. State is still never shown by colour alone.
+
+## Rows (after phone testing: accidental ticks)
+- Only the round tick (a 56 dp target) ticks; the rest of the row opens the item card. TalkBack reads the tick as a checkbox named after the item.
+- Swipe-to-delete is gone. Delete is the bin at the item card's top right, with Undo on the list.
+
+## Adding a recipe (after phone testing)
+- The Recipes tab has a + button. It opens a sheet with two choices:
+  - **Paste a link:** the same path as sharing a page to the app.
+  - **Type it in:** a name, an optional "serves" and the ingredients, one per line.
+- A typed recipe is rule-parsed and opens the usual review screen. Claude is called only there, with a key, as for a shared page.
+
 ## Not changing
 - Navigation, view models, data, strings that tests or TalkBack depend on,
   the one-node-per-row semantics, and swipe-to-delete with its accessible

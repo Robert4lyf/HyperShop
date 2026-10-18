@@ -1,6 +1,6 @@
 package com.robert4lyf.hypershop.ui.list
 
-import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsFocused
@@ -56,7 +56,7 @@ class ListScreenTest {
     private val actions =
         ListActions(
             onToggle = { events += "toggle ${it.id}" },
-            onDelete = { events += "delete ${it.id}" },
+            onOpenItem = { events += "open ${it.id}" },
             onFinish = { events += "finish" },
             onClearAll = { events += "clear" },
         )
@@ -67,22 +67,18 @@ class ListScreenTest {
         }
 
     @Test
-    fun rowsAreSingleNodesWithStateAndActions() {
+    fun onlyTheTickTicksAndTheRowOpensDetails() {
         show()
-        val node = compose.onNodeWithTag("item-1").fetchSemanticsNode()
-        assertEquals("Partly ticked", node.config.getOrNull(SemanticsProperties.StateDescription))
-        assertEquals(listOf("1 more onion, 2 already ticked"), node.config.getOrNull(SemanticsProperties.ContentDescription))
-        assertEquals(listOf("Delete", "Details"), node.config[SemanticsActions.CustomActions].map { it.label })
+        val tick = compose.onNodeWithTag("tick-1").fetchSemanticsNode()
+        assertEquals("Partly ticked", tick.config.getOrNull(SemanticsProperties.StateDescription))
+        assertEquals(listOf("1 more onion"), tick.config.getOrNull(SemanticsProperties.ContentDescription))
+        assertEquals(Role.Checkbox, tick.config.getOrNull(SemanticsProperties.Role))
         compose.onNodeWithTag("item-1").performClick()
-        val delete =
-            compose.onNodeWithTag(
-                "item-4",
-            ).fetchSemanticsNode().config[SemanticsActions.CustomActions].first { it.label == "Delete" }
-        compose.runOnIdle { delete.action() }
-        assertEquals("Ticked", compose.onNodeWithTag("item-3").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
+        compose.onNodeWithTag("tick-1").performClick()
+        assertEquals("Ticked", compose.onNodeWithTag("tick-3").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
         compose.onNodeWithText("Finish shopping").performClick()
         compose.onNodeWithText("5 left").fetchSemanticsNode()
-        assertEquals(listOf("toggle 1", "delete 4", "finish"), events)
+        assertEquals(listOf("open 1", "toggle 1", "finish"), events)
     }
 
     @Test

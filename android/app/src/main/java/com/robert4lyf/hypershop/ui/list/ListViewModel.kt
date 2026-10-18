@@ -125,11 +125,15 @@ class ListViewModel(
             if (row.state == TickState.DONE) c.repository.untick(row.id) else c.repository.tick(row.id)
         }
 
-    fun delete(row: ListRow) =
-        viewModelScope.launch {
-            val stamp = c.repository.softDelete(row.id)
-            messages.send(UiMessage("Deleted ${row.name}", undo = { c.repository.undoDelete(stamp) }))
-        }
+    /** "Delete" on the item card: closes it, with Undo on the list. */
+    fun delete(
+        id: Long,
+        name: String,
+    ) = viewModelScope.launch {
+        _sheet.value = null
+        val stamp = c.repository.softDelete(id)
+        messages.send(UiMessage("Deleted $name", undo = { c.repository.undoDelete(stamp) }))
+    }
 
     fun finishShopping() =
         viewModelScope.launch {
