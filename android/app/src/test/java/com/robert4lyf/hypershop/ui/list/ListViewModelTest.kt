@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -161,5 +162,53 @@ class ListViewModelTest {
         await(vm.ui) { it.row("onion").main.startsWith("5 onions") }
         vm.moveItem(sheet.id, AisleCode.TINS_JARS, always = false)
         await(vm.ui) { it.row("onion").aisle == AisleCode.TINS_JARS }
+    }
+
+    @Test
+    fun finishCountsATickNotYetOnScreen() {
+        val c = TestContainer.create()
+        c.add("2 onions", "1 carrot")
+        val vm = ListViewModel(c)
+        val ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
+        // Straight after the tick: the screen may not show it yet; the count comes from the write.
+        runBlocking { c.repository.tick(ui.row("onion").id) }
+        vm.finishShopping()
+        assertEquals("Finished: removed 1 ticked items", nextMessage(vm).text)
+    }
+
+    @Test
+    fun theLastItemOpenedWinsAndCloseStaysClosed() {
+        val c = TestContainer.create()
+        c.add("2 onions", "1 carrot")
+        val vm = ListViewModel(c)
+        val ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
+        val onion = ui.row("onion").id
+        val carrot = ui.row("carrot").id
+        vm.openItem(onion)
+        vm.openItem(carrot)
+        assertEquals(carrot, await(vm.sheet) { it != null }!!.id)
+        settle()
+        assertEquals(carrot, vm.sheet.value?.id)
+        // Closed while loading: stays closed.
+        vm.openItem(onion)
+        vm.closeItem()
+        settle()
+        assertNull(vm.sheet.value)
+        // A move made from the onion's sheet doesn't close the carrot's, opened since.
+        vm.openItem(onion)
+        await(vm.sheet) { it?.id == onion }
+        vm.moveItem(onion, AisleCode.TINS_JARS, always = false)
+        vm.openItem(carrot)
+        await(vm.ui) { it.row("onion").aisle == AisleCode.TINS_JARS }
+        settle()
+        assertEquals(carrot, vm.sheet.value?.id)
+    }
+
+    /** Lets everything queued run: the main looper, and Room and background work. */
+    private fun settle() {
+        repeat(20) {
+            shadowOf(Looper.getMainLooper()).idle()
+            Thread.sleep(10)
+        }
     }
 }

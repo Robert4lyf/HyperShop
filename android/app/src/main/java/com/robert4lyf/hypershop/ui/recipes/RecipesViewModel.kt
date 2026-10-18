@@ -27,10 +27,14 @@ data class RecipesUi(
 class RecipesViewModel(
     private val c: AppContainer,
 ) : ViewModel() {
+    /** From the shared list read; only while the tab is shown (and 5 s after, across a rotation). */
     val ui: StateFlow<RecipesUi> =
-        c.repository.observe()
-            .map { RecipesUi(c.repository.usesOnList(), loaded = true) }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, RecipesUi())
+        c.repository.list
+            .map { RecipesUi(c.repository.usesOnList(it), loaded = true) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecipesUi())
+
+    /** Uses whose "Add the in-stock items now" is being set up: a second tap meanwhile does nothing. */
+    private val addingInStock = mutableSetOf<Long>()
 
     private val messages = Channel<UiMessage>(Channel.BUFFERED)
     val events: Flow<UiMessage> = messages.receiveAsFlow()
@@ -47,24 +51,35 @@ class RecipesViewModel(
         }
 
     /** "Add the in-stock items now": the review screen again, full amounts, nothing pre-ticked. */
-    fun addInStockNow(use: UseSummary) =
+    fun addInStockNow(use: UseSummary) {
+        // Main thread only: checked and set before the first suspension.
+        if (!addingInStock.add(use.useId)) return
         viewModelScope.launch {
-            val (recipe, lines) = c.repository.inStockLines(use.useId) ?: return@launch
-            if (lines.isEmpty()) return@launch
-            val result =
-                ImportResult(
-                    url = recipe.url,
-                    title = recipe.title,
-                    servings = recipe.servingsOriginal,
-                    targetServings = use.servings,
-                    locale = UnitLocale.valueOf(recipe.unitLocale),
-                    method = "IN_STOCK",
-                    lines = lines,
-                    rawLines = lines.map { it.raw },
-                    preTick = false,
-                )
-            reviews.send(c.importJobs.enqueueReady(ImportInput(recipe.url ?: "", recipe.title), result))
+            try {
+                addInStock(use)
+            } finally {
+                addingInStock.remove(use.useId)
+            }
         }
+    }
+
+    private suspend fun addInStock(use: UseSummary) {
+        val (recipe, lines) = c.repository.inStockLines(use.useId) ?: return
+        if (lines.isEmpty()) return
+        val result =
+            ImportResult(
+                url = recipe.url,
+                title = recipe.title,
+                servings = recipe.servingsOriginal,
+                targetServings = use.servings,
+                locale = UnitLocale.valueOf(recipe.unitLocale),
+                method = "IN_STOCK",
+                lines = lines,
+                rawLines = lines.map { it.raw },
+                preTick = false,
+            )
+        reviews.send(c.importJobs.enqueueReady(ImportInput(recipe.url ?: "", recipe.title), result))
+    }
 
     /** "+ › Paste a link": the same path as sharing a page to the app (the review screen opens when it is ready). */
     fun addLink(text: String) {

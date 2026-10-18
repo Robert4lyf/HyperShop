@@ -301,18 +301,6 @@ class ListRepository(
         }
     }
 
-    /** Titles of the uses behind an item, for the item sheet. */
-    suspend fun useTitles(useIds: Collection<Long>): Map<Long, String> {
-        val l = snapshot()
-        return useLinks(l, useIds).mapValues { it.value.title }
-    }
-
-    /** Recipe pages behind an item, by use, for the item sheet's links. */
-    suspend fun useUrls(useIds: Collection<Long>): Map<Long, String?> {
-        val l = snapshot()
-        return useLinks(l, useIds).mapValues { it.value.url }
-    }
-
     private suspend fun recipesById(ids: Collection<Long>): Map<Long, RecipeEntity> =
         ids.distinct().chunked(MAX_ARGS).flatMap { dao.recipes(it) }.associateBy { it.id }
 

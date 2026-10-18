@@ -12,15 +12,20 @@ import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.common.webLink
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 enum class TickState { OPEN, PARTIAL, DONE }
@@ -86,13 +91,22 @@ class ListViewModel(
     private val plusOne = MutableStateFlow<PlusOne?>(null)
     private val _sheet = MutableStateFlow<ItemSheet?>(null)
     val sheet: StateFlow<ItemSheet?> = _sheet
-    private var lastList: ShoppingList = ShoppingList()
+
+    // The list and units behind the latest [ui], written off the main thread.
+    @Volatile private var lastList: ShoppingList = ShoppingList()
+
+    @Volatile private var lastUnits: UnitsSetting? = null
+
+    /** The item sheet being loaded: a newer open, or a close, cancels it. */
+    private var openJob: Job? = null
 
     val ui: StateFlow<ListUi> =
-        combine(c.repository.observe(), c.settings.units, order, c.importJobs.ready, plusOne) { list, units, ord, ready, p ->
+        combine(c.repository.list, c.settings.units, order, c.importJobs.ready, plusOne) { list, units, ord, ready, p ->
             lastList = list
+            lastUnits = units
             build(list, units, ord).copy(readyJobs = ready.map { it.id }, plusOne = p)
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, ListUi())
+        }.flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, ListUi())
 
     private fun build(
         list: ShoppingList,
@@ -130,6 +144,7 @@ class ListViewModel(
         id: Long,
         name: String,
     ) = viewModelScope.launch {
+        openJob?.cancel()
         _sheet.value = null
         val stamp = c.repository.softDelete(id)
         messages.send(UiMessage("Deleted $name", undo = { c.repository.undoDelete(stamp) }))
@@ -137,19 +152,22 @@ class ListViewModel(
 
     fun finishShopping() =
         viewModelScope.launch {
-            val n = ui.value.doneCount
-            val stamp = c.repository.finishShopping()
+            // Counted inside the write: a tick still on its way to the screen is included.
+            val (stamp, n) = c.repository.finish()
             messages.send(UiMessage("Finished: removed $n ticked items", undo = { c.repository.undoDelete(stamp) }))
         }
 
     // ---- the item sheet (5.7) ---------------------------------------------------------------
 
-    fun openItem(id: Long) =
-        viewModelScope.launch {
-            val list = c.repository.snapshot()
+    /** Opens the sheet for [id]. Opening another, or closing, before it loads wins. */
+    fun openItem(id: Long): Job {
+        openJob?.cancel()
+        return viewModelScope.launch {
+            // The list on screen; a read only when the item isn't in it yet.
+            val list = lastList.takeIf { id in it.items } ?: c.repository.snapshot()
             val item = list.items[id] ?: return@launch
             val entry = item.catalogId?.let { c.catalog.byId[it] }
-            val units = c.settings.units.first()
+            val units = lastUnits ?: c.settings.units.first()
             val produce = item.aisle == AisleCode.PRODUCE
             val hint = list.contributionsOf(id).mapNotNull { it.unitHint }.distinct().singleOrNull()
             val totals =
@@ -157,22 +175,28 @@ class ListViewModel(
                     Display.amount(QtyBase(mapOf(k to v)), units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy)
                 }
             val byUse = list.contributionsOf(id).groupBy { it.useId }
-            val titles = c.repository.useTitles(byUse.keys)
-            val urls = c.repository.useUrls(byUse.keys)
+            val links = c.repository.useLinks(list, byUse.keys)
             val sources =
                 byUse.mapNotNull { (u, cs) ->
-                    val title = titles[u] ?: return@mapNotNull null
+                    val link = links[u] ?: return@mapNotNull null
                     val useHint = cs.mapNotNull { it.unitHint }.distinct().singleOrNull()
                     val qty = cs.fold(QtyBase.PRESENCE) { acc, x -> acc + x.qty }
                     val amount = Display.amount(qty, units, produce, useHint, entry?.gramsPerCup, entry?.displayPolicy)
-                    ItemSource(title, amount, webLink(urls[u]))
+                    ItemSource(link.title, amount, webLink(link.url))
                 }
+            // Main thread from here on: a cancel (newer open, close) can't slip in after this check.
+            ensureActive()
             _sheet.value = ItemSheet(id, entry?.name ?: item.displayName, totals, sources, entry?.packNote, item.aisle)
-        }
+        }.also { openJob = it }
+    }
 
     fun closeItem() {
+        openJob?.cancel()
         _sheet.value = null
     }
+
+    /** After a change made from [id]'s sheet: closes it, unless another item's sheet is open by now. */
+    private fun closeSheetOf(id: Long) = _sheet.update { if (it?.id == id) null else it }
 
     fun moveItem(
         id: Long,
@@ -180,7 +204,7 @@ class ListViewModel(
         always: Boolean,
     ) = viewModelScope.launch {
         c.repository.moveAisle(id, aisle, always)
-        _sheet.value = null
+        closeSheetOf(id)
     }
 
     /** Edit quantity: the new total; the difference becomes a manual contribution. False if [text] has no amount. */
@@ -193,7 +217,7 @@ class ListViewModel(
         if (q.isPresence) return false
         viewModelScope.launch {
             c.repository.editQuantity(id, q)
-            _sheet.value = null
+            closeSheetOf(id)
         }
         return true
     }

@@ -24,6 +24,12 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34])
 class RecipesViewModelTest {
+    /** The tab on screen: ui is only kept current while something collects it. */
+    private fun RecipesViewModel.shown(): RecipesViewModel {
+        CoroutineScope(Dispatchers.Main).launch { ui.collect {} }
+        return this
+    }
+
     private fun nextReview(vm: RecipesViewModel): Long {
         var id: Long? = null
         val job = CoroutineScope(Dispatchers.Main).launch { id = vm.openReview.first() }
@@ -40,7 +46,7 @@ class RecipesViewModelTest {
     fun usesInStockNowAndRemove() {
         val c = TestContainer.create()
         c.add(*CHILLI)
-        val vm = RecipesViewModel(c)
+        val vm = RecipesViewModel(c).shown()
         val use = await(vm.ui) { it.uses.isNotEmpty() }.uses.single()
         assertEquals("Weeknight chilli", use.title)
         assertEquals(4, use.servings)
@@ -83,7 +89,7 @@ class RecipesViewModelTest {
     @Test
     fun aTypedRecipeIsReviewedLikeAShare() {
         val c = TestContainer.create()
-        val vm = RecipesViewModel(c)
+        val vm = RecipesViewModel(c).shown()
         vm.addManual("  Gran's soup ", 6, "2 onions\n\n400 g chopped tomatoes\n")
         val review = ReviewViewModel(c, nextReview(vm))
         val ready = await(review.state) { it is ReviewState.Ready } as ReviewState.Ready
