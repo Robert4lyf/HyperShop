@@ -23,10 +23,15 @@ import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.parse.Normaliser
 import com.robert4lyf.hypershop.core.sync.OpResult
 import com.robert4lyf.hypershop.core.sync.WatchMessage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.serialization.json.Json
 
 /** A stored import: the recipe and its line ids, in line order. */
@@ -47,6 +52,18 @@ data class UseSummary(
     val inStockCount: Int,
 )
 
+/** A use's title and recipe page, for the item sheet's "From" rows. */
+data class UseLink(
+    val title: String,
+    val url: String?,
+)
+
+/** "Finish shopping": the stamp for Undo and how many ticked items went. */
+data class Finished(
+    val stamp: Long,
+    val removed: Int,
+)
+
 data class WatchReply(
     val ackedThrough: Int,
     val ackExceptions: List<Pair<Int, OpResult>>,
@@ -62,6 +79,8 @@ class ListRepository(
     private val db: HyperShopDatabase,
     private val catalog: Catalog = CatalogLoader.default,
     private val clock: () -> Long = System::currentTimeMillis,
+    /** Where the shared [list] reads run; lives as long as the repository (the app). */
+    scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
     private val dao = db.dao()
     private val normaliser = Normaliser(catalog)
@@ -72,8 +91,24 @@ class ListRepository(
 
     suspend fun snapshot(): ShoppingList = db.withTransaction { load() }
 
-    /** The list, re-read whenever listRev changes. */
-    fun observe(): Flow<ShoppingList> = dao.observeListRev().filterNotNull().distinctUntilChanged().map { snapshot() }
+    /**
+     * The list, re-read once whenever listRev changes and shared by every
+     * collector (the list, the Recipes tab, ...), so one change is one load
+     * however many screens watch it. Stops 5 s after the last collector goes;
+     * a later collector then waits for a fresh read rather than a stale one.
+     */
+    val list: Flow<ShoppingList> =
+        dao.observeListRev()
+            .filterNotNull()
+            .distinctUntilChanged()
+            .map { snapshot() }
+            .shareIn(scope, SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000, replayExpirationMillis = 0), replay = 1)
+
+    /** The shared [list]. */
+    fun observe(): Flow<ShoppingList> = list
+
+    /** Claude usage rows, re-emitted whenever one changes (Settings' spend). */
+    fun observeUsage(): Flow<List<ClaudeUsageEntity>> = dao.observeUsage()
 
     suspend fun aisleOrder(): List<AisleCode> {
         val hidden = dao.aisles().filter { it.hidden }.map { it.code }.toSet()
@@ -219,45 +254,67 @@ class ListRepository(
         }
 
     /** The Recipes tab: uses with something on the list, newest first. */
-    suspend fun usesOnList(): List<UseSummary> =
-        db.withTransaction {
-            val l = load()
-            val live = l.liveItems.map { it.id }.toSet()
+    suspend fun usesOnList(): List<UseSummary> = db.withTransaction { usesOnList(load()) }
+
+    /**
+     * [usesOnList] for a list already loaded (from [list]): the recipes and
+     * the in-stock decisions come in one query each, not two per use.
+     */
+    suspend fun usesOnList(l: ShoppingList): List<UseSummary> {
+        val live = l.liveItems.map { it.id }.toSet()
+        val shown =
             l.uses.values
-                .filter { u -> u.archivedAt == null && l.contributions.any { it.useId == u.id && it.itemId in live } }
-                .sortedByDescending { it.addedAt }
-                .map { u ->
-                    val r = u.recipeId?.let { dao.recipe(it) }
-                    val statuses = dao.decisions(u.id).map { it.status }
-                    UseSummary(
-                        useId = u.id,
-                        recipeId = u.recipeId,
-                        title = r?.title ?: if (u.kind == UseKind.MANUAL) "Added by hand" else "Recipe",
-                        url = r?.url,
-                        servings = u.servings.takeIf { r?.servingsOriginal != null },
-                        itemCount = l.contributions.filter { it.useId == u.id && it.itemId in live }.map { it.itemId }.distinct().size,
-                        inStockCount = statuses.count { it == LineStatus.IN_STOCK.name },
-                    )
-                }
+                .map { u -> u to l.contributionsOfUse(u.id).filter { it.itemId in live } }
+                .filter { (u, cs) -> u.archivedAt == null && cs.isNotEmpty() }
+                .sortedByDescending { (u, _) -> u.addedAt }
+        if (shown.isEmpty()) return emptyList()
+        val recipes = recipesById(shown.mapNotNull { (u, _) -> u.recipeId })
+        val inStock =
+            shown.map { (u, _) -> u.id }.chunked(MAX_ARGS).flatMap { dao.decisionsFor(it) }
+                .filter { it.status == LineStatus.IN_STOCK.name }
+                .groupingBy { it.useId }
+                .eachCount()
+        return shown.map { (u, cs) ->
+            val r = u.recipeId?.let { recipes[it] }
+            UseSummary(
+                useId = u.id,
+                recipeId = u.recipeId,
+                title = r?.title ?: if (u.kind == UseKind.MANUAL) "Added by hand" else "Recipe",
+                url = r?.url,
+                servings = u.servings.takeIf { r?.servingsOriginal != null },
+                itemCount = cs.map { it.itemId }.distinct().size,
+                inStockCount = inStock[u.id] ?: 0,
+            )
         }
+    }
+
+    /** Title and recipe page of each use in [useIds] (as found in [l]), for the item sheet: one query. */
+    suspend fun useLinks(
+        l: ShoppingList,
+        useIds: Collection<Long>,
+    ): Map<Long, UseLink> {
+        val recipes = recipesById(useIds.mapNotNull { l.uses[it]?.recipeId })
+        return useIds.associateWith { id ->
+            val u = l.uses[id]
+            val r = u?.recipeId?.let { recipes[it] }
+            UseLink(r?.title ?: if (u?.kind == UseKind.MANUAL) "Added by hand" else "Recipe", r?.url)
+        }
+    }
 
     /** Titles of the uses behind an item, for the item sheet. */
-    suspend fun useTitles(useIds: Collection<Long>): Map<Long, String> =
-        db.withTransaction {
-            val l = load()
-            useIds.associateWith { id ->
-                val u = l.uses[id]
-                val r = u?.recipeId?.let { dao.recipe(it) }
-                r?.title ?: if (u?.kind == UseKind.MANUAL) "Added by hand" else "Recipe"
-            }
-        }
+    suspend fun useTitles(useIds: Collection<Long>): Map<Long, String> {
+        val l = snapshot()
+        return useLinks(l, useIds).mapValues { it.value.title }
+    }
 
     /** Recipe pages behind an item, by use, for the item sheet's links. */
-    suspend fun useUrls(useIds: Collection<Long>): Map<Long, String?> =
-        db.withTransaction {
-            val l = load()
-            useIds.associateWith { id -> l.uses[id]?.recipeId?.let { dao.recipe(it) }?.url }
-        }
+    suspend fun useUrls(useIds: Collection<Long>): Map<Long, String?> {
+        val l = snapshot()
+        return useLinks(l, useIds).mapValues { it.value.url }
+    }
+
+    private suspend fun recipesById(ids: Collection<Long>): Map<Long, RecipeEntity> =
+        ids.distinct().chunked(MAX_ARGS).flatMap { dao.recipes(it) }.associateBy { it.id }
 
     /** "Add the in-stock items now": the lines of [useId] that were left out as in stock. */
     suspend fun inStockLines(useId: Long): Pair<RecipeEntity, List<ParsedIngredient>>? =
@@ -374,10 +431,13 @@ class ListRepository(
         return stamp
     }
 
-    suspend fun finishShopping(): Long {
+    suspend fun finishShopping(): Long = finish().stamp
+
+    /** "Finish shopping", with the number of ticked items it removed, counted inside the write. */
+    suspend fun finish(): Finished {
         val stamp = clock()
-        write { it.finishShopping(stamp) to Unit }
-        return stamp
+        val removed = write { l -> l.finishShopping(stamp) to l.liveItems.count { l.isDone(it.id) } } ?: 0
+        return Finished(stamp, removed)
     }
 
     suspend fun clearAll(): Long {
@@ -541,5 +601,8 @@ class ListRepository(
 
     companion object {
         const val RESULT_HISTORY = 64
+
+        /** Below SQLite's 999 bound variables. */
+        private const val MAX_ARGS = 500
     }
 }

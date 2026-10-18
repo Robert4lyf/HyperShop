@@ -76,6 +76,9 @@ interface ListDao {
     @Query("SELECT * FROM Recipe WHERE id = :id")
     suspend fun recipe(id: Long): RecipeEntity?
 
+    @Query("SELECT * FROM Recipe WHERE id IN (:ids)")
+    suspend fun recipes(ids: List<Long>): List<RecipeEntity>
+
     @Query("SELECT * FROM Recipe WHERE url = :url ORDER BY importedAt DESC")
     suspend fun recipesByUrl(url: String): List<RecipeEntity>
 
@@ -98,6 +101,9 @@ interface ListDao {
 
     @Query("SELECT * FROM LineDecision WHERE useId = :useId")
     suspend fun decisions(useId: Long): List<LineDecisionEntity>
+
+    @Query("SELECT * FROM LineDecision WHERE useId IN (:useIds)")
+    suspend fun decisionsFor(useIds: List<Long>): List<LineDecisionEntity>
 
     // ---- aisles, store, overrides, staples ----------------------------------------
     @Query("SELECT * FROM Aisle ORDER BY defaultOrder")
