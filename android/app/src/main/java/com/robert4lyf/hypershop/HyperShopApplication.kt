@@ -9,6 +9,7 @@ import com.robert4lyf.hypershop.secrets.KeystoreApiKeyStore
 import com.robert4lyf.hypershop.secrets.claudeKeyDataStore
 import com.robert4lyf.hypershop.settings.Settings
 import com.robert4lyf.hypershop.settings.settingsDataStore
+import com.robert4lyf.hypershop.watch.ConnectIqWatchLink
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -30,7 +31,7 @@ class HyperShopApplication :
                 CoroutineScope(SupervisorJob() + Dispatchers.IO),
                 onLost = { Settings(settingsDataStore).setKeyLostNotice(true) },
             )
-        container = AppContainer(this, apiKeyStore = keys)
+        container = AppContainer(this, apiKeyStore = keys, watchLink = ConnectIqWatchLink(this))
         container.startUp(EpochMarker(noBackupFilesDir))
     }
 
