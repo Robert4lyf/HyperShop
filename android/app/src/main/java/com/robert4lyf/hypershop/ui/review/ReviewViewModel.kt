@@ -517,16 +517,43 @@ class ReviewViewModel(
         replaceLine(lineId) { old -> c.ruleParser.parse(text).copy(section = old.section) }
     }
 
+    /**
+     * "Rename": the row's lines are read as [name] for this recipe only; the
+     * ingredient library is unchanged. A name the library knows joins that
+     * ingredient ("maple syrup"); any other becomes an item of its own. What was
+     * decided for the row (in stock, "I have some", an aisle move) goes with it.
+     */
+    fun rename(
+        key: String,
+        name: String,
+    ) = act {
+        val n = name.trim().lowercase()
+        val ids = preview?.incoming?.lines?.filter { it.target.mergeKey == key }?.map { it.recipeLineId }?.toSet()
+        if (n.isEmpty() || ids.isNullOrEmpty()) return@act
+        val to = c.repository.target(n).mergeKey
+        if (to != key) {
+            decisions.remove(key)?.let { decisions.putIfAbsent(to, it) }
+            aisleMoves.remove(key)?.let { aisleMoves.putIfAbsent(to, it) }
+        }
+        // Claude's aisle was for the old name.
+        replaceLines(ids) { it.copy(name = n, aisleSuggestion = null) }
+    }
+
     private suspend fun replaceLine(
         lineId: Long,
+        f: (com.robert4lyf.hypershop.core.model.ParsedIngredient) -> com.robert4lyf.hypershop.core.model.ParsedIngredient,
+    ) = replaceLines(setOf(lineId), f)
+
+    private suspend fun replaceLines(
+        lineIds: Set<Long>,
         f: (com.robert4lyf.hypershop.core.model.ParsedIngredient) -> com.robert4lyf.hypershop.core.model.ParsedIngredient,
     ) {
         val s = stored ?: return
         val r = result ?: return
-        val index = s.lines.indexOfFirst { it.first.id == lineId }.takeIf { it >= 0 } ?: return
         val lines = r.lines.toMutableList()
-        if (index !in lines.indices) return
-        lines[index] = f(lines[index])
+        val indices = s.lines.indices.filter { s.lines[it].first.id in lineIds && it in lines.indices }
+        if (indices.isEmpty()) return
+        for (i in indices) lines[i] = f(lines[i])
         val edited = r.copy(lines = lines)
         store(edited)
         result = edited

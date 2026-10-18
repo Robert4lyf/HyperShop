@@ -91,6 +91,24 @@ class ReviewRowSheetViewModelTest {
     }
 
     @Test
+    fun renameIsForThisRecipeOnly() {
+        val (c, vm) = vm("2 tbsp agave syrup", "1 tsp agave nectar", "2 onions")
+        vm.setInStock("cat:agave_syrup", true)
+        vm.rename("cat:agave_syrup", "Maple syrup")
+        val keys = { s: ReviewState -> (s as? ReviewState.Ready)?.ui?.aisles?.flatMap { it.second }?.map { it.key }.orEmpty() }
+        val ui = await(vm.state) { "cat:maple_syrup" in keys(it) }.ui()
+        // Both lines moved, and the row's "in stock" went with them.
+        assertEquals(2, vm.sheet("cat:maple_syrup")!!.lines.size)
+        assertTrue(ui.row("cat:maple_syrup").inStock)
+        // A name the library doesn't know is an item of its own.
+        vm.rename("cat:onion", "Banana shallots from the market")
+        await(vm.state) { s -> s is ReviewState.Ready && "cat:onion" !in keys(s) }
+        // The library is untouched.
+        assertEquals("agave syrup", c.catalog.byId.getValue("agave_syrup").name)
+        assertEquals(null, c.catalog.byId.getValue("agave_syrup").replaceWith)
+    }
+
+    @Test
     fun editTheSourceLine() {
         val (_, vm) = vm("2 onoins")
         assertEquals("2 red onion", vm.reparse("2 red onions").replace("onions", "onion"))
@@ -129,6 +147,7 @@ class ReviewRowSheetScreenTest {
             onMoveAisle = { a, always -> events += "move $a $always" },
             onEditLine = { id, t -> events += "edit $id $t" },
             reparse = { "parsed:$it" },
+            onRename = { events += "rename $it" },
         )
 
     private fun show(dark: Boolean = false) =
@@ -148,7 +167,9 @@ class ReviewRowSheetScreenTest {
         compose.onNodeWithText("Use this line").performClick()
         compose.onNodeWithText("Frozen").performClick()
         compose.onNodeWithText("Just this time").performClick()
-        assertEquals(listOf("swap 7", "always", "have 1 l", "edit 7 300ml milk", "move FROZEN false"), events)
+        compose.onNodeWithTag("rename").performTextReplacement("Oat milk")
+        compose.onNodeWithTag("rename-go").performClick()
+        assertEquals(listOf("swap 7", "always", "have 1 l", "edit 7 300ml milk", "move FROZEN false", "rename Oat milk"), events)
     }
 
     @Test

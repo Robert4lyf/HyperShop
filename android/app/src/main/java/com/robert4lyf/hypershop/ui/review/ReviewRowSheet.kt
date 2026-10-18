@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.TrendingFlat
@@ -40,6 +42,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.ui.common.AmountField
@@ -57,6 +61,8 @@ data class SheetActions(
     val onMoveAisle: (AisleCode, Boolean) -> Unit,
     val onEditLine: (Long, String) -> Unit,
     val reparse: (String) -> String,
+    /** A new name, for this recipe only. */
+    val onRename: (String) -> Unit = {},
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -89,6 +95,10 @@ internal fun ReviewRowSheetHost(
                     onDismiss()
                 },
                 reparse = vm::reparse,
+                onRename = {
+                    vm.rename(key, it)
+                    onDismiss()
+                },
             ),
         )
     }
@@ -108,6 +118,7 @@ fun ReviewRowSheet(
             SheetHeader(sheet.name, sheet.aisle)
             InfoBanner(sheet.effect, Icons.AutoMirrored.Rounded.TrendingFlat, Modifier.testTag("effect"), Tone.PRIMARY)
             sheet.packNote?.let { InfoBanner("Usually sold as $it", Icons.Rounded.LocalMall) }
+            key(sheet.key) { Rename(sheet.name, actions.onRename) }
             SectionLabel(if (sheet.lines.size == 1) "From the recipe" else "From the recipe (${sheet.lines.size} lines)")
             for (line in sheet.lines) key(line.id) { LineEditor(line, actions) }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -121,6 +132,35 @@ fun ReviewRowSheet(
             }
             MoveAisle(sheet.aisle, actions.onMoveAisle)
         }
+    }
+}
+
+/** The item's name for this recipe only; the library keeps its own. */
+@Composable
+private fun Rename(
+    current: String,
+    onRename: (String) -> Unit,
+) {
+    var text by remember { mutableStateOf(current.replaceFirstChar { it.uppercase() }) }
+    val changed = text.isNotBlank() && !text.trim().equals(current, ignoreCase = true)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            label = { Text("Name") },
+            singleLine = true,
+            shape = RoundedCornerShape(16.dp),
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { if (changed) onRename(text) }),
+            modifier = Modifier.fillMaxWidth().testTag("rename"),
+        )
+        Text(
+            "Just for this recipe. To change it everywhere, use Settings › Ingredient library.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        if (changed) Button(onClick = { onRename(text) }, modifier = Modifier.testTag("rename-go")) { Text("Rename") }
     }
 }
 
