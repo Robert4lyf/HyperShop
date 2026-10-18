@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.ui.recipes
 
 import android.text.format.DateUtils
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,26 +18,35 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.Inventory
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.People
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -56,6 +66,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -83,14 +94,35 @@ fun RecipesRoute(
     val ui by vm.ui.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
     LaunchedEffect(vm) { vm.openReview.collect(onReview) }
+    val chips by vm.searchChips.collectAsStateWithLifecycle()
     RecipesScreen(
         ui,
         onRemove = vm::remove,
         onAddInStock = vm::addInStockNow,
         onEdit = vm::edit,
-        library = LibraryActions(onAdd = vm::addFromLibrary, onRemove = vm::removeFromLibrary),
+        library = LibraryActions(onAdd = vm::addFromLibrary, onRemove = vm::removeFromLibrary, onOpen = vm::openDetail),
+        search =
+            SearchBox(
+                text = vm.searchText,
+                chips = chips,
+                onText = vm::onSearchText,
+                onCommit = vm::commitSearch,
+                onRemove = vm::removeChip,
+                onClear = vm::clearSearch,
+            ),
         add = AddRecipeActions(onLink = vm::addLink, onManual = { n, s, l -> vm.addManual(n, s, l) }, onPhoto = { vm.addPhoto(it) }),
     )
+    val detail by vm.detail.collectAsStateWithLifecycle()
+    detail?.let { d ->
+        RecipeDetailSheet(
+            d,
+            onAdd = {
+                vm.closeDetail()
+                vm.addFromLibrary(d.row)
+            },
+            onDismiss = vm::closeDetail,
+        )
+    }
 }
 
 /** The Recipes tab, stateless. */
@@ -102,6 +134,7 @@ fun RecipesScreen(
     onEdit: (UseSummary) -> Unit = {},
     add: AddRecipeActions = AddRecipeActions(),
     library: LibraryActions = LibraryActions(),
+    search: SearchBox = SearchBox(),
 ) {
     var confirm by remember { mutableStateOf<UseSummary?>(null) }
     var forget by remember { mutableStateOf<LibraryRow?>(null) }
@@ -126,7 +159,7 @@ fun RecipesScreen(
                             },
                     )
                 }
-                if (ui.loaded && ui.uses.isEmpty() && ui.library.isEmpty()) {
+                if (ui.loaded && ui.uses.isEmpty() && !ui.hasLibrary) {
                     item(key = "empty") {
                         EmptyHero(
                             Icons.AutoMirrored.Rounded.MenuBook,
@@ -138,19 +171,29 @@ fun RecipesScreen(
                 items(ui.uses, key = { it.useId }) { use ->
                     UseCard(use, onRemove = { confirm = use }, onAddInStock = { onAddInStock(use) }, onEdit = { onEdit(use) })
                 }
-                if (ui.library.isNotEmpty()) {
+                if (ui.hasLibrary) {
                     item(key = "library-title") {
-                        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp)) {
-                            Text("Your recipes", style = MaterialTheme.typography.titleLarge)
-                            Text(
-                                "Every recipe you've added. The longest since you last made it is at the top.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                        Column(
+                            Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Column {
+                                Text("Your recipes", style = MaterialTheme.typography.titleLarge)
+                                Text(
+                                    when {
+                                        ui.terms.isEmpty() -> "Every recipe you've added. The longest since you last made it is at the top."
+                                        ui.library.isEmpty() -> "Nothing uses ${ui.terms.joinToString(" or ")}."
+                                        else -> "Using the most of ${ui.terms.joinToString(", ")} first."
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            RecipeSearchBox(search)
                         }
                     }
                     items(ui.library, key = { "lib-${it.key}" }) { row ->
-                        LibraryCard(row, onAdd = { library.onAdd(row) }, onRemove = { forget = row })
+                        LibraryCard(row, onAdd = { library.onAdd(row) }, onRemove = { forget = row }, onOpen = { library.onOpen(row) })
                     }
                 }
             }
@@ -196,10 +239,62 @@ fun RecipesScreen(
 
 private const val DAY = DateUtils.DAY_IN_MILLIS
 
+/** "Search your recipes": what's typed, the terms already chips, and what changes them. */
+data class SearchBox(
+    val text: String = "",
+    val chips: List<String> = emptyList(),
+    val onText: (String) -> Unit = {},
+    val onCommit: () -> Unit = {},
+    val onRemove: (String) -> Unit = {},
+    val onClear: () -> Unit = {},
+)
+
+/**
+ * One box for both uses: what you have in ("mushrooms", Enter, "spinach") or a
+ * dish you fancy ("curry"). Each Enter makes a chip, so several can be combined.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RecipeSearchBox(s: SearchBox) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        OutlinedTextField(
+            value = s.text,
+            onValueChange = s.onText,
+            placeholder = { Text(if (s.chips.isEmpty()) "Search: an ingredient you have, or a dish" else "And…") },
+            leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+            trailingIcon = {
+                if (s.text.isNotEmpty() || s.chips.isNotEmpty()) {
+                    IconButton(onClick = s.onClear) { Icon(Icons.Rounded.Close, contentDescription = "Clear search") }
+                }
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(50),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { s.onCommit() }),
+            modifier = Modifier.fillMaxWidth().testTag("recipe-search"),
+        )
+        if (s.chips.isNotEmpty()) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (c in s.chips) {
+                    InputChip(
+                        selected = true,
+                        onClick = { s.onRemove(c) },
+                        label = { Text(c) },
+                        trailingIcon = { Icon(Icons.Rounded.Close, contentDescription = "Remove $c", modifier = Modifier.size(16.dp)) },
+                        modifier = Modifier.testTag("chip-$c"),
+                    )
+                }
+            }
+        }
+    }
+}
+
 /** What "Your recipes" can do. */
 data class LibraryActions(
     val onAdd: (LibraryRow) -> Unit = {},
     val onRemove: (LibraryRow) -> Unit = {},
+    /** Tap: see its ingredients. */
+    val onOpen: (LibraryRow) -> Unit = {},
 )
 
 /** One saved recipe: its name, where it's from, how big, when last added; Add to list. */
@@ -208,12 +303,18 @@ private fun LibraryCard(
     row: LibraryRow,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
+    onOpen: () -> Unit,
 ) {
     val dark = LocalDarkTheme.current
     val hue = Brand.recipeHue(row.title)
     val now = remember { System.currentTimeMillis() }
     Surface(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("lib-${row.key}"),
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clip(MaterialTheme.shapes.large)
+            .clickable(onClickLabel = "Show ingredients", onClick = onOpen)
+            .testTag("lib-${row.key}"),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.card,
     ) {
@@ -245,6 +346,9 @@ private fun LibraryCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                row.uses?.let {
+                    Text("Uses $it", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
+                }
                 if (row.onList) {
                     Text("On your list", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 }
@@ -374,6 +478,88 @@ private fun Fact(
         ) {
             Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(16.dp))
             Text(text, style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RecipeDetailSheet(
+    detail: RecipeDetail,
+    onAdd: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) { RecipeDetailContent(detail, onAdd) }
+}
+
+/** A saved recipe's ingredients, as written, with "Add to list" and its page. */
+@Composable
+fun RecipeDetailContent(
+    detail: RecipeDetail,
+    onAdd: () -> Unit,
+) {
+    val open = rememberOpenLink()
+    val url = webLink(detail.row.url)
+    LazyColumn(
+        Modifier.fillMaxWidth().testTag("recipe-detail"),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        item(key = "title") {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(detail.row.title, style = MaterialTheme.typography.headlineSmall)
+                val bits =
+                    listOfNotNull(
+                        url?.let { siteName(it) },
+                        detail.servings?.let { "Serves $it" },
+                        if (detail.row.lines == 1) "1 ingredient" else "${detail.row.lines} ingredients",
+                    )
+                Text(
+                    bits.joinToString(" · "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                DetailButtons(onAdd, url?.let { { open(it) } })
+            }
+        }
+        detail.sections.forEachIndexed { i, (heading, lines) ->
+            heading?.let { h ->
+                item(key = "h-$i") {
+                    Text(h, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
+                }
+            }
+            items(lines.size, key = { j -> "l-$i-$j" }) { j ->
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("•", color = MaterialTheme.colorScheme.primary)
+                    Text(lines[j], style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DetailButtons(
+    onAdd: () -> Unit,
+    onOpen: (() -> Unit)?,
+) {
+    FlowRow(
+        Modifier.padding(top = 8.dp, bottom = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Button(onClick = onAdd, modifier = Modifier.testTag("detail-add")) {
+            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.size(8.dp))
+            Text("Add to list")
+        }
+        onOpen?.let {
+            OutlinedButton(onClick = it) {
+                Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(8.dp))
+                Text("Open recipe")
+            }
         }
     }
 }

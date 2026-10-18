@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.ui.recipes
 
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -9,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -34,6 +36,17 @@ private val USES =
             listOf(
                 LibraryRow(9, "r:9", "Red lentil dal", null, 11, 1_700_000_000_000, onList = false),
                 LibraryRow(1, "r:1", "Weeknight chilli", "https://example.com/chilli", 14, 1_760_000_000_000, onList = true),
+            ),
+    )
+
+private val DETAIL =
+    RecipeDetail(
+        LibraryRow(9, "r:9", "Red lentil dal", null, 5, 1_700_000_000_000, onList = false),
+        servings = 4,
+        sections =
+            listOf(
+                null to listOf("200g red lentils", "1 onion, finely chopped", "2 garlic cloves", "1 tsp turmeric"),
+                "For the dressing" to listOf("Juice of 1 lemon"),
             ),
     )
 
@@ -86,6 +99,30 @@ class RecipesScreenTest {
         compose.onNodeWithTag("manual-go").performClick()
         assertEquals(listOf("link https://example.com/soup", "manual Gran's soup 6 2"), got)
         assertEquals(2, done)
+    }
+
+    @Test
+    fun tapASavedRecipeToSeeItsIngredients() {
+        val opened = mutableListOf<String>()
+        compose.setContent {
+            HyperShopTheme(dynamicColor = false) {
+                RecipesScreen(USES, onRemove = {}, onAddInStock = {}, library = LibraryActions(onOpen = { opened += it.key }))
+            }
+        }
+        compose.onNodeWithTag("recipes").performScrollToNode(hasTestTag("lib-r:9"))
+        compose.onNodeWithTag("lib-r:9").performClick()
+        assertEquals(listOf("r:9"), opened)
+    }
+
+    @Test
+    fun recipeDetailShowsTheIngredientsUnderTheirHeadings() {
+        var added = 0
+        compose.setContent { HyperShopTheme(dynamicColor = false) { RecipeDetailContent(DETAIL, onAdd = { added++ }) } }
+        compose.onNodeWithText("For the dressing").assertExists()
+        compose.onNodeWithText("200g red lentils").assertExists()
+        compose.onNodeWithTag("detail-add").performClick()
+        assertEquals(1, added)
+        compose.onRoot().captureRoboImage(Shots.path("recipe-detail-light.png"))
     }
 
     @Test
