@@ -27,6 +27,21 @@ class ReviewViewModelTest {
     private fun ready(vm: ReviewViewModel) = (await(vm.state) { it is ReviewState.Ready } as ReviewState.Ready).ui
 
     @Test
+    fun aRowChangeDuringAddCannotUndoIt() {
+        val c = TestContainer.create()
+        val vm = ReviewViewModel(c, runBlocking { c.readyJob("2 onions", "1 carrot") })
+        val key = ready(vm).aisles.flatMap { it.second }.first().key
+        vm.confirm()
+        vm.setInStock(key, true)
+        vm.setServings(8)
+        await(vm.state) { it is ReviewState.Added }
+        Thread.sleep(200)
+        // The queued row changes found the screen finished and did nothing.
+        assertTrue(vm.state.value is ReviewState.Added)
+        assertEquals(1, runBlocking { c.repository.usesOnList() }.size)
+    }
+
+    @Test
     fun rowsAreGroupedByAisleWithStaplesAndGarnishPreTicked() {
         val c = TestContainer.create()
         val id = runBlocking { c.readyJob(*CHILLI) }

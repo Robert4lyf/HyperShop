@@ -92,12 +92,13 @@ fun HyperShopApp(
     val route = entry?.destination?.route
     val share by container.shares.collectAsState()
     LaunchedEffect(share) {
-        when (val s = share) {
+        val s = share ?: return@LaunchedEffect
+        // Cleared only if it is still this one: a share arriving meanwhile is kept and handled next.
+        container.shares.compareAndSet(s, null)
+        when (s) {
             is ShareOutcome.Review -> nav.navigate(Routes.review(s.jobId)) { launchSingleTop = true }
             ShareOutcome.NoLink -> snackbar.showSnackbar("There was no https link in what you shared")
-            null -> return@LaunchedEffect
         }
-        container.shares.value = null
     }
     // The review screens pin their main action to the bottom edge (BottomActionBar pads for
     // the navigation bar itself), so the snackbar sits above that bar instead of over it.

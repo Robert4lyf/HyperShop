@@ -27,7 +27,9 @@ class ImportWorker(
         if (jobId < 0) return Result.failure()
         val jobs = container.importJobs
         val job = jobs.get(jobId) ?: return Result.failure()
-        jobs.setState(jobId, JobState.RUNNING)
+        // Only a waiting job runs: a WorkManager re-run of one already reviewed or ready
+        // must not replace its result (a saved Claude parse would be paid for again).
+        if (!jobs.claim(jobId)) return Result.success()
         val input = job.input
         val result =
             try {

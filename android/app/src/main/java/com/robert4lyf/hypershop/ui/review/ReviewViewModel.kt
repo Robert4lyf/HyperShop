@@ -17,10 +17,16 @@ import com.robert4lyf.hypershop.importing.ImportError
 import com.robert4lyf.hypershop.importing.ImportResult
 import com.robert4lyf.hypershop.importing.JobState
 import com.robert4lyf.hypershop.ui.common.webLink
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /** One review row: name, one quantity, "in stock" (PLAN §3.1 default view). */
 data class ReviewRow(
@@ -118,12 +124,44 @@ class ReviewViewModel(
     private var units = UnitsSetting.METRIC
     private val aisleMoves = mutableMapOf<String, AisleCode>()
 
+    /** See [act]. Declared before init, which uses it. */
+    private val ops = Mutex()
+
     init {
-        viewModelScope.launch { load() }
+        act { load() }
     }
+
+    /**
+     * Every action on this screen runs under [ops], one at a time, so a row toggle
+     * can't interleave with Add, Retry, Cancel or a line edit (each reads and writes
+     * the preview, the stored recipe and the decisions across suspensions). Once
+     * Added or Cancelled, later actions do nothing.
+     */
+    private fun act(block: suspend () -> Unit): Job = viewModelScope.launch { ops.withLock { if (!finished()) block() } }
+
+    private fun finished() = _state.value is ReviewState.Added || _state.value == ReviewState.Cancelled
+
+    /**
+     * Claude, and saving its answer on the job, run in the app's scope: leaving the
+     * screen mid-call (the request is billed whether or not anyone waits) still
+     * records the usage and keeps the answer, so reopening doesn't pay again.
+     */
+    private suspend fun parseWithClaude(
+        r: ImportResult,
+        keep: (ImportResult) -> Boolean = { true },
+    ): ImportResult =
+        c.applicationScope
+            .async {
+                c.importer.parse(
+                    r,
+                    allowClaude = true,
+                    model = c.settings.model.first(),
+                ).also { if (keep(it)) c.importJobs.finish(jobId, it) }
+            }.await()
 
     private suspend fun load() {
         units = c.settings.units.first()
+        c.importJobs.ensureScheduled(jobId)
         var job = c.importJobs.get(jobId)
         while (job != null && (job.state == JobState.QUEUED || job.state == JobState.RUNNING)) {
             kotlinx.coroutines.delay(100)
@@ -134,10 +172,9 @@ class ReviewViewModel(
         // Once per import: a failure or refusal in the worker isn't retried on open ("Retry with Claude" is).
         if (r.claudePending && !r.claudeTried && c.reviewGate.visible.value) {
             _state.value = ReviewState.Loading
-            r = c.importer.parse(r, allowClaude = true, model = c.settings.model.first())
             // Kept on the job, so reopening this review neither pays for Claude again nor
             // retries a failure (claudeTried is set on those).
-            c.importJobs.finish(jobId, r)
+            r = parseWithClaude(r)
         }
         if (r.lines.isEmpty()) return fail(r.error ?: ImportError.NO_RECIPE, candidates(r))
         result = r
@@ -150,7 +187,7 @@ class ReviewViewModel(
     }
 
     /** "Add again" on [ReviewState.AlreadyOnList]. */
-    fun addAgain() = viewModelScope.launch { result?.let { begin(it) } }
+    fun addAgain() = act { if (_state.value is ReviewState.AlreadyOnList) result?.let { begin(it) } }
 
     private suspend fun begin(r: ImportResult) {
         servings = r.targetServings ?: r.servings
@@ -161,10 +198,11 @@ class ReviewViewModel(
     }
 
     private suspend fun store(r: ImportResult) {
-        stored?.let { c.repository.discardRecipe(it.recipe.id) }
-        stored =
-            c.repository.storeRecipe(r.url, r.title, r.servings, r.locale, "WEB", r.parsedBy, r.model, r.claudePending, r.lines)
-        preview = c.repository.preview(stored!!, servings, emptyMap(), aisleMoves)
+        val old = stored
+        val s = c.repository.storeRecipe(r.url, r.title, r.servings, r.locale, "WEB", r.parsedBy, r.model, r.claudePending, r.lines)
+        preview = c.repository.preview(s, servings, emptyMap(), aisleMoves)
+        stored = s
+        old?.let { c.repository.discardRecipe(it.recipe.id) }
     }
 
     private var failedFrom: ImportResult? = null
@@ -176,16 +214,16 @@ class ReviewViewModel(
 
     /** "Select lines manually": the picked or pasted lines, parsed as a recipe and reviewed as usual. */
     fun useLines(lines: List<String>) =
-        viewModelScope.launch {
+        act {
             val picked = lines.flatMap { it.lines() }.map { it.trim() }.filter { it.isNotEmpty() }
-            if (picked.isEmpty()) return@launch
+            if (picked.isEmpty()) return@act
             _state.value = ReviewState.Loading
             val from = failedFrom
             val r =
                 c.importer
                     .fromLines(picked, from?.title, allowClaude = c.reviewGate.visible.value, model = c.settings.model.first())
                     .copy(url = from?.url)
-            if (r.lines.isEmpty()) return@launch fail(ImportError.NO_RECIPE, picked)
+            if (r.lines.isEmpty()) return@act fail(ImportError.NO_RECIPE, picked)
             result = r
             begin(r)
         }
@@ -198,13 +236,19 @@ class ReviewViewModel(
     }
 
     private suspend fun recompute(notice: String? = null) {
+        if (finished()) return
         val s = stored ?: return
-        val p = c.repository.preview(s, servings, decisions, aisleMoves)
-        preview = p
-        val order = c.repository.aisleOrder()
-        val rows = p.rows.map { row(it) }
+        // Re-targeting every line and building the rows is the heavy part: off the main
+        // thread. (Under [ops], so nothing else touches these fields meanwhile.)
         val grouped =
-            rows.groupBy { it.aisle }.toList().sortedBy { (a, _) -> order.indexOf(a).let { i -> if (i < 0) Int.MAX_VALUE else i } }
+            withContext(Dispatchers.Default) {
+                val p = c.repository.preview(s, servings, decisions.toMap(), aisleMoves.toMap())
+                preview = p
+                val order = c.repository.aisleOrder()
+                p.rows.map { row(it) }.groupBy { it.aisle }.toList().sortedBy { (a, _) ->
+                    order.indexOf(a).let { i -> if (i < 0) Int.MAX_VALUE else i }
+                }
+            }
         val r = result!!
         _state.value =
             ReviewState.Ready(
@@ -253,27 +297,27 @@ class ReviewViewModel(
     fun setInStock(
         key: String,
         inStock: Boolean,
-    ) = viewModelScope.launch {
+    ) = act {
         decisions[key] = (decisions[key] ?: RowDecision()).copy(inStock = inStock)
         recompute()
     }
 
     /** Overflow menu: mark this aisle in stock. */
     fun aisleInStock(aisle: AisleCode) =
-        viewModelScope.launch {
+        act {
             preview?.rows?.filter { it.target.aisle == aisle }?.forEach { decisions[it.target.mergeKey] = it.decision.copy(inStock = true) }
             recompute()
         }
 
     /** Overflow menu: clear in stock. */
     fun clearInStock() =
-        viewModelScope.launch {
+        act {
             decisions.replaceAll { _, d -> d.copy(inStock = false) }
             recompute()
         }
 
     fun setServings(n: Int) =
-        viewModelScope.launch {
+        act {
             if (n in 1..99) {
                 servings = n
                 recompute()
@@ -286,12 +330,11 @@ class ReviewViewModel(
         if (busy) return
         busy = true
         (state.value as? ReviewState.Ready)?.let { _state.value = it.copy(ui = it.ui.copy(busy = true)) }
-        viewModelScope.launch {
+        act {
             try {
-                val again = c.importer.parse(r.copy(claudePending = true), allowClaude = true, model = c.settings.model.first())
-                if (again.parsedBy == ParsedBy.CLAUDE) c.importJobs.finish(jobId, again)
-                result = again
+                val again = parseWithClaude((result ?: r).copy(claudePending = true)) { it.parsedBy == ParsedBy.CLAUDE }
                 store(again)
+                result = again
             } finally {
                 busy = false
             }
@@ -311,9 +354,9 @@ class ReviewViewModel(
         if (busy) return
         busy = true
         _state.value = ready.copy(ui = ready.ui.copy(busy = true))
-        viewModelScope.launch {
+        act {
             try {
-                val p = preview ?: return@launch
+                val p = preview ?: return@act
                 when (val r = c.repository.apply(p, jobId)) {
                     is ApplyResult.Applied -> {
                         _state.value = ReviewState.Added(r.added, r.useId)
@@ -339,7 +382,7 @@ class ReviewViewModel(
     }
 
     fun cancel() =
-        viewModelScope.launch {
+        act {
             stored?.let { c.repository.discardRecipe(it.recipe.id) }
             c.importJobs.done(jobId)
             _state.value = ReviewState.Cancelled
@@ -420,7 +463,7 @@ class ReviewViewModel(
             val needed = inc.lines.filter { it.target.mergeKey == key }.fold(QtyBase.PRESENCE) { acc, l -> acc + lineQty(l, inc) }
             if (!needed.isPresence && q.parts.keys.none { it in needed.parts.keys }) return false
         }
-        viewModelScope.launch {
+        act {
             decisions[key] = (decisions[key] ?: RowDecision()).copy(haveSome = q, inStock = false)
             recompute()
         }
@@ -429,7 +472,7 @@ class ReviewViewModel(
 
     /** "Always in stock": a staple from now on, and ticked here. */
     fun alwaysInStock(key: String) =
-        viewModelScope.launch {
+        act {
             c.repository.setStaple(key, true)
             decisions[key] = (decisions[key] ?: RowDecision()).copy(inStock = true)
             recompute()
@@ -440,7 +483,7 @@ class ReviewViewModel(
         key: String,
         aisle: AisleCode,
         always: Boolean,
-    ) = viewModelScope.launch {
+    ) = act {
         if (always) {
             aisleMoves.remove(key)
             c.repository.setOverride(key, aisle)
@@ -452,7 +495,7 @@ class ReviewViewModel(
 
     /** "A or B" swap: the line becomes B, with "or A" in its note. */
     fun swap(lineId: Long) =
-        viewModelScope.launch {
+        act {
             replaceLine(lineId) { p ->
                 val alt = p.note?.takeIf { it.startsWith("or ") }?.removePrefix("or ")?.trim() ?: return@replaceLine p
                 p.copy(name = alt.lowercase(), note = "or ${p.name}", unit = p.unit)
@@ -463,8 +506,8 @@ class ReviewViewModel(
     fun editLine(
         lineId: Long,
         text: String,
-    ) = viewModelScope.launch {
-        if (text.isBlank()) return@launch
+    ) = act {
+        if (text.isBlank()) return@act
         replaceLine(lineId) { old -> c.ruleParser.parse(text).copy(section = old.section) }
     }
 
@@ -476,9 +519,11 @@ class ReviewViewModel(
         val r = result ?: return
         val index = s.lines.indexOfFirst { it.first.id == lineId }.takeIf { it >= 0 } ?: return
         val lines = r.lines.toMutableList()
+        if (index !in lines.indices) return
         lines[index] = f(lines[index])
-        result = r.copy(lines = lines)
-        store(result!!)
+        val edited = r.copy(lines = lines)
+        store(edited)
+        result = edited
         recompute()
     }
 

@@ -202,6 +202,10 @@ interface ListDao {
     @Query("SELECT * FROM ImportJob WHERE state = :state ORDER BY createdAt")
     fun observeJobs(state: String): Flow<List<ImportJobEntity>>
 
+    /** The worker's claim: only a job still waiting (or interrupted mid-run) is run; 0 rows otherwise. */
+    @Query("UPDATE ImportJob SET state = 'RUNNING' WHERE id = :id AND state IN ('QUEUED', 'RUNNING')")
+    suspend fun claimJob(id: Long): Int
+
     // ---- watch ----------------------------------------------------------------
     @Query("SELECT * FROM WatchInstall WHERE installId = :id")
     suspend fun install(id: Int): WatchInstallEntity?
