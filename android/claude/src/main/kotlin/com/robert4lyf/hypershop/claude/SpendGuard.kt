@@ -105,6 +105,7 @@ class GuardedClaude(
             when (input) {
                 is ClaudeInput.Lines -> input.lines.sumOf { it.length + 1 }
                 is ClaudeInput.PageText -> minOf(input.text.length, ClaudeRequest.INPUT_CAP)
+                is ClaudeInput.Photo -> ClaudeRequest.PHOTO_CHARS
             }
         // Check and reserve together: two imports at once (a background share while a
         // review is open) can't both pass on the same history and overshoot a cap.

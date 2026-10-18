@@ -35,6 +35,20 @@
         </activity>
 
         <!--
+          Hands the camera app a file to save "Take a photo" in (TakePicture: no CAMERA
+          permission). Not exported; the URI is granted to the camera for that one shot.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.photos"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/photo_paths" />
+        </provider>
+
+        <!--
           WorkManager is initialised on demand from HyperShopApplication, so
           its worker factory can read from the AppContainer.
         -->

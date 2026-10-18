@@ -168,6 +168,8 @@ class ClaudeClient(
             when (input) {
                 is ClaudeInput.Lines -> input.lines.joinToString("\n")
                 is ClaudeInput.PageText -> input.text
+                // A photo has no text to check source URLs against: none are kept.
+                is ClaudeInput.Photo -> ""
             }
         val recipe =
             runCatching { PostProcess.recipe(out, source, answeredBy) }.getOrNull()

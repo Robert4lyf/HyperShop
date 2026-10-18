@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.ui.recipes
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.robert4lyf.hypershop.core.model.ParsedBy
@@ -8,6 +9,7 @@ import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.importing.ImportInput
 import com.robert4lyf.hypershop.importing.ImportResult
+import com.robert4lyf.hypershop.importing.PhotoStore
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -107,6 +109,30 @@ class RecipesViewModel(
                     inStockLines = src.inStockLines,
                 )
             reviews.send(c.importJobs.enqueueReady(ImportInput(r.url ?: "", r.title), result))
+        }
+
+    /**
+     * "+ › Photo of a recipe": the photo is saved, scaled down, and reviewed like a
+     * shared page; the review screen asks Claude to read it once it is open.
+     */
+    fun addPhoto(uri: Uri) =
+        viewModelScope.launch {
+            val file = PhotoStore.save(c.context, uri)
+            if (file == null) {
+                messages.send(UiMessage("Couldn't open that photo"))
+                return@launch
+            }
+            val result =
+                ImportResult(
+                    url = null,
+                    title = null,
+                    servings = null,
+                    locale = UnitLocale.METRIC,
+                    method = "PHOTO",
+                    claudePending = true,
+                    photo = file.path,
+                )
+            reviews.send(c.importJobs.enqueueReady(ImportInput("", "Photo of a recipe"), result))
         }
 
     /** "+ › Paste a link": the same path as sharing a page to the app (the review screen opens when it is ready). */

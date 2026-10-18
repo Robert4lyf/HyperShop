@@ -82,7 +82,7 @@ fun RecipesRoute(
         onRemove = vm::remove,
         onAddInStock = vm::addInStockNow,
         onEdit = vm::edit,
-        add = AddRecipeActions(onLink = vm::addLink, onManual = { n, s, l -> vm.addManual(n, s, l) }),
+        add = AddRecipeActions(onLink = vm::addLink, onManual = { n, s, l -> vm.addManual(n, s, l) }, onPhoto = { vm.addPhoto(it) }),
     )
 }
 

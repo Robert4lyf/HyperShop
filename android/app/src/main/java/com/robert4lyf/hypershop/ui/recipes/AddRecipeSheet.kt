@@ -1,12 +1,17 @@
 package com.robert4lyf.hypershop.ui.recipes
 
 import android.content.ClipboardManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
@@ -22,12 +27,15 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,17 +58,21 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.theme.card
+import java.io.File
 
-private enum class AddMode { CHOOSE, LINK, MANUAL }
+private enum class AddMode { CHOOSE, LINK, MANUAL, PHOTO }
 
 /** What "+" on the Recipes tab does: a page's link, or a recipe typed in. */
 data class AddRecipeActions(
     val onLink: (String) -> Unit = {},
     /** Name, servings (null when blank) and the ingredient lines as typed. */
     val onManual: (String, Int?, String) -> Unit = { _, _, _ -> },
+    /** A photo of a recipe, from the camera or the photo picker. */
+    val onPhoto: (Uri) -> Unit = {},
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -107,6 +119,13 @@ fun AddRecipeContent(
                     body = "Your own recipe: a name, how many it serves and the ingredients.",
                     tag = "add-manual",
                 ) { mode = AddMode.MANUAL.name }
+                Choice(
+                    Icons.Rounded.PhotoCamera,
+                    hue = 280f,
+                    title = "Photo of a recipe",
+                    body = "A cookbook page: Claude reads the ingredients from the photo.",
+                    tag = "add-photo",
+                ) { mode = AddMode.PHOTO.name }
             }
             AddMode.LINK ->
                 LinkForm(onBack = { mode = AddMode.CHOOSE.name }) { url ->
@@ -116,6 +135,11 @@ fun AddRecipeContent(
             AddMode.MANUAL ->
                 ManualForm(onBack = { mode = AddMode.CHOOSE.name }) { name, serves, lines ->
                     actions.onManual(name, serves, lines)
+                    onDone()
+                }
+            AddMode.PHOTO ->
+                PhotoForm(onBack = { mode = AddMode.CHOOSE.name }) { uri ->
+                    actions.onPhoto(uri)
                     onDone()
                 }
         }
@@ -196,6 +220,55 @@ private fun LinkForm(
         enabled = url.isNotBlank(),
         modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("link-go"),
     ) { Text("Get the ingredients") }
+}
+
+/**
+ * "Take a photo" hands the camera app a file of ours to save into (no CAMERA
+ * permission needed); "Choose from photos" is the system photo picker (none either).
+ */
+@Composable
+private fun PhotoForm(
+    onBack: () -> Unit,
+    onPicked: (Uri) -> Unit,
+) {
+    val context = LocalContext.current
+    // Where the camera app saves the shot: kept across the trip to the camera and back.
+    var shot by rememberSaveable { mutableStateOf<String?>(null) }
+    val camera =
+        rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+            val uri = shot?.let(Uri::parse)
+            if (ok && uri != null) onPicked(uri)
+        }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let(onPicked) }
+    FormTitle("Photo of a recipe", onBack)
+    Text(
+        "Get the whole ingredient list in the photo, flat and in good light. Claude reads it (this needs your key), " +
+            "then you check the ingredients as for a shared recipe.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Button(
+        onClick = {
+            val file = File(File(context.cacheDir, "camera").apply { mkdirs() }, "shot.jpg")
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.photos", file)
+            shot = uri.toString()
+            // No camera app (rare): nothing happens rather than a crash.
+            runCatching { camera.launch(uri) }
+        },
+        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("photo-camera"),
+    ) {
+        Icon(Icons.Rounded.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.size(8.dp))
+        Text("Take a photo")
+    }
+    OutlinedButton(
+        onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("photo-pick"),
+    ) {
+        Icon(Icons.Rounded.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.size(8.dp))
+        Text("Choose from photos")
+    }
 }
 
 @Composable
