@@ -27,14 +27,36 @@ if [[ -z "${DISPLAY:-}" ]]; then
     export DISPLAY=:99
     sleep 2
 fi
-"${SDK_DIR}/bin/connectiq" > /dev/null 2>&1 &
+SIM_LOG="${ROOT}/garmin/build/simulator.log"
+"${SDK_DIR}/bin/simulator" > "${SIM_LOG}" 2>&1 &
 sim=$!
 trap 'kill ${sim} 2>/dev/null || true' EXIT
-sleep 10
 
-timeout 600 "${SDK_DIR}/bin/monkeydo" "${OUT}" "${DEVICE}" -t 2>&1 | tee "${LOG}"
+# The simulator takes a while to open its port on a cold runner; monkeydo
+# says "Unable to connect" until it has.
+for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    sleep 10
+    if ! kill -0 "${sim}" 2>/dev/null; then
+        echo "The simulator exited:" >&2
+        cat "${SIM_LOG}" >&2
+        exit 1
+    fi
+    if timeout 600 "${SDK_DIR}/bin/monkeydo" "${OUT}" "${DEVICE}" -t > "${LOG}" 2>&1; then
+        break
+    fi
+    if ! grep -q "Unable to connect" "${LOG}"; then
+        break
+    fi
+    echo "Simulator not ready (attempt ${attempt})"
+done
+cat "${LOG}"
 
 # monkeydo's exit code does not say whether the tests passed; its report does.
+if grep -q "Unable to connect" "${LOG}"; then
+    echo "The simulator never accepted a connection. Its log:" >&2
+    cat "${SIM_LOG}" >&2
+    exit 1
+fi
 if grep -qE '^(FAIL|ERROR)|FAILED' "${LOG}"; then
     echo "Watch tests failed" >&2
     exit 1

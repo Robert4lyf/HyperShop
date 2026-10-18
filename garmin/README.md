@@ -29,8 +29,14 @@ build size to the job summary, compiles the tests for the device, and uploads
 - API: `Menu2`, `CheckboxMenu`, `Menu2.setFocus` are 3.0.0; `getGlanceView` is
   3.1.0; `WatchUi.showToast` is 3.4.0, **not** available at 3.2, so notices are
   drawn in the app's own views.
-- Glances: read from the device job summary (`tools/device_facts.py`). Until
-  that says the 245 lists a `glance` app type, the app has no glance; it keeps
-  the summary ("14 left · Produce next") in Storage key `glance` ready for one.
+- **From the device definitions** (CI device job, SDK 9.2.0, `tools/device_facts.py`):
+  fr245 watch app 128 KB, glance 32 KB (glances supported), widget 64 KB;
+  fr245m watch app 1.25 MB; both Connect IQ 3.3.1–3.3.6, 240×240 MIP.
+- **Release build size** (fr245, `--build-stats 0`, step 6.5 commit): code
+  16.1 KB, data 2.5 KB, PRG 25 KB — about 14% of the 128 KB.
+- Glance: "14 left · Produce next", read from Storage `g`, which the app
+  writes whenever the list changes. Only `getGlanceView` and the glance view
+  are `(:glance)`; the foreground entry points carry
+  `(:typecheck(disableGlanceCheck))` because they build the link and screens.
 - Messages may be capped in the low hundreds of bytes (unverified; the
   payload probe in the debug build measures it at Hand-off B).
