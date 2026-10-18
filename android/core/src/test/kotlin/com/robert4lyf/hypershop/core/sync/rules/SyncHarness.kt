@@ -48,6 +48,64 @@ class SyncHarness(
     private val aisles = listOf(PagerAisle("PRODUCE", "Produce", false), PagerAisle("DAIRY_EGGS", "Dairy & Eggs", false))
     val log = mutableListOf<String>()
 
+    /**
+     * Every call into the watch model and the state after it, for
+     * garmin/test/SyncTraces.mc ([WatchTraceTest]): the Monkey C port
+     * replays the same calls and must end up in the same state.
+     */
+    val trace =
+        mutableListOf<List<Any?>>(
+            listOf("config", vector["batchSize"]?.jsonPrimitive?.int ?: 8, vector["outboxCap"]?.jsonPrimitive?.int ?: 32),
+        )
+
+    private fun traced(vararg event: Any?) {
+        trace += event.toList()
+        trace += watchState()
+    }
+
+    private fun watchState(): List<Any?> {
+        val last = watch.notices.lastOrNull()
+        val (code, count) =
+            when {
+                last == null -> null to 0
+                last == "1 more" -> "more" to 1
+                last == "Changed on phone" -> "changed" to 1
+                last.endsWith(" watch ticks discarded (list replaced)") -> "discarded" to last.substringBefore(' ').toInt()
+                else -> error("unmapped notice $last")
+            }
+        return listOf(
+            "state",
+            watch.view().toSortedMap(),
+            watch.outbox.map { it.seq ?: 0 },
+            watch.ackedThrough,
+            watch.nextSeq,
+            watch.epoch,
+            watch.listRev,
+            watch.helloDue,
+            code,
+            count,
+            watch.results.toSortedMap().mapValues { it.value.wire },
+        )
+    }
+
+    private fun watchHello() {
+        val h = watch.hello(nowMs / 1000)
+        traced("hello", (nowMs / 1000).toInt(), h.listRev, h.ackedThrough, h.epoch)
+        toPhone += WatchCodec.encode(h)
+    }
+
+    private fun watchSend() {
+        val batch = watch.nextBatch()
+        val encoded = batch?.let { WatchCodec.encode(it) }
+        traced("send", encoded?.get("op"))
+        encoded?.let { toPhone += it }
+    }
+
+    private fun watchTimeout() {
+        watch.timeout()
+        traced("timeout")
+    }
+
     fun run() {
         for ((i, step) in vector.getValue("steps").jsonArray.withIndex()) {
             val s = step.jsonObject
@@ -71,10 +129,13 @@ class SyncHarness(
             "phone.rekey" -> phone.rekey(int("from"), int("to"))
             "phone.newEpoch" -> phone.newEpoch(int("epoch"))
             "phone.push" -> pushSnapshot()
-            "watch.hello" -> toPhone += WatchCodec.encode(watch.hello(nowMs / 1000))
-            "watch.toggle" -> lastToggle = watch.toggle(int("item"), nowMs / 1000)
-            "watch.send" -> watch.nextBatch()?.let { toPhone += WatchCodec.encode(it) }
-            "watch.timeout" -> watch.timeout()
+            "watch.hello" -> watchHello()
+            "watch.toggle" -> {
+                lastToggle = watch.toggle(int("item"), nowMs / 1000)
+                traced("toggle", int("item"), (nowMs / 1000).toInt(), lastToggle)
+            }
+            "watch.send" -> watchSend()
+            "watch.timeout" -> watchTimeout()
             "watch.rawOps" ->
                 toPhone +=
                     mapOf(
@@ -117,8 +178,10 @@ class SyncHarness(
             val reply = phone.receive(m) ?: return
             if (reply.fullSnapshot) pushSnapshot(reply) else toWatch += WatchCodec.encodePage(ackOnly(reply))
         } else {
-            val page = requireNotNull(WatchCodec.decodePage(toWatch.removeAt(index))) { "watch could not decode" }
+            val payload = toWatch.removeAt(index)
+            val page = requireNotNull(WatchCodec.decodePage(payload)) { "watch could not decode" }
             watch.receive(page)
+            traced("recv", payload)
         }
     }
 
@@ -155,11 +218,11 @@ class SyncHarness(
     /** Send, deliver and retry until nothing is left to do (no faults). */
     private fun settle() {
         repeat(100) {
-            if (watch.helloDue) toPhone += WatchCodec.encode(watch.hello(nowMs / 1000))
-            watch.nextBatch()?.let { toPhone += WatchCodec.encode(it) }
+            if (watch.helloDue) watchHello()
+            watchSend()
             if (toPhone.isEmpty() && toWatch.isEmpty()) {
                 if (watch.outbox.isEmpty() && !watch.helloDue) return
-                watch.timeout()
+                watchTimeout()
                 return@repeat
             }
             while (toPhone.isNotEmpty()) deliver("phone", 0)

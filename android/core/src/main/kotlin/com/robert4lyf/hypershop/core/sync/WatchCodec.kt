@@ -76,14 +76,16 @@ object WatchCodec {
      * request (`n`) and of this reply (`sd`).
      */
     fun encodeProbeReply(r: ProbeRequest): Map<String, Any> {
-        fun build(pad: Int, down: Int) =
-            mapOf<String, Any>(
-                Key.VERSION to WatchProtocol.VERSION,
-                Key.TYPE to WatchProtocol.Outbound.PROBE,
-                Key.PROBE_SIZE to r.received,
-                Key.SIZE_DOWN to down,
-                Key.PAD to "x".repeat(pad),
-            )
+        fun build(
+            pad: Int,
+            down: Int,
+        ) = mapOf<String, Any>(
+            Key.VERSION to WatchProtocol.VERSION,
+            Key.TYPE to WatchProtocol.Outbound.PROBE,
+            Key.PROBE_SIZE to r.received,
+            Key.SIZE_DOWN to down,
+            Key.PAD to "x".repeat(pad),
+        )
         val bare = PayloadSize.of(build(0, 0))
         val pad = (r.want - bare).coerceAtLeast(0)
         return build(pad, PayloadSize.of(build(pad, 0)))

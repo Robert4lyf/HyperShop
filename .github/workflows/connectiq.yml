@@ -205,3 +205,66 @@ jobs:
           path: garmin/build/hypershop-fr245.prg
           if-no-files-found: error
           retention-days: 14
+
+  # Runs the Monkey C tests (garmin/test: the sync traces generated from the
+  # Kotlin model, and the rest). The simulator links webkit2gtk-4.0, which
+  # Ubuntu 24.04 dropped, hence 22.04, and needs a display, hence Xvfb.
+  # Experimental: kept non-blocking until it has passed on a few runs.
+  simulator:
+    name: Run the watch tests in the simulator
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+
+    steps:
+      - name: Check the secrets are set
+        id: secrets
+        env:
+          USER: ${{ secrets.GARMIN_USERNAME }}
+          PASS: ${{ secrets.GARMIN_PASSWORD }}
+        run: |
+          if [[ -n "$USER" && -n "$PASS" ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::GARMIN_USERNAME and GARMIN_PASSWORD are not set; the simulator needs the device definitions."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.ready == 'true'
+
+      - name: Set up JDK 21
+        if: steps.secrets.outputs.ready == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Cache the Connect IQ SDK
+        if: steps.secrets.outputs.ready == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/connectiq/sdk-${{ env.CIQ_SDK_VERSION }}
+          key: connectiq-sdk-${{ env.CIQ_SDK_VERSION }}-${{ runner.os }}-2204
+
+      - name: Install the simulator's libraries
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libwebkit2gtk-4.0-37 libsecret-1-0 libsoup2.4-1 > /dev/null
+
+      - name: Download the device definitions
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          GARMIN_USERNAME: ${{ secrets.GARMIN_USERNAME }}
+          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/lindell/connect-iq-sdk-manager-cli/master/install.sh \
+            | sh -s -- -b "$HOME/.local/bin"
+          export PATH="$HOME/.local/bin:$PATH"
+          connect-iq-sdk-manager agreement view > /dev/null
+          connect-iq-sdk-manager agreement accept
+          connect-iq-sdk-manager login
+          connect-iq-sdk-manager device download --manifest garmin/manifest.xml
+
+      - name: Run the tests
+        if: steps.secrets.outputs.ready == 'true'
+        run: tools/run_watch_tests.sh
