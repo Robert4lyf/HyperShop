@@ -225,6 +225,24 @@ class RuleParserTest {
     }
 
     @Test
+    fun r35SizedCountWithoutAContainer() {
+        val salmon = p.parse("4 x 150g salmon fillets")
+        assertEquals(Rational.of(4), salmon.quantity)
+        assertNull(salmon.unit)
+        assertEquals(Rational.of(150), salmon.altQuantity)
+        assertEquals(QtyUnit.G, salmon.altUnit)
+        assertEquals("salmon fillets", salmon.name)
+        assertFalse(salmon.check)
+        val chicken = p.parse("2 x 200g skinless chicken breasts")
+        assertEquals(Rational.of(2), chicken.quantity)
+        assertNull(chicken.unit)
+        assertEquals(Rational.of(200), chicken.altQuantity)
+        assertEquals("skinless chicken breasts", chicken.name)
+        assertFalse(chicken.check)
+    }
+
+
+    @Test
     fun hostileLinesDoNotThrowAndStayFast() {
         val lines = listOf("", "(((((", ")))", "1/", "½-½-½", "x x x 2 x", "of of of", ",,,,", "(".repeat(3000), "1 ".repeat(3000))
         for (l in lines) p.parse(l)

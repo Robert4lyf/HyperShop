@@ -82,6 +82,7 @@ class RuleParser(
             var unit: QtyUnit? = null
             var altQty: Rational? = null
             var altUnit: QtyUnit? = null
+            var sizedCount = false
 
             if (qty != null) {
                 skipSizes()
@@ -92,14 +93,16 @@ class RuleParser(
                     altUnit = bare.second
                     unit = bare.third
                 } else if (word(i) == "x" && kind(i + 1) == Kind.NUM) {
-                    // R3.5: 2 x 400g tins
+                    // R3.5: 2 x 400g tins; without a container (4 x 150g salmon fillets)
+                    // the amount is a count of the named thing, each of the size.
                     i++
                     val size = readNumber()
                     val sizeUnit = readUnit()
                     if (size != null && sizeUnit != null) {
                         altQty = size
                         altUnit = sizeUnit
-                        unit = readUnit() ?: QtyUnit.OTHER.also { check = true }
+                        unit = readUnit()
+                        if (unit == null) sizedCount = true
                     }
                 } else {
                     unit = readUnit()
@@ -164,7 +167,7 @@ class RuleParser(
             }
             if (word(i) == "of") i++ // R4.5
 
-            val (name, trailingUnit, impliedQty) = nameAndNote(unit == null && qty != null)
+            val (name, trailingUnit, impliedQty) = nameAndNote(unit == null && qty != null && !sizedCount)
             if (trailingUnit != null) unit = trailingUnit
             if (qty == null && impliedQty != null) qty = impliedQty
             if (unit == QtyUnit.OTHER) check = true

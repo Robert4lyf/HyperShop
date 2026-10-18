@@ -60,7 +60,7 @@ Serialised lower case (Claude's enum and the golden JSON use these strings).
 - **R3.2 Ranges**: `1-2`, `1 – 2`, `1 to 2`, `1 or 2` (between two numbers) → `quantity` 1, `quantity_max` 2.
 - **R3.3** Number words `a`/`an` before a unit (= 1), `one`…`twelve`, `half`, `dozen` (= 12). A line that *starts* with a unit word and has no number ("Pinch of cayenne", "Strip of orange peel" is not — strip is not a unit) has quantity 1.
 - **R3.4 Parenthetical alternatives**: a parenthesised amount with a unit right after the primary amount/unit (`2 cups (300g)`, `1 (14-ounce) tin`) is `alt_quantity`/`alt_unit`. For "`N (size-unit) container`" the container is the unit and the size goes to alt: `1 (400g) tin tomatoes` → qty 1 tin, alt 400 g.
-- **R3.5** `x` multipliers (`2 x 400g tins`) → qty 2, unit tin, alt 400 g.
+- **R3.5** `x` multipliers (`2 x 400g tins`) → qty 2, unit tin, alt 400 g. With no container (`4 x 150g salmon fillets`) → qty 4, no unit (a count), alt 150 g, name `salmon fillets`.
 - **R3.6** "plus 2 tbsp", "and 1 tsp" after the first amount → the extra amount goes into `note` (not added).
 
 ## R4 — Name vs note
