@@ -99,7 +99,9 @@ class KeystoreApiKeyStore(
     private var cached: String? = null
 
     init {
-        scope.launch { has.value = store.data.first()[BLOB] != null }
+        // Under the lock: read before a wipe or after it, never in between, so a
+        // late start-up read can't report a key that get() has just wiped.
+        scope.launch { lock.withLock { has.value = store.data.first()[BLOB] != null } }
     }
 
     override suspend fun get(): String? =
