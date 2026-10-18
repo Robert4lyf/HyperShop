@@ -13,6 +13,7 @@ import com.robert4lyf.hypershop.importing.PhotoStore
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -27,6 +28,14 @@ data class RecipesUi(
     val loaded: Boolean = false,
     /** Every recipe you've added, the one added longest ago first. */
     val library: List<LibraryRow> = emptyList(),
+)
+
+/** A saved recipe opened from "Your recipes": its ingredients, under their headings. */
+data class RecipeDetail(
+    val row: LibraryRow,
+    val servings: Int?,
+    /** Heading (null for none) and its lines as written, in recipe order. */
+    val sections: List<Pair<String?, List<String>>>,
 )
 
 /** One recipe in "Your recipes". */
@@ -79,6 +88,27 @@ class RecipesViewModel(
                 )
             reviews.send(c.importJobs.enqueueReady(ImportInput(r.url ?: "", r.title), result))
         }
+
+    private val _detail = MutableStateFlow<RecipeDetail?>(null)
+
+    /** The saved recipe being looked at, or null. */
+    val detail: StateFlow<RecipeDetail?> = _detail
+
+    /** Tap on a saved recipe: its ingredients. */
+    fun openDetail(row: LibraryRow) =
+        viewModelScope.launch {
+            val (r, lines) = c.repository.librarySource(row.recipeId) ?: return@launch
+            val sections = ArrayList<Pair<String?, MutableList<String>>>()
+            for (l in lines) {
+                if (sections.isEmpty() || sections.last().first != l.section) sections += l.section to mutableListOf()
+                sections.last().second += l.raw
+            }
+            _detail.value = RecipeDetail(row, r.servingsOriginal, sections)
+        }
+
+    fun closeDetail() {
+        _detail.value = null
+    }
 
     /** "Remove from your recipes" (what's on the list stays). */
     fun removeFromLibrary(row: LibraryRow) =

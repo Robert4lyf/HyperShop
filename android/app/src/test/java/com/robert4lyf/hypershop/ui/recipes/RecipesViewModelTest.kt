@@ -111,6 +111,20 @@ class RecipesViewModelTest {
     }
 
     @Test
+    fun aSavedRecipeOpensWithItsIngredients() {
+        val c = TestContainer.create()
+        c.add(*CHILLI)
+        val vm = RecipesViewModel(c).shown()
+        val row = await(vm.ui) { it.library.isNotEmpty() }.library.single()
+        vm.openDetail(row)
+        val d = await(vm.detail) { it != null }!!
+        assertEquals(CHILLI.toList(), d.sections.flatMap { it.second })
+        assertEquals(4, d.servings)
+        vm.closeDetail()
+        assertEquals(null, vm.detail.value)
+    }
+
+    @Test
     fun usesInStockNowAndRemove() {
         val c = TestContainer.create()
         c.add(*CHILLI)

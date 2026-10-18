@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.ui.recipes
 
 import android.text.format.DateUtils
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,13 +30,16 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.People
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -88,9 +92,20 @@ fun RecipesRoute(
         onRemove = vm::remove,
         onAddInStock = vm::addInStockNow,
         onEdit = vm::edit,
-        library = LibraryActions(onAdd = vm::addFromLibrary, onRemove = vm::removeFromLibrary),
+        library = LibraryActions(onAdd = vm::addFromLibrary, onRemove = vm::removeFromLibrary, onOpen = vm::openDetail),
         add = AddRecipeActions(onLink = vm::addLink, onManual = { n, s, l -> vm.addManual(n, s, l) }, onPhoto = { vm.addPhoto(it) }),
     )
+    val detail by vm.detail.collectAsStateWithLifecycle()
+    detail?.let { d ->
+        RecipeDetailSheet(
+            d,
+            onAdd = {
+                vm.closeDetail()
+                vm.addFromLibrary(d.row)
+            },
+            onDismiss = vm::closeDetail,
+        )
+    }
 }
 
 /** The Recipes tab, stateless. */
@@ -150,7 +165,7 @@ fun RecipesScreen(
                         }
                     }
                     items(ui.library, key = { "lib-${it.key}" }) { row ->
-                        LibraryCard(row, onAdd = { library.onAdd(row) }, onRemove = { forget = row })
+                        LibraryCard(row, onAdd = { library.onAdd(row) }, onRemove = { forget = row }, onOpen = { library.onOpen(row) })
                     }
                 }
             }
@@ -200,6 +215,8 @@ private const val DAY = DateUtils.DAY_IN_MILLIS
 data class LibraryActions(
     val onAdd: (LibraryRow) -> Unit = {},
     val onRemove: (LibraryRow) -> Unit = {},
+    /** Tap: see its ingredients. */
+    val onOpen: (LibraryRow) -> Unit = {},
 )
 
 /** One saved recipe: its name, where it's from, how big, when last added; Add to list. */
@@ -208,12 +225,18 @@ private fun LibraryCard(
     row: LibraryRow,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
+    onOpen: () -> Unit,
 ) {
     val dark = LocalDarkTheme.current
     val hue = Brand.recipeHue(row.title)
     val now = remember { System.currentTimeMillis() }
     Surface(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("lib-${row.key}"),
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clip(MaterialTheme.shapes.large)
+            .clickable(onClickLabel = "Show ingredients", onClick = onOpen)
+            .testTag("lib-${row.key}"),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.card,
     ) {
@@ -374,6 +397,88 @@ private fun Fact(
         ) {
             Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(16.dp))
             Text(text, style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RecipeDetailSheet(
+    detail: RecipeDetail,
+    onAdd: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) { RecipeDetailContent(detail, onAdd) }
+}
+
+/** A saved recipe's ingredients, as written, with "Add to list" and its page. */
+@Composable
+fun RecipeDetailContent(
+    detail: RecipeDetail,
+    onAdd: () -> Unit,
+) {
+    val open = rememberOpenLink()
+    val url = webLink(detail.row.url)
+    LazyColumn(
+        Modifier.fillMaxWidth().testTag("recipe-detail"),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        item(key = "title") {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(detail.row.title, style = MaterialTheme.typography.headlineSmall)
+                val bits =
+                    listOfNotNull(
+                        url?.let { siteName(it) },
+                        detail.servings?.let { "Serves $it" },
+                        if (detail.row.lines == 1) "1 ingredient" else "${detail.row.lines} ingredients",
+                    )
+                Text(
+                    bits.joinToString(" · "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                DetailButtons(onAdd, url?.let { { open(it) } })
+            }
+        }
+        detail.sections.forEachIndexed { i, (heading, lines) ->
+            heading?.let { h ->
+                item(key = "h-$i") {
+                    Text(h, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
+                }
+            }
+            items(lines.size, key = { j -> "l-$i-$j" }) { j ->
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("•", color = MaterialTheme.colorScheme.primary)
+                    Text(lines[j], style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DetailButtons(
+    onAdd: () -> Unit,
+    onOpen: (() -> Unit)?,
+) {
+    FlowRow(
+        Modifier.padding(top = 8.dp, bottom = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Button(onClick = onAdd, modifier = Modifier.testTag("detail-add")) {
+            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.size(8.dp))
+            Text("Add to list")
+        }
+        onOpen?.let {
+            OutlinedButton(onClick = it) {
+                Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(8.dp))
+                Text("Open recipe")
+            }
         }
     }
 }
