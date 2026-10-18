@@ -59,6 +59,27 @@ Not in v1:
    - A persistent notification offers **Listen**, **Next** and **Stop**.
 6. **Ticks use the existing path.** Voice ticks call `ListRepository.tick`/`untick`/`swapItem`. Revision bumps, watch sync and undo then work exactly as for a tap. The service never writes to the database directly.
 
+### Should Claude Haiku interpret what you say? Decided: not in v1
+
+Possible uses: send the speech-to-text transcript (never audio) to Haiku when the
+local grammar doesn't understand it, or for free questions ("what was the coriander for?").
+
+Against, for this feature:
+- **Latency:** each call is a network round trip of a second or more, made while you stand in an aisle waiting. Local parsing is instant.
+- **Signal:** supermarkets often have poor reception, so this help would fail exactly where it's needed.
+- **Trust:** a wrong tick is worse than "say that again". A fixed grammar is predictable and testable; a model's guess isn't.
+- **Recognition errors:** Haiku can't fix them. It sees the same text the recognizer produced.
+- **Coverage:** the requested commands are a small, closed set.
+- **Rules:** it would break "Claude is only called while the review screen is in the foreground" and add spend on every unclear phrase.
+
+Revisit after real shops. The session will count how often it answers "Sorry, say that again"
+(a local counter, no audio or text kept). If that is common, add an opt-in "Ask Claude" fallback:
+- for unclear phrases only;
+- text only, with the list's item names;
+- it may answer or suggest, but never ticks without your "yes";
+- it goes through the spend guard;
+- it needs a CLAUDE.md rule change.
+
 ## 3. Architecture
 
 `:core/voice` is pure JVM and fully unit-tested:
