@@ -47,6 +47,12 @@ class DisplayTest {
         assertEquals("120 g", amount(QtyBase.of(Rational.ONE, QtyUnit.CUP, UnitLocale.METRIC), "cheddar", QtyUnit.CUP))
         assertEquals("85 g", amount(QtyBase.of(Rational.of(3, 4), QtyUnit.CUP, UnitLocale.US), "mozzarella", QtyUnit.CUP))
         assertEquals("300 g", amount(QtyBase.of(Rational.of(2), QtyUnit.CUP, UnitLocale.METRIC), "chicken", QtyUnit.CUP))
+        // Frozen diced onions are sold by weight: "1 cup (115g) frozen diced onions".
+        for (name in listOf("frozen diced onions", "frozen chopped onion", "frozen onions")) {
+            assertEquals("frozen_diced_onion", cat.lookup(name)?.id, name)
+        }
+        // 113 g, rounded.
+        assertEquals("120 g", amount(QtyBase.of(Rational.ONE, QtyUnit.CUP, UnitLocale.US), "frozen_diced_onion", QtyUnit.CUP))
         // No density known: still metric, in ml.
         assertEquals("240 ml", amount(QtyBase.of(Rational.ONE, QtyUnit.CUP, UnitLocale.US), "okra", QtyUnit.CUP))
         // Liquids in ml; spoons as written, even large amounts of a solid.

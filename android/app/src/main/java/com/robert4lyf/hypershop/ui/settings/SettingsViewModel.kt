@@ -8,6 +8,7 @@ import com.robert4lyf.hypershop.claude.SpendGuard
 import com.robert4lyf.hypershop.core.merge.UnitsSetting
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.di.AppContainer
+import com.robert4lyf.hypershop.settings.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +20,7 @@ enum class KeyStatus { TESTING, OK, BAD_KEY, OFFLINE, ERROR }
 
 data class SettingsUi(
     val units: UnitsSetting = UnitsSetting.METRIC,
+    val theme: ThemeMode = ThemeMode.SYSTEM,
     val staples: List<String> = emptyList(),
     val aisles: List<AisleCode> = emptyList(),
     val watchVibrate: Boolean = true,
@@ -50,6 +52,7 @@ class SettingsViewModel(
     init {
         val s = c.settings
         watch(s.units) { copy(units = it) }
+        watch(s.theme) { copy(theme = it) }
         watch(s.model) { copy(model = it) }
         watch(s.monthlyCapUsd) { copy(monthlyCapUsd = it) }
         watch(s.dailyCalls) { copy(dailyCalls = it) }
@@ -82,6 +85,8 @@ class SettingsViewModel(
     }
 
     // ---- List ------------------------------------------------------------------------------
+
+    fun setTheme(t: ThemeMode) = viewModelScope.launch { c.settings.setTheme(t) }
 
     fun setUnits(u: UnitsSetting) =
         viewModelScope.launch {
