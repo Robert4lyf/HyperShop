@@ -1,6 +1,6 @@
 # Voice mode — design plan (not built yet)
 
-Status: **plan only**. Goal: do a whole shop with headphones on and the phone in a
+Status: **plan only**, updated with your answers (§6). Goal: do a whole shop with headphones on and the phone in a
 pocket, asking for the next items, saying "done" to tick, and asking simple
 questions.
 
@@ -8,9 +8,10 @@ questions.
 
 | You say (examples) | The app does | It says |
 | --- | --- | --- |
-| "next", "what's next", "next item" | Reads the current item (the first unticked one in walking order) | "Next: 2 onions." |
-| "next three", "what's coming up" | Reads up to 3, the first one becomes current | "Next: 2 onions, then carrots, then a pack of basil." |
-| "done", "got it", "tick", "yes" | Ticks the current item | "Ticked onions. Next: carrots." |
+| "next", "what's next", "next items" | Reads the next **3** unticked items in walking order. These become the "current three" | "Next: 2 onions, carrots, and a pack of basil." |
+| "next one", "just the next" | Reads only the first | "Next: 2 onions." |
+| "done", "got it", "tick" | Ticks the first of the current three that is still unticked, and names it | "Ticked onions. Still to get: carrots, basil." When all three are ticked, it reads the next three. |
+| "got the carrots", "done carrots", "tick milk" | Ticks the named item (fuzzy match, preferring the current three) | "Ticked carrots." |
 | "got the milk", "done milk", "tick milk" | Ticks the named item (fuzzy match among unticked) | "Ticked milk. Next: …" |
 | "undo", "untick that" | Unticks the last item ticked by voice | "Unticked milk." |
 | "skip", "later" | Moves on and leaves the item unticked. Skipped items come back at the end | "Skipping basil. Next: …" |
@@ -19,13 +20,14 @@ questions.
 | "how many left", "how many items" | Counts | "12 left, 5 ticked." |
 | "what's left in this aisle", "anything else here" | Reads the unticked items in the current aisle | "In Produce: carrots and basil." |
 | "which aisle" | — | "Milk is in Dairy and eggs." |
-| "swaps", "what can I use instead", "they're out" | Reads the swaps from the ingredient library | "Instead of agave syrup: maple syrup, honey or golden syrup. Say 'swap for' and a name, or 'skip'." |
-| "swap for maple syrup" | Swaps the item just this time (`ListRepository.swapItem`) | "Swapped agave syrup for maple syrup." |
+| "swaps", "what can I use instead" | Reads the swaps from the ingredient library (read only: the list is not changed) | "Instead of agave syrup: maple syrup, honey or golden syrup." |
+| "they're out", "out of stock", "none left" | Reads the swaps, then waits | "Agave syrup is out. You could get maple syrup, honey or golden syrup. Say 'done' if you got one, or 'skip'." Then "done" ticks the item; "skip" or "no" leaves it unticked and it isn't offered again this trip. No swaps → "No swaps for agave syrup; leaving it on the list." |
 | "help", "what can I say" | — | A short list of commands |
 | "stop", "pause voice" | Ends voice mode | "Voice mode off." |
 | "finish shopping" | Asks to confirm, then runs the same Finish as the button | "Finish and clear 14 ticked items? Say yes or no." |
 
 Not in v1:
+- Changing the list by voice (no "swap for …"; swaps are read only).
 - Adding items by voice.
 - Partial ticks ("got 2 of 3").
 - Reading recipes.
@@ -44,7 +46,10 @@ Not in v1:
 3. **Speech out: Android `TextToSpeech`.**
    - Use `en-GB`, with audio attributes `USAGE_ASSISTANT`.
    - Request short-lived audio focus (`AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK`), so other audio dips while the app talks and then returns.
-4. **How listening starts** (needs your choice, §6 Q3). Recommended: a **conversation window plus a headset button**.
+4. **How listening starts. Decided: always listening** (§6). Finding an item can take minutes, which a short listening window can't cover.
+   - Use **segmented sessions** (`RecognizerIntent.EXTRA_SEGMENTED_SESSION`, API 33+, with `onSegmentResults`). One long recognition session hands back each phrase as you say it, instead of a stop/restart (and a beep) after every silence. It is restarted only when Android ends the session (`onEndOfSegmentedSession`) or on an error, with a short back-off.
+   - The **Shokz single click** (play/pause) is the backup: it toggles "listening paused". The same applies to the Bose tap. This needs testing in the device test, because in call-audio mode (below) the button may act as "end call" instead.
+   - The text below was the original recommendation, kept for reference:
    - After the app speaks, it listens for about 6 seconds. That covers the normal "next → done → next" exchange.
    - If nothing is heard, it stops listening. A **headset button press** (or the notification's "Listen" button) starts listening again at any time.
    - An optional **"Always listening"** setting keeps restarting the recognizer. This is not the default: it uses more battery and the official documentation says the API isn't meant for continuous use.
@@ -96,10 +101,14 @@ Entry points:
    - Fix: when voice mode starts (and after each spoken reply), play a ~100 ms silent clip through `MediaPlayer` so we become the target.
    - If you're playing music, Spotify or similar will keep the buttons. The notification's Listen button and the conversation window still work.
    - This is the biggest uncertainty; it is checked in the device test, step 0.
-2. **Bluetooth headset microphone.**
+2. **Bluetooth headset microphone. Decided: use the headset mic** (§6). With the phone in a pocket, its own mic will be too muffled. The Shokz have noise-reducing mics aimed at your mouth, which also cuts false triggers from other shoppers. Original analysis:
    - By default the recognizer uses the **phone's** microphone, even with Bluetooth earbuds. With the phone in a pocket that's muffled, but usually workable for single words.
    - Using the earbuds' own mic needs the call audio route (HFP/SCO). That lowers audio quality, pauses or degrades music, and on Android 12+ probably needs the `BLUETOOTH_CONNECT` permission. That breaks the CLAUDE.md "No Bluetooth permissions" rule (written for the Garmin link).
-   - v1: phone mic only. If it isn't good enough in practice, decide in v2 whether to allow `BLUETOOTH_CONNECT` (§6 Q4).
+   - **Decided for v1:**
+     - Route the mic to the headset with `AudioManager.setCommunicationDevice` while voice mode is on, using `MODE_IN_COMMUNICATION`, and release it on stop.
+     - Request `BLUETOOTH_CONNECT` if the device test shows Android needs it. That needs a CLAUDE.md and `check_manifest.py` change: "No Bluetooth permissions" becomes "`BLUETOOTH_CONNECT` only, for the voice mode mic".
+     - Call-audio quality is fine, since you listen to nothing else.
+     - Fallback when no headset is connected: the phone mic.
    - Wired headsets with a mic just work.
 3. **Background microphone limits (Android 14).**
    - The service must be started from a visible screen, with `RECORD_AUDIO` granted and `FOREGROUND_SERVICE_MICROPHONE` declared. If the system kills it, it can't restart itself in the background. On restart we post a notification: "Voice mode stopped, tap to resume".
@@ -148,7 +157,13 @@ Entry points:
    - (c) the headset button reaches us with your headphones, including the silent-clip trick;
    - (d) how well the phone mic hears you with the phone in a pocket.
 
-   If (b) fails, voice mode needs the screen on. That would change the plan.
+   Added after your answers (Pixel 7 Pro, Shokz OpenRun Pro 2, Bose QC Earbuds II):
+   - (e) the recognizer hears through the Shokz and Bose mics with the headset route set via `setCommunicationDevice`, and whether `BLUETOOTH_CONNECT` is needed;
+   - (f) a segmented session runs for 10+ minutes with the screen locked: how often it ends, whether it beeps, battery use;
+   - (g) what a Shokz click and a Bose tap send while call audio is on: a media button we receive, or "hang up";
+   - (h) whether other shoppers' voices trigger commands, at a store or with a TV on.
+
+   If (b) or (f) fails, voice mode needs the screen on, or listening windows instead. That would change the plan.
 1. `:core/voice`: `SpeechText`, `ItemMatcher`, `VoiceGrammar`, `VoiceSession`, with tests (the bulk of the logic).
 2. `:app/voice`: the service, speech input and output, the notification, the mic button and permissions, settings, and the manifest-check update.
 3. Conversation window and headset button. Then the optional Always-listening mode.
@@ -162,7 +177,17 @@ Entry points:
    - the app killed in the background;
    - 45 minutes of battery drain.
 
-## 6. Questions for you
+## 6. Your answers (18 Oct 2026)
+
+- **Phone and headphones:** Pixel 7 Pro, with Shokz OpenRun Pro 2 or Bose QC (QuietComfort Earbuds II). Bluetooth works well; I've read that as agreement to `BLUETOOTH_CONNECT` for the headset mic. Shokz: a single click on the multifunction button is play/pause (Shokz guide).
+- **Nothing else is played while shopping:** the media session and the audio route are ours alone.
+- **Always listening** (push-to-talk as a backup where the button allows).
+- **"Next" reads 3** by default.
+- **Swaps are read only.**
+- **Out of stock:** offer the swaps; if none is taken, leave the item unticked.
+- **Still open:** Q8, whether the watch app (Run 2) is still wanted.
+
+### Original questions
 
 1. **Which phone and headphones?** For example, Pixel or Samsung; AirPods, Pixel Buds, Galaxy Buds or wired. Button gestures, and whether the earbuds' mic can be used, depend on this.
 2. **Do you listen to music or podcasts while shopping?** If so, the headset button usually stays with the music app. You'd rely on the conversation window or Always-listening instead.
@@ -174,6 +199,9 @@ Entry points:
 8. **Is the watch app (Run 2) still wanted** once voice mode exists?
 
 ## 7. Sources
+
+- Segmented recognition sessions (`onSegmentResults`, `onEndOfSegmentedSession`, API 33): <https://developer.android.com/reference/android/speech/RecognitionListener>
+- Shokz OpenRun Pro 2 controls: <https://shokz.com/blogs/guides/openrun-pro-2-using-guides>
 
 - Foreground service types and the Android 14 while-in-use rules: <https://developer.android.com/develop/background-work/services/fgs/service-types>, <https://developer.android.com/about/versions/12/foreground-services>
 - `SpeechRecognizer` (on-device, recognition support, model download; "not intended for continuous recognition"): <https://developer.android.com/reference/android/speech/SpeechRecognizer>
