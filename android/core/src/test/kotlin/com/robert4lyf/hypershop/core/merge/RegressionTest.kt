@@ -1,6 +1,5 @@
 package com.robert4lyf.hypershop.core.merge
 
-import com.robert4lyf.hypershop.core.model.BaseKey
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.QtyUnit
 import com.robert4lyf.hypershop.core.model.Rational
@@ -114,18 +113,6 @@ class RegressionTest {
         l2 = l2.copy(items = l2.items + (again.id to again.copy(rev = onion.rev)))
         assertTrue(again.id != onion.id)
         assertEquals(ApplyResult.Stale, merger.apply(l2, p, 11))
-    }
-
-    @Test
-    fun haveSomeInAnotherDimensionIsNotPartial() {
-        val p =
-            merger.preview(
-                ShoppingList(),
-                recipe(listOf("200 ml milk")),
-                mapOf("cat:milk" to RowDecision(haveSome = g(50))),
-            )
-        assertEquals(LineStatus.ADDED, p.lineStatus[1L])
-        assertEquals(Rational.of(200), p.rows.single().adding[BaseKey.VOLUME])
     }
 
     @Test

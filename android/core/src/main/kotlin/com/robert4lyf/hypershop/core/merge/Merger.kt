@@ -9,6 +9,7 @@ import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.parse.Normaliser
 
+/** PARTIAL is no longer written (it was "I have some"); kept so stored decisions still read. */
 enum class LineStatus { ADDED, IN_STOCK, PARTIAL, EXCLUDED }
 
 data class IncomingLine(
@@ -37,8 +38,6 @@ data class Incoming(
 /** The review screen's choice for one row (one mergeKey). */
 data class RowDecision(
     val inStock: Boolean = false,
-    /** "I have some": subtracted earliest line first. */
-    val haveSome: QtyBase? = null,
     val excluded: Boolean = false,
 )
 
@@ -152,7 +151,6 @@ class Merger(
         for ((key, lines) in incoming.lines.groupBy { it.target.mergeKey }) {
             val d = decisions[key] ?: RowDecision()
             val existing = list.itemByKey(key)
-            var have = d.haveSome ?: QtyBase.PRESENCE
             var adding = QtyBase.PRESENCE
             for (l in lines) {
                 if (d.excluded) {
@@ -164,22 +162,8 @@ class Merger(
                     continue
                 }
                 val noScale = l.parsed.noScale
-                var q = l.parsed.shopBase(incoming.locale)
-                if (!noScale) q = q.times(scale)
-                var lineStatus = LineStatus.ADDED
-                if (!have.isPresence && !q.isPresence) {
-                    // Subtract what you have from this line, earliest line first.
-                    val after = q.minusClamped(have)
-                    have = have.minusClamped(q)
-                    // Only PARTIAL when something was actually subtracted (not "I have 50 g" of 200 ml).
-                    if (after != q) lineStatus = LineStatus.PARTIAL
-                    q = after
-                    if (q.isPresence) {
-                        status[l.recipeLineId] = LineStatus.PARTIAL
-                        continue
-                    }
-                }
-                status[l.recipeLineId] = lineStatus
+                val q = l.parsed.shopBase(incoming.locale).let { if (noScale) it else it.times(scale) }
+                status[l.recipeLineId] = LineStatus.ADDED
                 contributions += PreviewContribution(l.recipeLineId, key, q, noScale || q.isPresence, l.parsed.shopUnit)
                 adding += q
             }

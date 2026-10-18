@@ -46,7 +46,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
-import com.robert4lyf.hypershop.ui.common.AmountField
 import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.SectionLabel
 import com.robert4lyf.hypershop.ui.common.SheetHeader
@@ -55,7 +54,6 @@ import com.robert4lyf.hypershop.ui.theme.icon
 
 /** Callbacks of the row sheet. */
 data class SheetActions(
-    val onHaveSome: (String) -> Boolean,
     val onAlwaysInStock: () -> Unit,
     val onSwap: (Long) -> Unit,
     val onMoveAisle: (AisleCode, Boolean) -> Unit,
@@ -77,7 +75,6 @@ internal fun ReviewRowSheetHost(
         ReviewRowSheet(
             sheet,
             SheetActions(
-                onHaveSome = { vm.haveSome(key, it) },
                 onAlwaysInStock = {
                     vm.alwaysInStock(key)
                     onDismiss()
@@ -122,7 +119,6 @@ fun ReviewRowSheet(
             SectionLabel(if (sheet.lines.size == 1) "From the recipe" else "From the recipe (${sheet.lines.size} lines)")
             for (line in sheet.lines) key(line.id) { LineEditor(line, actions) }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            AmountField("Already have some?", "I have some, e.g. 200 ml", "Subtract", "have-some", actions.onHaveSome)
             if (!sheet.isStaple) {
                 FilledTonalButton(onClick = actions.onAlwaysInStock) {
                     Icon(Icons.Rounded.Inventory, contentDescription = null, modifier = Modifier.size(18.dp))

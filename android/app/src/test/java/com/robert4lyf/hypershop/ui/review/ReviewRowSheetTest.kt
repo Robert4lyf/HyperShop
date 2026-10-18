@@ -16,7 +16,6 @@ import com.robert4lyf.hypershop.testutil.readyJob
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -49,15 +48,6 @@ class ReviewRowSheetViewModelTest {
         assertEquals("milk: +200ml → 700ml on list", vm.sheet("cat:milk")!!.effect)
         assertEquals("1 × 4 pint (2.27l) bottle", vm.sheet("cat:milk")!!.packNote)
         assertEquals("200 ml milk", vm.sheet("cat:milk")!!.lines.single().raw)
-    }
-
-    @Test
-    fun iHaveSomeSubtracts() {
-        val (_, vm) = vm("500 ml milk")
-        assertFalse(vm.haveSome("cat:milk", "lots"))
-        assertTrue(vm.haveSome("cat:milk", "200ml"))
-        val ui = await(vm.state) { it is ReviewState.Ready && it.ui().row("cat:milk").quantity == "300ml" }.ui()
-        assertEquals("300ml", ui.row("cat:milk").quantity)
     }
 
     @Test
@@ -138,10 +128,6 @@ class ReviewRowSheetScreenTest {
     private val events = mutableListOf<String>()
     private val actions =
         SheetActions(
-            onHaveSome = {
-                events += "have $it"
-                true
-            },
             onAlwaysInStock = { events += "always" },
             onSwap = { events += "swap $it" },
             onMoveAisle = { a, always -> events += "move $a $always" },
@@ -160,8 +146,6 @@ class ReviewRowSheetScreenTest {
         compose.onNodeWithText("Usually sold as 1 × 4 pint (2.27 l) bottle").fetchSemanticsNode()
         compose.onNodeWithText("Use oat milk instead").performClick()
         compose.onNodeWithText("Always in stock").performClick()
-        compose.onNodeWithTag("have-some").performTextReplacement("1 l")
-        compose.onNodeWithText("Subtract").performClick()
         compose.onNodeWithTag("line-7").performTextReplacement("300ml milk")
         compose.onNodeWithText("Read as: parsed:300ml milk").fetchSemanticsNode()
         compose.onNodeWithText("Use this line").performClick()
@@ -169,7 +153,7 @@ class ReviewRowSheetScreenTest {
         compose.onNodeWithText("Just this time").performClick()
         compose.onNodeWithTag("rename").performTextReplacement("Oat milk")
         compose.onNodeWithTag("rename-go").performClick()
-        assertEquals(listOf("swap 7", "always", "have 1 l", "edit 7 300ml milk", "move FROZEN false", "rename Oat milk"), events)
+        assertEquals(listOf("swap 7", "always", "edit 7 300ml milk", "move FROZEN false", "rename Oat milk"), events)
     }
 
     @Test

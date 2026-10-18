@@ -455,27 +455,6 @@ class ReviewViewModel(
             p.note?.let { "($it)" },
         ).joinToString(" ")
 
-    /** "I have some": an amount such as "200 ml" or "2". False when it cannot be read. */
-    fun haveSome(
-        key: String,
-        text: String,
-    ): Boolean {
-        val parsed = c.ruleParser.parse(text.trim() + " x")
-        val inc = preview?.incoming
-        val q = QtyBase.of(parsed.quantity, parsed.unit, inc?.locale ?: com.robert4lyf.hypershop.core.model.UnitLocale.METRIC)
-        if (q.isPresence) return false
-        // A volume can't come off a mass (and so on): refuse rather than pretend it worked.
-        if (inc != null) {
-            val needed = inc.lines.filter { it.target.mergeKey == key }.fold(QtyBase.PRESENCE) { acc, l -> acc + lineQty(l, inc) }
-            if (!needed.isPresence && q.parts.keys.none { it in needed.parts.keys }) return false
-        }
-        act {
-            decisions[key] = (decisions[key] ?: RowDecision()).copy(haveSome = q, inStock = false)
-            recompute()
-        }
-        return true
-    }
-
     /** "Always in stock": a staple from now on, and ticked here. */
     fun alwaysInStock(key: String) =
         act {
@@ -521,7 +500,7 @@ class ReviewViewModel(
      * "Rename": the row's lines are read as [name] for this recipe only; the
      * ingredient library is unchanged. A name the library knows joins that
      * ingredient ("maple syrup"); any other becomes an item of its own. What was
-     * decided for the row (in stock, "I have some", an aisle move) goes with it.
+     * decided for the row (in stock, an aisle move) goes with it.
      */
     fun rename(
         key: String,
