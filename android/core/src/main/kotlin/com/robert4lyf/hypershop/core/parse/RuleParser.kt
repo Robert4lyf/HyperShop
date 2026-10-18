@@ -333,7 +333,11 @@ class RuleParser(
                     }
                     Kind.RPAREN -> depth = maxOf(0, depth - 1)
                     Kind.COMMA, Kind.SEMI ->
-                        if (depth == 0) {
+                        if (t.kind == Kind.COMMA && adjectivesOnly(head) && kind(k + 1) == Kind.WORD) {
+                            // "boneless, skinless chicken breasts": the comma sits between adjectives.
+                            k++
+                            continue
+                        } else if (depth == 0) {
                             cut = k
                             break
                         }
@@ -406,6 +410,12 @@ class RuleParser(
             }
             return Triple(name.trim(',', '.', '-', ' ', '\''), trailing, implied)
         }
+
+        /** The name so far is only known adjectives ("boneless", "large, ripe") and no catalogue name. */
+        fun adjectivesOnly(head: List<Token>): Boolean =
+            head.isNotEmpty() &&
+                head.all { it.kind == Kind.WORD && it.text.lowercase() in COMMA_ADJECTIVES } &&
+                catalog.lookup(joinWords(head)) == null
 
         fun startsCatalogName(
             words: List<Token>,
@@ -492,6 +502,13 @@ class RuleParser(
 
         /** "a few", "a little": not an amount (R6). */
         val VAGUE = setOf("few", "little", "couple", "bit", "touch")
+
+        /** Adjectives a recipe may list with commas before the noun ("large, ripe tomatoes"). */
+        val COMMA_ADJECTIVES =
+            setOf(
+                "boneless", "skinless", "bone-in", "skin-on", "ripe", "fresh", "large", "small", "medium",
+                "extra-large", "firm", "juicy", "lean", "organic", "free-range", "thick", "thin", "plump",
+            )
     }
 }
 
