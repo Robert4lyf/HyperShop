@@ -68,3 +68,6 @@ and retry; `verify.sh` already does.
 - **No `CAMERA` permission**, and only the launcher and share activities are
   exported. `verify.sh` checks the merged manifest.
 - **No Bluetooth permissions.** The Connect IQ SDK binds to Garmin Connect.
+- **`RECORD_AUDIO` is for voice only** (Settings › Voice test now, voice mode
+  later): a non-exported `microphone` foreground service, started from the
+  screen, never storing audio.

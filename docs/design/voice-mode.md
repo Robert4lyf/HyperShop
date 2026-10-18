@@ -172,7 +172,7 @@ Entry points:
 
 ## 5. Build order
 
-0. **Device test on your phone, about an hour, throwaway branch.** It must prove four things before any real work:
+0. **Device test on your phone, about an hour.** Built as Settings › Advanced › Voice test (`VoiceTestService`, `VoiceTestTools`); run it and share the log. It must prove four things before any real work:
    - (a) the on-device en-GB recognizer works and how fast;
    - (b) recognition works from a microphone foreground service with the screen locked;
    - (c) the headset button reaches us with your headphones, including the silent-clip trick;
