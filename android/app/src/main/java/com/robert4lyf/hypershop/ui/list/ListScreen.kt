@@ -24,6 +24,7 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -33,6 +34,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -71,6 +73,8 @@ data class ListActions(
     val onClearAll: () -> Unit,
     val onOpenItem: (ListRow) -> Unit = {},
     val onShare: () -> Unit = {},
+    /** "Need it" on an in-stock ingredient. */
+    val onNeed: (InStockRow) -> Unit = {},
 )
 
 /**
@@ -132,6 +136,79 @@ private fun ListBody(
             if (open) {
                 itemsIndexed(rows, key = { _, r -> r.id }, contentType = { _, _ -> "row" }) { i, r ->
                     ListRowItem(r, actions, Modifier.sectionItem(sectionPosition(i + 1, count), card))
+                }
+            }
+        }
+        if (ui.inStock.isNotEmpty()) inStockSection(ui.inStock, card, actions.onNeed)
+    }
+}
+
+/**
+ * "In stock": what you marked in stock on review for the recipes on the list,
+ * to check before you go. Closed until opened; "Need it" puts one on the list.
+ */
+private fun LazyListScope.inStockSection(
+    rows: List<InStockRow>,
+    card: Color,
+    onNeed: (InStockRow) -> Unit,
+) {
+    item(key = "in-stock", contentType = "aisle") {
+        var open by rememberSaveable { mutableStateOf(false) }
+        Column {
+            val count = if (open) rows.size + 1 else 1
+            Row(
+                Modifier
+                    .padding(top = 24.dp)
+                    .sectionItem(sectionPosition(0, count), MaterialTheme.colorScheme.secondaryContainer)
+                    .fillMaxWidth()
+                    .clickable(role = Role.Button) { open = !open }
+                    .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
+                    .testTag("in-stock"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Box(
+                    Modifier.size(36.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondary),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Rounded.Inventory2,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                Column(Modifier.weight(1f)) {
+                    Text("In stock", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                    Text(
+                        "Marked in stock for these recipes. Check before you go.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+                Text("${rows.size}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                Icon(
+                    if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
+            if (open) {
+                rows.forEachIndexed { i, r ->
+                    Row(
+                        Modifier
+                            .sectionItem(sectionPosition(i + 1, count), card)
+                            .fillMaxWidth()
+                            .heightIn(min = 60.dp)
+                            .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(r.main.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodyLarge)
+                            Text(r.from, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        TextButton(onClick = { onNeed(r) }, modifier = Modifier.testTag("need-${r.key}")) { Text("Need it") }
+                    }
                 }
             }
         }

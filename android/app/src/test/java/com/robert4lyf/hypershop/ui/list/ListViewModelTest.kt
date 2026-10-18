@@ -50,6 +50,24 @@ class ListViewModelTest {
     }
 
     @Test
+    fun inStockIsListedAndNeedItPutsItOnTheList() {
+        val c = TestContainer.create()
+        val review = ReviewViewModel(c, runBlocking { c.readyJob("2 onions", "2 tbsp olive oil") })
+        await(review.state) { it is ReviewState.Ready }
+        review.setInStock("cat:olive_oil", true)
+        await(review.state) { it is ReviewState.Ready && it.ui.addCount == 1 }
+        review.confirm()
+        await(review.state) { it is ReviewState.Added }
+        val vm = ListViewModel(c)
+        val ui = await(vm.ui) { it.loaded && it.inStock.isNotEmpty() }
+        assertEquals("olive oil", ui.inStock.single().main)
+        assertTrue(ui.aisles.flatMap { it.second }.none { it.name == "olive oil" })
+        vm.needIt(ui.inStock.single())
+        val after = await(vm.ui) { u -> u.inStock.isEmpty() && u.aisles.flatMap { it.second }.any { it.name == "olive oil" } }
+        assertEquals("olive oil", after.row("olive oil").main)
+    }
+
+    @Test
     fun groupedByAisleInStoreOrderAndDoneSinks() {
         val c = TestContainer.create()
         c.add("2 onions", "1 carrot", "500g beef mince", "1 tsp ground cumin")

@@ -32,6 +32,15 @@ data class RecipeUse(
     val archivedAt: Long? = null,
 )
 
+/** One recipe line for [ShoppingList.addToUse], already scaled. */
+data class UseLineAdd(
+    val target: NewItem,
+    val recipeLineId: Long,
+    val qty: QtyBase,
+    val noScale: Boolean,
+    val unitHint: QtyUnit?,
+)
+
 /** Already scaled (PLAN §3.3). */
 data class Contribution(
     val id: Long,
@@ -263,6 +272,28 @@ data class ShoppingList(
             uses = uses + (useId to use.copy(servings = servings)),
             contributions = contributions.map { if (it.useId == useId && !it.noScale) it.copy(qty = it.qty.times(f)) else it },
         ).bumped(affected)
+    }
+
+    /**
+     * "Need it" on an in-stock ingredient: the recipe lines left out on review go
+     * on the list as contributions of their own use, created now, so a tick from
+     * before never covers them. Null when there is nothing to add.
+     */
+    fun addToUse(
+        useId: Long,
+        adds: List<UseLineAdd>,
+    ): ShoppingList? {
+        if (useId !in uses || adds.isEmpty()) return null
+        val rev = listRev + 1
+        var l = this
+        val touched = HashSet<Long>()
+        for (a in adds) {
+            val (l2, itemId) = l.ensureItem(a.target)
+            val c = Contribution(l2.nextId, useId, a.recipeLineId, itemId, a.qty, a.noScale, rev, unitHint = a.unitHint)
+            l = l2.copy(contributions = l2.contributions + c, nextId = l2.nextId + 1)
+            touched += itemId
+        }
+        return l.bumped(touched)
     }
 
     // ---- manual changes ---------------------------------------------------------

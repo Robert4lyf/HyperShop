@@ -13,6 +13,7 @@ import com.robert4lyf.hypershop.core.merge.RowDecision
 import com.robert4lyf.hypershop.core.merge.ShoppingList
 import com.robert4lyf.hypershop.core.merge.TickSource
 import com.robert4lyf.hypershop.core.merge.UseKind
+import com.robert4lyf.hypershop.core.merge.UseLineAdd
 import com.robert4lyf.hypershop.core.merge.WatchTickResult
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.ParsedBy
@@ -33,6 +34,18 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.serialization.json.Json
+
+/** A recipe line marked in stock on review, for a recipe still on the list. */
+data class InStockLine(
+    val useId: Long,
+    val recipeTitle: String,
+    val recipeLineId: Long,
+    val target: NewItem,
+    /** Scaled to the use's servings. */
+    val qty: QtyBase,
+    val noScale: Boolean,
+    val unitHint: QtyUnit?,
+)
 
 /** A stored import: the recipe and its line ids, in line order. */
 data class StoredRecipe(
@@ -303,6 +316,59 @@ class ListRepository(
 
     private suspend fun recipesById(ids: Collection<Long>): Map<Long, RecipeEntity> =
         ids.distinct().chunked(MAX_ARGS).flatMap { dao.recipes(it) }.associateBy { it.id }
+
+    /**
+     * What you marked in stock for the recipes on the list ([usesOnList]'s
+     * recipes), line by line: one query for the decisions, one per recipe.
+     */
+    suspend fun inStockOnList(l: ShoppingList): List<InStockLine> {
+        val live = l.liveItems.map { it.id }.toSet()
+        val uses =
+            l.uses.values.filter { u ->
+                u.archivedAt == null && u.recipeId != null && l.contributionsOfUse(u.id).any { it.itemId in live }
+            }
+        if (uses.isEmpty()) return emptyList()
+        val inStock =
+            uses.map { it.id }.chunked(MAX_ARGS).flatMap { dao.decisionsFor(it) }
+                .filter { it.status == LineStatus.IN_STOCK.name }
+                .groupBy({ it.useId }, { it.recipeLineId })
+        if (inStock.isEmpty()) return emptyList()
+        val recipes = recipesById(uses.mapNotNull { it.recipeId })
+        val ov = overrides()
+        // A line already on the list ("Add the in-stock items now", "Need it") isn't in stock any more.
+        val onList = l.contributions.filter { it.itemId in live }.mapNotNull { it.recipeLineId }.toSet()
+        return uses.sortedBy { it.addedAt }.flatMap { u ->
+            val ids = inStock[u.id]?.toSet()?.minus(onList) ?: return@flatMap emptyList()
+            val r = recipes[u.recipeId] ?: return@flatMap emptyList()
+            val parsed =
+                dao.lines(r.id).filter { it.id in ids }.map { it.id to json.decodeFromString(ParsedIngredient.serializer(), it.parsedJson) }
+            val locale = UnitLocale.valueOf(r.unitLocale)
+            val inc = merger.incoming(r.id, r.servingsOriginal, u.servings, locale, parsed, ov)
+            inc.lines.map { line ->
+                val noScale = line.parsed.noScale
+                val q = line.parsed.shopBase(locale).let { if (noScale) it else it.times(inc.scale) }
+                InStockLine(u.id, r.title ?: "Recipe", line.recipeLineId, line.target, q, noScale || q.isPresence, line.parsed.shopUnit)
+            }
+        }
+    }
+
+    /**
+     * "Need it": every in-stock line for [mergeKey] goes on the list, under its
+     * recipe, and stops counting as in stock. One transaction. The number of lines added.
+     */
+    suspend fun needAfterAll(mergeKey: String): Int =
+        db.withTransaction {
+            val old = load()
+            val lines = inStockOnList(old).filter { it.target.mergeKey == mergeKey }
+            if (lines.isEmpty()) return@withTransaction 0
+            var l = old
+            for ((useId, ls) in lines.groupBy { it.useId }) {
+                l = l.addToUse(useId, ls.map { UseLineAdd(it.target, it.recipeLineId, it.qty, it.noScale, it.unitHint) }) ?: l
+            }
+            persist(old, l)
+            dao.putDecisions(lines.map { LineDecisionEntity(it.useId, it.recipeLineId, LineStatus.ADDED.name) })
+            lines.size
+        }
 
     /** "Add the in-stock items now": the lines of [useId] that were left out as in stock. */
     suspend fun inStockLines(useId: Long): Pair<RecipeEntity, List<ParsedIngredient>>? =
