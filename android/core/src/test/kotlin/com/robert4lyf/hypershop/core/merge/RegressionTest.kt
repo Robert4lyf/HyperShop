@@ -127,4 +127,39 @@ class RegressionTest {
         assertEquals(LineStatus.ADDED, p.lineStatus[1L])
         assertEquals(Rational.of(200), p.rows.single().adding[BaseKey.VOLUME])
     }
+
+    @Test
+    fun swappingRenamesOrMergesAndKeepsTheAmounts() {
+        val tbsp = QtyBase.of(Rational.ONE, QtyUnit.TBSP, UnitLocale.METRIC)
+        var (l, agave) = ShoppingList().manualAdd(merger.target("agave syrup"), tbsp, QtyUnit.TBSP, 1)
+        // Not on the list yet: renamed in place, amount kept, rev moved on.
+        val swapped = l.swapItem(agave, merger.target("maple syrup"))!!
+        assertEquals("cat:maple_syrup", swapped.items.getValue(agave).mergeKey)
+        assertEquals(tbsp, swapped.total(agave))
+        assertTrue(swapped.items.getValue(agave).rev > l.items.getValue(agave).rev)
+        // Already on the list: merged into it, amounts added.
+        val (l2, maple) = l.manualAdd(merger.target("maple syrup"), tbsp, QtyUnit.TBSP, 2)
+        l = l2.swapItem(agave, merger.target("maple syrup"))!!
+        assertNull(l.itemByKey("cat:agave_syrup"))
+        assertEquals(tbsp + tbsp, l.total(maple))
+        assertEquals(maple, l.aliases[agave])
+        assertNull(l.swapItem(maple, merger.target("maple syrup")))
+    }
+
+    @Test
+    fun alwaysUseInsteadSendsNewLinesToTheReplacement() {
+        val catalog = com.robert4lyf.hypershop.core.catalog.CatalogLoader.default.copy()
+        val agave = catalog.byId.getValue("agave_syrup")
+        catalog.replace("test", catalog.entries.map { if (it.id == agave.id) it.copy(replaceWith = "maple_syrup") else it })
+        val m = Merger(catalog)
+        assertEquals("cat:maple_syrup", m.target("agave nectar").mergeKey)
+        assertEquals("cat:honey", m.target("honey").mergeKey)
+    }
+
+    @Test
+    fun defaultSwapsNameRealIngredients() {
+        val ids = com.robert4lyf.hypershop.core.catalog.CatalogLoader.default.byId.keys
+        assertEquals(emptySet<String>(), com.robert4lyf.hypershop.core.catalog.DefaultSwaps.ids - ids)
+        assertTrue("maple_syrup" in com.robert4lyf.hypershop.core.catalog.CatalogLoader.default.byId.getValue("agave_syrup").swaps)
+    }
 }

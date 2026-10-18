@@ -115,7 +115,12 @@ class Merger(
         overrides: Map<String, com.robert4lyf.hypershop.core.model.AisleCode> = emptyMap(),
         raw: String = name,
     ): NewItem {
-        val entry = normaliser.entry(name)
+        val found = normaliser.entry(name)
+        // "Always use instead" (ingredient library): the line goes straight to the replacement.
+        found?.replaceWith?.let { catalog.byId[it] }?.let { r ->
+            return NewItem(r.mergeKey, r.id, normaliser.normName(r.name), r.name, categoriser.aisle(r.name, overrides, claudeAisle).first)
+        }
+        val entry = found
         val norm = normaliser.normName(name)
         return NewItem(
             mergeKey = normaliser.mergeKey(name, raw),

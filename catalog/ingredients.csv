@@ -237,6 +237,7 @@ pumpkin_puree,pumpkin purée,pumpkin purée,canned pumpkin,WORLD_FOODS,false,tin
 jam,jam,jam,apricot jam|raspberry jam|strawberry jam|preserves,TINS_JARS,false,jar,count,,,agent-estimate
 honey,honey,honey,mild honey|runny honey|clear honey,TINS_JARS,false,jar,presence,,,agent-estimate
 maple_syrup,maple syrup,maple syrup,pure maple syrup,TINS_JARS,false,bottle,presence,,,agent-estimate
+agave_syrup,agave syrup,agave syrup,agave|agave nectar|agave sweetener,TINS_JARS,false,bottle,presence,,,agent-estimate
 golden_syrup,golden syrup,golden syrup,,BAKING,false,tin,presence,,,agent-estimate
 corn_syrup,corn syrup,corn syrup,light corn syrup|dark corn syrup,BAKING,false,bottle,presence,,,agent-estimate
 peanut_butter,peanut butter,peanut butter,smooth peanut butter|crunchy peanut butter,TINS_JARS,false,jar,presence,,,agent-estimate

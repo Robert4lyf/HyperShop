@@ -267,6 +267,13 @@ fun EntryEditor(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        Field("Swaps, separated by commas", f.swaps, "entry-swaps", lines = 2) { f = f.copy(swaps = it) }
+        Text(
+            "Offered on the list as \"Swap for\", e.g. maple syrup for agave syrup.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Field("Always use instead (optional)", f.replaceWith, "entry-replace") { f = f.copy(replaceWith = it) }
         Field("Usually sold as, e.g. 1 kg bag", f.packNote, "entry-pack") { f = f.copy(packNote = it) }
         Field("Grams per cup (turns cups into grams)", f.gramsPerCup, "entry-grams", number = true) { f = f.copy(gramsPerCup = it) }
         Row(

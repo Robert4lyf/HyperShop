@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.ui.list
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.robert4lyf.hypershop.catalog.EntryEdit
 import com.robert4lyf.hypershop.core.merge.Display
 import com.robert4lyf.hypershop.core.merge.ShoppingList
 import com.robert4lyf.hypershop.core.merge.UnitsSetting
@@ -58,6 +59,10 @@ data class ItemSheet(
     val sources: List<ItemSource>,
     val packNote: String?,
     val aisle: AisleCode,
+    /** Names it can be swapped for (from the ingredient library). */
+    val swaps: List<String> = emptyList(),
+    /** It is a catalogue ingredient, so "Always use instead" can be set on it. */
+    val canAlways: Boolean = false,
 )
 
 /** One "From" row: "Weeknight chilli · 400 g", linked to the recipe's page when it has one. */
@@ -169,7 +174,7 @@ class ListViewModel(
             val entry = item.catalogId?.let { c.catalog.byId[it] }
             val units = lastUnits ?: c.settings.units.first()
             val produce = item.aisle == AisleCode.PRODUCE
-            val hint = list.contributionsOf(id).mapNotNull { it.unitHint }.distinct().singleOrNull()
+            val hint = Display.hintOf(list.contributionsOf(id).map { it.unitHint })
             val totals =
                 list.total(id).parts.filterValues { it > Rational.ZERO }.mapNotNull { (k, v) ->
                     Display.amount(QtyBase(mapOf(k to v)), units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy)
@@ -179,15 +184,40 @@ class ListViewModel(
             val sources =
                 byUse.mapNotNull { (u, cs) ->
                     val link = links[u] ?: return@mapNotNull null
-                    val useHint = cs.mapNotNull { it.unitHint }.distinct().singleOrNull()
+                    val useHint = Display.hintOf(cs.map { it.unitHint })
                     val qty = cs.fold(QtyBase.PRESENCE) { acc, x -> acc + x.qty }
                     val amount = Display.amount(qty, units, produce, useHint, entry?.gramsPerCup, entry?.displayPolicy)
                     ItemSource(link.title, amount, webLink(link.url))
                 }
             // Main thread from here on: a cancel (newer open, close) can't slip in after this check.
             ensureActive()
-            _sheet.value = ItemSheet(id, entry?.name ?: item.displayName, totals, sources, entry?.packNote, item.aisle)
+            val swaps = entry?.swaps.orEmpty().mapNotNull { c.catalog.byId[it]?.name }
+            val pack = entry?.packNote?.let(Display::compactUnits)
+            _sheet.value = ItemSheet(id, entry?.name ?: item.displayName, totals, sources, pack, item.aisle, swaps, entry != null)
         }.also { openJob = it }
+    }
+
+    /**
+     * "Swap for": the item becomes [to] (merging into it if it's on the list).
+     * [always] also sets "always use instead" on the ingredient in the library,
+     * so later recipes ask for [to] straight away.
+     */
+    fun swapItem(
+        id: Long,
+        to: String,
+        always: Boolean,
+    ) = viewModelScope.launch {
+        val item = lastList.items[id] ?: c.repository.snapshot().items[id] ?: return@launch
+        val from = item.catalogId?.let { c.catalog.byId[it] }
+        val name = c.repository.swapItem(id, to) ?: return@launch
+        closeSheetOf(id)
+        val target = c.catalog.lookup(to)
+        if (always && from != null && target != null) {
+            c.library.save(EntryEdit.of(from).copy(replaceWith = target.id))
+            c.repository.rekeyIfCatalogChanged()
+        }
+        val was = from?.name ?: item.displayName
+        messages.send(UiMessage(if (always) "Swapped $was for $name, from now on" else "Swapped $was for $name"))
     }
 
     fun closeItem() {

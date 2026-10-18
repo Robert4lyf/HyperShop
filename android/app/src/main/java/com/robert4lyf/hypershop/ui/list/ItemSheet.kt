@@ -4,6 +4,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,16 +16,25 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.LocalMall
+import androidx.compose.material.icons.rounded.SwapHoriz
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +58,8 @@ data class ItemSheetActions(
     val onEditQuantity: (String) -> Boolean,
     /** Takes the item off the list (with Undo on the list). */
     val onDelete: () -> Unit = {},
+    /** Swap for this name; true = always use it instead from now on. */
+    val onSwap: (String, Boolean) -> Unit = { _, _ -> },
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,10 +106,93 @@ fun ItemSheetContent(
             }
             sheet.packNote?.let { InfoBanner("Usually sold as $it", Icons.Rounded.LocalMall) }
             if (sheet.sources.isNotEmpty()) Sources(sheet.sources)
+            Swaps(sheet, actions.onSwap)
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             AmountField("Change the amount", "Total needed, e.g. 3 or 500 g", "Set", "edit-qty", actions.onEditQuantity)
             MoveAisle(sheet.aisle, actions.onMove)
         }
+    }
+}
+
+/**
+ * "Swap for": the ingredient's usual swaps as chips, and a field for anything
+ * else. A chip asks first, offering "Always" (the library then sends new recipe
+ * lines straight to the swap) as well as "Just this time".
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun Swaps(
+    sheet: ItemSheet,
+    onSwap: (String, Boolean) -> Unit,
+) {
+    var asking by remember { mutableStateOf<String?>(null) }
+    var other by remember { mutableStateOf("") }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionLabel("Swap for")
+        if (sheet.swaps.isNotEmpty()) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                for (s in sheet.swaps) {
+                    AssistChip(
+                        onClick = { asking = s },
+                        label = { Text(s.replaceFirstChar { it.uppercase() }) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Rounded.SwapHoriz,
+                                contentDescription = null,
+                                Modifier.size(AssistChipDefaults.IconSize),
+                            )
+                        },
+                        modifier = Modifier.testTag("swap-$s"),
+                    )
+                }
+            }
+        }
+        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = other,
+                onValueChange = { other = it },
+                label = { Text(if (sheet.swaps.isEmpty()) "Swap for, e.g. maple syrup" else "Something else") },
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.weight(1f).testTag("swap-other"),
+            )
+            FilledTonalButton(
+                onClick = { asking = other.trim() },
+                enabled = other.isNotBlank(),
+                modifier = Modifier.padding(top = 8.dp),
+            ) { Text("Swap") }
+        }
+    }
+    asking?.let { to ->
+        AlertDialog(
+            onDismissRequest = { asking = null },
+            title = { Text("Swap ${sheet.name} for $to?") },
+            text = {
+                Text(
+                    if (sheet.canAlways) {
+                        "Its amounts move to $to. \"Always\" also uses $to whenever a recipe asks for ${sheet.name}."
+                    } else {
+                        "Its amounts move to $to."
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    asking = null
+                    onSwap(to, false)
+                }) { Text("Just this time") }
+            },
+            dismissButton = {
+                if (sheet.canAlways && to in sheet.swaps) {
+                    TextButton(onClick = {
+                        asking = null
+                        onSwap(to, true)
+                    }) { Text("Always") }
+                } else {
+                    TextButton(onClick = { asking = null }) { Text("Cancel") }
+                }
+            },
+        )
     }
 }
 

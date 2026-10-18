@@ -104,11 +104,10 @@ class ListScreenTest {
                 suggestions = { q -> if (q.startsWith("on")) listOf("onion", "spring onion") else emptyList() },
                 onReview = { events += "review $it" },
                 onSample = { events += "sample" },
-                onPasteLink = { events += "paste" },
             )
         compose.setContent {
             HyperShopTheme(dark = dark, dynamicColor = false) {
-                ListScreen(ui, actions, header = { listHeader(ui, header) }, empty = { EmptyState(header.onSample, header.onPasteLink) })
+                ListScreen(ui, actions, header = { listHeader(ui, header) }, empty = { EmptyState(header.onSample) })
             }
         }
     }
@@ -132,8 +131,9 @@ class ListScreenTest {
         showWithHeader(ListUi(loaded = true, readyJobs = listOf(7, 8)))
         compose.onNodeWithText("2 recipes ready to review").performClick()
         compose.onNodeWithText("Try a sample list").performClick()
-        compose.onNodeWithText("Paste link").performClick()
-        assertEquals(listOf("review 7", "sample", "paste"), events)
+        // Paste link lives on the Recipes tab only.
+        compose.onNodeWithText("Paste link").assertDoesNotExist()
+        assertEquals(listOf("review 7", "sample"), events)
     }
 
     @Test

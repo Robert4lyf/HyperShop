@@ -19,8 +19,64 @@ data class CatalogEntry(
     /** Lets volume and mass combine (PLAN §3.3). Null for most items. */
     val gramsPerCup: Rational?,
     val packNote: String?,
+    /** Ingredient ids it can be swapped for on the list ("agave syrup" → maple syrup, honey). */
+    val swaps: List<String> = emptyList(),
+    /** Always use this ingredient id instead: new recipe lines go straight to it. */
+    val replaceWith: String? = null,
 ) {
     val mergeKey: String get() = "cat:$id"
+}
+
+/**
+ * Swaps that ship with the app: within each group any ingredient can stand in
+ * for another. Your edits in the ingredient library replace an ingredient's list.
+ */
+object DefaultSwaps {
+    private val groups =
+        listOf(
+            listOf("agave_syrup", "maple_syrup", "honey", "golden_syrup"),
+            listOf("caster_sugar", "brown_sugar", "demerara"),
+            listOf("brown_sugar", "dark_brown_sugar"),
+            listOf("double_cream", "single_cream", "creme_fraiche"),
+            listOf("sour_cream", "creme_fraiche", "greek_yogurt"),
+            listOf("yogurt", "greek_yogurt"),
+            listOf("buttermilk", "yogurt", "milk"),
+            listOf("milk", "oat_milk", "almond_milk", "soy_milk"),
+            listOf("butter", "vegan_butter"),
+            listOf("onion", "shallot", "red_onion"),
+            listOf("spring_onion", "chives"),
+            listOf("parsley", "coriander"),
+            listOf("lemon", "lime"),
+            listOf("lemon_juice", "lime_juice"),
+            listOf("white_wine_vinegar", "cider_vinegar", "red_wine_vinegar", "sherry_vinegar", "rice_vinegar"),
+            listOf("olive_oil", "vegetable_oil", "evoo"),
+            listOf("parmesan", "pecorino"),
+            listOf("cheddar", "gruyere", "emmental"),
+            listOf("feta", "goat_cheese"),
+            listOf("ricotta", "cream_cheese", "mascarpone"),
+            listOf("cannellini_beans", "haricot_beans", "butter_beans"),
+            listOf("kidney_beans", "black_beans"),
+            listOf("breadcrumbs", "panko"),
+            listOf("flour", "gf_flour"),
+            listOf("pasta", "spaghetti", "penne", "gf_pasta"),
+            listOf("rice", "basmati_rice", "jasmine_rice"),
+            listOf("egg_noodles", "rice_noodles"),
+            listOf("chicken_stock", "vegetable_stock", "beef_stock"),
+            listOf("beef_mince", "pork_mince", "lamb_mince", "turkey_mince"),
+            listOf("chicken_breast", "chicken_thigh"),
+            listOf("bacon", "pancetta"),
+            listOf("spinach", "kale", "chard"),
+            listOf("sweet_potato", "butternut_squash"),
+            listOf("paprika", "smoked_paprika"),
+            listOf("chilli_flakes", "chilli_powder", "cayenne"),
+            listOf("dijon", "wholegrain_mustard"),
+            listOf("white_wine", "vermouth"),
+        )
+
+    /** Every id named in a group (a test checks they are all in the catalogue). */
+    val ids: Set<String> = groups.flatten().toSet()
+
+    fun forId(id: String): List<String> = groups.filter { id in it }.flatten().distinct().filter { it != id }
 }
 
 /**
@@ -114,6 +170,7 @@ class Catalog(
                         displayPolicy = DisplayPolicy.valueOf(f[7].uppercase()),
                         gramsPerCup = f[8].takeIf { it.isNotEmpty() }?.let { Rational.fromDouble(it.toDouble()) },
                         packNote = f[9].takeIf { it.isNotEmpty() },
+                        swaps = DefaultSwaps.forId(f[0]),
                     )
             }
             require(version.isNotEmpty()) { "catalog.tsv: no #version line" }

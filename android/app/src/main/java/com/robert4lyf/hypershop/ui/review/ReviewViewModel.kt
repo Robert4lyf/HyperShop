@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.ui.review
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.robert4lyf.hypershop.core.catalog.DisplayPolicy
 import com.robert4lyf.hypershop.core.merge.ApplyResult
 import com.robert4lyf.hypershop.core.merge.Display
 import com.robert4lyf.hypershop.core.merge.Preview
@@ -276,12 +277,17 @@ class ReviewViewModel(
         val inc = preview!!.incoming
         val needed = if (d.inStock) lines.fold(QtyBase.PRESENCE) { acc, l -> acc + lineQty(l, inc) } else r.adding
         val produce = r.target.aisle == AisleCode.PRODUCE
-        val hint = lines.mapNotNull { it.parsed.shopUnit }.distinct().singleOrNull()
+        val hint = Display.hintOf(lines.map { it.parsed.shopUnit })
         val entry = c.catalog.byId[r.target.catalogId ?: ""]
         return ReviewRow(
             key = r.target.mergeKey,
             name = entry?.name ?: r.target.displayName,
-            quantity = Display.amount(needed, units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy),
+            quantity =
+                if (entry?.displayPolicy == DisplayPolicy.PRESENCE && units != UnitsSetting.AS_WRITTEN) {
+                    Display.packs(needed, entry.shoppingUnit)
+                } else {
+                    Display.amount(needed, units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy)
+                },
             inStock = d.inStock,
             check = lines.any { it.parsed.check },
             aisle = r.target.aisle,
@@ -430,7 +436,7 @@ class ReviewViewModel(
             key,
             name,
             effect,
-            entry?.packNote,
+            entry?.packNote?.let(Display::compactUnits),
             lines,
             row.target.aisle,
             row.decision.inStock,
