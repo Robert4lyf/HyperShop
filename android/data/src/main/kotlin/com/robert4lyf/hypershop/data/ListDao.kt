@@ -114,6 +114,9 @@ interface ListDao {
     @Query("SELECT * FROM RecipeLine WHERE recipeId = :recipeId ORDER BY id")
     suspend fun lines(recipeId: Long): List<RecipeLineEntity>
 
+    @Query("SELECT * FROM RecipeLine WHERE recipeId IN (:ids) ORDER BY id")
+    suspend fun linesFor(ids: List<Long>): List<RecipeLineEntity>
+
     @Query("UPDATE Recipe SET claudePending = :pending, parsedBy = :parsedBy, model = :model WHERE id = :id")
     suspend fun setParsed(
         id: Long,

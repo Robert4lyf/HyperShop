@@ -443,6 +443,12 @@ class ListRepository(
             for (r in copies) if (dao.usesOfRecipe(r.id) == 0) dao.deleteRecipe(r.id)
         }
 
+    /** The parsed lines of each recipe in [ids] (the recipe search's index): one query per 900. */
+    suspend fun ingredientsOf(ids: List<Long>): Map<Long, List<ParsedIngredient>> =
+        ids.distinct().chunked(MAX_ARGS).flatMap { dao.linesFor(it) }.groupBy({ it.recipeId }) {
+            json.decodeFromString(ParsedIngredient.serializer(), it.parsedJson)
+        }
+
     /** "Add to list" from the library: the recipe and its lines, as stored. */
     suspend fun librarySource(recipeId: Long): Pair<RecipeEntity, List<ParsedIngredient>>? =
         db.withTransaction {

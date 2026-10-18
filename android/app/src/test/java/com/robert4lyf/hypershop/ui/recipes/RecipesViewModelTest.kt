@@ -1,6 +1,7 @@
 package com.robert4lyf.hypershop.ui.recipes
 
 import android.os.Looper
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.robert4lyf.hypershop.testutil.CHILLI
 import com.robert4lyf.hypershop.testutil.TestContainer
@@ -122,6 +123,35 @@ class RecipesViewModelTest {
         assertEquals(4, d.servings)
         vm.closeDetail()
         assertEquals(null, vm.detail.value)
+    }
+
+    @Test
+    fun searchByWhatYouHaveOrWhatYouFancy() {
+        val c = TestContainer.create()
+        c.add(*CHILLI)
+        val vm0 = RecipesViewModel(c)
+        runBlocking { c.readyJob("250g chestnut mushrooms", "1 onion", "300g risotto rice", title = "Mushroom risotto") }.let { job ->
+            val r = ReviewViewModel(c, job)
+            await(r.state) { it is ReviewState.Ready }
+            r.confirm()
+            await(r.state) { it is ReviewState.Added }
+        }
+        val vm = vm0.shown()
+        await(vm.ui) { it.library.size == 2 }
+        vm.onSearchText("mushroom")
+        Snapshot.sendApplyNotifications()
+        val hits = await(vm.ui) { it.terms == listOf("mushroom") }
+        assertEquals(listOf("Mushroom risotto"), hits.library.map { it.title })
+        assertEquals("chestnut mushroom", hits.library.single().uses)
+        // What you have in: Enter makes a chip; the recipe using both comes first.
+        vm.commitSearch()
+        vm.onSearchText("onion")
+        Snapshot.sendApplyNotifications()
+        val both = await(vm.ui) { it.terms == listOf("mushroom", "onion") }
+        assertEquals(listOf("Mushroom risotto", "Weeknight chilli"), both.library.map { it.title })
+        vm.clearSearch()
+        Snapshot.sendApplyNotifications()
+        assertEquals(2, await(vm.ui) { it.terms.isEmpty() }.library.size)
     }
 
     @Test
