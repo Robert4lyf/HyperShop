@@ -44,8 +44,7 @@ class ConnectIqWatchLink(
 
     private val _problem = MutableStateFlow<String?>(null)
 
-    /** Why the link is down, in words for Settings, or null. */
-    val problem: StateFlow<String?> = _problem
+    override val problem: StateFlow<String?> = _problem
 
     @Volatile private var device: IQDevice? = null
 

@@ -94,6 +94,21 @@ object SnapshotPager {
     }
 
     /**
+     * An ack-only page (`pgs = 0`): the reply to a batch that changed nothing.
+     * Its exceptions are fitted like a full page's, so it never exceeds the cap.
+     */
+    fun ackOnly(
+        epoch: Int,
+        listRev: Int,
+        ackedThrough: Int,
+        ackExceptions: List<Pair<Int, OpResult>>,
+        cap: PayloadCap = PayloadCap(),
+    ): SnapshotPage {
+        val fitted = fittingAcks(SnapshotInput(epoch, listRev, ackedThrough, ackExceptions, emptyList(), emptyList(), 0), cap)
+        return SnapshotPage(epoch, listRev, fitted.ackedThrough, fitted.ackExceptions, 0, 0, emptyList(), 0, emptyList(), 0)
+    }
+
+    /**
      * Ack exceptions take at most half of the room a page has left after the
      * bare envelope, so they can never crowd out the list. When they don't all
      * fit, the oldest that do are sent and ackedThrough is lowered to just before
