@@ -1,6 +1,8 @@
 package com.robert4lyf.hypershop.ui.recipes
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -39,6 +41,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -54,7 +57,10 @@ import com.robert4lyf.hypershop.ui.common.rememberOpenLink
 import com.robert4lyf.hypershop.ui.common.siteName
 import com.robert4lyf.hypershop.ui.common.webLink
 import com.robert4lyf.hypershop.ui.list.show
+import com.robert4lyf.hypershop.ui.theme.Brand
+import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.theme.card
+import com.robert4lyf.hypershop.ui.theme.heroGlow
 import com.robert4lyf.hypershop.ui.util.factoryFor
 
 @Composable
@@ -140,44 +146,62 @@ private fun UseCard(
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.card,
     ) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(use.title, style = MaterialTheme.typography.titleLarge)
-                val site = url?.let { siteName(it) }
-                when {
-                    site != null -> Meta(Icons.Rounded.Link, site)
-                    use.recipeId == null -> Meta(Icons.Rounded.EditNote, "Typed into the list")
-                }
-            }
-            // The facts as one sentence for TalkBack, chips on screen.
-            val bits =
-                listOfNotNull(
-                    use.servings?.let { "Serves $it" },
-                    if (use.itemCount == 1) "1 item on the list" else "${use.itemCount} items on the list",
-                    use.inStockCount.takeIf { it > 0 }?.let { "$it in stock" },
+        val dark = LocalDarkTheme.current
+        val hue = Brand.recipeHue(use.title)
+        Column {
+            // The recipe's own colour band: the same hue as its review screen.
+            Box(Modifier.fillMaxWidth().background(Brand.recipeBrush(use.title)).heroGlow()) {
+                Icon(
+                    Icons.AutoMirrored.Rounded.MenuBook,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.16f),
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp).size(72.dp),
                 )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.clearAndSetSemantics { contentDescription = bits.joinToString(" · ") },
-            ) {
-                use.servings?.let { Fact(Icons.Rounded.People, "Serves $it") }
-                Fact(Icons.Rounded.ShoppingCart, if (use.itemCount == 1) "1 item" else "${use.itemCount} items")
-                if (use.inStockCount > 0) Fact(Icons.Rounded.Inventory, "${use.inStockCount} in stock")
-            }
-            // Wraps on narrow phones and large text instead of squeezing the second button.
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (url != null) {
-                    FilledTonalButton(onClick = { open(url) }, modifier = Modifier.testTag("open-${use.useId}")) {
-                        Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.size(8.dp))
-                        Text("Open recipe")
+                Column(Modifier.padding(20.dp).padding(end = 56.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(use.title, style = MaterialTheme.typography.titleLarge, color = Brand.OnHero)
+                    val site = url?.let { siteName(it) }
+                    when {
+                        site != null -> Meta(Icons.Rounded.Link, site)
+                        use.recipeId == null -> Meta(Icons.Rounded.EditNote, "Typed into the list")
                     }
                 }
-                OutlinedButton(onClick = onRemove) { Text("Remove from list") }
             }
-            if (use.inStockCount > 0) {
-                TextButton(onClick = onAddInStock, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Add the in-stock items now") }
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // The facts as one sentence for TalkBack, chips on screen.
+                val bits =
+                    listOfNotNull(
+                        use.servings?.let { "Serves $it" },
+                        if (use.itemCount == 1) "1 item on the list" else "${use.itemCount} items on the list",
+                        use.inStockCount.takeIf { it > 0 }?.let { "$it in stock" },
+                    )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.clearAndSetSemantics { contentDescription = bits.joinToString(" · ") },
+                ) {
+                    val bg = Brand.tint(hue, dark)
+                    val fg = Brand.strong(hue, dark)
+                    use.servings?.let { Fact(Icons.Rounded.People, "Serves $it", bg, fg) }
+                    Fact(Icons.Rounded.ShoppingCart, if (use.itemCount == 1) "1 item" else "${use.itemCount} items", bg, fg)
+                    if (use.inStockCount > 0) Fact(Icons.Rounded.Inventory, "${use.inStockCount} in stock", bg, fg)
+                }
+                // Wraps on narrow phones and large text instead of squeezing the second button.
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (url != null) {
+                        FilledTonalButton(onClick = { open(url) }, modifier = Modifier.testTag("open-${use.useId}")) {
+                            Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.size(8.dp))
+                            Text("Open recipe")
+                        }
+                    }
+                    OutlinedButton(onClick = onRemove) { Text("Remove from list") }
+                }
+                if (use.inStockCount > 0) {
+                    TextButton(
+                        onClick = onAddInStock,
+                        contentPadding = PaddingValues(horizontal = 4.dp),
+                    ) { Text("Add the in-stock items now") }
+                }
             }
         }
     }
@@ -189,8 +213,8 @@ private fun Meta(
     text: String,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(icon, contentDescription = null, tint = Brand.OnHeroSoft, modifier = Modifier.size(16.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = Brand.OnHeroSoft)
     }
 }
 
@@ -198,14 +222,16 @@ private fun Meta(
 private fun Fact(
     icon: ImageVector,
     text: String,
+    bg: Color,
+    fg: Color,
 ) {
-    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surfaceContainerHighest) {
+    Surface(shape = RoundedCornerShape(50), color = bg) {
         Row(
             Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+            Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(16.dp))
             Text(text, style = MaterialTheme.typography.labelLarge)
         }
     }

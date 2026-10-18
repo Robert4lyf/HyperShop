@@ -131,6 +131,13 @@ Shared components (`ui/common/`):
 - Aisle styles are an exhaustive `when` (a new aisle won't compile without one); the theme
   provides `LocalDarkTheme` instead of guessing dark mode from colours.
 
+## Colour pass (after phone testing: "sleek but dull")
+- **Hero headers:** every tab's title sits on a basil-to-lagoon gradient card with two soft light circles. The text is white, and the overline and progress bar are citrus. "Finish shopping" is a white pill.
+- **Aisles carry their colour:** the aisle header is tinted, the badge is solid with a light icon, and ticks fill in the aisle's colour.
+- **Recipes have a hue:** each recipe gets a colour band picked from its title, and its review header uses the same gradient. Its fact chips are tinted to match.
+- **Other screens:** "Ready to review" is a warm tomato-to-berry card. Each settings group has its own coloured icon tile. The empty state's circle uses the hero gradient.
+- **Contrast:** white text on every gradient clears 4.5:1, and the gradients are darker in dark mode. State is still never shown by colour alone.
+
 ## Not changing
 - Navigation, view models, data, strings that tests or TalkBack depend on,
   the one-node-per-row semantics, and swipe-to-delete with its accessible

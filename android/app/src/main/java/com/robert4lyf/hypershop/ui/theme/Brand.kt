@@ -1,0 +1,62 @@
+package com.robert4lyf.hypershop.ui.theme
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+
+/**
+ * The brand's colour beyond Material's roles (docs/design/ui-overhaul.md,
+ * "Colour pass"): a basil-to-lagoon gradient for heroes, citrus for highlights
+ * on it, and a hue per recipe. White text clears 4.5:1 on every gradient here.
+ */
+object Brand {
+    val Citrus = Color(0xFFFFE08A)
+
+    /** Text and icons on a hero: white, or a touch softer for secondary lines. */
+    val OnHero = Color.White
+    val OnHeroSoft = Color.White.copy(alpha = 0.9f)
+
+    /** Warm, for "ready to review": a call to act, distinct from the basil header. */
+    val WarmCall = Brush.linearGradient(listOf(Color(0xFFB4471F), Color(0xFFB83A5E)))
+
+    /** A recipe's own two-tone gradient, picked from its title so it stays the same. */
+    fun recipeBrush(seed: String): Brush {
+        val hue = recipeHue(seed)
+        return Brush.linearGradient(listOf(Color.hsl(hue, 0.55f, 0.28f), Color.hsl((hue + 40f) % 360f, 0.55f, 0.26f)))
+    }
+
+    fun recipeHue(seed: String): Float = ((seed.hashCode() % 360 + 360) % 360).toFloat()
+
+    /** A soft tint of [hue] for chips on a card. */
+    fun tint(
+        hue: Float,
+        dark: Boolean,
+    ): Color = if (dark) Color.hsl(hue, 0.30f, 0.24f) else Color.hsl(hue, 0.55f, 0.92f)
+
+    /** A strong [hue] for an icon on [tint]. */
+    fun strong(
+        hue: Float,
+        dark: Boolean,
+    ): Color = if (dark) Color.hsl(hue, 0.60f, 0.80f) else Color.hsl(hue, 0.60f, 0.30f)
+}
+
+/** The hero gradient for the current theme. */
+val heroBrush: Brush
+    @Composable
+    @ReadOnlyComposable
+    get() = Brush.linearGradient(if (LocalDarkTheme.current) HERO_DARK else HERO_LIGHT)
+
+private val HERO_LIGHT = listOf(Color(0xFF0B6B3E), Color(0xFF0B6E73))
+private val HERO_DARK = listOf(Color(0xFF0A4A2C), Color(0xFF0A4A55))
+
+/** Two soft light circles in the top-right corner: depth on a hero without an image. */
+fun Modifier.heroGlow(): Modifier =
+    drawBehind {
+        val r = size.minDimension
+        drawCircle(Color.White.copy(alpha = 0.08f), radius = r * 0.9f, center = Offset(size.width + r * 0.15f, -r * 0.25f))
+        drawCircle(Color.White.copy(alpha = 0.06f), radius = r * 0.55f, center = Offset(size.width - r * 0.2f, size.height + r * 0.1f))
+    }

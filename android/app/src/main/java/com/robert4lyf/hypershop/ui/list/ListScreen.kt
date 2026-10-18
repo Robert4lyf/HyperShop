@@ -28,7 +28,6 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -46,6 +45,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -62,11 +62,14 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.ui.common.AisleBadge
+import com.robert4lyf.hypershop.ui.common.HeroButton
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
 import com.robert4lyf.hypershop.ui.common.TickMark
 import com.robert4lyf.hypershop.ui.common.sectionItem
 import com.robert4lyf.hypershop.ui.common.sectionPosition
+import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.card
+import com.robert4lyf.hypershop.ui.theme.style
 
 data class ListActions(
     val onToggle: (ListRow) -> Unit,
@@ -104,7 +107,6 @@ private fun ListBody(
     header: LazyListScope.() -> Unit,
     empty: @Composable () -> Unit,
 ) {
-    val card = MaterialTheme.colorScheme.card
     val delete = MaterialTheme.colorScheme.errorContainer
     // Collapsed aisles, by name: kept across tab switches and rotation.
     var collapsed by rememberSaveable { mutableStateOf(emptyList<String>()) }
@@ -120,7 +122,7 @@ private fun ListBody(
                     rows,
                     open,
                     onToggle = { collapsed = if (open) collapsed + aisle.name else collapsed - aisle.name },
-                    modifier = Modifier.padding(top = 16.dp).sectionItem(sectionPosition(0, count), card),
+                    modifier = Modifier.padding(top = 16.dp).sectionItem(sectionPosition(0, count), aisle.style.container),
                 )
             }
             if (open) {
@@ -150,7 +152,7 @@ private fun ListTop(
             },
         actions = {
             if (ui.doneCount > 0) {
-                FilledTonalButton(onClick = actions.onFinish, contentPadding = PaddingValues(horizontal = 14.dp)) {
+                HeroButton(onClick = actions.onFinish) {
                     Icon(Icons.Rounded.DoneAll, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(6.dp))
                     Text("Finish shopping")
@@ -180,7 +182,8 @@ private fun ListTop(
                     strokeCap = StrokeCap.Round,
                     gapSize = 4.dp,
                     drawStopIndicator = {},
-                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    color = Brand.Citrus,
+                    trackColor = Color.White.copy(alpha = 0.22f),
                 )
             }
         },
@@ -300,7 +303,14 @@ private fun ListRowItem(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            TickMark(done = done, partial = row.state == TickState.PARTIAL)
+            val tint = row.aisle.style
+            TickMark(
+                done = done,
+                partial = row.state == TickState.PARTIAL,
+                color = tint.content,
+                onColor = tint.container,
+                softColor = tint.container,
+            )
             Column(Modifier.weight(1f)) {
                 Text(
                     row.main.replaceFirstChar { it.uppercase() },
