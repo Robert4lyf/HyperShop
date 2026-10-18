@@ -101,6 +101,8 @@ beets,beetroot
 belgian endive,endive
 bell pepper,bell_pepper
 bell peppers,bell_pepper
+beluga lentil,black_lentils
+beluga lentils,black_lentils
 bicarb,bicarb
 bicarbonate of soda,bicarb
 bin bags,bin_bags
@@ -108,6 +110,8 @@ bitters,bitters
 bittersweet chocolate,dark_chocolate
 black bean,black_beans
 black beans,black_beans
+black lentil,black_lentils
+black lentils,black_lentils
 black mustard seeds,mustard_seed
 black olive,olive
 black olives,olive
@@ -151,7 +155,8 @@ broccoli,broccoli
 broccolini,tenderstem
 broth,vegetable_stock
 brown bread,wholemeal_bread
-brown lentils,lentils
+brown lentil,brown_lentils
+brown lentils,brown_lentils
 brown onion,onion
 brown rice,brown_rice
 brown sugar,brown_sugar
@@ -417,6 +422,7 @@ dried ceps,porcini
 dried cranberries,dried_cranberry
 dried currants,currant
 dried figs,dried_fig
+dried lentils,lentils
 dried mixed herbs,dried_mixed_herbs
 dried mushroom,dried_mushroom
 dried mushrooms,dried_mushroom
@@ -513,6 +519,8 @@ free-range egg,egg
 free-range eggs,egg
 french beans,green_beans
 french bread,baguette
+french green lentils,puy_lentils
+french lentils,puy_lentils
 french stick,baguette
 fresh basil,basil
 fresh breadcrumbs,breadcrumbs
@@ -606,7 +614,8 @@ green cabbage,cabbage
 green cardamom,cardamom
 green curry paste,curry_paste
 green grapes,grape
-green lentils,lentils
+green lentil,green_lentils
+green lentils,green_lentils
 green olive,olive
 green olives,olive
 green onion,spring_onion
@@ -740,6 +749,7 @@ large shrimp,prawn
 lasagna noodles,lasagne_sheets
 lasagne,lasagne_sheets
 lasagne sheets,lasagne_sheets
+le puy lentils,puy_lentils
 leek,leek
 leeks,leek
 leg of lamb,lamb_leg
@@ -806,6 +816,7 @@ marjoram,marjoram
 marsala,marsala
 marsala wine,marsala
 mascarpone,mascarpone
+masoor dal,red_lentils
 mature cheddar,cheddar
 mayo,mayonnaise
 mayonnaise,mayonnaise
@@ -1019,7 +1030,8 @@ pure maple syrup,maple_syrup
 pure olive oil,olive_oil
 pure vanilla extract,vanilla_extract
 purple onion,red_onion
-puy lentils,lentils
+puy lentil,puy_lentils
+puy lentils,puy_lentils
 quinoa,quinoa
 rack of lamb,lamb_chop
 radicchio,radicchio
@@ -1044,7 +1056,8 @@ red curry paste,curry_paste
 red food coloring,food_colouring
 red grapes,grape
 red kidney beans,kidney_beans
-red lentils,lentils
+red lentil,red_lentils
+red lentils,red_lentils
 red miso,miso
 red onion,red_onion
 red onions,red_onion
@@ -1052,6 +1065,7 @@ red pepper,bell_pepper
 red pepper flakes,chilli_flakes
 red potato,potato
 red potatoes,potato
+red split lentils,red_lentils
 red wine,red_wine
 red wine vinegar,red_wine_vinegar
 red-pepper flakes,chilli_flakes
@@ -1197,6 +1211,7 @@ spelt grain,farro
 spinach,spinach
 spinach leaves,spinach
 split peas,split_peas
+split red lentils,red_lentils
 spring onion,spring_onion
 spring onions,spring_onion
 sprinkles,sprinkles

@@ -157,6 +157,16 @@ class RegressionTest {
     }
 
     @Test
+    fun lentilsOfDifferentColoursAreDifferentItems() {
+        val m = Merger(com.robert4lyf.hypershop.core.catalog.CatalogLoader.default)
+        assertEquals("cat:red_lentils", m.target("split red lentils").mergeKey)
+        assertEquals("cat:green_lentils", m.target("green lentils").mergeKey)
+        assertEquals("cat:puy_lentils", m.target("french lentils").mergeKey)
+        assertEquals("cat:black_lentils", m.target("beluga lentils").mergeKey)
+        assertEquals("cat:lentils", m.target("lentils").mergeKey)
+    }
+
+    @Test
     fun defaultSwapsNameRealIngredients() {
         val ids = com.robert4lyf.hypershop.core.catalog.CatalogLoader.default.byId.keys
         assertEquals(emptySet<String>(), com.robert4lyf.hypershop.core.catalog.DefaultSwaps.ids - ids)

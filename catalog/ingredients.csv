@@ -265,7 +265,12 @@ pearl_barley,pearl barley,pearl barley,barley,PASTA_RICE_GRAINS,false,bag,mass,2
 farro,farro,farro,spelt grain,PASTA_RICE_GRAINS,false,bag,mass,180,,agent-estimate
 oats,porridge oats,porridge oats,oats|rolled oats|oatmeal|old-fashioned oats,PASTA_RICE_GRAINS,false,bag,mass,90,,agent-estimate
 polenta,polenta,polenta,cornmeal|yellow cornmeal|grits,PASTA_RICE_GRAINS,false,bag,mass,160,,agent-estimate
-lentils,lentils,lentils,red lentils|green lentils|puy lentils|brown lentils|lentil,PASTA_RICE_GRAINS,false,bag,mass,190,,agent-estimate
+lentils,lentils,lentils,lentil|dried lentils,PASTA_RICE_GRAINS,false,bag,mass,190,,agent-estimate
+red_lentils,red lentils,red lentils,red lentil|split red lentils|red split lentils|masoor dal,PASTA_RICE_GRAINS,false,bag,mass,190,,agent-estimate
+green_lentils,green lentils,green lentils,green lentil,PASTA_RICE_GRAINS,false,bag,mass,190,,agent-estimate
+brown_lentils,brown lentils,brown lentils,brown lentil,PASTA_RICE_GRAINS,false,bag,mass,190,,agent-estimate
+puy_lentils,puy lentils,puy lentils,puy lentil|french lentils|french green lentils|le puy lentils,PASTA_RICE_GRAINS,false,bag,mass,190,,agent-estimate
+black_lentils,black lentils,black lentils,black lentil|beluga lentils|beluga lentil,PASTA_RICE_GRAINS,false,bag,mass,190,,agent-estimate
 split_peas,split peas,split peas,yellow split peas,PASTA_RICE_GRAINS,false,bag,mass,200,,agent-estimate
 dried_beans,dried beans,dried beans,bean|beans,PASTA_RICE_GRAINS,false,bag,mass,190,,agent-estimate
 soy_sauce,soy sauce,soy sauce,light soy sauce|dark soy sauce|tamari|shoyu,WORLD_FOODS,false,bottle,presence,,,agent-estimate

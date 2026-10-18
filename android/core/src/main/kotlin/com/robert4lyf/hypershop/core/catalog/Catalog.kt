@@ -56,6 +56,7 @@ object DefaultSwaps {
             listOf("ricotta", "cream_cheese", "mascarpone"),
             listOf("cannellini_beans", "haricot_beans", "butter_beans"),
             listOf("kidney_beans", "black_beans"),
+            listOf("red_lentils", "green_lentils", "brown_lentils", "puy_lentils", "black_lentils"),
             listOf("breadcrumbs", "panko"),
             listOf("flour", "gf_flour"),
             listOf("pasta", "spaghetti", "penne", "gf_pasta"),
