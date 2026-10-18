@@ -12,6 +12,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -64,4 +65,25 @@ class RecipesViewModel(
                 )
             reviews.send(c.importJobs.enqueueReady(ImportInput(recipe.url ?: "", recipe.title), result))
         }
+
+    /** "+ › Paste a link": the same path as sharing a page to the app (the review screen opens when it is ready). */
+    fun addLink(text: String) {
+        c.applicationScope.launch { c.importShared(text, null) }
+    }
+
+    /**
+     * "+ › Type it in": the lines are rule-parsed here, never sent to Claude; the
+     * review screen calls Claude (with a key) once it is open, as for a shared page.
+     */
+    fun addManual(
+        title: String,
+        servings: Int?,
+        ingredients: String,
+    ) = viewModelScope.launch {
+        val lines = ingredients.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        val name = title.trim()
+        if (lines.isEmpty() || name.isEmpty()) return@launch
+        val parsed = c.importer.fromLines(lines, name, allowClaude = false, model = c.settings.model.first())
+        reviews.send(c.importJobs.enqueueReady(ImportInput("", name), parsed.copy(servings = servings)))
+    }
 }

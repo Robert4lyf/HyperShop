@@ -1,12 +1,15 @@
 package com.robert4lyf.hypershop.ui.recipes
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.robert4lyf.hypershop.data.UseSummary
@@ -58,6 +61,34 @@ class RecipesScreenTest {
         compose.onAllNodesWithText("Remove from list")[1].performClick()
         compose.onNodeWithText("Remove").performClick()
         assertEquals(listOf("in stock 1", "remove 2"), events)
+    }
+
+    @Test
+    fun addARecipeByLinkOrByHand() {
+        val got = mutableListOf<String>()
+        val add = AddRecipeActions(onLink = { got += "link $it" }, onManual = { n, sv, l -> got += "manual $n $sv ${l.lines().size}" })
+        var done = 0
+        compose.setContent { HyperShopTheme { AddRecipeContent(add, onDone = { done++ }) } }
+        compose.onNodeWithTag("add-link").performClick()
+        compose.onNodeWithTag("link-field").performTextInput("https://example.com/soup")
+        compose.onNodeWithTag("link-go").performClick()
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithTag("add-manual").performClick()
+        compose.onNodeWithTag("manual-go").assertIsNotEnabled()
+        compose.onNodeWithTag("manual-name").performTextInput("Gran's soup")
+        compose.onNodeWithTag("manual-serves").performTextInput("6")
+        compose.onNodeWithTag("manual-lines").performTextInput("2 onions\n1 leek")
+        compose.onNodeWithTag("manual-go").performClick()
+        assertEquals(listOf("link https://example.com/soup", "manual Gran's soup 6 2"), got)
+        assertEquals(2, done)
+    }
+
+    @Test
+    fun recordAddSheet() {
+        compose.setContent {
+            HyperShopTheme { AddRecipeContent(AddRecipeActions(), onDone = {}) }
+        }
+        compose.onRoot().captureRoboImage(Shots.path("add-recipe-light.png"))
     }
 
     @Test

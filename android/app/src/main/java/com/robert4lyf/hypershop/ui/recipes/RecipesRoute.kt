@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.Inventory
 import androidx.compose.material.icons.rounded.Link
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.rounded.People
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -73,7 +75,12 @@ fun RecipesRoute(
     val ui by vm.ui.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
     LaunchedEffect(vm) { vm.openReview.collect(onReview) }
-    RecipesScreen(ui, onRemove = vm::remove, onAddInStock = vm::addInStockNow)
+    RecipesScreen(
+        ui,
+        onRemove = vm::remove,
+        onAddInStock = vm::addInStockNow,
+        add = AddRecipeActions(onLink = vm::addLink, onManual = { n, s, l -> vm.addManual(n, s, l) }),
+    )
 }
 
 /** The Recipes tab, stateless. */
@@ -82,40 +89,53 @@ fun RecipesScreen(
     ui: RecipesUi,
     onRemove: (UseSummary) -> Unit,
     onAddInStock: (UseSummary) -> Unit,
+    add: AddRecipeActions = AddRecipeActions(),
 ) {
     var confirm by remember { mutableStateOf<UseSummary?>(null) }
+    var adding by remember { mutableStateOf(false) }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        LazyColumn(
-            Modifier.fillMaxSize().testTag("recipes"),
-            contentPadding = PaddingValues(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item(key = "top") {
-                val n = ui.uses.count { it.recipeId != null }
-                ScreenHeader(
-                    title = "Recipes",
-                    subtitle =
-                        when {
-                            !ui.loaded || n == 0 -> null
-                            n == 1 -> "1 recipe on your list"
-                            else -> "$n recipes on your list"
-                        },
-                )
-            }
-            if (ui.loaded && ui.uses.isEmpty()) {
-                item(key = "empty") {
-                    EmptyHero(
-                        Icons.AutoMirrored.Rounded.MenuBook,
-                        "No recipes yet",
-                        body = "No recipes on the list. Share one from your browser.",
+        Box(Modifier.fillMaxSize()) {
+            LazyColumn(
+                Modifier.fillMaxSize().testTag("recipes"),
+                // Room under the last card for the + button.
+                contentPadding = PaddingValues(bottom = 96.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                item(key = "top") {
+                    val n = ui.uses.count { it.recipeId != null }
+                    ScreenHeader(
+                        title = "Recipes",
+                        subtitle =
+                            when {
+                                !ui.loaded || n == 0 -> null
+                                n == 1 -> "1 recipe on your list"
+                                else -> "$n recipes on your list"
+                            },
                     )
                 }
+                if (ui.loaded && ui.uses.isEmpty()) {
+                    item(key = "empty") {
+                        EmptyHero(
+                            Icons.AutoMirrored.Rounded.MenuBook,
+                            "No recipes yet",
+                            body = "No recipes on the list. Tap + to paste a link or type one in, or share a page from your browser.",
+                        )
+                    }
+                }
+                items(ui.uses, key = { it.useId }) { use ->
+                    UseCard(use, onRemove = { confirm = use }, onAddInStock = { onAddInStock(use) })
+                }
             }
-            items(ui.uses, key = { it.useId }) { use ->
-                UseCard(use, onRemove = { confirm = use }, onAddInStock = { onAddInStock(use) })
-            }
+            FloatingActionButton(
+                onClick = { adding = true },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp).testTag("add-recipe"),
+                shape = RoundedCornerShape(20.dp),
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ) { Icon(Icons.Rounded.Add, contentDescription = "Add a recipe", modifier = Modifier.size(28.dp)) }
         }
     }
+    if (adding) AddRecipeSheet(add, onDismiss = { adding = false })
     confirm?.let { use ->
         AlertDialog(
             onDismissRequest = { confirm = null },

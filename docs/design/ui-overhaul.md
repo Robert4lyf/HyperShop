@@ -142,6 +142,12 @@ Shared components (`ui/common/`):
 - Only the round tick (a 56 dp target) ticks; the rest of the row opens the item card. TalkBack reads the tick as a checkbox named after the item.
 - Swipe-to-delete is gone. Delete is the bin at the item card's top right, with Undo on the list.
 
+## Adding a recipe (after phone testing)
+- The Recipes tab has a + button. It opens a sheet with two choices:
+  - **Paste a link:** the same path as sharing a page to the app.
+  - **Type it in:** a name, an optional "serves" and the ingredients, one per line.
+- A typed recipe is rule-parsed and opens the usual review screen. Claude is called only there, with a key, as for a shared page.
+
 ## Not changing
 - Navigation, view models, data, strings that tests or TalkBack depend on,
   the one-node-per-row semantics, and swipe-to-delete with its accessible
