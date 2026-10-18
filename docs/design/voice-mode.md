@@ -206,7 +206,7 @@ Entry points:
 - **"Next" reads 3** by default.
 - **Swaps are read only.**
 - **Out of stock:** offer the swaps; if none is taken, leave the item unticked.
-- **Still open:** Q8, whether the watch app (Run 2) is still wanted.
+- **Watch app (Run 2):** still wanted, as an alternative. Voice mode and the watch both tick through `ListRepository`, so they work side by side; nothing in this plan blocks Run 2.
 
 ### Original questions
 
