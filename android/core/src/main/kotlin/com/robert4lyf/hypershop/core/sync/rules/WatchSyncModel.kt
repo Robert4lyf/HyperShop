@@ -101,9 +101,10 @@ class WatchSyncModel(
         return true
     }
 
-    /** The item's state from the snapshot plus every op except the unsent ones. */
+    /** The item's state as [view] shows it without the unsent ops: the snapshot, the settled ops, then the sent ones. */
     private fun baseline(itemId: Int): Boolean? {
         var d = items[itemId]?.done ?: return null
+        for ((p, _) in settled) if (p.itemId == itemId) d = p.done
         for (p in outbox) if (p.itemId == itemId && p.seq != null) d = p.done
         return d
     }

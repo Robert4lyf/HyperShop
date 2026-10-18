@@ -288,4 +288,41 @@ class RuleParserTest {
         p.parse("2 cups " + "very ".repeat(2000) + "flour")
         assertTrue((System.nanoTime() - t0) / 1e6 < 200)
     }
+
+    @Test
+    fun aBareMultiplierIsNotPartOfTheName() {
+        val thighs = p.parse("4 x chicken thighs")
+        assertEquals(Rational.of(4), thighs.quantity)
+        assertEquals("chicken thighs", thighs.name)
+        assertFalse(thighs.check)
+        val onions = p.parse("2 x large onions")
+        assertEquals(Rational.of(2), onions.quantity)
+        assertEquals("onions", onions.name)
+        // A multiplier with no size after it: the count stays, the line is flagged (R7).
+        val eggs = p.parse("2 x 3 eggs")
+        assertEquals(Rational.of(2), eggs.quantity)
+        assertTrue(eggs.name.endsWith("eggs"))
+        assertTrue(eggs.check)
+    }
+
+    @Test
+    fun aDescendingRangeIsFlagged() {
+        val r = p.parse("3-2 eggs")
+        assertEquals(Rational.of(3), r.quantity)
+        assertNull(r.quantityMax)
+        assertTrue(r.check)
+    }
+
+    @Test
+    fun hostileNumbersNeverOverflowOrCrash() {
+        // Thousands groups on top of the nine-digit cap would overflow Long.
+        val big = p.parse("999999999,999,999.9999 g flour")
+        assertTrue(big.quantity == null || !big.quantity!!.isNegative)
+        // A 320-digit "amount" in the note parses to Infinity; shopBase must not throw on it.
+        val note = p.parse("1 cup flour (" + "9".repeat(320) + "g)")
+        assertEquals(QtyUnit.CUP, note.shopUnit)
+        assertFalse(note.shopBase(com.robert4lyf.hypershop.core.model.UnitLocale.METRIC).isPresence)
+        // Twenty digits: not a metric alternative either, so the line is still shopped by the cup.
+        assertEquals(QtyUnit.CUP, p.parse("1 cup flour (" + "9".repeat(20) + "g)").shopUnit)
+    }
 }

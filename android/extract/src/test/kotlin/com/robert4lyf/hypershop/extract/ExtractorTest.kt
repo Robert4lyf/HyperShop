@@ -223,4 +223,28 @@ class ExtractorTest {
     fun depthScanIgnoresBracketsInStrings() {
         assertEquals(2, Extractor.depth("""{"a":["[[[[{{{{"]}"""))
     }
+
+    @Test
+    fun oneStringOfLinesIsCappedBeforeCleaning() {
+        val lines = (1..1000).joinToString("\\n") { "$it egg" }
+        val r = ld("""{"@type":"Recipe","recipeIngredient":"$lines"}""").recipes.single()
+        assertEquals(300, r.lines.size)
+        assertEquals("1 egg", r.lines.first())
+    }
+
+    @Test
+    fun aFourDigitYieldIsNotReadAsAHundredServings() {
+        assertNull(Extractor.servings(JsonPrimitive("1000 ml")))
+        assertNull(Extractor.servings(JsonPrimitive("Makes 2500")))
+        assertEquals(12, Extractor.servings(JsonPrimitive("Makes 12 muffins")))
+    }
+
+    @Test
+    fun aBareJsonLdDocumentIsReadLikeAScriptBlock() {
+        val json = """{"@type":"Recipe","name":"Eggs","recipeIngredient":["1 egg </script>","2 eggs"]}"""
+        val r = Extractor.extract(Extractor.wrapLdJson(json))
+        val recipe = r.recipes.single()
+        assertEquals(2, recipe.lines.size)
+        assertTrue(recipe.lines[0].startsWith("1 egg"))
+    }
 }

@@ -59,6 +59,16 @@ object Extractor {
             allowComments = true
         }
 
+    /**
+     * A document served as `application/ld+json` (which the fetcher allows), as
+     * the HTML [extract] reads: one script block. A `</script>` inside a JSON
+     * string would end the block early, so it is escaped as JSON allows.
+     */
+    fun wrapLdJson(json: String): String {
+        val safe = json.replace("</", "<\\/")
+        return "<html><head><script type=\"application/ld+json\">$safe</script></head></html>"
+    }
+
     fun extract(
         html: String,
         baseUrl: String = "",
@@ -200,7 +210,9 @@ object Extractor {
             if (flat.size >= MAX_LINES || d > MAX_DEPTH) return
             when (e) {
                 is JsonArray -> e.forEach { walk(it, d + 1) }
-                is JsonPrimitive -> e.contentOrNull?.let { s -> s.split('\n').forEach { flat += it } }
+                // One string holding every line: bounded like the array form, or a 512 KB
+                // block of "\n" could queue hundreds of thousands of pieces for cleaning.
+                is JsonPrimitive -> e.contentOrNull?.let { s -> flat += s.splitToSequence('\n').take(MAX_LINES - flat.size) }
                 is JsonObject -> {
                     // A section ("For the sauce") holds its lines in itemListElement; its name is a
                     // "Header:" line (R8), as for WPRM and Tasty.
@@ -216,7 +228,7 @@ object Extractor {
             }
         }
         walk(v, 0)
-        return flat.map { clean(it) }.filter { it.isNotEmpty() }
+        return flat.take(MAX_LINES).map { clean(it) }.filter { it.isNotEmpty() }
     }
 
     /** recipeYield: 4, "4", "4 servings", "Serves 4-6", ["4", "4 servings"]. */
@@ -231,7 +243,8 @@ object Extractor {
         var i = 0
         while (i < s.length && !s[i].isDigit()) i++
         var j = i
-        while (j < s.length && s[j].isDigit() && j - i < 3) j++
+        // The whole number: "1000 ml" is a yield of 1000, not 100 servings; the range check drops it.
+        while (j < s.length && s[j].isDigit()) j++
         return s.substring(i, j).toIntOrNull()?.takeIf { it in 1..100 }
     }
 

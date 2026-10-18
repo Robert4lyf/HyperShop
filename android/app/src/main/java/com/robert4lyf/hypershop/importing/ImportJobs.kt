@@ -6,6 +6,7 @@ import androidx.work.WorkManager
 import com.robert4lyf.hypershop.data.ImportJobEntity
 import com.robert4lyf.hypershop.data.ListDao
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -79,6 +80,10 @@ class ImportJobs(
         )
 
     suspend fun get(id: Long): Job? = dao.job(id)?.let(::map)
+
+    /** The job once the worker is done with it (or null when there is no such job). */
+    suspend fun awaitFinished(id: Long): Job? =
+        dao.observeJob(id).first { it == null || (it.state != JobState.QUEUED.name && it.state != JobState.RUNNING.name) }?.let(::map)
 
     suspend fun setState(
         id: Long,

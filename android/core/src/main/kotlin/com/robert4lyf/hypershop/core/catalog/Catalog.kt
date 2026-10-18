@@ -172,7 +172,7 @@ class Catalog(
     }
 
     /** An independent copy, so editing it leaves [CatalogLoader.default] alone. */
-    fun copy(): Catalog = Catalog(version, entries)
+    fun copy(): Catalog = s.let { snap -> Catalog(snap.version, snap.entries) }
 
     companion object {
         /** Parses the generated `catalog.tsv` (see tools/catalog/build_catalog.py). */

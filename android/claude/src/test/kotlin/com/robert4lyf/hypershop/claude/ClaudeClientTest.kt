@@ -3,9 +3,12 @@ package com.robert4lyf.hypershop.claude
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.QtyUnit
 import com.robert4lyf.hypershop.core.model.Rational
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -14,6 +17,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.SocketPolicy
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -21,6 +25,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.util.concurrent.TimeUnit
 
 /** Every stop_reason and every error path, against MockWebServer (Step 4 check). */
 class ClaudeClientTest {
@@ -283,5 +288,31 @@ class ClaudeClientTest {
                 """{"raw":"1 tbsp olive oil","name":"olive oil","quantity":1,"quantity_max":null,"quantity_text":"1",""" +
                     """"unit":"tbsp","alt_quantity":null,"alt_unit":null,$TAIL,"aisle_suggestion":"OILS_VINEGARS"}""",
             ).joinToString(",")
+    }
+
+    @Test
+    fun cancellingTheCallerCancelsTheRequest() {
+        // A server that never answers: the call would otherwise block its thread for the whole 180 s budget.
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
+        val c =
+            ClaudeClient(
+                apiKey = { key },
+                baseUrl = server.url("").toString().trimEnd('/'),
+                usageSink = { m, u -> recorded += m to u },
+                log = log,
+            )
+        runBlocking {
+            val job = launch { c.parse(input, ClaudeModel.HAIKU) }
+            server.takeRequest(5, TimeUnit.SECONDS)
+            job.cancel()
+            withTimeout(5_000) { job.join() }
+        }
+        assertTrue(recorded.isEmpty())
+    }
+
+    @Test
+    fun aDroppedConnectionIsNeverRetriedByOkHttpItself() {
+        // The client's own policy decides what is retried; a silent re-POST would bill a second generation.
+        assertFalse(ClaudeClient.defaultHttp().retryOnConnectionFailure)
     }
 }

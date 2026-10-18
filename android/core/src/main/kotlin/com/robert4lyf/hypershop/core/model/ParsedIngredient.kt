@@ -73,7 +73,9 @@ data class ParsedIngredient(
         private val NO_SCALE = listOf("to taste", "for frying", "for greasing", "for dusting", "as needed")
         private val METRIC = setOf(QtyUnit.G, QtyUnit.KG, QtyUnit.ML, QtyUnit.L)
         private val GRAMS = setOf(QtyUnit.G, QtyUnit.KG)
-        private val METRIC_IN_NOTE = Regex("""(?<![\d.,])(\d+(?:[.,]\d+)?)\s*(ml|g|kg|l)\b""", RegexOption.IGNORE_CASE)
+
+        // Digits bounded as in the tokeniser: a 320-digit "amount" in a note would parse to Infinity and crash fromDouble.
+        private val METRIC_IN_NOTE = Regex("""(?<![\d.,])(\d{1,9}(?:[.,]\d{1,4})?)(?!\d)\s*(ml|g|kg|l)\b""", RegexOption.IGNORE_CASE)
     }
 }
 

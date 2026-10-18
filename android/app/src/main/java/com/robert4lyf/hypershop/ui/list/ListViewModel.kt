@@ -128,19 +128,19 @@ class ListViewModel(
     /** The walking order and the categorised switch. */
     private val view = combine(order, c.settings.listCategorised) { o, cat -> o to cat }
 
-    /** The in-stock lines, read again on every list change (an import, a removed recipe, "Need it"). */
-    private val inStockLines = c.repository.list.map { c.repository.inStockOnList(it) }
+    /**
+     * The list with its in-stock lines, read together on every list change (an
+     * import, a removed recipe, "Need it"): one emission per change, so the aisles
+     * and the "In stock" section never show two different lists for a frame.
+     */
+    private val listWithInStock = c.repository.list.map { it to c.repository.inStockOnList(it) }
 
     val ui: StateFlow<ListUi> =
-        combine(
-            combine(c.repository.list, c.settings.units, view, c.importJobs.ready, plusOne) { list, units, (ord, cat), ready, p ->
-                lastList = list
-                lastUnits = units
-                build(list, units, ord, cat).copy(readyJobs = ready.map { it.id }, plusOne = p) to units
-            },
-            inStockLines,
-        ) { (ui, units), lines -> ui.copy(inStock = inStockRows(lines, units)) }
-            .flowOn(Dispatchers.Default)
+        combine(listWithInStock, c.settings.units, view, c.importJobs.ready, plusOne) { (list, lines), units, (ord, cat), ready, p ->
+            lastList = list
+            lastUnits = units
+            build(list, units, ord, cat).copy(readyJobs = ready.map { it.id }, plusOne = p, inStock = inStockRows(lines, units))
+        }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.Eagerly, ListUi())
 
     private fun inStockRows(

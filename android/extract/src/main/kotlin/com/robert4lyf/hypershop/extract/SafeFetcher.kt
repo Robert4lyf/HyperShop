@@ -1,10 +1,16 @@
 package com.robert4lyf.hypershop.extract
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.Dns
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import java.io.IOException
 import java.net.Inet4Address
 import java.net.Inet6Address
@@ -12,6 +18,8 @@ import java.net.InetAddress
 import java.net.Proxy
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
  * What the fetcher allows. Production is [STRICT]; tests loosen it to reach
@@ -93,7 +101,14 @@ class SafeFetcher(
         return null
     }
 
-    fun fetch(url: String): FetchResult {
+    /**
+     * Fetches [url], following redirects itself. Runs on the IO dispatcher, and
+     * cancelling the caller (a stopped import worker) cancels the request in
+     * flight rather than leaving a thread blocked for the rest of the 30 s.
+     */
+    suspend fun fetch(url: String): FetchResult = withContext(Dispatchers.IO) { fetchBlocking(url) }
+
+    private suspend fun fetchBlocking(url: String): FetchResult {
         var current = url.toHttpUrlOrNull() ?: return FetchResult.Blocked("not an http(s) URL")
         // One clock for the whole chain, so redirects can't stretch it to 6 × 30 s.
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(CALL_TIMEOUT_S)
@@ -111,7 +126,7 @@ class SafeFetcher(
             val call = client.newCall(req)
             call.timeout().timeout(left, TimeUnit.NANOSECONDS)
             try {
-                call.execute().use { r ->
+                call.await().use { r ->
                     if (r.isRedirect) {
                         val next = r.header("Location")?.let { current.resolve(it) } ?: return FetchResult.HttpError(r.code)
                         current = next
@@ -138,6 +153,30 @@ class SafeFetcher(
         }
         return FetchResult.Blocked("too many redirects")
     }
+
+    /** The response, or the IOException the call failed with; cancelling the coroutine cancels the call. */
+    private suspend fun Call.await(): Response =
+        suspendCancellableCoroutine { cont ->
+            cont.invokeOnCancellation { cancel() }
+            enqueue(
+                object : Callback {
+                    override fun onFailure(
+                        call: Call,
+                        e: IOException,
+                    ) {
+                        cont.resumeWithException(e)
+                    }
+
+                    override fun onResponse(
+                        call: Call,
+                        response: Response,
+                    ) {
+                        // Resumed after a cancellation, the body would leak: close it instead.
+                        if (!cont.isActive) response.close() else cont.resume(response)
+                    }
+                },
+            )
+        }
 
     private class BlockedAddress(
         msg: String,

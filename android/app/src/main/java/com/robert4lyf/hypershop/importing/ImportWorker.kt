@@ -41,8 +41,10 @@ class ImportWorker(
                 )
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
-                // Never leave the job RUNNING: the review screen would wait on it for ever.
+            } catch (e: Throwable) {
+                // Never leave the job RUNNING: the review screen would wait on it for ever. That
+                // includes an OutOfMemoryError or StackOverflowError on a hostile page (PLAN §3.1:
+                // those go to "Select lines manually"); WorkManager would not run the job again.
                 ImportResult(input.url, input.subject, null, UnitLocale.METRIC, "MANUAL", error = ImportError.NO_RECIPE)
             }
         jobs.finish(jobId, result)

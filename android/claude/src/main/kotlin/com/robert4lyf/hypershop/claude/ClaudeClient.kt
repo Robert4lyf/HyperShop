@@ -2,9 +2,13 @@ package com.robert4lyf.hypershop.claude
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -12,6 +16,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
 
 /** Records every response's token use (`ClaudeUsage` in `:data`). */
 fun interface UsageSink {
@@ -117,7 +122,12 @@ class ClaudeClient(
         ) : Outcome
     }
 
-    private fun send(
+    /**
+     * One POST. Cancelling the caller cancels the call: leaving the review screen
+     * two seconds into a long Opus answer must not keep a thread, the socket and
+     * the spend reservation for the rest of the 180 s budget.
+     */
+    private suspend fun send(
         key: String,
         model: ClaudeModel,
         body: String,
@@ -125,15 +135,39 @@ class ClaudeClient(
         val b = Request.Builder().url("$baseUrl/v1/messages").post(body.toRequestBody(JSON))
         ClaudeRequest.headers(key, model).forEach { (k, v) -> if (k != "content-type") b.header(k, v) }
         val req = b.build()
-        return try {
-            http.newCall(req).execute().use { r: Response ->
-                // Status only: request and response bodies never reach the log.
-                log.log("POST ${req.url} ${model.id} → ${r.code}")
-                Outcome.Http(r.code, r.body?.string().orEmpty(), r.header("retry-after")?.toLongOrNull())
-            }
-        } catch (e: IOException) {
-            log.log("POST ${req.url} failed: ${e.javaClass.simpleName}")
-            Outcome.Offline
+        val call = http.newCall(req)
+        return suspendCancellableCoroutine { cont ->
+            cont.invokeOnCancellation { call.cancel() }
+            call.enqueue(
+                object : Callback {
+                    override fun onFailure(
+                        call: Call,
+                        e: IOException,
+                    ) {
+                        if (!call.isCanceled()) log.log("POST ${req.url} failed: ${e.javaClass.simpleName}")
+                        // After a cancellation the continuation is already done; this is then a no-op.
+                        cont.resume(Outcome.Offline)
+                    }
+
+                    override fun onResponse(
+                        call: Call,
+                        response: Response,
+                    ) {
+                        val outcome =
+                            try {
+                                response.use { r ->
+                                    // Status only: request and response bodies never reach the log.
+                                    log.log("POST ${req.url} ${model.id} → ${r.code}")
+                                    Outcome.Http(r.code, r.body?.string().orEmpty(), r.header("retry-after")?.toLongOrNull())
+                                }
+                            } catch (e: IOException) {
+                                log.log("POST ${req.url} body failed: ${e.javaClass.simpleName}")
+                                Outcome.Offline
+                            }
+                        cont.resume(outcome)
+                    }
+                },
+            )
         }
     }
 
@@ -150,7 +184,8 @@ class ClaudeClient(
                 Usage(it.inputTokens, it.outputTokens, it.cacheCreationInputTokens ?: 0, it.cacheReadInputTokens ?: 0)
             }
         val answeredBy = msg.model ?: model.id
-        if (usage != null) usageSink.record(answeredBy, usage)
+        // The tokens are spent whatever happens next: a cancellation can't skip the meter.
+        if (usage != null) withContext(NonCancellable) { usageSink.record(answeredBy, usage) }
         // stop_reason first, content after.
         when (msg.stopReason) {
             "refusal" -> return ClaudeResult.Refused(usage)
@@ -191,6 +226,9 @@ class ClaudeClient(
                 // OkHttp's 10 s default read timeout would cut those off.
                 .readTimeout(180, TimeUnit.SECONDS)
                 .callTimeout(180, TimeUnit.SECONDS)
+                // OkHttp would otherwise re-POST on a dropped connection: two generations billed,
+                // one recorded. Retries are this client's own, explicit policy.
+                .retryOnConnectionFailure(false)
                 .build()
     }
 }

@@ -205,6 +205,10 @@ interface ListDao {
     @Query("SELECT * FROM ImportJob WHERE id = :id")
     suspend fun job(id: Long): ImportJobEntity?
 
+    /** Re-emitted whenever the row changes: the review screen waits on it rather than polling. */
+    @Query("SELECT * FROM ImportJob WHERE id = :id")
+    fun observeJob(id: Long): Flow<ImportJobEntity?>
+
     @Query("SELECT * FROM ImportJob WHERE state = :state ORDER BY createdAt")
     fun observeJobs(state: String): Flow<List<ImportJobEntity>>
 

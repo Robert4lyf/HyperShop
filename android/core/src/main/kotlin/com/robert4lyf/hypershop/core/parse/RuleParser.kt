@@ -95,6 +95,7 @@ class RuleParser(
                 } else if (word(i) == "x" && kind(i + 1) == Kind.NUM) {
                     // R3.5: 2 x 400g tins; without a container (4 x 150g salmon fillets)
                     // the amount is a count of the named thing, each of the size.
+                    val save = i
                     i++
                     val size = readNumber()
                     val sizeUnit = readUnit()
@@ -103,7 +104,15 @@ class RuleParser(
                         altUnit = sizeUnit
                         unit = readUnit()
                         if (unit == null) sizedCount = true
+                    } else {
+                        // "2 x 3 eggs": a multiplier with no size. Keep the count, drop the "x", and flag it (R7).
+                        i = save + 1
+                        check = true
                     }
+                } else if (word(i) == "x") {
+                    // "4 x chicken thighs": a bare multiplier, not part of the name.
+                    i++
+                    unit = readUnit()
                 } else {
                     unit = readUnit()
                     // R3.4: 2 cups (300g) … / 1 (14-ounce) tin
@@ -261,7 +270,9 @@ class RuleParser(
             i++
             val second = readNumber()
             if (second != null && second > first) return second
+            // "3-2 eggs": a separator and a number that make no range; the name would otherwise start "-2".
             i = save
+            check = true
             return null
         }
 
@@ -304,7 +315,7 @@ class RuleParser(
             to: Int,
         ): Pair<Rational, QtyUnit>? {
             var j = from
-            while (j < to && word(j) in setOf("about", "approx", "approximately", "one", "a", "an")) j++
+            while (j < to && word(j) in APPROX_WORDS) j++
             if (j >= to || kind(j) != Kind.NUM) return null
             val v = toks[j].value!!
             j++
@@ -428,7 +439,8 @@ class RuleParser(
             words: List<Token>,
             idx: Int,
         ): Boolean {
-            for (end in words.size downTo idx + 2) {
+            // No catalogue name is longer than MAX_KEY_WORDS words, so longer phrases need no lookup.
+            for (end in minOf(words.size, idx + MAX_KEY_WORDS) downTo idx + 2) {
                 val phrase = words.subList(idx, end).joinToString(" ") { it.text }
                 if (catalog.lookup(phrase) != null) return true
             }
@@ -471,7 +483,7 @@ class RuleParser(
         if (w == "fl" || w == "fluid") {
             var j = at + 1
             if (toks.getOrNull(j)?.kind == Kind.PERIOD) j++
-            if (toks.getOrNull(j)?.text?.lowercase() in setOf("oz", "ounce", "ounces")) return QtyUnit.FL_OZ to (j - at + 1)
+            if (toks.getOrNull(j)?.text?.lowercase() in OUNCE_WORDS) return QtyUnit.FL_OZ to (j - at + 1)
         }
         // R2.1: T alone is a tablespoon, t alone a teaspoon.
         if (raw == "T" || raw == "Tb" || raw == "Tbs") return QtyUnit.TBSP to 1
@@ -506,6 +518,14 @@ class RuleParser(
 
         /** A name that starts with one of these is a leftover amount. */
         val LEFTOVER = setOf(Kind.NUM, Kind.SLASH)
+
+        /** Words that may sit between a parenthesis and its amount ("(about 2 cups)"). */
+        val APPROX_WORDS = setOf("about", "approx", "approximately", "one", "a", "an")
+
+        val OUNCE_WORDS = setOf("oz", "ounce", "ounces")
+
+        /** The longest catalogue name ("peas in the pod"), in words: longer phrases are never looked up. */
+        const val MAX_KEY_WORDS = 4
 
         /** "a few", "a little": not an amount (R6). */
         val VAGUE = setOf("few", "little", "couple", "bit", "touch")

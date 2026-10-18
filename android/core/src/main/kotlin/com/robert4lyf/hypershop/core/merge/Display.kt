@@ -9,6 +9,7 @@ import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.QtyUnit
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
+import java.util.Locale
 
 /** The units setting (PLAN §3.3). */
 enum class UnitsSetting { METRIC, IMPERIAL, AS_WRITTEN }
@@ -143,10 +144,15 @@ object Display {
     private fun tablespoons(ml: Rational): String {
         val half = Rational.of(15, 2)
         if ((ml / half).den == 1L) return "${fraction(ml / Rational.of(15))}tbsp"
-        val whole = Math.floorDiv((ml / Rational.of(15)).num, (ml / Rational.of(15)).den)
+        var whole = Math.floorDiv((ml / Rational.of(15)).num, (ml / Rational.of(15)).den)
         val rest = ml - Rational.of(whole * 15)
-        val tsp = "${fraction(roundUp(rest / Rational.of(5), Rational.of(1, 4)))}tsp"
-        return if (whole == 0L) tsp else "${whole}tbsp + $tsp"
+        val tsp = roundUp(rest / Rational.of(5), Rational.of(1, 4))
+        // Three teaspoons are a tablespoon: 29.25 ml is "2tbsp", not "1tbsp + 3tsp".
+        if (tsp >= Rational.of(3)) {
+            whole++
+            return "${whole}tbsp"
+        }
+        return if (whole == 0L) "${fraction(tsp)}tsp" else "${whole}tbsp + ${fraction(tsp)}tsp"
     }
 
     // ---- per dimension ------------------------------------------------------------
@@ -205,10 +211,10 @@ object Display {
             return "${fraction(roundUp(ml / Rational.of(240), Rational.of(1, 4)))} ${if (ml > Rational.of(240)) "cups" else "cup"}"
         }
         if (spoons && d < 60) {
-            return if (d < 15) {
-                "${fraction(
-                    roundUp(ml / Rational.of(5), Rational.of(1, 4)),
-                )}tsp"
+            // Under a tablespoon: teaspoons, unless they round up to three (14 ml is "1tbsp", not "3tsp").
+            val tsp = roundUp(ml / Rational.of(5), Rational.of(1, 4))
+            return if (d < 15 && tsp < Rational.of(3)) {
+                "${fraction(tsp)}tsp"
             } else {
                 "${fraction(roundUp(ml / Rational.of(15), Rational.of(1, 2)))}tbsp"
             }
@@ -236,7 +242,8 @@ object Display {
         step: Double,
     ): Double = Math.ceil(v / step - 1e-9) * step
 
-    private fun trim(d: Double): String = if (d == Math.floor(d)) d.toLong().toString() else "%.1f".format(d)
+    // Locale.ROOT: a German phone would otherwise show "1,1kg" beside "1/2" and the tests' "1.1kg".
+    private fun trim(d: Double): String = if (d == Math.floor(d)) d.toLong().toString() else String.format(Locale.ROOT, "%.1f", d)
 
     /** 2½, ⅓, 1¼, 3. Other fractions fall back to one decimal. */
     fun fraction(r: Rational): String {
@@ -250,7 +257,7 @@ object Display {
                 Rational.of(2, 3) -> "⅔"
                 Rational.of(1, 4) -> "¼"
                 Rational.of(3, 4) -> "¾"
-                else -> return "%.1f".format(r.toDouble())
+                else -> return String.format(Locale.ROOT, "%.1f", r.toDouble())
             }
         return if (whole == 0L && glyph.isNotEmpty()) glyph else "$whole$glyph"
     }

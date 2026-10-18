@@ -45,7 +45,14 @@ sealed interface WatchMessage {
         override val epoch: Int,
         override val installId: Int,
         val ops: List<WatchOp>,
-    ) : WatchMessage
+    ) : WatchMessage {
+        init {
+            require(ops.isNotEmpty()) { "an op batch holds at least one op" }
+        }
+
+        /** The watch's own ackedThrough: its outbox is a contiguous run from there. */
+        val watchAckedThrough: Int get() = ops.first().seq - 1
+    }
 
     data class Bye(
         override val epoch: Int,

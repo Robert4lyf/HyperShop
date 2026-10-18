@@ -139,6 +139,8 @@ object SnapshotPager {
             items.mapNotNull { i ->
                 aisleIndex[i.aisleCode]?.let { SnapItem(i.id, i.name, i.sub, it, i.done, i.rev) }
             }
+        // An item whose aisle the caller left out of `aisles` cannot be shown; it still counts as left off.
+        val more = dropped + (items.size - snapItems.size)
         val ax = input.ackExceptions.takeLast(MAX_AX)
 
         val pages = mutableListOf<SnapshotPage>()
@@ -147,7 +149,7 @@ object SnapshotPager {
         while (ai < aisles.size || ii < snapItems.size || pages.isEmpty()) {
             if (pages.size >= cap.maxPages) return null
             var page =
-                SnapshotPage(input.epoch, input.listRev, input.ackedThrough, ax, pages.size, 0, emptyList(), ai, emptyList(), dropped)
+                SnapshotPage(input.epoch, input.listRev, input.ackedThrough, ax, pages.size, 0, emptyList(), ai, emptyList(), more)
             if (size(page) > cap.bytes) return null
             while (ai < aisles.size) {
                 val next = page.copy(aisles = page.aisles + aisles[ai])

@@ -43,8 +43,16 @@ class PhoneSyncModel(
     class Install(
         var lastSeq: Int,
     ) {
-        /** The last [RESULT_HISTORY] results, by seq, so a duplicate is re-acked correctly. */
+        /**
+         * The results the watch has not settled yet, by seq (at most
+         * [RESULT_HISTORY]), so a duplicate is re-acked correctly. A seq the
+         * watch reports as acked is never asked about again, so it goes.
+         */
         val results = LinkedHashMap<Int, OpResult>()
+
+        fun settledThrough(seq: Int) {
+            results.keys.removeAll { it <= seq }
+        }
     }
 
     /** What the phone sends back: always, to hello and to every batch. */
@@ -165,11 +173,18 @@ class PhoneSyncModel(
         // A watch that adopted a new epoch voids the seqs it discarded by
         // reporting them as settled; jump over them so go-back-N has no gap.
         if (m.ackedThrough > install.lastSeq) install.lastSeq = m.ackedThrough
+        install.settledThrough(m.ackedThrough)
         return reply(m.installId, full = true)
     }
 
     private fun ops(m: WatchMessage.Ops): Reply {
-        val install = installs.getOrPut(m.installId) { Install(m.ops.first().seq - 1) }
+        val install = installs.getOrPut(m.installId) { Install(m.watchAckedThrough) }
+        // The batch starts right after what the watch has settled: only results
+        // from there on can still be asked for, so the reply carries only those.
+        // (Sending every non-ok result in history could never fit the payload cap
+        // once a handful of noops had piled up, and the watch then resent for ever.)
+        // A batch with a gap is ignored below, and its claim is ignored with it.
+        if (m.watchAckedThrough <= install.lastSeq) install.settledThrough(m.watchAckedThrough)
         var changed = false
         for (op in m.ops) {
             when {

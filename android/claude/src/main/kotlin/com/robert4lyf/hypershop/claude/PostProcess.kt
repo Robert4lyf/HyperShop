@@ -35,7 +35,8 @@ object PostProcess {
             title = out.title?.trim()?.take(200)?.ifEmpty { null },
             servings = out.servings?.takeIf { it in 1..100 },
             ingredients = out.ingredients.take(MAX_INGREDIENTS).map(::ingredient).filter { it.name.isNotBlank() },
-            sourceUrls = out.sourceUrls.filter { it.startsWith("https://") && source.contains(it) && it.length <= 2000 }.distinct(),
+            // Cheap checks first: the substring search over the whole source runs only for plausible URLs.
+            sourceUrls = out.sourceUrls.filter { it.length <= 2000 && it.startsWith("https://") && source.contains(it) }.distinct(),
             model = model,
         )
     }
