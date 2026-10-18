@@ -139,6 +139,13 @@ class RuleParser(
                         if (a != null && au != null) {
                             altQty = a
                             altUnit = au
+                            // 500g/1lb 2oz: the rest of a compound alt goes to the note with it.
+                            val more = i
+                            if (kind(i) == Kind.NUM && readNumber() != null && readUnit()?.dimension == au.dimension) {
+                                notes += span(save + 1, i)
+                            } else {
+                                i = more
+                            }
                         } else {
                             i = save
                         }

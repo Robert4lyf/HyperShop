@@ -258,6 +258,22 @@ class RuleParserTest {
 
 
     @Test
+    fun compoundImperialAltAfterASlash() {
+        val mince = p.parse("500g/1lb 2oz beef mince")
+        assertEquals(Rational.of(500), mince.quantity)
+        assertEquals(QtyUnit.G, mince.unit)
+        assertEquals(Rational.ONE, mince.altQuantity)
+        assertEquals(QtyUnit.LB, mince.altUnit)
+        assertEquals("beef mince", mince.name)
+        assertEquals("1lb 2oz", mince.note)
+        val big = p.parse("1.25kg/2lb 12oz beef mince")
+        assertEquals(QtyUnit.KG, big.unit)
+        assertEquals("beef mince", big.name)
+        assertFalse(big.check)
+    }
+
+
+    @Test
     fun hostileLinesDoNotThrowAndStayFast() {
         val lines = listOf("", "(((((", ")))", "1/", "½-½-½", "x x x 2 x", "of of of", ",,,,", "(".repeat(3000), "1 ".repeat(3000))
         for (l in lines) p.parse(l)
