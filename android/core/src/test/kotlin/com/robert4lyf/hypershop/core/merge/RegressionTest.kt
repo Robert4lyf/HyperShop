@@ -1,6 +1,5 @@
 package com.robert4lyf.hypershop.core.merge
 
-import com.robert4lyf.hypershop.core.model.BaseKey
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.QtyUnit
 import com.robert4lyf.hypershop.core.model.Rational
@@ -117,18 +116,6 @@ class RegressionTest {
     }
 
     @Test
-    fun haveSomeInAnotherDimensionIsNotPartial() {
-        val p =
-            merger.preview(
-                ShoppingList(),
-                recipe(listOf("200 ml milk")),
-                mapOf("cat:milk" to RowDecision(haveSome = g(50))),
-            )
-        assertEquals(LineStatus.ADDED, p.lineStatus[1L])
-        assertEquals(Rational.of(200), p.rows.single().adding[BaseKey.VOLUME])
-    }
-
-    @Test
     fun swappingRenamesOrMergesAndKeepsTheAmounts() {
         val tbsp = QtyBase.of(Rational.ONE, QtyUnit.TBSP, UnitLocale.METRIC)
         var (l, agave) = ShoppingList().manualAdd(merger.target("agave syrup"), tbsp, QtyUnit.TBSP, 1)
@@ -154,6 +141,16 @@ class RegressionTest {
         val m = Merger(catalog)
         assertEquals("cat:maple_syrup", m.target("agave nectar").mergeKey)
         assertEquals("cat:honey", m.target("honey").mergeKey)
+    }
+
+    @Test
+    fun lentilsOfDifferentColoursAreDifferentItems() {
+        val m = Merger(com.robert4lyf.hypershop.core.catalog.CatalogLoader.default)
+        assertEquals("cat:red_lentils", m.target("split red lentils").mergeKey)
+        assertEquals("cat:green_lentils", m.target("green lentils").mergeKey)
+        assertEquals("cat:puy_lentils", m.target("french lentils").mergeKey)
+        assertEquals("cat:black_lentils", m.target("beluga lentils").mergeKey)
+        assertEquals("cat:lentils", m.target("lentils").mergeKey)
     }
 
     @Test

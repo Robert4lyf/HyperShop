@@ -1,5 +1,9 @@
 package com.robert4lyf.hypershop.ui.library
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.robert4lyf.hypershop.catalog.EntryEdit
@@ -14,7 +18,6 @@ import com.robert4lyf.hypershop.ui.common.UiMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -39,7 +42,6 @@ data class LibraryRow(
 data class LibraryUi(
     val rows: List<LibraryRow> = emptyList(),
     val total: Int = 0,
-    val query: String = "",
 )
 
 /** What the edit sheet shows and saves. */
@@ -69,12 +71,18 @@ data class EntryForm(
 class LibraryViewModel(
     private val c: AppContainer,
 ) : ViewModel() {
-    private val query = MutableStateFlow("")
+    /**
+     * What is typed in the search box. Compose state, read straight back by the
+     * field: were it the filtered [ui] (worked out off the main thread), each
+     * keystroke would be overwritten by the previous text before it showed.
+     */
+    var query by mutableStateOf("")
+        private set
     private val messages = Channel<UiMessage>(Channel.BUFFERED)
     val events: Flow<UiMessage> = messages.receiveAsFlow()
 
     val ui: StateFlow<LibraryUi> =
-        combine(c.library.edits, query) { edits, q ->
+        combine(c.library.edits, snapshotFlow { query }) { edits, q ->
             val all = c.catalog.entries
             val key = CatalogKey.of(q)
             val rows =
@@ -84,11 +92,11 @@ class LibraryViewModel(
                     .sortedBy { it.name.lowercase() }
                     .map { e -> row(e, edited = e.id in edits && c.library.isBundled(e.id), custom = !c.library.isBundled(e.id)) }
                     .toList()
-            LibraryUi(rows, all.size, q)
+            LibraryUi(rows, all.size)
         }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUi())
 
     fun search(text: String) {
-        query.value = text
+        query = text
     }
 
     private fun row(

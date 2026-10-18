@@ -316,8 +316,7 @@ fun SheetHeader(
 }
 
 /**
- * An amount field and its button: "Set" on the item sheet, "Subtract" on the
- * review sheet. The label stays visible (and spoken) once something is typed;
+ * An amount field and its button ("Set" on the item sheet). The label stays visible (and spoken) once something is typed;
  * [onSubmit] returns false when the text has no amount.
  */
 @Composable

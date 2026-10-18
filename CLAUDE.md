@@ -51,7 +51,7 @@ and retry; `verify.sh` already does.
   touch a DAO.
 - **Room enums are stored by name**, never ordinal.
 - **An item's amount is the sum of its contributions.** Never store a total.
-  "I have some" is subtracted when contributions are created, never stored.
+  A row marked in stock on review adds nothing.
 - **Ticks never create stock.** A tick covers exactly the contributions that
   existed at that moment; later ones start uncovered.
 - **`Item.rev` is bumped in the same transaction** as any change to the

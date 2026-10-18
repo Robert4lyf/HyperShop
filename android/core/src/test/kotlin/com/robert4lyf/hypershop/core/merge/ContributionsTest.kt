@@ -2,7 +2,6 @@ package com.robert4lyf.hypershop.core.merge
 
 import com.robert4lyf.hypershop.core.model.BaseKey
 import com.robert4lyf.hypershop.core.model.QtyBase
-import com.robert4lyf.hypershop.core.model.QtyUnit
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.parse.Normaliser
@@ -47,20 +46,6 @@ class ContributionsTest {
         assertTrue(l.total(l.itemByKey("cat:salt")!!.id).isPresence)
         val rescaled = l.rescaleUse(l.uses.keys.first(), 2)
         assertEquals(Rational.of(1), rescaled.total(rescaled.itemByKey("cat:onion")!!.id)[BaseKey.ITEMS])
-    }
-
-    @Test
-    fun iHaveSomeIsSubtractedEarliestLineFirstAndNeverStored() {
-        val lines = listOf("200 ml milk", "300 ml milk")
-        val have = QtyBase.of(Rational.of(250), QtyUnit.ML, UnitLocale.METRIC)
-        val (l, _) = add(ShoppingList(), lines) { mapOf("cat:milk" to RowDecision(haveSome = have)) }
-        val milk = l.itemByKey("cat:milk")!!
-        val cs = l.contributionsOf(milk.id)
-        assertEquals(1, cs.size) // the first line was used up entirely
-        assertEquals(Rational.of(250), cs.single().qty[BaseKey.VOLUME])
-        val p = merger.preview(ShoppingList(), recipe(lines), mapOf("cat:milk" to RowDecision(haveSome = have)))
-        assertEquals(LineStatus.PARTIAL, p.lineStatus[1L])
-        assertEquals(LineStatus.PARTIAL, p.lineStatus[2L])
     }
 
     @Test

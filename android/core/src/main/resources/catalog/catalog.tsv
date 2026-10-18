@@ -1,4 +1,4 @@
-#version	488f58e5db49
+#version	cddaef74d4bc
 #id	name	plural	synonyms	aisleCode	staple	shoppingUnit	displayPolicy	gramsPerCup	packNote
 onion	onion	onions	yellow onion|brown onion|white onion|spanish onion	PRODUCE	false	each	count	160	
 red_onion	red onion	red onions	purple onion	PRODUCE	false	each	count	160	
@@ -266,7 +266,12 @@ pearl_barley	pearl barley	pearl barley	barley	PASTA_RICE_GRAINS	false	bag	mass	2
 farro	farro	farro	spelt grain	PASTA_RICE_GRAINS	false	bag	mass	180	
 oats	porridge oats	porridge oats	oats|rolled oats|oatmeal|old-fashioned oats	PASTA_RICE_GRAINS	false	bag	mass	90	
 polenta	polenta	polenta	cornmeal|yellow cornmeal|grits	PASTA_RICE_GRAINS	false	bag	mass	160	
-lentils	lentils	lentils	red lentils|green lentils|puy lentils|brown lentils|lentil	PASTA_RICE_GRAINS	false	bag	mass	190	
+lentils	lentils	lentils	lentil|dried lentils	PASTA_RICE_GRAINS	false	bag	mass	190	
+red_lentils	red lentils	red lentils	red lentil|split red lentils|red split lentils|masoor dal	PASTA_RICE_GRAINS	false	bag	mass	190	
+green_lentils	green lentils	green lentils	green lentil	PASTA_RICE_GRAINS	false	bag	mass	190	
+brown_lentils	brown lentils	brown lentils	brown lentil	PASTA_RICE_GRAINS	false	bag	mass	190	
+puy_lentils	puy lentils	puy lentils	puy lentil|french lentils|french green lentils|le puy lentils	PASTA_RICE_GRAINS	false	bag	mass	190	
+black_lentils	black lentils	black lentils	black lentil|beluga lentils|beluga lentil	PASTA_RICE_GRAINS	false	bag	mass	190	
 split_peas	split peas	split peas	yellow split peas	PASTA_RICE_GRAINS	false	bag	mass	200	
 dried_beans	dried beans	dried beans	bean|beans	PASTA_RICE_GRAINS	false	bag	mass	190	
 soy_sauce	soy sauce	soy sauce	light soy sauce|dark soy sauce|tamari|shoyu	WORLD_FOODS	false	bottle	presence		

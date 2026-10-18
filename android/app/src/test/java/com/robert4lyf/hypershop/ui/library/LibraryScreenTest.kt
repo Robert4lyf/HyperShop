@@ -44,6 +44,7 @@ class LibraryScreenTest {
             HyperShopTheme {
                 LibraryScreen(
                     UI,
+                    "",
                     onBack = {},
                     onSearch = { events += "search $it" },
                     onOpen = { events += "open $it" },
@@ -84,13 +85,13 @@ class LibraryScreenTest {
 
     @Test
     fun recordLight() {
-        compose.setContent { HyperShopTheme { LibraryScreen(UI, onBack = {}, onSearch = {}, onOpen = {}, onAdd = {}) } }
+        compose.setContent { HyperShopTheme { LibraryScreen(UI, "", onBack = {}, onSearch = {}, onOpen = {}, onAdd = {}) } }
         compose.onRoot().captureRoboImage(Shots.path("library-light.png"))
     }
 
     @Test
     fun recordDark() {
-        compose.setContent { HyperShopTheme(dark = true) { LibraryScreen(UI, onBack = {}, onSearch = {}, onOpen = {}, onAdd = {}) } }
+        compose.setContent { HyperShopTheme(dark = true) { LibraryScreen(UI, "", onBack = {}, onSearch = {}, onOpen = {}, onAdd = {}) } }
         compose.onRoot().captureRoboImage(Shots.path("library-dark.png"))
     }
 

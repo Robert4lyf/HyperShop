@@ -32,7 +32,7 @@ data class RecipeUse(
     val archivedAt: Long? = null,
 )
 
-/** Already scaled, with "I have some" already subtracted (PLAN §3.3). */
+/** Already scaled (PLAN §3.3). */
 data class Contribution(
     val id: Long,
     val useId: Long,

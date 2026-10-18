@@ -41,7 +41,7 @@ data class BaseKey(
 
 /**
  * An amount in base units, per dimension (PLAN §3.3). A contribution stores
- * one of these, already scaled and with "I have some" subtracted.
+ * one of these, already scaled.
  *
  * An empty [parts] map is a *presence* amount: "salt, to taste" is on the
  * list but has no quantity to add up.
