@@ -30,13 +30,21 @@ module Protocol {
     const KEY_MORE = "mo";
     const KEY_OPS = "op";
 
+    // The payload probe (debug builds): padding, the size asked for or
+    // measured, and the size of the phone's reply as the phone counts it.
+    const KEY_PAD = "pd";
+    const KEY_PROBE_SIZE = "n";
+    const KEY_SIZE_DOWN = "sd";
+
     // Watch → phone.
     const OUT_HELLO = "hello";
     const OUT_OPS = "ops";
     const OUT_BYE = "bye";
+    const OUT_PROBE = "prb";
 
     // Phone → watch.
     const IN_SNAPSHOT = "snap";
+    const IN_PROBE = "prb";
 
     // Op results, in `ax` for every acked seq whose result is not ok.
     const RESULT_OK = "ok";

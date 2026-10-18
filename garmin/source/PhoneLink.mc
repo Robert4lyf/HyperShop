@@ -26,6 +26,10 @@ class PhoneLink {
     //! When a reply last arrived (Time seconds), 0 for never this session.
     var lastHeard as Lang.Number = 0;
 
+    //! The debug payload probe's reply handler; probe replies go nowhere else.
+    var probeHandler as Lang.Method or Null = null;
+
+    private var _real as WatchSync or Null = null;
     private var _onChange as Lang.Method or Null = null;
     private var _timer as Timer.Timer or Null = null;
     private var _sentAt as Lang.Number = 0;
@@ -86,6 +90,26 @@ class PhoneLink {
         return _offline;
     }
 
+    //! The debug sample in place of the phone's list, or null to go back.
+    function useSample(sample as WatchSync or Null) as Void {
+        if (sample != null) {
+            if (_real == null) {
+                _real = sync;
+            }
+            sync = sample;
+            setOffline(true);
+        } else if (_real != null) {
+            sync = _real as WatchSync;
+            _real = null;
+            setOffline(false);
+        }
+    }
+
+    //! A payload outside the sync rules (the probe).
+    function send(payload as Lang.Dictionary) as Void {
+        transmit(payload);
+    }
+
     //! Asks the phone for the list now, whatever the back-off says.
     function refresh() as Void {
         _awaiting = false;
@@ -118,6 +142,13 @@ class PhoneLink {
             return;
         }
         versionMismatch = false;
+        var type = data.get(Protocol.KEY_TYPE);
+        if (type instanceof Lang.String && (type as Lang.String).equals(Protocol.IN_PROBE)) {
+            if (probeHandler != null) {
+                (probeHandler as Lang.Method).invoke(data);
+            }
+            return;
+        }
         if (!sync.receive(data)) {
             return;
         }

@@ -36,6 +36,33 @@ class CodecTest {
     }
 
     @Test
+    fun probeRequestIsMeasuredAndAnsweredAtTheSizeAskedFor() {
+        val request = mapOf("v" to 1, "t" to "prb", "ep" to 7, "ii" to 42, "n" to 600, "pd" to "x".repeat(300))
+        val probe = requireNotNull(WatchCodec.decodeProbe(request))
+        assertEquals(PayloadSize.of(request), probe.received)
+        // A probe is not a list message, and a list message is not a probe.
+        assertNull(WatchCodec.decode(request))
+        assertNull(WatchCodec.decodeProbe(WatchCodec.encode(hello)))
+
+        val reply = WatchCodec.encodeProbeReply(probe)
+        assertEquals(probe.received, reply["n"])
+        assertEquals(PayloadSize.of(reply), reply["sd"])
+        assertTrue(PayloadSize.of(reply) in 600..610, "${PayloadSize.of(reply)}")
+    }
+
+    @Test
+    fun hostileProbesDecodeToNull() {
+        val ok = mapOf("v" to 1, "t" to "prb", "ep" to 7, "ii" to 42, "n" to 100)
+        assertNotNull(WatchCodec.decodeProbe(ok))
+        assertNull(WatchCodec.decodeProbe(ok + ("n" to 100_000)))
+        assertNull(WatchCodec.decodeProbe(ok + ("n" to -1)))
+        assertNull(WatchCodec.decodeProbe(ok + ("pd" to 5)))
+        assertNull(WatchCodec.decodeProbe(ok + ("pd" to "x".repeat(9000))))
+        assertNull(WatchCodec.decodeProbe(ok + ("ii" to 0)))
+        assertNull(WatchCodec.decodeProbe(ok + ("v" to 2)))
+    }
+
+    @Test
     fun versionMismatchIsDropped() {
         val p = WatchCodec.encode(hello).toMutableMap()
         p[WatchProtocol.Key.VERSION] = 2

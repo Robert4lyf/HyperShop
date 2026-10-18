@@ -110,6 +110,14 @@ class WatchSync {
         saveSnapshot();
     }
 
+    //! A list that came from nowhere: the debug sample. Never persisted.
+    function useSnapshot(newAisles as Lang.Array<Lang.Array>, newItems as Lang.Array<Lang.Array>) as Void {
+        aisles = newAisles;
+        items = newItems;
+        listRev = 1;
+        hasSnapshot = true;
+    }
+
     // --- outbound
 
     function hello(nowSeconds as Lang.Number) as Lang.Dictionary {
