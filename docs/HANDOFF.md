@@ -1,15 +1,41 @@
 # Hand-off notes
 
-## Status: Run 1 finished — stopped at ⏸ Hand-off A
+## Status: Run 2 finished — stopped at ⏸ Hand-off B
 
-Steps 0–5 are done (branch `claude/happy-bardeen-i5ervk`, now on `main`). The
-live smoke test (4.5) and eval (4.6) were run afterwards, once a key was set. `tools/verify.sh`
-is green on the last commit. Details per sub-step: `PROGRESS.md`. Problems and
-workarounds: `docs/KNOWN_ISSUES.md`.
+Steps 6–7 are done: the Forerunner 245 app (`garmin/`) and phone ↔ watch sync.
+`tools/verify.sh` is green, and it now compiles the watch app too. The real `fr245` build passes in CI
+with your Garmin secrets (release: 16 KB code + 2.5 KB data of the 128 KB).
+Details per sub-step are in `PROGRESS.md` (Run 2). Run 1's notes are below.
 
-**No pull request was opened.** PLAN §6 rule 4 says to open one only if `main`
-exists, and the repository has no `main` (its default branch is
-`ccr-e37096cd-947kz3`). Creating `main` is the first check below.
+## ⏸ Hand-off B — your checks (yes/no)
+
+**Install**
+
+The watch files are attached to the same rolling release as the APK once
+this run is merged:
+
+- **Debug build**, with the sample list and the probe:
+  https://github.com/Robert4lyf/HyperShop/releases/latest/download/hypershop-fr245-debug.prg
+- **Release build**, for everyday use:
+  https://github.com/Robert4lyf/HyperShop/releases/latest/download/hypershop-fr245.prg
+
+To install, plug the watch into a computer by USB and copy the `.prg` into
+`GARMIN/APPS/`. Unplug it, and HyperShop appears in the watch's apps list.
+Copy one build at a time; the newer copy replaces the older one. Install the
+new APK on the phone as usual.
+
+1. [ ] The watch app opens and shows "Waiting for phone", then your list within 10 s of opening it with the phone nearby?
+2. [ ] Settings › Watch on the phone says "Forerunner connected…"?
+3. [ ] **Payload probe** (debug build): watch › Settings (bottom of the aisle list) › Payload probe. Note the two numbers ("To watch", "To phone") here: ______ / ______
+4. [ ] Import a recipe on the phone, then open the watch app: the aisles appear, each showing "N left"?
+5. [ ] In an aisle, tick 3 items with Start: each one buzzes, sinks to the bottom, and shows ticked on the phone within a few seconds?
+6. [ ] Tick every item in an aisle: "<aisle> done" appears with **Next: <aisle>** selected, and Start goes to that aisle?
+7. [ ] "Undo <item>" on that prompt unticks it on both the watch and the phone?
+8. [ ] **Offline:** with the phone's Bluetooth off (or the phone out of range), tick 2 items; the status row says "2 unsynced". On the phone, add a recipe that also uses one of those items, then turn Bluetooth back on and reopen the watch app. Does that item come back unticked with "1 more" under it?
+9. [ ] **Memory** (debug build): watch › Settings › Load sample (60). Scrolling and ticking stay quick, and nothing crashes. Use "Back to phone list" afterwards.
+10. [ ] The glance (scroll up or down from the watch face) shows "N left · <aisle> next" after using the app?
+
+If the probe numbers differ much from 384 bytes, tell me and I'll set the phone's page size from them (`PayloadCap`).
 
 ## The APK
 
@@ -63,14 +89,8 @@ A ground-up visual refresh, planned in `docs/design/ui-overhaul.md`; behaviour i
 
 To check on the phone: everything reads well in daylight and at night, and nothing you used before is harder to find.
 
-## Before Run 2
-
-- Hand-off A done (above), with `main` in place.
-- Copy your BangGym secrets to this repository: `CIQ_DEVELOPER_KEY`, `GARMIN_USERNAME`, `GARMIN_PASSWORD` (Settings › Secrets and variables › Actions).
-
 ## Open items carried forward
 
-- 4.5 live smoke test and 4.6 eval report: done after Run 1, once the key was set.
-- Real-app share payloads (KNOWN_ISSUES #5) and the real Android Keystore path (KNOWN_ISSUES #7) are checked by you in Hand-off A.
-- Settings › Aisles reorders the store's walking order; the list screen picks it up when it is next opened.
-- The watch: Settings › Watch says "not connected"; the debug build's "Fake watch" ticks through the same transaction Run 2's link will use.
+- Monkey C tests: they compile against the real `fr245` definition in CI. The job that *runs* them in the simulator (`connectiq.yml` › simulator, Ubuntu 22.04 + Xvfb) is experimental and non-blocking until it has passed. The same logic is held to the Kotlin model step by step by the generated traces (`garmin/test/SyncTraces.mc`).
+- Auto-advance to the next aisle (optional, off by default in PLAN): not built.
+- Real-app share payloads (KNOWN_ISSUES #5) and the real Android Keystore path (#7) are still yours to confirm on the phone.

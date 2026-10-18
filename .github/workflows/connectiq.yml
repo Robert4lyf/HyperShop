@@ -178,7 +178,7 @@ jobs:
           printf '%s' "$KEY_B64" | base64 -d > "$key"
           CIQ_DEVELOPER_KEY="$key" ./tools/package_watch.sh 2>&1 | tee "$RUNNER_TEMP/package.log"
           {
-            echo "## Build stats (fr245, release)"
+            echo "## Build stats (fr245: release, then debug)"
             echo '```'
             grep -iE 'size|memory|bytes|code|data' "$RUNNER_TEMP/package.log" | grep -v JAVA_TOOL || true
             echo '```'
@@ -202,7 +202,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hypershop-fr245
-          path: garmin/build/hypershop-fr245.prg
+          path: |
+            garmin/build/hypershop-fr245.prg
+            garmin/build/hypershop-fr245-debug.prg
           if-no-files-found: error
           retention-days: 14
 

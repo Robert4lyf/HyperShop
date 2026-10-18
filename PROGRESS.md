@@ -91,3 +91,7 @@ Run 1 stops here. The yes/no checks are in `docs/HANDOFF.md`. No PR: there is no
 - [x] 7.3 `DeviceSyncVectorTest` (app, Robolectric): every testdata/sync vector end to end — the watch is `WatchSyncModel` (the reference the Monkey C port's traces come from), the phone is the real `WatchSyncCoordinator` over `FakeWatchLink`, codec, pager and `ListRepository` on Room. Vector phone steps map to repository calls (`manualAdd`, `editQuantity` down, `tick`/`untick`/`softDelete`, `swapItem` for a re-key with alias, `checkEpoch` with a fresh marker); ids and epochs are mapped; a vector's byte cap grows by the real rows' extra size ("1 milk" + pack note vs "Milk"). 16/16 pass — check: `tools/gradle.sh :app:testDebugUnitTest --tests "*DeviceSyncVectorTest*"`
 
 **Step 7 check:** `tools/verify.sh` green (now including the watch compiles).
+
+## ⏸ Hand-off B — waiting on you
+Run 2 stops here. The yes/no checks (install, probe, sync, offline, memory, glance) are in `docs/HANDOFF.md`. The watch builds (`hypershop-fr245.prg`, `hypershop-fr245-debug.prg`) are attached to the rolling release once this run is merged.
+- [x] Hand-off B checklist written (docs/HANDOFF.md)

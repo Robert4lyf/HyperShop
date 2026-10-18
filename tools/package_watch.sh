@@ -60,4 +60,10 @@ cd "${ROOT}/garmin"
     --device fr245 --release --optimization 2 --warn --build-stats 0 \
     --output "${BUILD}/hypershop-fr245.prg"
 
-echo "Built ${BUILD}/hypershop.iq and ${BUILD}/hypershop-fr245.prg"
+# The debug build, for Hand-off B: it carries Settings › "Load sample (60)"
+# and "Payload probe" (garmin/source/Debug.mc), which --release leaves out.
+"${SDK_DIR}/bin/monkeyc" --jungles monkey.jungle --private-key "${KEY}" \
+    --device fr245 --warn --build-stats 0 \
+    --output "${BUILD}/hypershop-fr245-debug.prg"
+
+echo "Built ${BUILD}/hypershop.iq, hypershop-fr245.prg and hypershop-fr245-debug.prg"
