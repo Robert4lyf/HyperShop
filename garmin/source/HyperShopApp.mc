@@ -12,8 +12,20 @@ using Toybox.WatchUi;
 //
 class HyperShopApp extends Application.AppBase {
 
+    // Built here rather than in onStart so neither is ever null.
+    private var _link as PhoneLink;
+
     function initialize() {
         AppBase.initialize();
+        _link = new PhoneLink(new WatchSync(true));
+    }
+
+    function onStart(state as Lang.Dictionary or Null) as Void {
+        _link.start();
+    }
+
+    function onStop(state as Lang.Dictionary or Null) as Void {
+        _link.stop();
     }
 
     function getInitialView() as [WatchUi.Views] or [WatchUi.Views, WatchUi.InputDelegates] {
