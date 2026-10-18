@@ -268,6 +268,7 @@ fun EntryEditor(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        Field("Group in the aisle, e.g. Herbs (optional)", f.group, "entry-group") { f = f.copy(group = it) }
         Field("Swaps, separated by commas", f.swaps, "entry-swaps", lines = 2) { f = f.copy(swaps = it) }
         Text(
             "Offered on the list as \"Swap for\", e.g. maple syrup for agave syrup.",

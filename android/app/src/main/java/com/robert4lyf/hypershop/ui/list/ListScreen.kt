@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ViewList
+import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DoneAll
@@ -75,6 +77,8 @@ data class ListActions(
     val onShare: () -> Unit = {},
     /** "Need it" on an in-stock ingredient. */
     val onNeed: (InStockRow) -> Unit = {},
+    /** The header's switch between the standard and categorised views. */
+    val onToggleView: () -> Unit = {},
 )
 
 /**
@@ -123,7 +127,10 @@ private fun ListBody(
         if (ui.isEmpty) item { empty() }
         for ((aisle, rows) in ui.aisles) {
             val open = aisle.name !in collapsed
-            val count = if (open) rows.size + 1 else 1
+            // Categorised: a label above each group, when the aisle has more than one.
+            val labelled = ui.categorised && rows.map { it.group }.distinct().size > 1
+            val cells = if (labelled) withLabels(rows) else rows.map { Cell.Item(it) }
+            val count = if (open) cells.size + 1 else 1
             item(key = "aisle-${aisle.name}", contentType = "aisle") {
                 AisleTitle(
                     aisle,
@@ -134,8 +141,12 @@ private fun ListBody(
                 )
             }
             if (open) {
-                itemsIndexed(rows, key = { _, r -> r.id }, contentType = { _, _ -> "row" }) { i, r ->
-                    ListRowItem(r, actions, Modifier.sectionItem(sectionPosition(i + 1, count), card))
+                itemsIndexed(cells, key = { _, c -> c.key(aisle) }, contentType = { _, c -> c.javaClass.simpleName }) { i, c ->
+                    val tile = Modifier.sectionItem(sectionPosition(i + 1, count), card)
+                    when (c) {
+                        is Cell.Item -> ListRowItem(c.row, actions, tile)
+                        is Cell.Label -> GroupLabel(c.name, tile)
+                    }
                 }
             }
         }
@@ -215,6 +226,53 @@ private fun LazyListScope.inStockSection(
     }
 }
 
+/** One cell of an aisle's card: a row, or (categorised) a group's label. */
+private sealed interface Cell {
+    fun key(aisle: AisleCode): Any
+
+    data class Item(
+        val row: ListRow,
+    ) : Cell {
+        override fun key(aisle: AisleCode): Any = row.id
+    }
+
+    data class Label(
+        val name: String,
+    ) : Cell {
+        override fun key(aisle: AisleCode): Any = "group-${aisle.name}-$name"
+    }
+}
+
+/** The rows with a label before each group's first ("Other" for rows without one). */
+private fun withLabels(rows: List<ListRow>): List<Cell> =
+    buildList {
+        var last: String? = null
+        rows.forEachIndexed { i, r ->
+            val name = r.group ?: "Other"
+            if (i == 0 || name != last) add(Cell.Label(name))
+            last = name
+            add(Cell.Item(r))
+        }
+    }
+
+@Composable
+private fun GroupLabel(
+    name: String,
+    tile: Modifier,
+) {
+    Text(
+        name,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        modifier =
+            tile
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.card)
+                .padding(start = 20.dp, top = 12.dp, bottom = 4.dp)
+                .semantics { heading() },
+    )
+}
+
 /** The left-to-buy count per aisle as last seen; deliberately not snapshot state. */
 private class LeftMemo(
     var counts: Map<String, Int>,
@@ -243,6 +301,12 @@ private fun ListTop(
                     Spacer(Modifier.size(6.dp))
                     Text("Finish shopping")
                 }
+            }
+            IconButton(onClick = actions.onToggleView, modifier = Modifier.testTag("view-toggle")) {
+                Icon(
+                    if (ui.categorised) Icons.Rounded.Category else Icons.AutoMirrored.Rounded.ViewList,
+                    contentDescription = if (ui.categorised) "Categorised view: show standard" else "Standard view: show categorised",
+                )
             }
             var menu by remember { mutableStateOf(false) }
             Box {

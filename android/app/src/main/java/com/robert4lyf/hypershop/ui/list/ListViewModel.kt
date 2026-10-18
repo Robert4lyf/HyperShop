@@ -43,6 +43,8 @@ data class ListRow(
     val sub: String?,
     val state: TickState,
     val aisle: AisleCode,
+    /** Its group within the aisle ("Herbs"), shown in the categorised view. */
+    val group: String? = null,
 )
 
 /** "Onion is on the list. +1?" */
@@ -94,6 +96,8 @@ data class ListUi(
     /** Imports waiting for review: the "1 recipe ready to review" card. */
     val readyJobs: List<Long> = emptyList(),
     val plusOne: PlusOne? = null,
+    /** Rows grouped within each aisle, with a label per group. */
+    val categorised: Boolean = false,
 ) {
     val isEmpty: Boolean get() = loaded && aisles.isEmpty()
     val left: Int get() = aisles.sumOf { (_, r) -> r.count { it.state != TickState.DONE } }
@@ -121,15 +125,18 @@ class ListViewModel(
     /** The item sheet being loaded: a newer open, or a close, cancels it. */
     private var openJob: Job? = null
 
+    /** The walking order and the categorised switch. */
+    private val view = combine(order, c.settings.listCategorised) { o, cat -> o to cat }
+
     /** The in-stock lines, read again on every list change (an import, a removed recipe, "Need it"). */
     private val inStockLines = c.repository.list.map { c.repository.inStockOnList(it) }
 
     val ui: StateFlow<ListUi> =
         combine(
-            combine(c.repository.list, c.settings.units, order, c.importJobs.ready, plusOne) { list, units, ord, ready, p ->
+            combine(c.repository.list, c.settings.units, view, c.importJobs.ready, plusOne) { list, units, (ord, cat), ready, p ->
                 lastList = list
                 lastUnits = units
-                build(list, units, ord).copy(readyJobs = ready.map { it.id }, plusOne = p) to units
+                build(list, units, ord, cat).copy(readyJobs = ready.map { it.id }, plusOne = p) to units
             },
             inStockLines,
         ) { (ui, units), lines -> ui.copy(inStock = inStockRows(lines, units)) }
@@ -175,6 +182,7 @@ class ListViewModel(
         list: ShoppingList,
         units: UnitsSetting,
         ord: List<AisleCode>,
+        categorised: Boolean = false,
     ): ListUi {
         val rows =
             list.liveItems.map { item ->
@@ -186,15 +194,32 @@ class ListViewModel(
                         list.isPartial(item.id) -> TickState.PARTIAL
                         else -> TickState.OPEN
                     }
-                ListRow(item.id, item.displayName, text.main, text.sub, state, item.aisle) to item.position
+                ListRow(item.id, item.displayName, text.main, text.sub, state, item.aisle, entry?.group) to item.position
+            }
+        // Categorised: by group (the catalogue's order), then as usual within it.
+        val order =
+            if (categorised) {
+                compareBy<Pair<ListRow, Int>>(
+                    { c.catalog.groupRank(it.first.aisle, it.first.group) },
+                    { it.first.state == TickState.DONE },
+                    { it.second },
+                )
+            } else {
+                compareBy({ it.first.state == TickState.DONE }, { it.second })
             }
         val grouped =
             rows.groupBy { it.first.aisle }
                 .toList()
                 .sortedBy { (a, _) -> ord.indexOf(a).let { if (it < 0) Int.MAX_VALUE else it } }
-                .map { (a, rs) -> a to rs.sortedWith(compareBy({ it.first.state == TickState.DONE }, { it.second })).map { it.first } }
-        return ListUi(grouped, loaded = true)
+                .map { (a, rs) -> a to rs.sortedWith(order).map { it.first } }
+        return ListUi(grouped, loaded = true, categorised = categorised)
     }
+
+    /** The header's switch between the order added and grouped within each aisle. */
+    fun toggleCategorised() =
+        viewModelScope.launch {
+            c.settings.setListCategorised(!c.settings.listCategorised.first())
+        }
 
     /** Tap: tick, or untick a DONE row. No snackbar: tapping again is the undo. */
     fun toggle(row: ListRow) =

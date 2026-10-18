@@ -23,6 +23,8 @@ data class CatalogEntry(
     val swaps: List<String> = emptyList(),
     /** Always use this ingredient id instead: new recipe lines go straight to it. */
     val replaceWith: String? = null,
+    /** Where it sits within its aisle ("Herbs", "Fruit"), for the categorised list. */
+    val group: String? = null,
 ) {
     val mergeKey: String get() = "cat:$id"
 }
@@ -50,12 +52,21 @@ object DefaultSwaps {
             listOf("lemon_juice", "lime_juice"),
             listOf("white_wine_vinegar", "cider_vinegar", "red_wine_vinegar", "sherry_vinegar", "rice_vinegar"),
             listOf("olive_oil", "vegetable_oil", "evoo"),
-            listOf("parmesan", "pecorino"),
             listOf("cheddar", "gruyere", "emmental"),
             listOf("feta", "goat_cheese"),
             listOf("ricotta", "cream_cheese", "mascarpone"),
             listOf("cannellini_beans", "haricot_beans", "butter_beans"),
             listOf("kidney_beans", "black_beans"),
+            listOf("spaghetti", "linguine", "bucatini", "fettuccine", "tagliatelle", "pappardelle", "angel_hair"),
+            listOf("penne", "rigatoni", "fusilli", "macaroni", "farfalle", "conchiglie", "orecchiette"),
+            listOf("mushroom", "chestnut_mushroom", "oyster_mushroom", "shiitake", "chanterelle", "wild_mushroom"),
+            listOf("white_fish", "cod", "haddock", "hake", "pollock", "sole", "halibut", "sea_bass", "tilapia"),
+            listOf("blue_cheese", "stilton", "gorgonzola", "roquefort"),
+            listOf("parmesan", "grana_padano", "pecorino"),
+            listOf("lettuce", "iceberg", "little_gem"),
+            listOf("kale", "cavolo_nero"),
+            listOf("soy_sauce", "tamari", "dark_soy_sauce"),
+            listOf("olive", "green_olive", "kalamata_olive"),
             listOf("red_lentils", "green_lentils", "brown_lentils", "puy_lentils", "black_lentils"),
             listOf("breadcrumbs", "panko"),
             listOf("flour", "gf_flour"),
@@ -121,6 +132,10 @@ class Catalog(
                     for (n in listOf(e.name, e.plural) + e.synonyms) put(CatalogKey.of(n), e)
                 }
             }
+
+        /** Per aisle, its groups in the order they first appear. */
+        val groups: Map<AisleCode, List<String>> =
+            entries.filter { it.group != null }.groupBy { it.aisle }.mapValues { (_, es) -> es.mapNotNull { it.group }.distinct() }
     }
 
     @Volatile private var s = Snapshot(version, entries)
@@ -128,6 +143,20 @@ class Catalog(
     val version: String get() = s.version
     val entries: List<CatalogEntry> get() = s.entries
     val byId: Map<String, CatalogEntry> get() = s.byId
+
+    /**
+     * Where [group] sorts within [aisle] on the categorised list: the catalogue's
+     * order, then groups it doesn't know (yours) by name, then no group at all.
+     */
+    fun groupRank(
+        aisle: AisleCode,
+        group: String?,
+    ): Int {
+        if (group == null) return Int.MAX_VALUE
+        val known = s.groups[aisle].orEmpty()
+        val i = known.indexOf(group)
+        return if (i >= 0) i else known.size
+    }
 
     /** The entry whose name, plural or synonym has this name's key. */
     fun lookup(name: String): CatalogEntry? = s.byKey[CatalogKey.of(name)]
@@ -158,7 +187,7 @@ class Catalog(
                 }
                 if (line.startsWith("#")) continue
                 val f = line.split('\t')
-                require(f.size == 10) { "catalog.tsv: expected 10 fields, got ${f.size}: $line" }
+                require(f.size == 11) { "catalog.tsv: expected 11 fields, got ${f.size}: $line" }
                 entries +=
                     CatalogEntry(
                         id = f[0],
@@ -171,6 +200,7 @@ class Catalog(
                         displayPolicy = DisplayPolicy.valueOf(f[7].uppercase()),
                         gramsPerCup = f[8].takeIf { it.isNotEmpty() }?.let { Rational.fromDouble(it.toDouble()) },
                         packNote = f[9].takeIf { it.isNotEmpty() },
+                        group = f[10].takeIf { it.isNotEmpty() },
                         swaps = DefaultSwaps.forId(f[0]),
                     )
             }

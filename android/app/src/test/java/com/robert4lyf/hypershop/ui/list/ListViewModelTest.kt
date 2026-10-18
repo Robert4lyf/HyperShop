@@ -50,6 +50,19 @@ class ListViewModelTest {
     }
 
     @Test
+    fun categorisedGroupsRowsWithinTheAisle() {
+        val c = TestContainer.create()
+        c.add("1 lemon", "2 onions", "1 bunch basil", "1 carrot")
+        val vm = ListViewModel(c)
+        val standard = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
+        assertEquals(listOf("lemon", "onion", "basil", "carrot"), standard.aisles.single().second.map { it.name })
+        vm.toggleCategorised()
+        val grouped = await(vm.ui) { it.categorised }
+        assertEquals(listOf("onion", "carrot", "basil", "lemon"), grouped.aisles.single().second.map { it.name })
+        assertEquals(listOf("Vegetables", "Vegetables", "Herbs", "Fruit"), grouped.aisles.single().second.map { it.group })
+    }
+
+    @Test
     fun inStockIsListedAndNeedItPutsItOnTheList() {
         val c = TestContainer.create()
         val review = ReviewViewModel(c, runBlocking { c.readyJob("2 onions", "2 tbsp olive oil") })

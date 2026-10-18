@@ -61,6 +61,8 @@ data class EntryForm(
     val swaps: String = "",
     /** An ingredient name, or blank. */
     val replaceWith: String = "",
+    /** Its group within the aisle ("Herbs"), or blank. */
+    val group: String = "",
     val edited: Boolean = false,
     val custom: Boolean = false,
 ) {
@@ -135,6 +137,7 @@ class LibraryViewModel(
             alwaysInStock = staple,
             swaps = e.swaps.mapNotNull { c.catalog.byId[it]?.name }.joinToString(", "),
             replaceWith = e.replaceWith?.let { c.catalog.byId[it]?.name }.orEmpty(),
+            group = e.group.orEmpty(),
             edited = e.id in c.library.edits.value && c.library.isBundled(e.id),
             custom = !c.library.isBundled(e.id),
         )
@@ -175,6 +178,7 @@ class LibraryViewModel(
                 packNote = f.packNote,
                 swaps = swapIds,
                 replaceWith = replacement?.id,
+                group = f.group.trim().take(30).takeIf { it.isNotEmpty() },
             )
         return when (val r = c.library.save(edit)) {
             SaveResult.NoName -> "Give it a name"

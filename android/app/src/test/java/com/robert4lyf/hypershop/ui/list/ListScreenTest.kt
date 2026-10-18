@@ -97,6 +97,21 @@ class ListScreenTest {
     }
 
     @Test
+    fun categorisedShowsGroupLabelsAndTheToggle() {
+        val rows =
+            listOf(
+                ListRow(1, "onion", "2 onions", null, TickState.OPEN, AisleCode.PRODUCE, "Vegetables"),
+                ListRow(2, "basil", "basil", null, TickState.OPEN, AisleCode.PRODUCE, "Herbs"),
+            )
+        val ui = SAMPLE_LIST.copy(aisles = listOf(AisleCode.PRODUCE to rows), categorised = true)
+        compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions.copy(onToggleView = { events += "view" })) } }
+        compose.onNodeWithText("Vegetables").assertExists()
+        compose.onNodeWithText("Herbs").assertExists()
+        compose.onNodeWithTag("view-toggle").performClick()
+        assertEquals(listOf("view"), events)
+    }
+
+    @Test
     fun inStockOpensAndNeedItAdds() {
         val ui =
             SAMPLE_LIST.copy(

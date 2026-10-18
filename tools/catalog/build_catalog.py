@@ -28,7 +28,7 @@ TSV = ROOT / "android/core/src/main/resources/catalog/catalog.tsv"
 REVIEW = ROOT / "catalog/REVIEW.md"
 
 COLUMNS = ["id", "name", "plural", "synonyms", "aisleCode", "staple", "shoppingUnit",
-           "displayPolicy", "gramsPerCup", "packNote", "src"]
+           "displayPolicy", "gramsPerCup", "packNote", "group", "src"]
 AISLES = ["PRODUCE", "BAKERY", "MEAT_FISH", "DAIRY_EGGS", "CHILLED", "FROZEN", "TINS_JARS",
           "PASTA_RICE_GRAINS", "WORLD_FOODS", "BAKING", "NUTS_DRIED_FRUIT", "OILS_VINEGARS",
           "SPICES_CONDIMENTS", "FREE_FROM", "DRINKS", "HOUSEHOLD", "OTHER"]
@@ -64,6 +64,8 @@ def validate(rows: list[dict[str, str]]) -> list[str]:
                     errors.append(f"{where}: gramsPerCup out of range")
             except ValueError:
                 errors.append(f"{where}: gramsPerCup not a number")
+        if r["group"] and (len(r["group"]) > 30 or r["group"] != r["group"].strip()):
+            errors.append(f"{where}: group {r['group']!r}")
         if r["src"] not in SRCS:
             errors.append(f"{where}: src {r['src']}")
         if any("\t" in v or "\n" in v for v in r.values()):
@@ -79,8 +81,8 @@ def validate(rows: list[dict[str, str]]) -> list[str]:
     packs = sum(1 for r in rows if r.get("packNote"))
     if not 15 <= packs <= 30:
         errors.append(f"{packs} pack notes; the plan calls for about 20")
-    if not 350 <= len(rows) <= 500:
-        errors.append(f"{len(rows)} rows; the plan calls for about 400")
+    if not 350 <= len(rows) <= 600:
+        errors.append(f"{len(rows)} rows; the plan calls for about 400 (600 at most)")
     return errors
 
 
@@ -122,12 +124,12 @@ def review(rows: list[dict[str, str]], version: str) -> str:
         items = [r for r in rows if r["aisleCode"] == aisle]
         if not items:
             continue
-        out += ["", f"## {aisle} ({len(items)})", "", "| ✓ | name | also matches | NYT rank | staple | pack note |", "|---|---|---|---|---|---|"]
+        out += ["", f"## {aisle} ({len(items)})", "", "| ✓ | name | also matches | group | NYT rank | staple | pack note |", "|---|---|---|---|---|---|---|"]
         for r in items:
             syn = [s for s in r["synonyms"].split("|") if s]
             rank = min([ranks[k] for k in [key(r["name"]), key(r["plural"]), *map(key, syn)] if k in ranks], default=None)
             shown = ", ".join(syn[:4]) + (" …" if len(syn) > 4 else "")
-            out.append(f"| ☐ | {r['name']} | {shown} | {rank or ''} | {'yes' if r['staple'] == 'true' else ''} | {r['packNote']} |")
+            out.append(f"| ☐ | {r['name']} | {shown} | {r['group']} | {rank or ''} | {'yes' if r['staple'] == 'true' else ''} | {r['packNote']} |")
     return "\n".join(out) + "\n"
 
 
