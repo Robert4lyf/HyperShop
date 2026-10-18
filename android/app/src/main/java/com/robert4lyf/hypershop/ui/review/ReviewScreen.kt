@@ -20,6 +20,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Add
@@ -27,12 +29,14 @@ import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.HourglassTop
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.ReportProblem
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -40,10 +44,12 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -52,6 +58,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,6 +69,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -81,6 +90,12 @@ import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.theme.heroGlow
 import com.robert4lyf.hypershop.ui.theme.style
 
+/** Changes to the recipe itself: its name, and an ingredient added by hand. */
+data class ReviewEdits(
+    val onTitle: (String) -> Unit = {},
+    val onAddLine: (String) -> Unit = {},
+)
+
 /** The review screen's default view (PLAN §3.1), stateless. */
 @Composable
 fun ReviewScreen(
@@ -93,13 +108,14 @@ fun ReviewScreen(
     onRetryClaude: () -> Unit,
     onAisleInStock: (AisleCode) -> Unit,
     onClearInStock: () -> Unit,
+    edits: ReviewEdits = ReviewEdits(),
 ) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
             TopBar(onCancel, onClearInStock)
             val card = MaterialTheme.colorScheme.card
             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
-                item(key = "hero") { Hero(ui, onServings, onRetryClaude) }
+                item(key = "hero") { Hero(ui, onServings, onRetryClaude, edits.onTitle) }
                 ui.notice?.let { n ->
                     item(key = "notice") {
                         InfoBanner(
@@ -124,17 +140,27 @@ fun ReviewScreen(
                         ReviewRowItem(r, onInStock, onRow, sectionPosition(i + 1, count), card)
                     }
                 }
+                item(key = "add-line") { AddLine(edits.onAddLine, enabled = !ui.busy) }
             }
             BottomActionBar {
                 Button(
                     onClick = onAdd,
-                    enabled = ui.addCount > 0 && !ui.busy,
+                    // An edit can be saved with nothing to add (everything now in stock).
+                    enabled = (ui.addCount > 0 || ui.editing) && !ui.busy,
                     modifier = Modifier.weight(1f).heightIn(min = 56.dp).testTag("add"),
                 ) {
-                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Icon(
+                        if (ui.editing) Icons.Rounded.Check else Icons.Rounded.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
                     Spacer(Modifier.size(8.dp))
                     Text(
-                        if (ui.addCount == 1) "Add 1 item" else "Add ${ui.addCount} items",
+                        when {
+                            ui.editing -> "Save changes"
+                            ui.addCount == 1 -> "Add 1 item"
+                            else -> "Add ${ui.addCount} items"
+                        },
                         style = MaterialTheme.typography.titleMedium,
                     )
                 }
@@ -181,7 +207,10 @@ private fun Hero(
     ui: ReviewUi,
     onServings: (Int) -> Unit,
     onRetryClaude: () -> Unit,
+    onTitle: (String) -> Unit,
 ) {
+    var renaming by remember { mutableStateOf(false) }
+    if (renaming) TitleDialog(ui.title, onDismiss = { renaming = false }) { onTitle(it) }
     val open = rememberOpenLink()
     val onHero = ButtonDefaults.textButtonColors(contentColor = Brand.OnHero)
     CompositionLocalProvider(LocalContentColor provides Brand.OnHero) {
@@ -214,7 +243,17 @@ private fun Hero(
                 }
                 if (ui.busy) CircularProgressIndicator(Modifier.size(20.dp), color = Brand.OnHero, strokeWidth = 2.dp)
             }
-            Text(ui.title, style = MaterialTheme.typography.headlineMedium, color = Brand.OnHero)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    ui.title,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = Brand.OnHero,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                IconButton(onClick = { renaming = true }, modifier = Modifier.testTag("edit-title")) {
+                    Icon(Icons.Rounded.Edit, contentDescription = "Rename recipe", tint = Brand.OnHero)
+                }
+            }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)) {
                 ui.servings?.let { s -> Servings(s, onServings) }
                 Spacer(Modifier.weight(1f))
@@ -236,6 +275,71 @@ private fun Hero(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TitleDialog(
+    current: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    var text by remember { mutableStateOf(current) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Recipe name") },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                modifier = Modifier.fillMaxWidth().testTag("title-field"),
+            )
+        },
+        confirmButton = {
+            TextButton(enabled = text.isNotBlank(), onClick = {
+                onSave(text)
+                onDismiss()
+            }, modifier = Modifier.testTag("title-save")) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/** "Add an ingredient": typed as a recipe line ("2 tbsp honey"), read like the others. */
+@Composable
+private fun AddLine(
+    onAdd: (String) -> Unit,
+    enabled: Boolean,
+) {
+    var text by rememberSaveable { mutableStateOf("") }
+    val submit = {
+        if (text.isNotBlank()) {
+            onAdd(text)
+            text = ""
+        }
+    }
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            placeholder = { Text("Add an ingredient, e.g. 2 tbsp honey") },
+            singleLine = true,
+            shape = RoundedCornerShape(50),
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { submit() }),
+            modifier = Modifier.weight(1f).testTag("add-line"),
+        )
+        FilledTonalButton(
+            onClick = submit,
+            enabled = enabled && text.isNotBlank(),
+            modifier = Modifier.testTag("add-line-go"),
+        ) { Text("Add") }
     }
 }
 

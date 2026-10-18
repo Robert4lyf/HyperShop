@@ -37,6 +37,8 @@ data class EntryEdit(
     val swaps: List<String> = emptyList(),
     /** Always use this ingredient id instead. */
     val replaceWith: String? = null,
+    /** Its group within the aisle ("Herbs"), or none. */
+    val group: String? = null,
 ) {
     fun toEntry(): CatalogEntry =
         CatalogEntry(
@@ -52,6 +54,7 @@ data class EntryEdit(
             packNote = packNote?.takeIf { it.isNotBlank() },
             swaps = swaps,
             replaceWith = replaceWith,
+            group = group?.trim()?.takeIf { it.isNotEmpty() },
         )
 
     companion object {
@@ -71,6 +74,7 @@ data class EntryEdit(
             custom,
             e.swaps,
             e.replaceWith,
+            e.group,
         )
     }
 }

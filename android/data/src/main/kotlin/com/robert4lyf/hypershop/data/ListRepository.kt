@@ -47,6 +47,14 @@ data class InStockLine(
     val unitHint: QtyUnit?,
 )
 
+/** What "Edit" on the Recipes tab reopens: see [ListRepository.editSource]. */
+data class EditSource(
+    val recipe: RecipeEntity,
+    val lines: List<ParsedIngredient>,
+    val inStockLines: List<Int>,
+    val servings: Int,
+)
+
 /** A stored import: the recipe and its line ids, in line order. */
 data class StoredRecipe(
     val recipe: RecipeEntity,
@@ -192,6 +200,10 @@ class ListRepository(
         new: ShoppingList,
     ) {
         val now = clock()
+        // Items gone from the list go first (their ticks and contributions cascade): an
+        // edit can drop an item and create another with the same key, and keys are
+        // unique among live items.
+        (old.items.keys - new.items.keys).toList().takeIf { it.isNotEmpty() }?.let { dao.deleteItems(it) }
         val changedItems = new.items.values.filter { old.items[it.id] != it }
         val (rekeyed, others) = changedItems.partition { i -> old.items[i.id]?.let { it.mergeKey != i.mergeKey } == true }
         dao.upsertItems(others.map { Mapping.item(it, now) })
@@ -211,7 +223,6 @@ class ListRepository(
         val newTicks = new.ticks.map { it.id }.toSet()
         old.ticks.map { it.id }.filter { it !in newTicks }.takeIf { it.isNotEmpty() }?.let { dao.deleteTicks(it) }
         (old.uses.keys - new.uses.keys).toList().takeIf { it.isNotEmpty() }?.let { dao.deleteUses(it) }
-        (old.items.keys - new.items.keys).toList().takeIf { it.isNotEmpty() }?.let { dao.deleteItems(it) }
         dao.upsertItems(rekeyed.map { Mapping.item(it, now) })
 
         val meta = dao.meta()!!
@@ -381,12 +392,39 @@ class ListRepository(
             recipe to lines
         }
 
+    /**
+     * "Edit" on the Recipes tab: the recipe as it went on the list for [useId] —
+     * the recipe, its lines in order, the indices of those marked in stock — and
+     * the use's servings. Null when the use or recipe is gone.
+     */
+    suspend fun editSource(useId: Long): EditSource? =
+        db.withTransaction {
+            val use = load().uses[useId] ?: return@withTransaction null
+            val recipe = use.recipeId?.let { dao.recipe(it) } ?: return@withTransaction null
+            val rows = dao.lines(recipe.id)
+            val inStock = dao.decisions(useId).filter { it.status == LineStatus.IN_STOCK.name }.map { it.recipeLineId }.toSet()
+            EditSource(
+                recipe,
+                rows.map { json.decodeFromString(ParsedIngredient.serializer(), it.parsedJson) },
+                rows.indices.filter { rows[it].id in inStock },
+                use.servings,
+            )
+        }
+
+    /** The list a review shows against: without [replacing], the use an edit replaces. */
+    private fun without(
+        l: ShoppingList,
+        replacing: Long?,
+    ): ShoppingList = replacing?.takeIf { it in l.uses }?.let { l.removeUse(it) } ?: l
+
     suspend fun preview(
         stored: StoredRecipe,
         servings: Int?,
         decisions: Map<String, RowDecision>? = null,
         /** "Just this time" aisle moves from the review screen. */
         extraOverrides: Map<String, AisleCode> = emptyMap(),
+        /** The use an edit replaces, left out of the list the preview is against. */
+        replacing: Long? = null,
     ): Preview {
         val incoming =
             merger.incoming(
@@ -398,7 +436,7 @@ class ListRepository(
                 overrides() + extraOverrides,
             )
         val d = decisions ?: merger.defaultDecisions(incoming, staples())
-        return merger.preview(snapshot(), incoming, d)
+        return merger.preview(without(snapshot(), replacing), incoming, d)
     }
 
     /**
@@ -408,14 +446,21 @@ class ListRepository(
     suspend fun apply(
         preview: Preview,
         jobId: Long? = null,
+        /** An edit: this use (and its items, ticks and decisions) is replaced by the new one. */
+        replacing: Long? = null,
     ): ApplyResult =
         db.withTransaction {
             val old = load()
-            when (val r = merger.apply(old, preview, clock())) {
+            val oldRecipe = replacing?.let { old.uses[it]?.recipeId }
+            when (val r = merger.apply(without(old, replacing), preview, clock())) {
                 is ApplyResult.Applied -> {
                     persist(old, r.list)
                     dao.putDecisions(preview.lineStatus.map { (line, s) -> LineDecisionEntity(r.useId, line, s.name) })
                     jobId?.let { dao.setJobState(it, "DONE") }
+                    // The edited recipe was stored afresh; the old one goes once nothing uses it.
+                    if (oldRecipe != null && oldRecipe != preview.incoming.recipeId && dao.uses().none { it.recipeId == oldRecipe }) {
+                        db.openHelper.writableDatabase.execSQL("DELETE FROM Recipe WHERE id = ?", arrayOf(oldRecipe))
+                    }
                     r
                 }
                 ApplyResult.Stale -> r

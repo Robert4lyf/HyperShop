@@ -46,6 +46,7 @@ fun ListRoute(
             onClearAll = vm::clearAll,
             onOpenItem = { vm.openItem(it.id) },
             onNeed = vm::needIt,
+            onToggleView = vm::toggleCategorised,
             onShare = {
                 val send =
                     Intent(Intent.ACTION_SEND)

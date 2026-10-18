@@ -144,6 +144,46 @@ class RegressionTest {
     }
 
     @Test
+    fun pastaShapesMushroomsAndFishAreTheirOwnItems() {
+        val m = Merger(com.robert4lyf.hypershop.core.catalog.CatalogLoader.default)
+        val keys =
+            listOf(
+                "oyster mushrooms",
+                "chestnut mushrooms",
+                "wild mushrooms",
+                "rigatoni",
+                "penne",
+                "linguine",
+                "spaghetti",
+                "haddock",
+                "white fish",
+            ).map { m.target(it).mergeKey }
+        assertEquals(
+            listOf(
+                "cat:oyster_mushroom",
+                "cat:chestnut_mushroom",
+                "cat:wild_mushroom",
+                "cat:rigatoni",
+                "cat:penne",
+                "cat:linguine",
+                "cat:spaghetti",
+                "cat:haddock",
+                "cat:white_fish",
+            ),
+            keys,
+        )
+    }
+
+    @Test
+    fun groupsSortInCatalogueOrderWithinTheirAisle() {
+        val c = com.robert4lyf.hypershop.core.catalog.CatalogLoader.default
+        val produce = com.robert4lyf.hypershop.core.model.AisleCode.PRODUCE
+        val ranks = listOf("Vegetables", "Salad", "Herbs", "Fruit", "Mine", null).map { c.groupRank(produce, it) }
+        assertEquals(ranks.sorted(), ranks)
+        assertEquals("Herbs", c.byId.getValue("basil").group)
+    }
+
+    @Test
     fun lentilsOfDifferentColoursAreDifferentItems() {
         val m = Merger(com.robert4lyf.hypershop.core.catalog.CatalogLoader.default)
         assertEquals("cat:red_lentils", m.target("split red lentils").mergeKey)

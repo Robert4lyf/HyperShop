@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -61,6 +60,8 @@ data class SheetActions(
     val reparse: (String) -> String,
     /** A new name, for this recipe only. */
     val onRename: (String) -> Unit = {},
+    /** "Remove from recipe": the line goes from this recipe. */
+    val onRemoveLine: (Long) -> Unit = {},
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,6 +95,10 @@ internal fun ReviewRowSheetHost(
                 reparse = vm::reparse,
                 onRename = {
                     vm.rename(key, it)
+                    onDismiss()
+                },
+                onRemoveLine = {
+                    vm.removeLine(it)
                     onDismiss()
                 },
             ),
@@ -160,6 +165,7 @@ private fun Rename(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LineEditor(
     line: SheetLine,
@@ -180,8 +186,11 @@ private fun LineEditor(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 4.dp),
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (text != line.raw) Button(onClick = { actions.onEditLine(line.id, text) }) { Text("Use this line") }
+            TextButton(onClick = { actions.onRemoveLine(line.id) }, modifier = Modifier.testTag("remove-${line.id}")) {
+                Text("Remove from recipe")
+            }
             line.alternative?.let { alt ->
                 OutlinedButton(onClick = { actions.onSwap(line.id) }) {
                     Icon(Icons.Rounded.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp))

@@ -79,8 +79,9 @@ class CatalogTest {
         assertEquals(AisleCode.MEAT_FISH, catalog.lookup("ham hock")?.aisle)
         assertEquals(AisleCode.CHILLED, catalog.lookup("smoked mackerel")?.aisle)
         assertEquals(AisleCode.SPICES_CONDIMENTS, catalog.lookup("mustard powder")?.aisle)
-        // Generic buckets that are fine as they are.
-        assertEquals("blue_cheese", catalog.lookup("stilton")?.id)
+        // Different products you buy separately are their own items; true synonyms aren't.
+        assertEquals("stilton", catalog.lookup("stilton")?.id)
+        assertEquals("blue_cheese", catalog.lookup("blue cheese")?.id)
         assertEquals("parmesan", catalog.lookup("parmigiano reggiano")?.id)
     }
 

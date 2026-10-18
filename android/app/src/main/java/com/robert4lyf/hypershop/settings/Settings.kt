@@ -41,6 +41,9 @@ class Settings(
     val watchVibrate: Flow<Boolean> = store.data.map { it[WATCH_VIBRATE] ?: true }
     val debugLog: Flow<Boolean> = store.data.map { it[DEBUG_LOG] ?: false }
 
+    /** The list grouped within each aisle ("Herbs", "Fruit") rather than in the order added. */
+    val listCategorised: Flow<Boolean> = store.data.map { it[LIST_CATEGORISED] ?: false }
+
     /** The one-time "your key could not be read" notice is pending. */
     val keyLostNotice: Flow<Boolean> = store.data.map { it[KEY_LOST] ?: false }
 
@@ -66,6 +69,8 @@ class Settings(
 
     suspend fun setDebugLog(on: Boolean) = store.edit { it[DEBUG_LOG] = on }
 
+    suspend fun setListCategorised(on: Boolean) = store.edit { it[LIST_CATEGORISED] = on }
+
     suspend fun setKeyLostNotice(on: Boolean) = store.edit { it[KEY_LOST] = on }
 
     suspend fun guard(): SpendGuard = SpendGuard(monthlyCapUsd.first(), dailyCalls.first())
@@ -78,6 +83,7 @@ class Settings(
         val DAILY_CALLS = intPreferencesKey("claude_daily_calls")
         val WATCH_VIBRATE = booleanPreferencesKey("watch_vibrate")
         val DEBUG_LOG = booleanPreferencesKey("debug_log")
+        val LIST_CATEGORISED = booleanPreferencesKey("list_categorised")
         val KEY_LOST = booleanPreferencesKey("claude_key_lost_notice")
         val KEY_SET = booleanPreferencesKey("claude_key_was_set")
     }

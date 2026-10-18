@@ -1,463 +1,501 @@
-#version	cddaef74d4bc
-#id	name	plural	synonyms	aisleCode	staple	shoppingUnit	displayPolicy	gramsPerCup	packNote
-onion	onion	onions	yellow onion|brown onion|white onion|spanish onion	PRODUCE	false	each	count	160	
-red_onion	red onion	red onions	purple onion	PRODUCE	false	each	count	160	
-spring_onion	spring onion	spring onions	scallion|green onion|salad onion	PRODUCE	false	bunch	count		
-shallot	shallot	shallots	banana shallot|eschalot	PRODUCE	false	each	count	160	
-garlic	garlic	garlic	garlic clove|garlic bulb|head of garlic	PRODUCE	false	bulb	count		
-leek	leek	leeks		PRODUCE	false	each	count		
-carrot	carrot	carrots		PRODUCE	false	each	count	128	
-potato	potato	potatoes	baking potato|maris piper|russet potato|yukon gold potato|red potato|new potato|red potatoes	PRODUCE	false	kg	count	150	
-sweet_potato	sweet potato	sweet potatoes	yam	PRODUCE	false	each	count	133	
-tomato	tomato	tomatoes	vine tomato|beefsteak tomato|ripe tomato	PRODUCE	false	each	count	180	
-cherry_tomato	cherry tomato	cherry tomatoes	grape tomato|baby plum tomato	PRODUCE	false	punnet	count	150	
-plum_tomato	plum tomato	plum tomatoes	roma tomato	PRODUCE	false	each	count		
-celery	celery	celery	celery stalk|celery rib|celery stick	PRODUCE	false	head	count	100	
-celeriac	celeriac	celeriacs	celery root	PRODUCE	false	each	count		
-cucumber	cucumber	cucumbers	english cucumber	PRODUCE	false	each	count		
-courgette	courgette	courgettes	zucchini	PRODUCE	false	each	count	125	
-aubergine	aubergine	aubergines	eggplant|miniature eggplant	PRODUCE	false	each	count	82	
-bell_pepper	bell pepper	bell peppers	red bell pepper|green bell pepper|yellow bell pepper|red pepper|green pepper|yellow pepper|sweet red pepper|capsicum|peppers|sweet pepper|sweet peppers	PRODUCE	false	each	count	150	
-padron_pepper	padron pepper	padron peppers	pimientos de padron|padron	PRODUCE	false	pack	mass		
-chilli	red chilli	red chillies	chili pepper|chile|chili|chilli pepper|fresh chilli|red chile|chilies|chillies|chiles	PRODUCE	false	each	count		
-jalapeno	jalapeño	jalapeños	jalapeno pepper|jalape o|jalape o pepper	PRODUCE	false	each	count		
-serrano_chilli	serrano chilli	serrano chillies	serrano chile|serrano	PRODUCE	false	each	count		
-mushroom	mushroom	mushrooms	button mushroom|white mushroom|cremini mushroom|chestnut mushroom|cremini	PRODUCE	false	pack	mass	70	
-shiitake	shiitake mushroom	shiitake mushrooms	shiitake	PRODUCE	false	pack	mass		
-portobello	portobello mushroom	portobello mushrooms	portabella mushroom|flat mushroom	PRODUCE	false	each	count		
-wild_mushroom	wild mushrooms	wild mushrooms	chanterelle mushroom|chanterelle|morel|oyster mushroom	PRODUCE	false	pack	mass		
-porcini	dried porcini	dried porcini	porcini|porcini mushrooms|dried porcini mushrooms|dried porcini mushroom|ceps|dried ceps	WORLD_FOODS	false	pack	mass		
-dried_mushroom	dried mushrooms	dried mushrooms	dried mushroom|dried shiitake|dried shiitake mushrooms|dried wild mushrooms	WORLD_FOODS	false	pack	mass		
-broccoli	broccoli	broccoli		PRODUCE	false	head	count	90	
-tenderstem	tenderstem broccoli	tenderstem broccoli	broccolini	PRODUCE	false	pack	mass		
-cauliflower	cauliflower	cauliflowers		PRODUCE	false	head	count	107	
-cabbage	cabbage	cabbages	green cabbage|savoy cabbage|white cabbage	PRODUCE	false	head	count	90	
-red_cabbage	red cabbage	red cabbages		PRODUCE	false	head	count		
-kale	kale	kale	cavolo nero|lacinato kale	PRODUCE	false	bag	mass	67	
-spinach	spinach	spinach	baby spinach|spinach leaves|fresh spinach	PRODUCE	false	bag	mass	30	1 × 250 g bag
-chard	swiss chard	swiss chard	chard|rainbow chard	PRODUCE	false	bunch	count		
-lettuce	lettuce	lettuces	romaine lettuce|cos lettuce|iceberg lettuce|little gem|romaine	PRODUCE	false	head	count		
-rocket	rocket	rocket	arugula	PRODUCE	false	bag	mass	20	
-watercress	watercress	watercress		PRODUCE	false	bag	mass	34	
-salad_leaves	salad leaves	salad leaves	mixed salad|mesclun|mixed greens|salad greens	PRODUCE	false	bag	mass	20	
-radicchio	radicchio	radicchio		PRODUCE	false	head	count		
-endive	chicory	chicory	endive|belgian endive	PRODUCE	false	each	count		
-asparagus	asparagus	asparagus		PRODUCE	false	bunch	count		
-green_beans	green beans	green beans	french beans|string beans|haricots verts	PRODUCE	false	pack	mass	125	
-runner_beans	runner beans	runner beans		PRODUCE	false	pack	mass		
-peas_fresh	peas in the pod	peas in the pod		PRODUCE	false	pack	mass	145	
-mangetout	mangetout	mangetout	snow pea|snow peas|sugar snap peas|sugar snap	PRODUCE	false	pack	mass		
-sweetcorn_cob	corn on the cob	corn on the cob	corn|ear of corn|sweet corn|corn cob	PRODUCE	false	each	count		
-butternut_squash	butternut squash	butternut squashes	squash|winter squash	PRODUCE	false	each	count		
-pumpkin	pumpkin	pumpkins		PRODUCE	false	each	count		
-beetroot	beetroot	beetroot	beet|beets	PRODUCE	false	pack	count		
-parsnip	parsnip	parsnips		PRODUCE	false	each	count		
-turnip	turnip	turnips		PRODUCE	false	each	count		
-swede	swede	swedes	rutabaga	PRODUCE	false	each	count		
-radish	radish	radishes		PRODUCE	false	bunch	count		
-fennel	fennel	fennel	fennel bulb|florence fennel	PRODUCE	false	bulb	count		
-artichoke	artichoke	artichokes	globe artichoke	PRODUCE	false	each	count		
-avocado	avocado	avocados	hass avocado	PRODUCE	false	each	count	150	
-brussels_sprouts	brussels sprouts	brussels sprouts	brussels sprout|sprouts	PRODUCE	false	bag	mass		
-pak_choi	pak choi	pak choi	bok choy|baby bok choy	PRODUCE	false	each	count		
-beansprouts	beansprouts	beansprouts	bean sprouts|mung bean sprouts	PRODUCE	false	bag	mass	105	
-okra	okra	okra		PRODUCE	false	pack	mass		
-tomatillo	tomatillo	tomatillos		WORLD_FOODS	false	tin	count		
-horseradish_root	horseradish root	horseradish root	fresh horseradish	PRODUCE	false	each	count		
-ginger	ginger	ginger	ginger root|fresh ginger|root ginger	PRODUCE	false	piece	count		
-lemongrass	lemongrass	lemongrass	lemon grass	PRODUCE	false	stalk	count		
-parsley	parsley	parsley	flat-leaf parsley|italian parsley|curly parsley|parsley leaves	PRODUCE	false	pack	presence		1 × 30 g pack
-coriander	coriander	coriander	cilantro|cilantro leaves|coriander leaves|fresh coriander	PRODUCE	false	pack	presence		1 × 30 g pack
-basil	basil	basil	basil leaves|fresh basil|thai basil	PRODUCE	false	pack	presence		
-mint	mint	mint	mint leaves|fresh mint|mint leave	PRODUCE	false	pack	presence		
-dill	dill	dill	fresh dill|dill fronds	PRODUCE	false	pack	presence		
-chives	chives	chives	chive	PRODUCE	false	pack	presence		
-thyme	thyme	thyme	fresh thyme|thyme leaves	PRODUCE	false	pack	presence		
-rosemary	rosemary	rosemary	fresh rosemary|rosemary leaves	PRODUCE	false	pack	presence		
-sage	sage	sage	sage leaves|fresh sage	PRODUCE	false	pack	presence		
-tarragon	tarragon	tarragon	tarragon leaves	PRODUCE	false	pack	presence		
-oregano_fresh	fresh oregano	fresh oregano		PRODUCE	false	pack	presence		
-chervil	chervil	chervil		PRODUCE	false	pack	presence		
-marjoram	marjoram	marjoram		PRODUCE	false	pack	presence		
-bay_leaf	bay leaf	bay leaves	bay leave|bay	SPICES_CONDIMENTS	false	jar	presence		
-mixed_herbs_fresh	mixed herbs	mixed herbs	herb|herbs|fresh herbs|bouquet garni	PRODUCE	false	pack	presence		
-lemon	lemon	lemons	lemon wedge|lemon zest|lemon rind|lemon peel	PRODUCE	false	each	count		
-lime	lime	limes	lime wedge|lime zest	PRODUCE	false	each	count		
-orange	orange	oranges	orange zest|orange peel|orange rind|navel orange	PRODUCE	false	each	count		
-blood_orange	blood orange	blood oranges		PRODUCE	false	each	count		
-grapefruit	grapefruit	grapefruits		PRODUCE	false	each	count		
-apple	apple	apples	tart apple|granny smith apple|eating apple|cooking apple|bramley apple	PRODUCE	false	each	count	125	
-pear	pear	pears		PRODUCE	false	each	count		
-banana	banana	bananas		PRODUCE	false	each	count	225	
-strawberry	strawberries	strawberries	strawberry	PRODUCE	false	punnet	mass	150	
-raspberry	raspberries	raspberries	raspberry	PRODUCE	false	punnet	mass	125	
-blueberry	blueberries	blueberries	blueberry	PRODUCE	false	punnet	mass	150	
-blackberry	blackberries	blackberries	blackberry	PRODUCE	false	punnet	mass	145	
-cherry	cherries	cherries	cherry|sweet cherries|sweet cherry	PRODUCE	false	punnet	mass	155	
-grape	grapes	grapes	grape|red grapes|green grapes	PRODUCE	false	pack	mass	150	
-peach	peach	peaches		PRODUCE	false	each	count		
-nectarine	nectarine	nectarines		PRODUCE	false	each	count		
-plum	plum	plums		PRODUCE	false	each	count		
-apricot	apricot	apricots		PRODUCE	false	each	count		
-mango	mango	mangoes		PRODUCE	false	each	count	165	
-pineapple	pineapple	pineapples		PRODUCE	false	each	count	165	
-melon	melon	melons	cantaloupe|honeydew	PRODUCE	false	each	count		
-watermelon	watermelon	watermelons		PRODUCE	false	each	count		
-kiwi	kiwi	kiwis	kiwi fruit	PRODUCE	false	each	count		
-pomegranate	pomegranate	pomegranates	pomegranate seeds	PRODUCE	false	each	count		
-passion_fruit	passion fruit	passion fruit	passionfruit	PRODUCE	false	each	count		
-fig	fig	figs	fresh fig	PRODUCE	false	each	count		
-rhubarb	rhubarb	rhubarb		PRODUCE	false	pack	mass		
-cranberry	cranberries	cranberries	cranberry	PRODUCE	false	pack	mass	100	
-coconut_fresh	coconut	coconuts	fresh coconut	PRODUCE	false	each	count		
-bread	bread	bread	loaf|white bread|sandwich bread	BAKERY	false	loaf	count		
-wholemeal_bread	wholemeal bread	wholemeal bread	whole-wheat bread|brown bread|whole wheat bread	BAKERY	false	loaf	count		
-sourdough	sourdough bread	sourdough bread	sourdough	BAKERY	false	loaf	count		
-baguette	baguette	baguettes	french bread|french stick	BAKERY	false	each	count		
-ciabatta	ciabatta	ciabattas	italian bread	BAKERY	false	each	count		
-pitta	pitta bread	pitta bread	pita|pita bread|pitta	BAKERY	false	pack	count		
-naan	naan bread	naan bread	naan	BAKERY	false	pack	count		
-tortilla_wrap	tortilla wraps	tortilla wraps	flour tortilla|tortilla|wrap|wraps	BAKERY	false	pack	count		
-burger_bun	burger buns	burger buns	hamburger bun|bun|buns|brioche bun	BAKERY	false	pack	count		
-breadcrumbs	breadcrumbs	breadcrumbs	bread crumbs|dried breadcrumbs|fresh breadcrumbs	BAKERY	false	pack	mass	100	
-panko	panko	panko	panko breadcrumbs|panko bread crumbs|japanese breadcrumbs	BAKERY	false	pack	mass	60	
-croissant	croissant	croissants		BAKERY	false	pack	count		
-english_muffin	english muffins	english muffins	muffin	BAKERY	false	pack	count		
-bagel	bagel	bagels		BAKERY	false	pack	count		
-brioche	brioche	brioche		BAKERY	false	loaf	count		
-chicken	chicken	chicken	whole chicken|roasting chicken	MEAT_FISH	false	each	count	140	
-chicken_breast	chicken breast	chicken breasts	skinless chicken breast|boneless chicken breast|boneless skinless chicken breast	MEAT_FISH	false	pack	count	140	
-chicken_thigh	chicken thigh	chicken thighs	boneless chicken thigh|skinless chicken thigh	MEAT_FISH	false	pack	count	140	
-chicken_wing	chicken wings	chicken wings	chicken wing	MEAT_FISH	false	pack	mass		
-chicken_leg	chicken legs	chicken legs	chicken drumstick|drumsticks|chicken leg	MEAT_FISH	false	pack	count		
-chicken_liver	chicken livers	chicken livers	chicken liver	MEAT_FISH	false	pack	mass		
-turkey	turkey	turkey	turkey breast	MEAT_FISH	false	pack	mass	140	
-turkey_mince	turkey mince	turkey mince	ground turkey	MEAT_FISH	false	pack	mass	225	
-duck	duck	duck	duck breast|duck legs	MEAT_FISH	false	pack	count		
-beef	beef	beef	stewing beef|braising steak|chuck|beef chuck	MEAT_FISH	false	pack	mass		
-beef_mince	beef mince	beef mince	minced beef|ground beef|ground chuck|mince	MEAT_FISH	false	pack	mass	225	1 × 500 g pack
-steak	steak	steaks	sirloin steak|ribeye steak|rib-eye steak|flank steak|skirt steak|beef steak	MEAT_FISH	false	pack	count		
-beef_brisket	beef brisket	beef brisket	brisket	MEAT_FISH	false	each	mass		
-pork	pork	pork	pork loin|pork tenderloin|pork fillet	MEAT_FISH	false	pack	mass		
-pork_shoulder	pork shoulder	pork shoulder	pork butt	MEAT_FISH	false	each	mass		
-pork_chop	pork chop	pork chops		MEAT_FISH	false	pack	count		
-pork_mince	pork mince	pork mince	ground pork|minced pork	MEAT_FISH	false	pack	mass	225	
-pork_belly	pork belly	pork belly		MEAT_FISH	false	pack	mass		
-bacon	bacon	bacon	bacon rashers|streaky bacon|back bacon|thick-cut bacon|slab bacon|sliced bacon	MEAT_FISH	false	pack	count		1 × pack of 8 rashers
-pancetta	pancetta	pancetta	cubed pancetta|lardons	MEAT_FISH	false	pack	mass	140	
-ham	ham	ham	cooked ham|smoked ham	CHILLED	false	pack	mass	140	
-ham_hock	ham hock	ham hocks	smoked ham hock|smoked ham hocks|gammon hock	MEAT_FISH	false	each	count		
-prosciutto	prosciutto	prosciutto	parma ham|serrano ham	CHILLED	false	pack	mass		
-chorizo	chorizo	chorizo	chorizo sausage	CHILLED	false	pack	mass	130	
-sausage	sausage	sausages	pork sausage|italian sausage	MEAT_FISH	false	pack	count		
-lamb	lamb	lamb	lamb shoulder|lamb neck|diced lamb	MEAT_FISH	false	pack	mass		
-lamb_leg	leg of lamb	legs of lamb	lamb leg	MEAT_FISH	false	each	mass		
-lamb_mince	lamb mince	lamb mince	ground lamb|minced lamb	MEAT_FISH	false	pack	mass	225	
-lamb_chop	lamb chop	lamb chops	lamb cutlets|rack of lamb	MEAT_FISH	false	pack	count		
-veal	veal	veal		MEAT_FISH	false	pack	mass		
-salmon	salmon	salmon	salmon fillet|salmon fillets|salmon steak	MEAT_FISH	false	pack	count		
-smoked_salmon	smoked salmon	smoked salmon		CHILLED	false	pack	mass	140	
-cod	cod	cod	cod fillet|cod loin	MEAT_FISH	false	pack	count		
-white_fish	white fish	white fish	haddock|pollock|hake|sole|sole fillet|halibut|white fish fillet|fish fillet|fish|catfish fillet|tilapia|sea bass|swordfish	MEAT_FISH	false	pack	count		
-tuna_steak	tuna steak	tuna steaks	fresh tuna	MEAT_FISH	false	pack	count		
-mackerel	mackerel	mackerel		MEAT_FISH	false	pack	count		
-smoked_mackerel	smoked mackerel	smoked mackerel	smoked mackerel fillets|peppered smoked mackerel	CHILLED	false	pack	count		
-prawn	prawns	prawns	prawn|shrimp|king prawns|tiger prawns|jumbo shrimp|large shrimp	MEAT_FISH	false	pack	mass	145	
-scallop	scallops	scallops	scallop|sea scallop|sea scallops|bay scallops	MEAT_FISH	false	pack	mass		
-mussel	mussels	mussels	mussel	MEAT_FISH	false	bag	mass		
-clam	clams	clams	clam|littleneck clams	MEAT_FISH	false	bag	mass		
-squid	squid	squid	calamari	MEAT_FISH	false	pack	mass		
-crab	crab meat	crab meat	crabmeat|crab|lump crabmeat	MEAT_FISH	false	pack	mass	135	
-lobster	lobster	lobsters		MEAT_FISH	false	each	count		
-anchovy	anchovies	anchovies	anchovy|anchovy fillet|anchovy fillets	TINS_JARS	false	tin	count		
-oyster	oysters	oysters	oyster	MEAT_FISH	false	each	count		
-egg	egg	eggs	large egg|free-range egg|free-range eggs|egg yolk|egg white|egg yolks|egg whites	DAIRY_EGGS	false	box	count		1 × box of 6
-milk	milk	milk	whole milk|semi-skimmed milk|skimmed milk|low-fat milk|2% milk|full-fat milk	DAIRY_EGGS	false	bottle	volume		1 × 4 pint (2.27 l) bottle
-butter	butter	butter	unsalted butter|salted butter|sweet butter|cold butter	DAIRY_EGGS	false	block	mass	227	1 × 250 g block
-double_cream	double cream	double cream	heavy cream|whipping cream|heavy whipping cream|cream|whipped cream	DAIRY_EGGS	false	pot	volume		1 × 300 ml pot
-single_cream	single cream	single cream	light cream|half-and-half	DAIRY_EGGS	false	pot	volume		
-creme_fraiche	crème fraîche	crème fraîche	cr me fra che	DAIRY_EGGS	false	pot	volume		1 × 300 ml pot
-sour_cream	soured cream	soured cream	sour cream	DAIRY_EGGS	false	pot	volume		
-yogurt	natural yogurt	natural yogurt	yogurt|plain yogurt|yoghurt|whole-milk yogurt	DAIRY_EGGS	false	pot	volume		
-greek_yogurt	greek yogurt	greek yogurt	greek-style yogurt|strained yogurt	DAIRY_EGGS	false	pot	volume		
-buttermilk	buttermilk	buttermilk		DAIRY_EGGS	false	carton	volume		
-cheddar	cheddar	cheddar	cheddar cheese|mature cheddar|sharp cheddar	DAIRY_EGGS	false	block	mass	113	1 × 400 g block
-parmesan	parmesan	parmesan	parmesan cheese|parmigiano-reggiano|parmigiano reggiano|grana padano	DAIRY_EGGS	false	block	mass	100	
-pecorino	pecorino	pecorino	pecorino romano|pecorino cheese|pecorino romano cheese	DAIRY_EGGS	false	block	mass	100	
-mozzarella	mozzarella	mozzarella	fresh mozzarella|buffalo mozzarella|mozzarella cheese	DAIRY_EGGS	false	ball	count	113	
-feta	feta	feta	feta cheese	DAIRY_EGGS	false	pack	mass	150	
-goat_cheese	goats' cheese	goats' cheese	goat cheese|chevre|goat's cheese	DAIRY_EGGS	false	pack	mass	150	
-ricotta	ricotta	ricotta	ricotta cheese	DAIRY_EGGS	false	tub	mass	245	
-cream_cheese	cream cheese	cream cheese	soft cheese|philadelphia	DAIRY_EGGS	false	tub	mass	230	
-mascarpone	mascarpone	mascarpone		DAIRY_EGGS	false	tub	mass	230	
-gruyere	gruyère	gruyère	gruy re cheese|gruyere cheese	DAIRY_EGGS	false	pack	mass	108	
-emmental	emmental	emmental	emmenthal|emmentaler|swiss cheese	DAIRY_EGGS	false	pack	mass	108	
-blue_cheese	blue cheese	blue cheese	stilton|gorgonzola|roquefort	DAIRY_EGGS	false	pack	mass	135	
-halloumi	halloumi	halloumi		DAIRY_EGGS	false	pack	count		
-cheese	cheese	cheese	grated cheese	DAIRY_EGGS	false	pack	mass	113	
-tofu	tofu	tofu	firm tofu|silken tofu	CHILLED	false	pack	count		
-hummus	houmous	houmous	hummus	CHILLED	false	tub	count		
-pesto	pesto	pesto	basil pesto|green pesto	TINS_JARS	false	jar	count		
-fresh_pasta	fresh pasta	fresh pasta	fresh tagliatelle|fresh lasagne sheets	CHILLED	false	pack	count		
-puff_pastry	puff pastry	puff pastry	ready-rolled puff pastry	CHILLED	false	pack	count		
-shortcrust_pastry	shortcrust pastry	shortcrust pastry	pie crust|pie dough	CHILLED	false	pack	count		
-filo_pastry	filo pastry	filo pastry	phyllo|phyllo dough|filo	CHILLED	false	pack	count		
-dumpling_wrappers	dumpling wrappers	dumpling wrappers	dumpling skins|gyoza wrappers|wonton wrappers|gyoza skins	WORLD_FOODS	false	pack	count		
-fresh_stock	fresh stock	fresh stock		CHILLED	false	pot	volume		
-frozen_peas	frozen peas	frozen peas	peas|petits pois|garden peas	FROZEN	false	bag	mass	145	
-frozen_sweetcorn	frozen sweetcorn	frozen sweetcorn	corn kernels|frozen corn	FROZEN	false	bag	mass	165	
-frozen_spinach	frozen spinach	frozen spinach		FROZEN	false	bag	mass	190	
-frozen_diced_onion	frozen diced onion	frozen diced onions	frozen chopped onion|frozen chopped onions|frozen onion|frozen onions|diced frozen onion|chopped frozen onion	FROZEN	false	bag	mass	115	
-frozen_berries	frozen berries	frozen berries	frozen mixed berries	FROZEN	false	bag	mass	140	
-edamame	edamame beans	edamame beans	edamame|soya beans	FROZEN	false	bag	mass	155	
-broad_beans	broad beans	broad beans	fava beans|fava bean|broad bean	FROZEN	false	bag	mass	150	
-ice_cream	ice cream	ice cream	vanilla ice cream	FROZEN	false	tub	count		
-ice	ice	ice	ice cubes	FROZEN	false	bag	presence		
-chopped_tomatoes	chopped tomatoes	chopped tomatoes	canned tomatoes|tinned tomatoes|diced tomatoes|crushed tomatoes|whole peeled tomatoes|canned plum tomatoes|plum tomatoes in juice	TINS_JARS	false	tin	count		1 × 400 g tin
-passata	passata	passata	tomato sauce|strained tomatoes|sieved tomatoes	TINS_JARS	false	carton	volume		
-tomato_puree	tomato purée	tomato purée	tomato paste|double concentrated tomato puree	TINS_JARS	false	tube	presence		
-sundried_tomato	sun-dried tomatoes	sun-dried tomatoes	sundried tomatoes|sun dried tomatoes	TINS_JARS	false	jar	count		
-chickpeas	chickpeas	chickpeas	chickpea|garbanzo beans|garbanzo bean|canned chickpeas	TINS_JARS	false	tin	count		1 × 400 g tin
-kidney_beans	kidney beans	kidney beans	red kidney beans	TINS_JARS	false	tin	count		
-black_beans	black beans	black beans	black bean	TINS_JARS	false	tin	count		
-cannellini_beans	cannellini beans	cannellini beans	white beans|white bean|great northern beans|cannellini bean	TINS_JARS	false	tin	count		
-haricot_beans	haricot beans	haricot beans	haricot bean|navy beans|navy bean	TINS_JARS	false	tin	count		
-butter_beans	butter beans	butter beans	butter bean|lima beans|lima bean	TINS_JARS	false	tin	count		
-baked_beans	baked beans	baked beans		TINS_JARS	false	tin	count		
-lentils_tin	tinned lentils	tinned lentils		TINS_JARS	false	tin	count		
-coconut_milk	coconut milk	coconut milk	unsweetened coconut milk|light coconut milk	TINS_JARS	false	tin	count		1 × 400 ml tin
-coconut_cream	coconut cream	coconut cream		TINS_JARS	false	tin	count		
-sweetcorn_tin	tinned sweetcorn	tinned sweetcorn	canned corn	TINS_JARS	false	tin	count		
-tuna_tin	tinned tuna	tinned tuna	tuna|canned tuna|tuna in oil	TINS_JARS	false	tin	count		
-olive	olives	olives	olive|black olive|black olives|green olive|green olives|kalamata olives|kalamata olive	TINS_JARS	false	jar	count		
-caper	capers	capers	caper	TINS_JARS	false	jar	presence		
-gherkin	gherkins	gherkins	pickles|cornichons|dill pickles	TINS_JARS	false	jar	count		
-roasted_pepper	roasted red peppers	roasted red peppers	jarred roasted peppers|roasted peppers	TINS_JARS	false	jar	count		
-artichoke_hearts	artichoke hearts	artichoke hearts	marinated artichokes	TINS_JARS	false	jar	count		
-pumpkin_puree	pumpkin purée	pumpkin purée	canned pumpkin	WORLD_FOODS	false	tin	count		
-jam	jam	jam	apricot jam|raspberry jam|strawberry jam|preserves	TINS_JARS	false	jar	count		
-honey	honey	honey	mild honey|runny honey|clear honey	TINS_JARS	false	jar	presence		
-maple_syrup	maple syrup	maple syrup	pure maple syrup	TINS_JARS	false	bottle	presence		
-agave_syrup	agave syrup	agave syrup	agave|agave nectar|agave sweetener	TINS_JARS	false	bottle	presence		
-golden_syrup	golden syrup	golden syrup		BAKING	false	tin	presence		
-corn_syrup	corn syrup	corn syrup	light corn syrup|dark corn syrup	BAKING	false	bottle	presence		
-peanut_butter	peanut butter	peanut butter	smooth peanut butter|crunchy peanut butter	TINS_JARS	false	jar	presence		
-tahini	tahini	tahini	tahini paste	WORLD_FOODS	false	jar	presence		
-stock_cube	stock cubes	stock cubes	bouillon cube|stock cube|bouillon|chicken stock cube|chicken stock cubes|chicken bouillon cube	TINS_JARS	false	pack	presence		
-chicken_stock	chicken stock	chicken stock	chicken broth|low-sodium chicken broth	TINS_JARS	false	carton	volume		
-vegetable_stock	vegetable stock	vegetable stock	vegetable broth|veg stock|stock|broth	TINS_JARS	false	carton	volume		
-beef_stock	beef stock	beef stock	beef broth	TINS_JARS	false	carton	volume		
-fish_stock	fish stock	fish stock		TINS_JARS	false	carton	volume		
-pasta	pasta	pasta	dried pasta|dry pasta	PASTA_RICE_GRAINS	false	bag	mass	100	1 × 500 g bag
-spaghetti	spaghetti	spaghetti	linguine|linguini|bucatini|fettuccine|tagliatelle|angel hair	PASTA_RICE_GRAINS	false	bag	mass	100	1 × 500 g bag
-penne	penne	penne	rigatoni|fusilli|macaroni|orecchiette|farfalle|short pasta	PASTA_RICE_GRAINS	false	bag	mass	100	
-lasagne_sheets	lasagne sheets	lasagne sheets	lasagna noodles|lasagne	PASTA_RICE_GRAINS	false	box	count		
-egg_noodles	egg noodles	egg noodles	noodles|noodle	WORLD_FOODS	false	pack	count		
-rice_noodles	rice noodles	rice noodles	vermicelli rice noodles|rice vermicelli	WORLD_FOODS	false	pack	count		
-rice	rice	rice	long-grain rice|white rice|long grain rice|cooked rice	PASTA_RICE_GRAINS	false	bag	mass	185	1 × 1 kg bag
-basmati_rice	basmati rice	basmati rice	basmati	PASTA_RICE_GRAINS	false	bag	mass	185	
-jasmine_rice	jasmine rice	jasmine rice	thai fragrant rice	PASTA_RICE_GRAINS	false	bag	mass	185	
-risotto_rice	risotto rice	risotto rice	arborio rice|arborio|carnaroli rice	PASTA_RICE_GRAINS	false	bag	mass	200	
-brown_rice	brown rice	brown rice		PASTA_RICE_GRAINS	false	bag	mass	190	
-couscous	couscous	couscous		PASTA_RICE_GRAINS	false	bag	mass	175	
-bulgur	bulgur wheat	bulgur wheat	bulgur|bulghur|cracked wheat	PASTA_RICE_GRAINS	false	bag	mass	140	
-quinoa	quinoa	quinoa		PASTA_RICE_GRAINS	false	bag	mass	170	
-pearl_barley	pearl barley	pearl barley	barley	PASTA_RICE_GRAINS	false	bag	mass	200	
-farro	farro	farro	spelt grain	PASTA_RICE_GRAINS	false	bag	mass	180	
-oats	porridge oats	porridge oats	oats|rolled oats|oatmeal|old-fashioned oats	PASTA_RICE_GRAINS	false	bag	mass	90	
-polenta	polenta	polenta	cornmeal|yellow cornmeal|grits	PASTA_RICE_GRAINS	false	bag	mass	160	
-lentils	lentils	lentils	lentil|dried lentils	PASTA_RICE_GRAINS	false	bag	mass	190	
-red_lentils	red lentils	red lentils	red lentil|split red lentils|red split lentils|masoor dal	PASTA_RICE_GRAINS	false	bag	mass	190	
-green_lentils	green lentils	green lentils	green lentil	PASTA_RICE_GRAINS	false	bag	mass	190	
-brown_lentils	brown lentils	brown lentils	brown lentil	PASTA_RICE_GRAINS	false	bag	mass	190	
-puy_lentils	puy lentils	puy lentils	puy lentil|french lentils|french green lentils|le puy lentils	PASTA_RICE_GRAINS	false	bag	mass	190	
-black_lentils	black lentils	black lentils	black lentil|beluga lentils|beluga lentil	PASTA_RICE_GRAINS	false	bag	mass	190	
-split_peas	split peas	split peas	yellow split peas	PASTA_RICE_GRAINS	false	bag	mass	200	
-dried_beans	dried beans	dried beans	bean|beans	PASTA_RICE_GRAINS	false	bag	mass	190	
-soy_sauce	soy sauce	soy sauce	light soy sauce|dark soy sauce|tamari|shoyu	WORLD_FOODS	false	bottle	presence		
-fish_sauce	fish sauce	fish sauce	nam pla	WORLD_FOODS	false	bottle	presence		
-oyster_sauce	oyster sauce	oyster sauce		WORLD_FOODS	false	bottle	presence		
-hoisin	hoisin sauce	hoisin sauce	hoisin	WORLD_FOODS	false	jar	presence		
-mirin	mirin	mirin		WORLD_FOODS	false	bottle	presence		
-rice_wine	shaoxing rice wine	shaoxing rice wine	rice wine|shaoxing wine	WORLD_FOODS	false	bottle	presence		
-sake	sake	sake		WORLD_FOODS	false	bottle	presence		
-miso	miso paste	miso paste	miso|white miso|red miso	WORLD_FOODS	false	tub	presence		
-curry_paste	curry paste	curry paste	thai red curry paste|thai green curry paste|red curry paste|green curry paste	WORLD_FOODS	false	jar	presence		
-gochujang	gochujang	gochujang		WORLD_FOODS	false	tub	presence		
-sriracha	sriracha	sriracha	sriracha sauce	WORLD_FOODS	false	bottle	presence		
-harissa	harissa	harissa	harissa paste	WORLD_FOODS	false	jar	presence		
-chipotle	chipotle in adobo	chipotle in adobo	chipotle chiles in adobo|chipotle paste|chipotle	WORLD_FOODS	false	tin	presence		
-corn_tortilla	corn tortillas	corn tortillas	corn tortilla|white corn tortillas	WORLD_FOODS	false	pack	count		
-tortilla_chips	tortilla chips	tortilla chips	corn chips	WORLD_FOODS	false	bag	count		
-nori	nori	nori	nori sheets|seaweed	WORLD_FOODS	false	pack	count		
-rice_paper	rice paper wrappers	rice paper wrappers	rice paper	WORLD_FOODS	false	pack	count		
-water_chestnut	water chestnuts	water chestnuts	water chestnut	WORLD_FOODS	false	tin	count		
-bamboo_shoots	bamboo shoots	bamboo shoots		WORLD_FOODS	false	tin	count		
-tamarind	tamarind paste	tamarind paste	tamarind	WORLD_FOODS	false	jar	presence		
-coconut_flakes	desiccated coconut	desiccated coconut	shredded coconut|coconut flakes|unsweetened shredded coconut	BAKING	false	bag	mass	60	
-flour	plain flour	plain flour	all-purpose flour|flour|white flour|unbleached all-purpose flour|ap flour	BAKING	false	bag	mass	125	1 × 1.5 kg bag
-self_raising_flour	self-raising flour	self-raising flour	self-rising flour	BAKING	false	bag	mass	125	
-strong_flour	strong white bread flour	strong white bread flour	bread flour|strong flour	BAKING	false	bag	mass	130	
-wholemeal_flour	wholemeal flour	wholemeal flour	whole-wheat flour|whole wheat flour|wholewheat flour	BAKING	false	bag	mass	120	
-cake_flour	cake flour	cake flour		BAKING	false	bag	mass	115	
-cornflour	cornflour	cornflour	cornstarch|corn starch	BAKING	false	box	presence		
-caster_sugar	caster sugar	caster sugar	superfine sugar|sugar|granulated sugar|white sugar	BAKING	false	bag	mass	200	1 × 1 kg bag
-icing_sugar	icing sugar	icing sugar	powdered sugar|confectioners' sugar|confectioners sugar	BAKING	false	bag	mass	120	
-brown_sugar	light brown sugar	light brown sugar	brown sugar|light brown soft sugar|soft brown sugar|packed brown sugar	BAKING	false	bag	mass	220	
-dark_brown_sugar	dark brown sugar	dark brown sugar	dark muscovado sugar|muscovado	BAKING	false	bag	mass	220	
-demerara	demerara sugar	demerara sugar	turbinado sugar|raw sugar	BAKING	false	bag	mass	200	
-molasses	black treacle	black treacle	molasses|treacle	BAKING	false	tin	presence		
-baking_powder	baking powder	baking powder		BAKING	false	tub	presence		
-bicarb	bicarbonate of soda	bicarbonate of soda	baking soda|bicarb|sodium bicarbonate	BAKING	false	tub	presence		
-cream_of_tartar	cream of tartar	cream of tartar		BAKING	false	tub	presence		
-yeast	fast-action dried yeast	fast-action dried yeast	yeast|dry yeast|active dry yeast|instant yeast|dried yeast	BAKING	false	pack	presence		1 × pack of 7 g sachets
-vanilla_extract	vanilla extract	vanilla extract	vanilla|pure vanilla extract|vanilla essence	BAKING	false	bottle	presence		
-vanilla_pod	vanilla pod	vanilla pods	vanilla bean|vanilla beans	BAKING	false	each	count		
-almond_extract	almond extract	almond extract		BAKING	false	bottle	presence		
-cocoa	cocoa powder	cocoa powder	cocoa|unsweetened cocoa powder|dutch-process cocoa	BAKING	false	tub	presence		
-dark_chocolate	dark chocolate	dark chocolate	bittersweet chocolate|semisweet chocolate|chocolate|chocolate chips|dark chocolate chips|semisweet chocolate chips	BAKING	false	bar	mass	170	
-milk_chocolate	milk chocolate	milk chocolate		BAKING	false	bar	mass	170	
-white_chocolate	white chocolate	white chocolate		BAKING	false	bar	mass	170	
-gelatine	gelatine	gelatine	gelatin|gelatine leaves|powdered gelatin|unflavored gelatin	BAKING	false	pack	presence		
-food_colouring	food colouring	food colouring	food coloring|red food coloring	BAKING	false	bottle	presence		
-sprinkles	sprinkles	sprinkles		BAKING	false	tub	presence		
-condensed_milk	condensed milk	condensed milk	sweetened condensed milk	BAKING	false	tin	count		
-evaporated_milk	evaporated milk	evaporated milk		BAKING	false	tin	count		
-ground_almonds	ground almonds	ground almonds	almond flour|almond meal	BAKING	false	bag	mass	96	
-almond	almonds	almonds	almond|flaked almonds|slivered almonds|blanched almonds|toasted almonds	NUTS_DRIED_FRUIT	false	bag	mass	140	
-walnut	walnuts	walnuts	walnut|walnut halves	NUTS_DRIED_FRUIT	false	bag	mass	120	
-pecan	pecans	pecans	pecan|pecan halves	NUTS_DRIED_FRUIT	false	bag	mass	110	
-hazelnut	hazelnuts	hazelnuts	hazelnut	NUTS_DRIED_FRUIT	false	bag	mass	135	
-pistachio	pistachios	pistachios	pistachio|shelled pistachios	NUTS_DRIED_FRUIT	false	bag	mass	125	
-cashew	cashews	cashews	cashew|cashew nuts	NUTS_DRIED_FRUIT	false	bag	mass	140	
-peanut	peanuts	peanuts	peanut|roasted peanuts	NUTS_DRIED_FRUIT	false	bag	mass	145	
-pine_nut	pine nuts	pine nuts	pine nut|pignoli	NUTS_DRIED_FRUIT	false	bag	mass	135	
-chestnut	chestnuts	chestnuts	chestnut|cooked chestnuts	NUTS_DRIED_FRUIT	false	pack	mass		
-macadamia	macadamia nuts	macadamia nuts	macadamia	NUTS_DRIED_FRUIT	false	bag	mass	135	
-sesame_seed	sesame seeds	sesame seeds	sesame seed|toasted sesame seeds	NUTS_DRIED_FRUIT	false	bag	presence		
-sunflower_seed	sunflower seeds	sunflower seeds		NUTS_DRIED_FRUIT	false	bag	mass	140	
-pumpkin_seed	pumpkin seeds	pumpkin seeds	pepitas	NUTS_DRIED_FRUIT	false	bag	mass	130	
-chia_seed	chia seeds	chia seeds		NUTS_DRIED_FRUIT	false	bag	mass	160	
-flaxseed	linseed	linseed	flaxseed|ground flaxseed	NUTS_DRIED_FRUIT	false	bag	mass	150	
-raisin	raisins	raisins	raisin|golden raisins|sultanas|sultana	NUTS_DRIED_FRUIT	false	bag	mass	150	
-currant	currants	currants	currant|dried currants	NUTS_DRIED_FRUIT	false	bag	mass	140	
-prune	prunes	prunes	prune|pitted prunes	NUTS_DRIED_FRUIT	false	bag	mass	170	
-date	dates	dates	date|medjool dates|pitted dates	NUTS_DRIED_FRUIT	false	pack	mass	150	
-dried_apricot	dried apricots	dried apricots	dried apricot	NUTS_DRIED_FRUIT	false	bag	mass	130	
-dried_cranberry	dried cranberries	dried cranberries	craisins	NUTS_DRIED_FRUIT	false	bag	mass	120	
-dried_fig	dried figs	dried figs		NUTS_DRIED_FRUIT	false	bag	mass	150	
-crystallised_ginger	crystallised ginger	crystallised ginger	crystallized ginger|candied ginger|stem ginger	NUTS_DRIED_FRUIT	false	bag	mass		
-olive_oil	olive oil	olive oil	light olive oil|pure olive oil	OILS_VINEGARS	true	bottle	presence		
-evoo	extra virgin olive oil	extra virgin olive oil	extra-virgin olive oil	OILS_VINEGARS	false	bottle	presence		
-vegetable_oil	vegetable oil	vegetable oil	canola oil|rapeseed oil|neutral oil|sunflower oil|corn oil|safflower oil|grapeseed oil|soy oil|cooking oil|oil	OILS_VINEGARS	true	bottle	presence		
-sesame_oil	sesame oil	sesame oil	toasted sesame oil|asian sesame oil	OILS_VINEGARS	false	bottle	presence		
-peanut_oil	groundnut oil	groundnut oil	peanut oil	OILS_VINEGARS	false	bottle	presence		
-coconut_oil	coconut oil	coconut oil		OILS_VINEGARS	false	jar	presence		
-walnut_oil	walnut oil	walnut oil		OILS_VINEGARS	false	bottle	presence		
-truffle_oil	truffle oil	truffle oil	white truffle oil	OILS_VINEGARS	false	bottle	presence		
-cooking_spray	cooking spray	cooking spray	cooking oil spray|oil spray|nonstick cooking spray	OILS_VINEGARS	false	can	presence		
-balsamic	balsamic vinegar	balsamic vinegar	balsamic	OILS_VINEGARS	false	bottle	presence		
-red_wine_vinegar	red wine vinegar	red wine vinegar	red-wine vinegar	OILS_VINEGARS	false	bottle	presence		
-white_wine_vinegar	white wine vinegar	white wine vinegar	white-wine vinegar|champagne vinegar	OILS_VINEGARS	false	bottle	presence		
-cider_vinegar	cider vinegar	cider vinegar	apple cider vinegar	OILS_VINEGARS	false	bottle	presence		
-sherry_vinegar	sherry vinegar	sherry vinegar		OILS_VINEGARS	false	bottle	presence		
-rice_vinegar	rice vinegar	rice vinegar	rice wine vinegar|seasoned rice vinegar	WORLD_FOODS	false	bottle	presence		
-white_vinegar	white vinegar	white vinegar	distilled vinegar|vinegar	OILS_VINEGARS	false	bottle	presence		
-malt_vinegar	malt vinegar	malt vinegar		OILS_VINEGARS	false	bottle	presence		
-lard	lard	lard		CHILLED	false	block	presence		
-ghee	ghee	ghee	clarified butter	WORLD_FOODS	false	jar	presence		
-salt	salt	salt	kosher salt|sea salt|table salt|flaky sea salt|coarse salt|fine salt|fleur de sel|iodized salt|maldon salt	SPICES_CONDIMENTS	true	pack	presence		
-black_pepper	black pepper	black pepper	pepper|ground black pepper|freshly ground black pepper|black peppercorns|peppercorns|ground pepper	SPICES_CONDIMENTS	true	jar	presence		
-white_pepper	white pepper	white pepper	ground white pepper	SPICES_CONDIMENTS	false	jar	presence		
-cumin	ground cumin	ground cumin	cumin	SPICES_CONDIMENTS	false	jar	presence		
-cumin_seed	cumin seeds	cumin seeds	cumin seed|whole cumin seeds	SPICES_CONDIMENTS	false	jar	presence		
-coriander_ground	ground coriander	ground coriander		SPICES_CONDIMENTS	false	jar	presence		
-coriander_seed	coriander seeds	coriander seeds	coriander seed|whole coriander seeds	SPICES_CONDIMENTS	false	jar	presence		
-paprika	paprika	paprika	sweet paprika|hungarian paprika	SPICES_CONDIMENTS	false	jar	presence		
-smoked_paprika	smoked paprika	smoked paprika	pimenton|spanish smoked paprika	SPICES_CONDIMENTS	false	jar	presence		
-cayenne	cayenne pepper	cayenne pepper	cayenne|ground red pepper	SPICES_CONDIMENTS	false	jar	presence		
-chilli_flakes	chilli flakes	chilli flakes	red pepper flakes|red-pepper flakes|crushed red pepper|hot red pepper flake|chili flakes	SPICES_CONDIMENTS	false	jar	presence		
-chilli_powder	chilli powder	chilli powder	chili powder|ancho chili powder	SPICES_CONDIMENTS	false	jar	presence		
-turmeric	ground turmeric	ground turmeric	turmeric	SPICES_CONDIMENTS	false	jar	presence		
-cinnamon	ground cinnamon	ground cinnamon	cinnamon	SPICES_CONDIMENTS	false	jar	presence		
-cinnamon_stick	cinnamon stick	cinnamon sticks		SPICES_CONDIMENTS	false	jar	count		
-nutmeg	nutmeg	nutmeg	ground nutmeg|whole nutmeg|freshly grated nutmeg	SPICES_CONDIMENTS	false	jar	presence		
-ginger_ground	ground ginger	ground ginger		SPICES_CONDIMENTS	false	jar	presence		
-allspice	allspice	allspice	ground allspice|allspice berries|allspice berry	SPICES_CONDIMENTS	false	jar	presence		
-clove_spice	cloves	cloves	clove|ground cloves|whole cloves	SPICES_CONDIMENTS	false	jar	presence		
-cardamom	cardamom pods	cardamom pods	cardamom|green cardamom	SPICES_CONDIMENTS	false	jar	presence		
-cardamom_ground	ground cardamom	ground cardamom		SPICES_CONDIMENTS	false	jar	presence		
-star_anise	star anise	star anise		SPICES_CONDIMENTS	false	jar	presence		
-fennel_seed	fennel seeds	fennel seeds	fennel seed	SPICES_CONDIMENTS	false	jar	presence		
-caraway	caraway seeds	caraway seeds	caraway seed|caraway	SPICES_CONDIMENTS	false	jar	presence		
-caraway_ground	ground caraway	ground caraway		SPICES_CONDIMENTS	false	jar	presence		
-mustard_seed	mustard seeds	mustard seeds	mustard seed|black mustard seeds	SPICES_CONDIMENTS	false	jar	presence		
-dried_oregano	dried oregano	dried oregano	oregano	SPICES_CONDIMENTS	false	jar	presence		
-dried_thyme	dried thyme	dried thyme		SPICES_CONDIMENTS	false	jar	presence		
-dried_mixed_herbs	dried mixed herbs	dried mixed herbs	herbes de provence|italian seasoning	SPICES_CONDIMENTS	false	jar	presence		
-curry_powder	curry powder	curry powder	madras curry powder|hot curry powder|mild curry powder	SPICES_CONDIMENTS	false	jar	presence		
-garam_masala	garam masala	garam masala		SPICES_CONDIMENTS	false	jar	presence		
-five_spice	chinese five spice	chinese five spice	five-spice powder|five spice	SPICES_CONDIMENTS	false	jar	presence		
-saffron	saffron	saffron	saffron threads	SPICES_CONDIMENTS	false	jar	presence		
-sumac	sumac	sumac		SPICES_CONDIMENTS	false	jar	presence		
-zaatar	za'atar	za'atar	zaatar	SPICES_CONDIMENTS	false	jar	presence		
-garlic_powder	garlic powder	garlic powder	granulated garlic	SPICES_CONDIMENTS	false	jar	presence		
-onion_powder	onion powder	onion powder		SPICES_CONDIMENTS	false	jar	presence		
-mace	mace	mace	ground mace	SPICES_CONDIMENTS	false	jar	presence		
-juniper	juniper berries	juniper berries	juniper berry	SPICES_CONDIMENTS	false	jar	presence		
-dijon	dijon mustard	dijon mustard	dijon-style mustard|dijon	SPICES_CONDIMENTS	false	jar	presence		
-wholegrain_mustard	wholegrain mustard	wholegrain mustard	whole-grain mustard|grainy mustard	SPICES_CONDIMENTS	false	jar	presence		
-mustard	english mustard	english mustard	mustard|yellow mustard	SPICES_CONDIMENTS	false	jar	presence		
-mustard_powder	mustard powder	mustard powder	dry mustard|english mustard powder|ground mustard	SPICES_CONDIMENTS	false	jar	presence		
-mayonnaise	mayonnaise	mayonnaise	mayo	SPICES_CONDIMENTS	false	jar	presence		
-ketchup	tomato ketchup	tomato ketchup	ketchup|catsup	SPICES_CONDIMENTS	false	bottle	presence		
-worcestershire	worcestershire sauce	worcestershire sauce	worcestershire	SPICES_CONDIMENTS	false	bottle	presence		
-hot_sauce	hot sauce	hot sauce	tabasco|tabasco sauce|hot pepper sauce	SPICES_CONDIMENTS	false	bottle	presence		
-horseradish	horseradish sauce	horseradish sauce	horseradish|prepared horseradish	SPICES_CONDIMENTS	false	jar	presence		
-bbq_sauce	barbecue sauce	barbecue sauce	bbq sauce	SPICES_CONDIMENTS	false	bottle	presence		
-sweet_chilli	sweet chilli sauce	sweet chilli sauce	sweet chili sauce	WORLD_FOODS	false	bottle	presence		
-mint_sauce	mint sauce	mint sauce		SPICES_CONDIMENTS	false	jar	presence		
-chutney	mango chutney	mango chutney	chutney	WORLD_FOODS	false	jar	presence		
-gravy_granules	gravy granules	gravy granules	gravy	SPICES_CONDIMENTS	false	tub	presence		
-water	water	water	cold water|warm water|boiling water|hot water|ice water	DRINKS	true	bottle	presence		
-white_wine	dry white wine	dry white wine	white wine	DRINKS	false	bottle	presence		
-vermouth	dry vermouth	dry vermouth	vermouth|white vermouth|noilly prat	DRINKS	false	bottle	presence		
-red_wine	red wine	red wine	dry red wine	DRINKS	false	bottle	presence		
-sherry	dry sherry	dry sherry	sherry|fino sherry	DRINKS	false	bottle	presence		
-marsala	marsala	marsala	marsala wine|dry marsala|sweet marsala	DRINKS	false	bottle	presence		
-port	port	port		DRINKS	false	bottle	presence		
-beer	beer	beer	lager|ale|stout	DRINKS	false	bottle	count		
-cider	cider	cider	hard cider	DRINKS	false	bottle	count		
-brandy	brandy	brandy	cognac|calvados|armagnac	DRINKS	false	bottle	presence		
-rum	rum	rum	dark rum|white rum|light rum	DRINKS	false	bottle	presence		
-vodka	vodka	vodka	citrus vodka	DRINKS	false	bottle	presence		
-gin	gin	gin		DRINKS	false	bottle	presence		
-whisky	whisky	whisky	bourbon|whiskey|scotch	DRINKS	false	bottle	presence		
-orange_liqueur	orange liqueur	orange liqueur	grand marnier|cointreau|triple sec	DRINKS	false	bottle	presence		
-bitters	angostura bitters	angostura bitters	bitters|lemon bitters	DRINKS	false	bottle	presence		
-orange_juice	orange juice	orange juice	fresh orange juice	DRINKS	false	carton	volume		
-apple_juice	apple juice	apple juice		DRINKS	false	carton	volume		
-lemon_juice	lemon juice	lemon juice	bottled lemon juice	DRINKS	false	bottle	presence		
-lime_juice	lime juice	lime juice	bottled lime juice	DRINKS	false	bottle	presence		
-tonic	tonic water	tonic water		DRINKS	false	bottle	count		
-soda_water	soda water	soda water	sparkling water|club soda|carbonated water|seltzer	DRINKS	false	bottle	count		
-coffee	coffee	coffee	ground coffee|espresso|ground espresso|instant coffee|brewed coffee	DRINKS	false	pack	presence		
-tea	tea bags	tea bags	tea|black tea|green tea	DRINKS	false	box	presence		
-coconut_water	coconut water	coconut water		DRINKS	false	carton	volume		
-rosewater	rose water	rose water	rosewater	WORLD_FOODS	false	bottle	presence		
-orange_blossom_water	orange blossom water	orange blossom water	orange flower water	WORLD_FOODS	false	bottle	presence		
-gf_flour	gluten-free flour	gluten-free flour	gluten free flour	FREE_FROM	false	bag	mass	125	
-oat_milk	oat milk	oat milk	oat drink	FREE_FROM	false	carton	volume		
-almond_milk	almond milk	almond milk	almond drink	FREE_FROM	false	carton	volume		
-soy_milk	soya milk	soya milk	soy milk|soya drink	FREE_FROM	false	carton	volume		
-vegan_butter	dairy-free spread	dairy-free spread	vegan butter|margarine	FREE_FROM	false	tub	mass	227	
-gf_pasta	gluten-free pasta	gluten-free pasta		FREE_FROM	false	bag	mass	100	
-foil	kitchen foil	kitchen foil	aluminium foil|aluminum foil|foil	HOUSEHOLD	false	roll	presence		
-baking_paper	baking paper	baking paper	parchment paper|greaseproof paper|parchment	HOUSEHOLD	false	roll	presence		
-cling_film	cling film	cling film	plastic wrap	HOUSEHOLD	false	roll	presence		
-cheesecloth	muslin cloth	muslin cloth	cheesecloth|food-grade cheesecloth	HOUSEHOLD	false	pack	presence		
-kitchen_roll	kitchen roll	kitchen roll	paper towels	HOUSEHOLD	false	pack	presence		
-skewers	skewers	skewers	wooden skewers|bamboo skewers	HOUSEHOLD	false	pack	presence		
-string	kitchen string	kitchen string	butcher's twine|kitchen twine	HOUSEHOLD	false	roll	presence		
-washing_up	washing-up liquid	washing-up liquid	dish soap	HOUSEHOLD	false	bottle	presence		
-bin_bags	bin bags	bin bags		HOUSEHOLD	false	roll	presence		
+#version	81de47d34f94
+#id	name	plural	synonyms	aisleCode	staple	shoppingUnit	displayPolicy	gramsPerCup	packNote	group
+onion	onion	onions	yellow onion|brown onion|white onion|spanish onion	PRODUCE	false	each	count	160		Vegetables
+red_onion	red onion	red onions	purple onion	PRODUCE	false	each	count	160		Vegetables
+spring_onion	spring onion	spring onions	scallion|green onion|salad onion	PRODUCE	false	bunch	count			Salad
+shallot	shallot	shallots	banana shallot|eschalot	PRODUCE	false	each	count	160		Vegetables
+garlic	garlic	garlic	garlic clove|garlic bulb|head of garlic	PRODUCE	false	bulb	count			Vegetables
+leek	leek	leeks		PRODUCE	false	each	count			Vegetables
+carrot	carrot	carrots		PRODUCE	false	each	count	128		Vegetables
+potato	potato	potatoes	baking potato|maris piper|russet potato|yukon gold potato|red potato|new potato|red potatoes	PRODUCE	false	kg	count	150		Vegetables
+sweet_potato	sweet potato	sweet potatoes	yam	PRODUCE	false	each	count	133		Vegetables
+tomato	tomato	tomatoes	vine tomato|beefsteak tomato|ripe tomato	PRODUCE	false	each	count	180		Salad
+cherry_tomato	cherry tomato	cherry tomatoes	grape tomato|baby plum tomato	PRODUCE	false	punnet	count	150		Salad
+plum_tomato	plum tomato	plum tomatoes	roma tomato	PRODUCE	false	each	count			Salad
+celery	celery	celery	celery stalk|celery rib|celery stick	PRODUCE	false	head	count	100		Salad
+celeriac	celeriac	celeriacs	celery root	PRODUCE	false	each	count			Vegetables
+cucumber	cucumber	cucumbers	english cucumber	PRODUCE	false	each	count			Salad
+courgette	courgette	courgettes	zucchini	PRODUCE	false	each	count	125		Vegetables
+aubergine	aubergine	aubergines	eggplant|miniature eggplant	PRODUCE	false	each	count	82		Vegetables
+bell_pepper	bell pepper	bell peppers	red bell pepper|green bell pepper|yellow bell pepper|red pepper|green pepper|yellow pepper|sweet red pepper|capsicum|peppers|sweet pepper|sweet peppers	PRODUCE	false	each	count	150		Salad
+padron_pepper	padron pepper	padron peppers	pimientos de padron|padron	PRODUCE	false	pack	mass			Vegetables
+chilli	red chilli	red chillies	chili pepper|chile|chili|chilli pepper|fresh chilli|red chile|chilies|chillies|chiles	PRODUCE	false	each	count			Vegetables
+jalapeno	jalapeño	jalapeños	jalapeno pepper|jalape o|jalape o pepper	PRODUCE	false	each	count			Vegetables
+serrano_chilli	serrano chilli	serrano chillies	serrano chile|serrano	PRODUCE	false	each	count			Vegetables
+mushroom	mushroom	mushrooms	button mushroom|white mushroom	PRODUCE	false	pack	mass	70		Vegetables
+chestnut_mushroom	chestnut mushroom	chestnut mushrooms	cremini mushroom|cremini|brown mushroom|baby bella mushroom	PRODUCE	false	pack	mass	70		Vegetables
+shiitake	shiitake mushroom	shiitake mushrooms	shiitake	PRODUCE	false	pack	mass			Vegetables
+portobello	portobello mushroom	portobello mushrooms	portabella mushroom|flat mushroom	PRODUCE	false	each	count			Vegetables
+wild_mushroom	wild mushrooms	wild mushrooms		PRODUCE	false	pack	mass			Vegetables
+oyster_mushroom	oyster mushroom	oyster mushrooms		PRODUCE	false	pack	mass			Vegetables
+chanterelle	chanterelle mushroom	chanterelle mushrooms	chanterelle|chanterelles|girolles|girolle	PRODUCE	false	pack	mass			Vegetables
+morel	morel mushroom	morel mushrooms	morel|morels	PRODUCE	false	pack	mass			Vegetables
+porcini	dried porcini	dried porcini	porcini|porcini mushrooms|dried porcini mushrooms|dried porcini mushroom|ceps|dried ceps	WORLD_FOODS	false	pack	mass			
+dried_mushroom	dried mushrooms	dried mushrooms	dried mushroom|dried shiitake|dried shiitake mushrooms|dried wild mushrooms	WORLD_FOODS	false	pack	mass			
+broccoli	broccoli	broccoli		PRODUCE	false	head	count	90		Vegetables
+tenderstem	tenderstem broccoli	tenderstem broccoli	broccolini	PRODUCE	false	pack	mass			Vegetables
+cauliflower	cauliflower	cauliflowers		PRODUCE	false	head	count	107		Vegetables
+cabbage	cabbage	cabbages	green cabbage|savoy cabbage|white cabbage	PRODUCE	false	head	count	90		Vegetables
+red_cabbage	red cabbage	red cabbages		PRODUCE	false	head	count			Vegetables
+kale	kale	kale		PRODUCE	false	bag	mass	67		Vegetables
+cavolo_nero	cavolo nero	cavolo nero	lacinato kale|tuscan kale|black kale	PRODUCE	false	bag	mass	67		Vegetables
+spinach	spinach	spinach	baby spinach|spinach leaves|fresh spinach	PRODUCE	false	bag	mass	30	1 × 250 g bag	Vegetables
+chard	swiss chard	swiss chard	chard|rainbow chard	PRODUCE	false	bunch	count			Vegetables
+lettuce	lettuce	lettuces	romaine lettuce|cos lettuce|romaine	PRODUCE	false	head	count			Salad
+iceberg	iceberg lettuce	iceberg lettuces	iceberg	PRODUCE	false	head	count			Salad
+little_gem	little gem lettuce	little gem lettuces	little gem|little gems|baby gem|baby gem lettuce	PRODUCE	false	head	count			Salad
+rocket	rocket	rocket	arugula	PRODUCE	false	bag	mass	20		Salad
+watercress	watercress	watercress		PRODUCE	false	bag	mass	34		Salad
+salad_leaves	salad leaves	salad leaves	mixed salad|mesclun|mixed greens|salad greens	PRODUCE	false	bag	mass	20		Salad
+radicchio	radicchio	radicchio		PRODUCE	false	head	count			Salad
+endive	chicory	chicory	endive|belgian endive	PRODUCE	false	each	count			Salad
+asparagus	asparagus	asparagus		PRODUCE	false	bunch	count			Vegetables
+green_beans	green beans	green beans	french beans|string beans|haricots verts	PRODUCE	false	pack	mass	125		Vegetables
+runner_beans	runner beans	runner beans		PRODUCE	false	pack	mass			Vegetables
+peas_fresh	peas in the pod	peas in the pod		PRODUCE	false	pack	mass	145		Vegetables
+mangetout	mangetout	mangetout	snow pea|snow peas|sugar snap peas|sugar snap	PRODUCE	false	pack	mass			Vegetables
+sweetcorn_cob	corn on the cob	corn on the cob	corn|ear of corn|sweet corn|corn cob	PRODUCE	false	each	count			Vegetables
+butternut_squash	butternut squash	butternut squashes	squash|winter squash	PRODUCE	false	each	count			Vegetables
+pumpkin	pumpkin	pumpkins		PRODUCE	false	each	count			Vegetables
+beetroot	beetroot	beetroot	beet|beets	PRODUCE	false	pack	count			Vegetables
+parsnip	parsnip	parsnips		PRODUCE	false	each	count			Vegetables
+turnip	turnip	turnips		PRODUCE	false	each	count			Vegetables
+swede	swede	swedes	rutabaga	PRODUCE	false	each	count			Vegetables
+radish	radish	radishes		PRODUCE	false	bunch	count			Salad
+fennel	fennel	fennel	fennel bulb|florence fennel	PRODUCE	false	bulb	count			Vegetables
+artichoke	artichoke	artichokes	globe artichoke	PRODUCE	false	each	count			Vegetables
+avocado	avocado	avocados	hass avocado	PRODUCE	false	each	count	150		Salad
+brussels_sprouts	brussels sprouts	brussels sprouts	brussels sprout|sprouts	PRODUCE	false	bag	mass			Vegetables
+pak_choi	pak choi	pak choi	bok choy|baby bok choy	PRODUCE	false	each	count			Vegetables
+beansprouts	beansprouts	beansprouts	bean sprouts|mung bean sprouts	PRODUCE	false	bag	mass	105		Salad
+okra	okra	okra		PRODUCE	false	pack	mass			Vegetables
+tomatillo	tomatillo	tomatillos		WORLD_FOODS	false	tin	count			Mexican
+horseradish_root	horseradish root	horseradish root	fresh horseradish	PRODUCE	false	each	count			Vegetables
+ginger	ginger	ginger	ginger root|fresh ginger|root ginger	PRODUCE	false	piece	count			Vegetables
+lemongrass	lemongrass	lemongrass	lemon grass	PRODUCE	false	stalk	count			Vegetables
+parsley	parsley	parsley	flat-leaf parsley|italian parsley|curly parsley|parsley leaves	PRODUCE	false	pack	presence		1 × 30 g pack	Herbs
+coriander	coriander	coriander	cilantro|cilantro leaves|coriander leaves|fresh coriander	PRODUCE	false	pack	presence		1 × 30 g pack	Herbs
+basil	basil	basil	basil leaves|fresh basil|thai basil	PRODUCE	false	pack	presence			Herbs
+mint	mint	mint	mint leaves|fresh mint|mint leave	PRODUCE	false	pack	presence			Herbs
+dill	dill	dill	fresh dill|dill fronds	PRODUCE	false	pack	presence			Herbs
+chives	chives	chives	chive	PRODUCE	false	pack	presence			Herbs
+thyme	thyme	thyme	fresh thyme|thyme leaves	PRODUCE	false	pack	presence			Herbs
+rosemary	rosemary	rosemary	fresh rosemary|rosemary leaves	PRODUCE	false	pack	presence			Herbs
+sage	sage	sage	sage leaves|fresh sage	PRODUCE	false	pack	presence			Herbs
+tarragon	tarragon	tarragon	tarragon leaves	PRODUCE	false	pack	presence			Herbs
+oregano_fresh	fresh oregano	fresh oregano		PRODUCE	false	pack	presence			Herbs
+chervil	chervil	chervil		PRODUCE	false	pack	presence			Herbs
+marjoram	marjoram	marjoram		PRODUCE	false	pack	presence			Herbs
+bay_leaf	bay leaf	bay leaves	bay leave|bay	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+mixed_herbs_fresh	mixed herbs	mixed herbs	herb|herbs|fresh herbs|bouquet garni	PRODUCE	false	pack	presence			Herbs
+lemon	lemon	lemons	lemon wedge|lemon zest|lemon rind|lemon peel	PRODUCE	false	each	count			Fruit
+lime	lime	limes	lime wedge|lime zest	PRODUCE	false	each	count			Fruit
+orange	orange	oranges	orange zest|orange peel|orange rind|navel orange	PRODUCE	false	each	count			Fruit
+blood_orange	blood orange	blood oranges		PRODUCE	false	each	count			Fruit
+grapefruit	grapefruit	grapefruits		PRODUCE	false	each	count			Fruit
+apple	apple	apples	tart apple|granny smith apple|eating apple|cooking apple|bramley apple	PRODUCE	false	each	count	125		Fruit
+pear	pear	pears		PRODUCE	false	each	count			Fruit
+banana	banana	bananas		PRODUCE	false	each	count	225		Fruit
+strawberry	strawberries	strawberries	strawberry	PRODUCE	false	punnet	mass	150		Fruit
+raspberry	raspberries	raspberries	raspberry	PRODUCE	false	punnet	mass	125		Fruit
+blueberry	blueberries	blueberries	blueberry	PRODUCE	false	punnet	mass	150		Fruit
+blackberry	blackberries	blackberries	blackberry	PRODUCE	false	punnet	mass	145		Fruit
+cherry	cherries	cherries	cherry|sweet cherries|sweet cherry	PRODUCE	false	punnet	mass	155		Fruit
+grape	grapes	grapes	grape|red grapes|green grapes	PRODUCE	false	pack	mass	150		Fruit
+peach	peach	peaches		PRODUCE	false	each	count			Fruit
+nectarine	nectarine	nectarines		PRODUCE	false	each	count			Fruit
+plum	plum	plums		PRODUCE	false	each	count			Fruit
+apricot	apricot	apricots		PRODUCE	false	each	count			Fruit
+mango	mango	mangoes		PRODUCE	false	each	count	165		Fruit
+pineapple	pineapple	pineapples		PRODUCE	false	each	count	165		Fruit
+melon	melon	melons	cantaloupe|honeydew	PRODUCE	false	each	count			Fruit
+watermelon	watermelon	watermelons		PRODUCE	false	each	count			Fruit
+kiwi	kiwi	kiwis	kiwi fruit	PRODUCE	false	each	count			Fruit
+pomegranate	pomegranate	pomegranates	pomegranate seeds	PRODUCE	false	each	count			Fruit
+passion_fruit	passion fruit	passion fruit	passionfruit	PRODUCE	false	each	count			Fruit
+fig	fig	figs	fresh fig	PRODUCE	false	each	count			Fruit
+rhubarb	rhubarb	rhubarb		PRODUCE	false	pack	mass			Fruit
+cranberry	cranberries	cranberries	cranberry	PRODUCE	false	pack	mass	100		Fruit
+coconut_fresh	coconut	coconuts	fresh coconut	PRODUCE	false	each	count			Fruit
+bread	bread	bread	loaf|white bread|sandwich bread	BAKERY	false	loaf	count			Bread
+wholemeal_bread	wholemeal bread	wholemeal bread	whole-wheat bread|brown bread|whole wheat bread	BAKERY	false	loaf	count			Bread
+sourdough	sourdough bread	sourdough bread	sourdough	BAKERY	false	loaf	count			Bread
+baguette	baguette	baguettes	french bread|french stick	BAKERY	false	each	count			Bread
+ciabatta	ciabatta	ciabattas	italian bread	BAKERY	false	each	count			Bread
+pitta	pitta bread	pitta bread	pita|pita bread|pitta	BAKERY	false	pack	count			Wraps & flatbreads
+naan	naan bread	naan bread	naan	BAKERY	false	pack	count			Wraps & flatbreads
+tortilla_wrap	tortilla wraps	tortilla wraps	flour tortilla|tortilla|wrap|wraps	BAKERY	false	pack	count			Wraps & flatbreads
+burger_bun	burger buns	burger buns	hamburger bun|bun|buns|brioche bun	BAKERY	false	pack	count			Rolls & pastries
+breadcrumbs	breadcrumbs	breadcrumbs	bread crumbs|dried breadcrumbs|fresh breadcrumbs	BAKERY	false	pack	mass	100		Breadcrumbs
+panko	panko	panko	panko breadcrumbs|panko bread crumbs|japanese breadcrumbs	BAKERY	false	pack	mass	60		Breadcrumbs
+croissant	croissant	croissants		BAKERY	false	pack	count			Rolls & pastries
+english_muffin	english muffins	english muffins	muffin	BAKERY	false	pack	count			Rolls & pastries
+bagel	bagel	bagels		BAKERY	false	pack	count			Rolls & pastries
+brioche	brioche	brioche		BAKERY	false	loaf	count			Bread
+chicken	chicken	chicken	whole chicken|roasting chicken	MEAT_FISH	false	each	count	140		Poultry
+chicken_breast	chicken breast	chicken breasts	skinless chicken breast|boneless chicken breast|boneless skinless chicken breast	MEAT_FISH	false	pack	count	140		Poultry
+chicken_thigh	chicken thigh	chicken thighs	boneless chicken thigh|skinless chicken thigh	MEAT_FISH	false	pack	count	140		Poultry
+chicken_wing	chicken wings	chicken wings	chicken wing	MEAT_FISH	false	pack	mass			Poultry
+chicken_leg	chicken legs	chicken legs	chicken drumstick|drumsticks|chicken leg	MEAT_FISH	false	pack	count			Poultry
+chicken_liver	chicken livers	chicken livers	chicken liver	MEAT_FISH	false	pack	mass			Poultry
+turkey	turkey	turkey	turkey breast	MEAT_FISH	false	pack	mass	140		Poultry
+turkey_mince	turkey mince	turkey mince	ground turkey	MEAT_FISH	false	pack	mass	225		Poultry
+duck	duck	duck	duck breast|duck legs	MEAT_FISH	false	pack	count			Poultry
+beef	beef	beef	stewing beef|braising steak|chuck|beef chuck	MEAT_FISH	false	pack	mass			Meat
+beef_mince	beef mince	beef mince	minced beef|ground beef|ground chuck|mince	MEAT_FISH	false	pack	mass	225	1 × 500 g pack	Meat
+steak	steak	steaks	sirloin steak|ribeye steak|rib-eye steak|flank steak|skirt steak|beef steak	MEAT_FISH	false	pack	count			Meat
+beef_brisket	beef brisket	beef brisket	brisket	MEAT_FISH	false	each	mass			Meat
+pork	pork	pork	pork loin|pork tenderloin|pork fillet	MEAT_FISH	false	pack	mass			Meat
+pork_shoulder	pork shoulder	pork shoulder	pork butt	MEAT_FISH	false	each	mass			Meat
+pork_chop	pork chop	pork chops		MEAT_FISH	false	pack	count			Meat
+pork_mince	pork mince	pork mince	ground pork|minced pork	MEAT_FISH	false	pack	mass	225		Meat
+pork_belly	pork belly	pork belly		MEAT_FISH	false	pack	mass			Meat
+bacon	bacon	bacon	bacon rashers|streaky bacon|back bacon|thick-cut bacon|slab bacon|sliced bacon	MEAT_FISH	false	pack	count		1 × pack of 8 rashers	Meat
+pancetta	pancetta	pancetta	cubed pancetta|lardons	MEAT_FISH	false	pack	mass	140		Meat
+ham	ham	ham	cooked ham|smoked ham	CHILLED	false	pack	mass	140		Deli
+ham_hock	ham hock	ham hocks	smoked ham hock|smoked ham hocks|gammon hock	MEAT_FISH	false	each	count			Meat
+prosciutto	prosciutto	prosciutto	parma ham|serrano ham	CHILLED	false	pack	mass			Deli
+chorizo	chorizo	chorizo	chorizo sausage	CHILLED	false	pack	mass	130		Deli
+sausage	sausage	sausages	pork sausage|italian sausage	MEAT_FISH	false	pack	count			Meat
+lamb	lamb	lamb	lamb shoulder|lamb neck|diced lamb	MEAT_FISH	false	pack	mass			Meat
+lamb_leg	leg of lamb	legs of lamb	lamb leg	MEAT_FISH	false	each	mass			Meat
+lamb_mince	lamb mince	lamb mince	ground lamb|minced lamb	MEAT_FISH	false	pack	mass	225		Meat
+lamb_chop	lamb chop	lamb chops	lamb cutlets|rack of lamb	MEAT_FISH	false	pack	count			Meat
+veal	veal	veal		MEAT_FISH	false	pack	mass			Meat
+salmon	salmon	salmon	salmon fillet|salmon fillets|salmon steak	MEAT_FISH	false	pack	count			Fish & seafood
+smoked_salmon	smoked salmon	smoked salmon		CHILLED	false	pack	mass	140		Deli
+cod	cod	cod	cod fillet|cod loin	MEAT_FISH	false	pack	count			Fish & seafood
+white_fish	white fish	white fish	white fish fillet|fish fillet|fish|catfish fillet	MEAT_FISH	false	pack	count			Fish & seafood
+haddock	haddock	haddock	haddock fillet|smoked haddock	MEAT_FISH	false	pack	count			Fish & seafood
+hake	hake	hake	hake fillet	MEAT_FISH	false	pack	count			Fish & seafood
+pollock	pollock	pollock	pollock fillet	MEAT_FISH	false	pack	count			Fish & seafood
+sole	sole	sole	sole fillet|lemon sole|dover sole	MEAT_FISH	false	pack	count			Fish & seafood
+halibut	halibut	halibut	halibut fillet	MEAT_FISH	false	pack	count			Fish & seafood
+sea_bass	sea bass	sea bass	sea bass fillet|seabass	MEAT_FISH	false	pack	count			Fish & seafood
+swordfish	swordfish	swordfish	swordfish steak	MEAT_FISH	false	pack	count			Fish & seafood
+tilapia	tilapia	tilapia	tilapia fillet	MEAT_FISH	false	pack	count			Fish & seafood
+tuna_steak	tuna steak	tuna steaks	fresh tuna	MEAT_FISH	false	pack	count			Fish & seafood
+mackerel	mackerel	mackerel		MEAT_FISH	false	pack	count			Fish & seafood
+smoked_mackerel	smoked mackerel	smoked mackerel	smoked mackerel fillets|peppered smoked mackerel	CHILLED	false	pack	count			Deli
+prawn	prawns	prawns	prawn|shrimp|king prawns|tiger prawns|jumbo shrimp|large shrimp	MEAT_FISH	false	pack	mass	145		Fish & seafood
+scallop	scallops	scallops	scallop|sea scallop|sea scallops|bay scallops	MEAT_FISH	false	pack	mass			Fish & seafood
+mussel	mussels	mussels	mussel	MEAT_FISH	false	bag	mass			Fish & seafood
+clam	clams	clams	clam|littleneck clams	MEAT_FISH	false	bag	mass			Fish & seafood
+squid	squid	squid	calamari	MEAT_FISH	false	pack	mass			Fish & seafood
+crab	crab meat	crab meat	crabmeat|crab|lump crabmeat	MEAT_FISH	false	pack	mass	135		Fish & seafood
+lobster	lobster	lobsters		MEAT_FISH	false	each	count			Fish & seafood
+anchovy	anchovies	anchovies	anchovy|anchovy fillet|anchovy fillets	TINS_JARS	false	tin	count			Fish
+oyster	oysters	oysters	oyster	MEAT_FISH	false	each	count			Fish & seafood
+egg	egg	eggs	large egg|free-range egg|free-range eggs|egg yolk|egg white|egg yolks|egg whites	DAIRY_EGGS	false	box	count		1 × box of 6	Butter & eggs
+milk	milk	milk	whole milk|semi-skimmed milk|skimmed milk|low-fat milk|2% milk|full-fat milk	DAIRY_EGGS	false	bottle	volume		1 × 4 pint (2.27 l) bottle	Milk & cream
+butter	butter	butter	unsalted butter|salted butter|sweet butter|cold butter	DAIRY_EGGS	false	block	mass	227	1 × 250 g block	Butter & eggs
+double_cream	double cream	double cream	heavy cream|whipping cream|heavy whipping cream|cream|whipped cream	DAIRY_EGGS	false	pot	volume		1 × 300 ml pot	Milk & cream
+single_cream	single cream	single cream	light cream|half-and-half	DAIRY_EGGS	false	pot	volume			Milk & cream
+creme_fraiche	crème fraîche	crème fraîche	cr me fra che	DAIRY_EGGS	false	pot	volume		1 × 300 ml pot	Milk & cream
+sour_cream	soured cream	soured cream	sour cream	DAIRY_EGGS	false	pot	volume			Milk & cream
+yogurt	natural yogurt	natural yogurt	yogurt|plain yogurt|yoghurt|whole-milk yogurt	DAIRY_EGGS	false	pot	volume			Yogurt
+greek_yogurt	greek yogurt	greek yogurt	greek-style yogurt|strained yogurt	DAIRY_EGGS	false	pot	volume			Yogurt
+buttermilk	buttermilk	buttermilk		DAIRY_EGGS	false	carton	volume			Milk & cream
+cheddar	cheddar	cheddar	cheddar cheese|mature cheddar|sharp cheddar	DAIRY_EGGS	false	block	mass	113	1 × 400 g block	Cheese
+parmesan	parmesan	parmesan	parmesan cheese|parmigiano-reggiano|parmigiano reggiano	DAIRY_EGGS	false	block	mass	100		Cheese
+grana_padano	grana padano	grana padano	grana padano cheese	DAIRY_EGGS	false	block	mass	100		Cheese
+pecorino	pecorino	pecorino	pecorino romano|pecorino cheese|pecorino romano cheese	DAIRY_EGGS	false	block	mass	100		Cheese
+mozzarella	mozzarella	mozzarella	fresh mozzarella|buffalo mozzarella|mozzarella cheese	DAIRY_EGGS	false	ball	count	113		Cheese
+feta	feta	feta	feta cheese	DAIRY_EGGS	false	pack	mass	150		Cheese
+goat_cheese	goats' cheese	goats' cheese	goat cheese|chevre|goat's cheese	DAIRY_EGGS	false	pack	mass	150		Cheese
+ricotta	ricotta	ricotta	ricotta cheese	DAIRY_EGGS	false	tub	mass	245		Cheese
+cream_cheese	cream cheese	cream cheese	soft cheese|philadelphia	DAIRY_EGGS	false	tub	mass	230		Cheese
+mascarpone	mascarpone	mascarpone		DAIRY_EGGS	false	tub	mass	230		Cheese
+gruyere	gruyère	gruyère	gruy re cheese|gruyere cheese	DAIRY_EGGS	false	pack	mass	108		Cheese
+emmental	emmental	emmental	emmenthal|emmentaler|swiss cheese	DAIRY_EGGS	false	pack	mass	108		Cheese
+blue_cheese	blue cheese	blue cheese		DAIRY_EGGS	false	pack	mass	135		Cheese
+stilton	stilton	stilton	stilton cheese	DAIRY_EGGS	false	pack	mass	135		Cheese
+gorgonzola	gorgonzola	gorgonzola	gorgonzola cheese|gorgonzola dolce	DAIRY_EGGS	false	pack	mass	135		Cheese
+roquefort	roquefort	roquefort	roquefort cheese	DAIRY_EGGS	false	pack	mass	135		Cheese
+halloumi	halloumi	halloumi		DAIRY_EGGS	false	pack	count			Cheese
+cheese	cheese	cheese	grated cheese	DAIRY_EGGS	false	pack	mass	113		Cheese
+tofu	tofu	tofu	firm tofu|silken tofu	CHILLED	false	pack	count			
+hummus	houmous	houmous	hummus	CHILLED	false	tub	count			
+pesto	pesto	pesto	basil pesto|green pesto	TINS_JARS	false	jar	count			Jars & pickles
+fresh_pasta	fresh pasta	fresh pasta	fresh tagliatelle|fresh lasagne sheets	CHILLED	false	pack	count			Pastry & pasta
+puff_pastry	puff pastry	puff pastry	ready-rolled puff pastry	CHILLED	false	pack	count			Pastry & pasta
+shortcrust_pastry	shortcrust pastry	shortcrust pastry	pie crust|pie dough	CHILLED	false	pack	count			Pastry & pasta
+filo_pastry	filo pastry	filo pastry	phyllo|phyllo dough|filo	CHILLED	false	pack	count			Pastry & pasta
+dumpling_wrappers	dumpling wrappers	dumpling wrappers	dumpling skins|gyoza wrappers|wonton wrappers|gyoza skins	WORLD_FOODS	false	pack	count			Asian
+fresh_stock	fresh stock	fresh stock		CHILLED	false	pot	volume			
+frozen_peas	frozen peas	frozen peas	peas|petits pois|garden peas	FROZEN	false	bag	mass	145		
+frozen_sweetcorn	frozen sweetcorn	frozen sweetcorn	corn kernels|frozen corn	FROZEN	false	bag	mass	165		
+frozen_spinach	frozen spinach	frozen spinach		FROZEN	false	bag	mass	190		
+frozen_diced_onion	frozen diced onion	frozen diced onions	frozen chopped onion|frozen chopped onions|frozen onion|frozen onions|diced frozen onion|chopped frozen onion	FROZEN	false	bag	mass	115		
+frozen_berries	frozen berries	frozen berries	frozen mixed berries	FROZEN	false	bag	mass	140		
+edamame	edamame beans	edamame beans	edamame|soya beans	FROZEN	false	bag	mass	155		
+broad_beans	broad beans	broad beans	fava beans|fava bean|broad bean	FROZEN	false	bag	mass	150		
+ice_cream	ice cream	ice cream	vanilla ice cream	FROZEN	false	tub	count			
+ice	ice	ice	ice cubes	FROZEN	false	bag	presence			
+chopped_tomatoes	chopped tomatoes	chopped tomatoes	canned tomatoes|tinned tomatoes|diced tomatoes|crushed tomatoes|whole peeled tomatoes|canned plum tomatoes|plum tomatoes in juice	TINS_JARS	false	tin	count		1 × 400 g tin	Tomatoes
+passata	passata	passata	tomato sauce|strained tomatoes|sieved tomatoes	TINS_JARS	false	carton	volume			Tomatoes
+tomato_puree	tomato purée	tomato purée	tomato paste|double concentrated tomato puree	TINS_JARS	false	tube	presence			Tomatoes
+sundried_tomato	sun-dried tomatoes	sun-dried tomatoes	sundried tomatoes|sun dried tomatoes	TINS_JARS	false	jar	count			Tomatoes
+chickpeas	chickpeas	chickpeas	chickpea|garbanzo beans|garbanzo bean|canned chickpeas	TINS_JARS	false	tin	count		1 × 400 g tin	Beans & pulses
+kidney_beans	kidney beans	kidney beans	red kidney beans	TINS_JARS	false	tin	count			Beans & pulses
+black_beans	black beans	black beans	black bean	TINS_JARS	false	tin	count			Beans & pulses
+cannellini_beans	cannellini beans	cannellini beans	white beans|white bean|great northern beans|cannellini bean	TINS_JARS	false	tin	count			Beans & pulses
+haricot_beans	haricot beans	haricot beans	haricot bean|navy beans|navy bean	TINS_JARS	false	tin	count			Beans & pulses
+butter_beans	butter beans	butter beans	butter bean|lima beans|lima bean	TINS_JARS	false	tin	count			Beans & pulses
+baked_beans	baked beans	baked beans		TINS_JARS	false	tin	count			Beans & pulses
+lentils_tin	tinned lentils	tinned lentils		TINS_JARS	false	tin	count			Beans & pulses
+coconut_milk	coconut milk	coconut milk	unsweetened coconut milk|light coconut milk	TINS_JARS	false	tin	count		1 × 400 ml tin	
+coconut_cream	coconut cream	coconut cream		TINS_JARS	false	tin	count			
+sweetcorn_tin	tinned sweetcorn	tinned sweetcorn	canned corn	TINS_JARS	false	tin	count			Beans & pulses
+tuna_tin	tinned tuna	tinned tuna	tuna|canned tuna|tuna in oil	TINS_JARS	false	tin	count			Fish
+olive	olives	olives	olive|black olive|black olives	TINS_JARS	false	jar	count			Jars & pickles
+green_olive	green olive	green olives		TINS_JARS	false	jar	count			Jars & pickles
+kalamata_olive	kalamata olive	kalamata olives	kalamata	TINS_JARS	false	jar	count			Jars & pickles
+caper	capers	capers	caper	TINS_JARS	false	jar	presence			Jars & pickles
+gherkin	gherkins	gherkins	pickles|cornichons|dill pickles	TINS_JARS	false	jar	count			Jars & pickles
+roasted_pepper	roasted red peppers	roasted red peppers	jarred roasted peppers|roasted peppers	TINS_JARS	false	jar	count			Jars & pickles
+artichoke_hearts	artichoke hearts	artichoke hearts	marinated artichokes	TINS_JARS	false	jar	count			Jars & pickles
+pumpkin_puree	pumpkin purée	pumpkin purée	canned pumpkin	WORLD_FOODS	false	tin	count			
+jam	jam	jam	apricot jam|raspberry jam|strawberry jam|preserves	TINS_JARS	false	jar	count			Spreads & syrups
+honey	honey	honey	mild honey|runny honey|clear honey	TINS_JARS	false	jar	presence			Spreads & syrups
+maple_syrup	maple syrup	maple syrup	pure maple syrup	TINS_JARS	false	bottle	presence			Spreads & syrups
+agave_syrup	agave syrup	agave syrup	agave|agave nectar|agave sweetener	TINS_JARS	false	bottle	presence			Spreads & syrups
+golden_syrup	golden syrup	golden syrup		BAKING	false	tin	presence			Sugar & syrups
+corn_syrup	corn syrup	corn syrup	light corn syrup|dark corn syrup	BAKING	false	bottle	presence			Sugar & syrups
+peanut_butter	peanut butter	peanut butter	smooth peanut butter|crunchy peanut butter	TINS_JARS	false	jar	presence			Spreads & syrups
+tahini	tahini	tahini	tahini paste	WORLD_FOODS	false	jar	presence			Middle Eastern & Indian
+stock_cube	stock cubes	stock cubes	bouillon cube|stock cube|bouillon|chicken stock cube|chicken stock cubes|chicken bouillon cube	TINS_JARS	false	pack	presence			Stock
+chicken_stock	chicken stock	chicken stock	chicken broth|low-sodium chicken broth	TINS_JARS	false	carton	volume			Stock
+vegetable_stock	vegetable stock	vegetable stock	vegetable broth|veg stock|stock|broth	TINS_JARS	false	carton	volume			Stock
+beef_stock	beef stock	beef stock	beef broth	TINS_JARS	false	carton	volume			Stock
+fish_stock	fish stock	fish stock		TINS_JARS	false	carton	volume			Stock
+pasta	pasta	pasta	dry pasta|dried pasta|short pasta	PASTA_RICE_GRAINS	false	bag	mass	100	1 × 500 g bag	Pasta
+spaghetti	spaghetti	spaghetti		PASTA_RICE_GRAINS	false	bag	mass	100	1 × 500 g bag	Pasta
+linguine	linguine	linguine	linguini	PASTA_RICE_GRAINS	false	bag	mass	100		Pasta
+bucatini	bucatini	bucatini		PASTA_RICE_GRAINS	false	bag	mass	100		Pasta
+fettuccine	fettuccine	fettuccine	fettuccini	PASTA_RICE_GRAINS	false	bag	mass	100		Pasta
+tagliatelle	tagliatelle	tagliatelle		PASTA_RICE_GRAINS	false	bag	mass	100		Pasta
+pappardelle	pappardelle	pappardelle		PASTA_RICE_GRAINS	false	bag	mass	100		Pasta
+angel_hair	angel hair pasta	angel hair pasta	angel hair|capellini	PASTA_RICE_GRAINS	false	bag	mass	100		Pasta
+penne	penne	penne		PASTA_RICE_GRAINS	false	bag	mass	100		Pasta
+rigatoni	rigatoni	rigatoni		PASTA_RICE_GRAINS	false	bag	mass	100		Pasta
+fusilli	fusilli	fusilli		PASTA_RICE_GRAINS	false	bag	mass	100		Pasta
+macaroni	macaroni	macaroni	elbow macaroni	PASTA_RICE_GRAINS	false	bag	mass	100		Pasta
+orecchiette	orecchiette	orecchiette		PASTA_RICE_GRAINS	false	bag	mass	100		Pasta
+farfalle	farfalle	farfalle	bow-tie pasta|bow tie pasta	PASTA_RICE_GRAINS	false	bag	mass	100		Pasta
+conchiglie	conchiglie	conchiglie	pasta shells|shell pasta	PASTA_RICE_GRAINS	false	bag	mass	100		Pasta
+orzo	orzo	orzo	orzo pasta|risoni	PASTA_RICE_GRAINS	false	bag	mass	100		Pasta
+lasagne_sheets	lasagne sheets	lasagne sheets	lasagna noodles|lasagne	PASTA_RICE_GRAINS	false	box	count			Pasta
+egg_noodles	egg noodles	egg noodles	noodles|noodle	WORLD_FOODS	false	pack	count			Asian
+rice_noodles	rice noodles	rice noodles	vermicelli rice noodles|rice vermicelli	WORLD_FOODS	false	pack	count			Asian
+rice	rice	rice	long-grain rice|white rice|long grain rice|cooked rice	PASTA_RICE_GRAINS	false	bag	mass	185	1 × 1 kg bag	Rice
+basmati_rice	basmati rice	basmati rice	basmati	PASTA_RICE_GRAINS	false	bag	mass	185		Rice
+jasmine_rice	jasmine rice	jasmine rice	thai fragrant rice	PASTA_RICE_GRAINS	false	bag	mass	185		Rice
+risotto_rice	risotto rice	risotto rice	arborio rice|arborio|carnaroli rice	PASTA_RICE_GRAINS	false	bag	mass	200		Rice
+brown_rice	brown rice	brown rice		PASTA_RICE_GRAINS	false	bag	mass	190		Rice
+couscous	couscous	couscous		PASTA_RICE_GRAINS	false	bag	mass	175		Grains
+bulgur	bulgur wheat	bulgur wheat	bulgur|bulghur|cracked wheat	PASTA_RICE_GRAINS	false	bag	mass	140		Grains
+quinoa	quinoa	quinoa		PASTA_RICE_GRAINS	false	bag	mass	170		Grains
+pearl_barley	pearl barley	pearl barley	barley	PASTA_RICE_GRAINS	false	bag	mass	200		Grains
+farro	farro	farro	spelt grain	PASTA_RICE_GRAINS	false	bag	mass	180		Grains
+oats	porridge oats	porridge oats	oats|rolled oats|oatmeal|old-fashioned oats	PASTA_RICE_GRAINS	false	bag	mass	90		Grains
+polenta	polenta	polenta	cornmeal|yellow cornmeal|grits	PASTA_RICE_GRAINS	false	bag	mass	160		Grains
+lentils	lentils	lentils	lentil|dried lentils	PASTA_RICE_GRAINS	false	bag	mass	190		Pulses
+red_lentils	red lentils	red lentils	red lentil|split red lentils|red split lentils|masoor dal	PASTA_RICE_GRAINS	false	bag	mass	190		Pulses
+green_lentils	green lentils	green lentils	green lentil	PASTA_RICE_GRAINS	false	bag	mass	190		Pulses
+brown_lentils	brown lentils	brown lentils	brown lentil	PASTA_RICE_GRAINS	false	bag	mass	190		Pulses
+puy_lentils	puy lentils	puy lentils	puy lentil|french lentils|french green lentils|le puy lentils	PASTA_RICE_GRAINS	false	bag	mass	190		Pulses
+black_lentils	black lentils	black lentils	black lentil|beluga lentils|beluga lentil	PASTA_RICE_GRAINS	false	bag	mass	190		Pulses
+split_peas	split peas	split peas	yellow split peas	PASTA_RICE_GRAINS	false	bag	mass	200		Pulses
+dried_beans	dried beans	dried beans	bean|beans	PASTA_RICE_GRAINS	false	bag	mass	190		Pulses
+soy_sauce	soy sauce	soy sauce	light soy sauce|shoyu	WORLD_FOODS	false	bottle	presence			Asian
+dark_soy_sauce	dark soy sauce	dark soy sauce	dark soy	WORLD_FOODS	false	bottle	presence			Asian
+tamari	tamari	tamari	tamari sauce|gluten-free soy sauce	WORLD_FOODS	false	bottle	presence			Asian
+fish_sauce	fish sauce	fish sauce	nam pla	WORLD_FOODS	false	bottle	presence			Asian
+oyster_sauce	oyster sauce	oyster sauce		WORLD_FOODS	false	bottle	presence			Asian
+hoisin	hoisin sauce	hoisin sauce	hoisin	WORLD_FOODS	false	jar	presence			Asian
+mirin	mirin	mirin		WORLD_FOODS	false	bottle	presence			Asian
+rice_wine	shaoxing rice wine	shaoxing rice wine	rice wine|shaoxing wine	WORLD_FOODS	false	bottle	presence			Asian
+sake	sake	sake		WORLD_FOODS	false	bottle	presence			Asian
+miso	miso paste	miso paste	miso|white miso|red miso	WORLD_FOODS	false	tub	presence			Asian
+curry_paste	curry paste	curry paste		WORLD_FOODS	false	jar	presence			Asian
+red_curry_paste	thai red curry paste	thai red curry paste	red curry paste	WORLD_FOODS	false	jar	presence			Asian
+green_curry_paste	thai green curry paste	thai green curry paste	green curry paste	WORLD_FOODS	false	jar	presence			Asian
+gochujang	gochujang	gochujang		WORLD_FOODS	false	tub	presence			Asian
+sriracha	sriracha	sriracha	sriracha sauce	WORLD_FOODS	false	bottle	presence			Asian
+harissa	harissa	harissa	harissa paste	WORLD_FOODS	false	jar	presence			Middle Eastern & Indian
+chipotle	chipotle in adobo	chipotle in adobo	chipotle chiles in adobo|chipotle paste|chipotle	WORLD_FOODS	false	tin	presence			Mexican
+corn_tortilla	corn tortillas	corn tortillas	corn tortilla|white corn tortillas	WORLD_FOODS	false	pack	count			Mexican
+tortilla_chips	tortilla chips	tortilla chips	corn chips	WORLD_FOODS	false	bag	count			Mexican
+nori	nori	nori	nori sheets|seaweed	WORLD_FOODS	false	pack	count			Asian
+rice_paper	rice paper wrappers	rice paper wrappers	rice paper	WORLD_FOODS	false	pack	count			Asian
+water_chestnut	water chestnuts	water chestnuts	water chestnut	WORLD_FOODS	false	tin	count			Asian
+bamboo_shoots	bamboo shoots	bamboo shoots		WORLD_FOODS	false	tin	count			Asian
+tamarind	tamarind paste	tamarind paste	tamarind	WORLD_FOODS	false	jar	presence			Asian
+coconut_flakes	desiccated coconut	desiccated coconut	shredded coconut|coconut flakes|unsweetened shredded coconut	BAKING	false	bag	mass	60		Chocolate & decorations
+flour	plain flour	plain flour	all-purpose flour|flour|white flour|unbleached all-purpose flour|ap flour	BAKING	false	bag	mass	125	1 × 1.5 kg bag	Flour
+self_raising_flour	self-raising flour	self-raising flour	self-rising flour	BAKING	false	bag	mass	125		Flour
+strong_flour	strong white bread flour	strong white bread flour	bread flour|strong flour	BAKING	false	bag	mass	130		Flour
+wholemeal_flour	wholemeal flour	wholemeal flour	whole-wheat flour|whole wheat flour|wholewheat flour	BAKING	false	bag	mass	120		Flour
+cake_flour	cake flour	cake flour		BAKING	false	bag	mass	115		Flour
+cornflour	cornflour	cornflour	cornstarch|corn starch	BAKING	false	box	presence			Flour
+caster_sugar	caster sugar	caster sugar	superfine sugar|sugar|granulated sugar|white sugar	BAKING	false	bag	mass	200	1 × 1 kg bag	Sugar & syrups
+icing_sugar	icing sugar	icing sugar	powdered sugar|confectioners' sugar|confectioners sugar	BAKING	false	bag	mass	120		Sugar & syrups
+brown_sugar	light brown sugar	light brown sugar	brown sugar|light brown soft sugar|soft brown sugar|packed brown sugar	BAKING	false	bag	mass	220		Sugar & syrups
+dark_brown_sugar	dark brown sugar	dark brown sugar	dark muscovado sugar|muscovado	BAKING	false	bag	mass	220		Sugar & syrups
+demerara	demerara sugar	demerara sugar	turbinado sugar|raw sugar	BAKING	false	bag	mass	200		Sugar & syrups
+molasses	black treacle	black treacle	molasses|treacle	BAKING	false	tin	presence			Sugar & syrups
+baking_powder	baking powder	baking powder		BAKING	false	tub	presence			Baking aids
+bicarb	bicarbonate of soda	bicarbonate of soda	baking soda|bicarb|sodium bicarbonate	BAKING	false	tub	presence			Baking aids
+cream_of_tartar	cream of tartar	cream of tartar		BAKING	false	tub	presence			Baking aids
+yeast	fast-action dried yeast	fast-action dried yeast	yeast|dry yeast|active dry yeast|instant yeast|dried yeast	BAKING	false	pack	presence		1 × pack of 7 g sachets	Baking aids
+vanilla_extract	vanilla extract	vanilla extract	vanilla|pure vanilla extract|vanilla essence	BAKING	false	bottle	presence			Baking aids
+vanilla_pod	vanilla pod	vanilla pods	vanilla bean|vanilla beans	BAKING	false	each	count			Baking aids
+almond_extract	almond extract	almond extract		BAKING	false	bottle	presence			Baking aids
+cocoa	cocoa powder	cocoa powder	cocoa|unsweetened cocoa powder|dutch-process cocoa	BAKING	false	tub	presence			Chocolate & decorations
+dark_chocolate	dark chocolate	dark chocolate	bittersweet chocolate|semisweet chocolate|chocolate|chocolate chips|dark chocolate chips|semisweet chocolate chips	BAKING	false	bar	mass	170		Chocolate & decorations
+milk_chocolate	milk chocolate	milk chocolate		BAKING	false	bar	mass	170		Chocolate & decorations
+white_chocolate	white chocolate	white chocolate		BAKING	false	bar	mass	170		Chocolate & decorations
+gelatine	gelatine	gelatine	gelatin|gelatine leaves|powdered gelatin|unflavored gelatin	BAKING	false	pack	presence			Baking aids
+food_colouring	food colouring	food colouring	food coloring|red food coloring	BAKING	false	bottle	presence			Baking aids
+sprinkles	sprinkles	sprinkles		BAKING	false	tub	presence			Chocolate & decorations
+condensed_milk	condensed milk	condensed milk	sweetened condensed milk	BAKING	false	tin	count			
+evaporated_milk	evaporated milk	evaporated milk		BAKING	false	tin	count			
+ground_almonds	ground almonds	ground almonds	almond flour|almond meal	BAKING	false	bag	mass	96		Flour
+almond	almonds	almonds	almond|flaked almonds|slivered almonds|blanched almonds|toasted almonds	NUTS_DRIED_FRUIT	false	bag	mass	140		Nuts
+walnut	walnuts	walnuts	walnut|walnut halves	NUTS_DRIED_FRUIT	false	bag	mass	120		Nuts
+pecan	pecans	pecans	pecan|pecan halves	NUTS_DRIED_FRUIT	false	bag	mass	110		Nuts
+hazelnut	hazelnuts	hazelnuts	hazelnut	NUTS_DRIED_FRUIT	false	bag	mass	135		Nuts
+pistachio	pistachios	pistachios	pistachio|shelled pistachios	NUTS_DRIED_FRUIT	false	bag	mass	125		Nuts
+cashew	cashews	cashews	cashew|cashew nuts	NUTS_DRIED_FRUIT	false	bag	mass	140		Nuts
+peanut	peanuts	peanuts	peanut|roasted peanuts	NUTS_DRIED_FRUIT	false	bag	mass	145		Nuts
+pine_nut	pine nuts	pine nuts	pine nut|pignoli	NUTS_DRIED_FRUIT	false	bag	mass	135		Nuts
+chestnut	chestnuts	chestnuts	chestnut|cooked chestnuts	NUTS_DRIED_FRUIT	false	pack	mass			Nuts
+macadamia	macadamia nuts	macadamia nuts	macadamia	NUTS_DRIED_FRUIT	false	bag	mass	135		Nuts
+sesame_seed	sesame seeds	sesame seeds	sesame seed|toasted sesame seeds	NUTS_DRIED_FRUIT	false	bag	presence			Seeds
+sunflower_seed	sunflower seeds	sunflower seeds		NUTS_DRIED_FRUIT	false	bag	mass	140		Seeds
+pumpkin_seed	pumpkin seeds	pumpkin seeds	pepitas	NUTS_DRIED_FRUIT	false	bag	mass	130		Seeds
+chia_seed	chia seeds	chia seeds		NUTS_DRIED_FRUIT	false	bag	mass	160		Seeds
+flaxseed	linseed	linseed	flaxseed|ground flaxseed	NUTS_DRIED_FRUIT	false	bag	mass	150		Seeds
+raisin	raisins	raisins	raisin|golden raisins|sultanas|sultana	NUTS_DRIED_FRUIT	false	bag	mass	150		Dried fruit
+currant	currants	currants	currant|dried currants	NUTS_DRIED_FRUIT	false	bag	mass	140		Dried fruit
+prune	prunes	prunes	prune|pitted prunes	NUTS_DRIED_FRUIT	false	bag	mass	170		Dried fruit
+date	dates	dates	date|medjool dates|pitted dates	NUTS_DRIED_FRUIT	false	pack	mass	150		Dried fruit
+dried_apricot	dried apricots	dried apricots	dried apricot	NUTS_DRIED_FRUIT	false	bag	mass	130		Dried fruit
+dried_cranberry	dried cranberries	dried cranberries	craisins	NUTS_DRIED_FRUIT	false	bag	mass	120		Dried fruit
+dried_fig	dried figs	dried figs		NUTS_DRIED_FRUIT	false	bag	mass	150		Dried fruit
+crystallised_ginger	crystallised ginger	crystallised ginger	crystallized ginger|candied ginger|stem ginger	NUTS_DRIED_FRUIT	false	bag	mass			Dried fruit
+olive_oil	olive oil	olive oil	light olive oil|pure olive oil	OILS_VINEGARS	true	bottle	presence			Oils
+evoo	extra virgin olive oil	extra virgin olive oil	extra-virgin olive oil	OILS_VINEGARS	false	bottle	presence			Oils
+vegetable_oil	vegetable oil	vegetable oil	canola oil|rapeseed oil|neutral oil|sunflower oil|corn oil|safflower oil|grapeseed oil|soy oil|cooking oil|oil	OILS_VINEGARS	true	bottle	presence			Oils
+sesame_oil	sesame oil	sesame oil	toasted sesame oil|asian sesame oil	OILS_VINEGARS	false	bottle	presence			Oils
+peanut_oil	groundnut oil	groundnut oil	peanut oil	OILS_VINEGARS	false	bottle	presence			Oils
+coconut_oil	coconut oil	coconut oil		OILS_VINEGARS	false	jar	presence			Oils
+walnut_oil	walnut oil	walnut oil		OILS_VINEGARS	false	bottle	presence			Oils
+truffle_oil	truffle oil	truffle oil	white truffle oil	OILS_VINEGARS	false	bottle	presence			Oils
+cooking_spray	cooking spray	cooking spray	cooking oil spray|oil spray|nonstick cooking spray	OILS_VINEGARS	false	can	presence			Oils
+balsamic	balsamic vinegar	balsamic vinegar	balsamic	OILS_VINEGARS	false	bottle	presence			Vinegars
+red_wine_vinegar	red wine vinegar	red wine vinegar	red-wine vinegar	OILS_VINEGARS	false	bottle	presence			Vinegars
+white_wine_vinegar	white wine vinegar	white wine vinegar	white-wine vinegar|champagne vinegar	OILS_VINEGARS	false	bottle	presence			Vinegars
+cider_vinegar	cider vinegar	cider vinegar	apple cider vinegar	OILS_VINEGARS	false	bottle	presence			Vinegars
+sherry_vinegar	sherry vinegar	sherry vinegar		OILS_VINEGARS	false	bottle	presence			Vinegars
+rice_vinegar	rice vinegar	rice vinegar	rice wine vinegar|seasoned rice vinegar	WORLD_FOODS	false	bottle	presence			Asian
+white_vinegar	white vinegar	white vinegar	distilled vinegar|vinegar	OILS_VINEGARS	false	bottle	presence			Vinegars
+malt_vinegar	malt vinegar	malt vinegar		OILS_VINEGARS	false	bottle	presence			Vinegars
+lard	lard	lard		CHILLED	false	block	presence			
+ghee	ghee	ghee	clarified butter	WORLD_FOODS	false	jar	presence			Middle Eastern & Indian
+salt	salt	salt	kosher salt|sea salt|table salt|flaky sea salt|coarse salt|fine salt|fleur de sel|iodized salt|maldon salt	SPICES_CONDIMENTS	true	pack	presence			Salt & pepper
+black_pepper	black pepper	black pepper	pepper|ground black pepper|freshly ground black pepper|black peppercorns|peppercorns|ground pepper	SPICES_CONDIMENTS	true	jar	presence			Salt & pepper
+white_pepper	white pepper	white pepper	ground white pepper	SPICES_CONDIMENTS	false	jar	presence			Salt & pepper
+cumin	ground cumin	ground cumin	cumin	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+cumin_seed	cumin seeds	cumin seeds	cumin seed|whole cumin seeds	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+coriander_ground	ground coriander	ground coriander		SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+coriander_seed	coriander seeds	coriander seeds	coriander seed|whole coriander seeds	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+paprika	paprika	paprika	sweet paprika|hungarian paprika	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+smoked_paprika	smoked paprika	smoked paprika	pimenton|spanish smoked paprika	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+cayenne	cayenne pepper	cayenne pepper	cayenne|ground red pepper	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+chilli_flakes	chilli flakes	chilli flakes	red pepper flakes|red-pepper flakes|crushed red pepper|hot red pepper flake|chili flakes	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+chilli_powder	chilli powder	chilli powder	chili powder|ancho chili powder	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+turmeric	ground turmeric	ground turmeric	turmeric	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+cinnamon	ground cinnamon	ground cinnamon	cinnamon	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+cinnamon_stick	cinnamon stick	cinnamon sticks		SPICES_CONDIMENTS	false	jar	count			Herbs & spices
+nutmeg	nutmeg	nutmeg	ground nutmeg|whole nutmeg|freshly grated nutmeg	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+ginger_ground	ground ginger	ground ginger		SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+allspice	allspice	allspice	ground allspice|allspice berries|allspice berry	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+clove_spice	cloves	cloves	clove|ground cloves|whole cloves	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+cardamom	cardamom pods	cardamom pods	cardamom|green cardamom	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+cardamom_ground	ground cardamom	ground cardamom		SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+star_anise	star anise	star anise		SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+fennel_seed	fennel seeds	fennel seeds	fennel seed	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+caraway	caraway seeds	caraway seeds	caraway seed|caraway	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+caraway_ground	ground caraway	ground caraway		SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+mustard_seed	mustard seeds	mustard seeds	mustard seed|black mustard seeds	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+dried_oregano	dried oregano	dried oregano	oregano	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+dried_thyme	dried thyme	dried thyme		SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+dried_mixed_herbs	dried mixed herbs	dried mixed herbs	herbes de provence|italian seasoning	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+curry_powder	curry powder	curry powder	madras curry powder|hot curry powder|mild curry powder	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+garam_masala	garam masala	garam masala		SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+five_spice	chinese five spice	chinese five spice	five-spice powder|five spice	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+saffron	saffron	saffron	saffron threads	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+sumac	sumac	sumac		SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+zaatar	za'atar	za'atar	zaatar	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+garlic_powder	garlic powder	garlic powder	granulated garlic	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+onion_powder	onion powder	onion powder		SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+mace	mace	mace	ground mace	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+juniper	juniper berries	juniper berries	juniper berry	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+dijon	dijon mustard	dijon mustard	dijon-style mustard|dijon	SPICES_CONDIMENTS	false	jar	presence			Sauces & condiments
+wholegrain_mustard	wholegrain mustard	wholegrain mustard	whole-grain mustard|grainy mustard	SPICES_CONDIMENTS	false	jar	presence			Sauces & condiments
+mustard	english mustard	english mustard	mustard|yellow mustard	SPICES_CONDIMENTS	false	jar	presence			Sauces & condiments
+mustard_powder	mustard powder	mustard powder	dry mustard|english mustard powder|ground mustard	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+mayonnaise	mayonnaise	mayonnaise	mayo	SPICES_CONDIMENTS	false	jar	presence			Sauces & condiments
+ketchup	tomato ketchup	tomato ketchup	ketchup|catsup	SPICES_CONDIMENTS	false	bottle	presence			Sauces & condiments
+worcestershire	worcestershire sauce	worcestershire sauce	worcestershire	SPICES_CONDIMENTS	false	bottle	presence			Sauces & condiments
+hot_sauce	hot sauce	hot sauce	tabasco|tabasco sauce|hot pepper sauce	SPICES_CONDIMENTS	false	bottle	presence			Sauces & condiments
+horseradish	horseradish sauce	horseradish sauce	horseradish|prepared horseradish	SPICES_CONDIMENTS	false	jar	presence			Sauces & condiments
+bbq_sauce	barbecue sauce	barbecue sauce	bbq sauce	SPICES_CONDIMENTS	false	bottle	presence			Sauces & condiments
+sweet_chilli	sweet chilli sauce	sweet chilli sauce	sweet chili sauce	WORLD_FOODS	false	bottle	presence			Asian
+mint_sauce	mint sauce	mint sauce		SPICES_CONDIMENTS	false	jar	presence			Sauces & condiments
+chutney	mango chutney	mango chutney	chutney	WORLD_FOODS	false	jar	presence			Middle Eastern & Indian
+gravy_granules	gravy granules	gravy granules	gravy	SPICES_CONDIMENTS	false	tub	presence			Sauces & condiments
+water	water	water	cold water|warm water|boiling water|hot water|ice water	DRINKS	true	bottle	presence			Juice & soft drinks
+white_wine	dry white wine	dry white wine	white wine	DRINKS	false	bottle	presence			Wine & spirits
+vermouth	dry vermouth	dry vermouth	vermouth|white vermouth|noilly prat	DRINKS	false	bottle	presence			Wine & spirits
+red_wine	red wine	red wine	dry red wine	DRINKS	false	bottle	presence			Wine & spirits
+sherry	dry sherry	dry sherry	sherry|fino sherry	DRINKS	false	bottle	presence			Wine & spirits
+marsala	marsala	marsala	marsala wine|dry marsala|sweet marsala	DRINKS	false	bottle	presence			Wine & spirits
+port	port	port		DRINKS	false	bottle	presence			Wine & spirits
+beer	beer	beer	lager|ale|stout	DRINKS	false	bottle	count			Wine & spirits
+cider	cider	cider	hard cider	DRINKS	false	bottle	count			Wine & spirits
+brandy	brandy	brandy	cognac|calvados|armagnac	DRINKS	false	bottle	presence			Wine & spirits
+rum	rum	rum	dark rum|white rum|light rum	DRINKS	false	bottle	presence			Wine & spirits
+vodka	vodka	vodka	citrus vodka	DRINKS	false	bottle	presence			Wine & spirits
+gin	gin	gin		DRINKS	false	bottle	presence			Wine & spirits
+whisky	whisky	whisky	bourbon|whiskey|scotch	DRINKS	false	bottle	presence			Wine & spirits
+orange_liqueur	orange liqueur	orange liqueur	grand marnier|cointreau|triple sec	DRINKS	false	bottle	presence			Wine & spirits
+bitters	angostura bitters	angostura bitters	bitters|lemon bitters	DRINKS	false	bottle	presence			Wine & spirits
+orange_juice	orange juice	orange juice	fresh orange juice	DRINKS	false	carton	volume			Juice & soft drinks
+apple_juice	apple juice	apple juice		DRINKS	false	carton	volume			Juice & soft drinks
+lemon_juice	lemon juice	lemon juice	bottled lemon juice	DRINKS	false	bottle	presence			Juice & soft drinks
+lime_juice	lime juice	lime juice	bottled lime juice	DRINKS	false	bottle	presence			Juice & soft drinks
+tonic	tonic water	tonic water		DRINKS	false	bottle	count			Juice & soft drinks
+soda_water	soda water	soda water	sparkling water|club soda|carbonated water|seltzer	DRINKS	false	bottle	count			Juice & soft drinks
+coffee	coffee	coffee	ground coffee|espresso|ground espresso|instant coffee|brewed coffee	DRINKS	false	pack	presence			Tea & coffee
+tea	tea bags	tea bags	tea|black tea|green tea	DRINKS	false	box	presence			Tea & coffee
+coconut_water	coconut water	coconut water		DRINKS	false	carton	volume			Juice & soft drinks
+rosewater	rose water	rose water	rosewater	WORLD_FOODS	false	bottle	presence			Middle Eastern & Indian
+orange_blossom_water	orange blossom water	orange blossom water	orange flower water	WORLD_FOODS	false	bottle	presence			Middle Eastern & Indian
+gf_flour	gluten-free flour	gluten-free flour	gluten free flour	FREE_FROM	false	bag	mass	125		
+oat_milk	oat milk	oat milk	oat drink	FREE_FROM	false	carton	volume			
+almond_milk	almond milk	almond milk	almond drink	FREE_FROM	false	carton	volume			
+soy_milk	soya milk	soya milk	soy milk|soya drink	FREE_FROM	false	carton	volume			
+vegan_butter	dairy-free spread	dairy-free spread	vegan butter|margarine	FREE_FROM	false	tub	mass	227		
+gf_pasta	gluten-free pasta	gluten-free pasta		FREE_FROM	false	bag	mass	100		
+foil	kitchen foil	kitchen foil	aluminium foil|aluminum foil|foil	HOUSEHOLD	false	roll	presence			
+baking_paper	baking paper	baking paper	parchment paper|greaseproof paper|parchment	HOUSEHOLD	false	roll	presence			
+cling_film	cling film	cling film	plastic wrap	HOUSEHOLD	false	roll	presence			
+cheesecloth	muslin cloth	muslin cloth	cheesecloth|food-grade cheesecloth	HOUSEHOLD	false	pack	presence			
+kitchen_roll	kitchen roll	kitchen roll	paper towels	HOUSEHOLD	false	pack	presence			
+skewers	skewers	skewers	wooden skewers|bamboo skewers	HOUSEHOLD	false	pack	presence			
+string	kitchen string	kitchen string	butcher's twine|kitchen twine	HOUSEHOLD	false	roll	presence			
+washing_up	washing-up liquid	washing-up liquid	dish soap	HOUSEHOLD	false	bottle	presence			
+bin_bags	bin bags	bin bags		HOUSEHOLD	false	roll	presence			
