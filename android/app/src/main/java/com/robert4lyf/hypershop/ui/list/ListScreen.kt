@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -47,11 +46,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
@@ -106,6 +102,14 @@ private fun ListBody(
     val card = MaterialTheme.colorScheme.card
     // Collapsed aisles, by name: kept across tab switches and rotation.
     var collapsed by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    // An aisle that gains something to buy opens again, so new items are never hidden.
+    val leftByAisle = ui.aisles.associate { (a, rows) -> a.name to rows.count { it.state != TickState.DONE } }
+    var lastLeft by remember { mutableStateOf(leftByAisle) }
+    if (leftByAisle != lastLeft) {
+        val grew = leftByAisle.filter { (a, n) -> n > (lastLeft[a] ?: 0) }.keys
+        if (grew.any { it in collapsed }) collapsed = collapsed - grew
+        lastLeft = leftByAisle
+    }
     LazyColumn(Modifier.fillMaxSize().testTag("list"), contentPadding = PaddingValues(bottom = 24.dp)) {
         header()
         if (ui.isEmpty) item { empty() }
@@ -261,16 +265,13 @@ private fun ListRowItem(
             Modifier
                 .size(56.dp)
                 .clip(CircleShape)
-                .toggleable(value = done, role = Role.Checkbox, onValueChange = { actions.onToggle(row) })
-                .clearAndSetSemantics {
+                // clickable carries the spoken action ("Tick"/"Untick") and the role; the
+                // name and state are added below (the tick's icons have no labels of their own).
+                .clickable(onClickLabel = if (done) "Untick" else "Tick", role = Role.Checkbox) { actions.onToggle(row) }
+                .semantics {
                     testTag = "tick-${row.id}"
                     contentDescription = row.main
                     stateDescription = state
-                    role = Role.Checkbox
-                    onClick(label = if (done) "Untick" else "Tick") {
-                        actions.onToggle(row)
-                        true
-                    }
                 },
             contentAlignment = Alignment.Center,
         ) {

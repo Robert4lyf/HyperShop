@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SnackbarVisuals
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -106,23 +107,35 @@ fun show(
 /**
  * Shows a snackbar for [seconds] once it is on screen. The clock starts when
  * this snackbar appears, not while it waits behind another, and it only ever
- * dismisses this one.
+ * dismisses this one: it is found by its own visuals object, so two snackbars
+ * with the same text can't be confused.
  */
 suspend fun SnackbarHostState.showTimed(
     text: String,
     action: String?,
     seconds: Int,
-): SnackbarResult =
-    coroutineScope {
+): SnackbarResult {
+    val visuals = TimedVisuals(text, action)
+    return coroutineScope {
         val timer =
             launch {
-                val mine = snapshotFlow { currentSnackbarData }.first { it?.visuals?.message == text }
+                val mine = snapshotFlow { currentSnackbarData }.first { it?.visuals === visuals }
                 delay(seconds * 1000L)
                 if (currentSnackbarData === mine) mine?.dismiss()
             }
         try {
-            showSnackbar(text, actionLabel = action, duration = SnackbarDuration.Indefinite)
+            showSnackbar(visuals)
         } finally {
             timer.cancel()
         }
     }
+}
+
+/** A class, not a data class: equal text must still be a different snackbar. */
+private class TimedVisuals(
+    override val message: String,
+    override val actionLabel: String?,
+) : SnackbarVisuals {
+    override val withDismissAction: Boolean = false
+    override val duration: SnackbarDuration = SnackbarDuration.Indefinite
+}

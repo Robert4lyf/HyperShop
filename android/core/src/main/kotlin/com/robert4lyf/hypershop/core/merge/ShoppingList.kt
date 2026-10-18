@@ -1,6 +1,8 @@
 package com.robert4lyf.hypershop.core.merge
 
 import com.robert4lyf.hypershop.core.model.AisleCode
+import com.robert4lyf.hypershop.core.model.BaseKey
+import com.robert4lyf.hypershop.core.model.Dimension
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.QtyUnit
 import com.robert4lyf.hypershop.core.model.Rational
@@ -293,6 +295,7 @@ data class ShoppingList(
         now: Long,
     ): ShoppingList {
         val current = total(itemId)
+        val newTotal = sameCountUnit(current, newTotal)
         val delta =
             (current.parts.keys + newTotal.parts.keys)
                 .associateWith { k -> (newTotal.parts[k] ?: Rational.ZERO) - (current.parts[k] ?: Rational.ZERO) }
@@ -341,7 +344,25 @@ data class ShoppingList(
     /** The units setting changed: every live item's shown amount did, so every live rev bumps. */
     fun unitsChanged(): ShoppingList = bumped(liveItems.map { it.id }.toSet())
 
+    /** A new catalogue version: every live item's text may change, so all are bumped. */
+    fun catalogueChanged(): ShoppingList = bumped(liveItems.map { it.id }.toSet())
+
     // ---- helpers ----------------------------------------------------------------
+
+    /**
+     * A bare number typed for an item counted in one unit means that unit:
+     * "3" for "2 cloves garlic" is 3 cloves, not 3 garlic and no cloves.
+     */
+    private fun sameCountUnit(
+        current: QtyBase,
+        typed: QtyBase,
+    ): QtyBase {
+        val bare = BaseKey.ITEMS.encode()
+        val n = typed.parts[bare] ?: return typed
+        if (typed.parts.size != 1 || current.parts.containsKey(bare)) return typed
+        val counts = current.parts.keys.filter { BaseKey.decode(it).dimension == Dimension.COUNT }
+        return if (counts.size == 1) QtyBase(mapOf(counts.single() to n)) else typed
+    }
 
     internal fun ensureItem(t: NewItem): Pair<ShoppingList, Long> {
         itemByKey(t.mergeKey)?.let { return this to it.id }

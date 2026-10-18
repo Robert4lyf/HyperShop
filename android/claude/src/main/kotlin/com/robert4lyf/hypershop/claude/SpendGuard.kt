@@ -62,11 +62,15 @@ class SpendGuard(
         const val DEFAULT_MONTHLY_CAP_USD = 2.0
         const val DEFAULT_DAILY_CALLS = 50
 
-        /** Roughly 4 characters a token, plus the system prompt and schema; a typical 2000 output tokens (the cap is ClaudeRequest.MAX_TOKENS). */
+        /**
+         * The most a call can cost: roughly 4 characters a token plus the system
+         * prompt and schema in, and the full ClaudeRequest.MAX_TOKENS out (at most
+         * $0.32 on Opus), so a call is only allowed if even its worst case fits under the cap.
+         */
         fun estimateUsd(
             model: ClaudeModel,
             inputChars: Int,
-        ): Double = model.costUsd(Usage(inputTokens = inputChars / 4L + 1200, outputTokens = 2000))
+        ): Double = model.costUsd(Usage(inputTokens = inputChars / 4L + 1200, outputTokens = ClaudeRequest.MAX_TOKENS.toLong()))
 
         /**
          * Cost of a usage row. A model HyperShop does not list (a server-side

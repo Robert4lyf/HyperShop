@@ -169,8 +169,10 @@ class PagerTest {
         for (p in pages) {
             assertTrue(PayloadSize.of(WatchCodec.encodePage(p)) <= PayloadCap.DEFAULT_BYTES)
             assertTrue(p.ackExceptions.isNotEmpty())
-            // The newest ones, in order.
-            assertEquals(ax.takeLast(p.ackExceptions.size), p.ackExceptions)
+            // The oldest ones, in order; the ack stops just before the first left out,
+            // so the watch never reads an op whose exception was dropped as ok.
+            assertEquals(ax.take(p.ackExceptions.size), p.ackExceptions)
+            assertEquals(p.ackExceptions.size, p.ackedThrough)
             assertEquals(pages[0].ackExceptions, p.ackExceptions)
         }
         assertTrue(assembled(pages).second.isNotEmpty(), "acks do not crowd out the list")

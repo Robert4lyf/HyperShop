@@ -147,7 +147,9 @@ object Display {
         if (hint == QtyUnit.TSP) return "${fraction(roundUp(ml / Rational.of(5), Rational.of(1, 4)))} tsp"
         if (hint == QtyUnit.TBSP) return "${fraction(roundUp(ml / Rational.of(15), Rational.of(1, 2)))} tbsp"
         val d = ml.toDouble()
-        val spoons = units != UnitsSetting.METRIC && d < 60
+        // Small amounts become spoons in imperial, and "as written" unless they were written in ml or l.
+        val writtenMetric = hint == QtyUnit.ML || hint == QtyUnit.L
+        val spoons = d < 60 && (units == UnitsSetting.IMPERIAL || units == UnitsSetting.AS_WRITTEN && !writtenMetric)
         if (units == UnitsSetting.AS_WRITTEN && hint == QtyUnit.CUP || units == UnitsSetting.IMPERIAL && d >= 60) {
             return "${fraction(roundUp(ml / Rational.of(240), Rational.of(1, 4)))} ${if (ml > Rational.of(240)) "cups" else "cup"}"
         }

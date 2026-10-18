@@ -40,9 +40,20 @@ class SpendGuardTest {
 
     @Test
     fun aTwoDollarCapIsAboutTwoThousandHaikuImports() {
-        val perImport = SpendGuard.estimateUsd(ClaudeModel.HAIKU, 4000)
+        // A typical import (about 2000 tokens out); the guard's estimate is the worst case.
+        val perImport = ClaudeModel.HAIKU.costUsd(Usage(4000 / 4L + 1200, 2000))
         val imports = (2.0 / perImport).toInt()
         assertTrue(imports in 1000..3000, "$imports imports")
+        assertTrue(SpendGuard.estimateUsd(ClaudeModel.HAIKU, 4000) >= perImport)
+    }
+
+    @Test
+    fun theCapHoldsEvenIfACallUsesItsWholeOutputAllowance() {
+        // $1.80 spent: an Opus call could cost $0.32 at most, so it is refused; Haiku still fits.
+        val spent = Usage(inputTokens = 0, outputTokens = 90_000)
+        val history = listOf(UsageRecord(today.withDayOfMonth(1), "claude-opus-5-5", spent))
+        assertTrue(guard.check(history, today, ClaudeModel.OPUS, 2000) is SpendGuard.Decision.MonthlyCapReached)
+        assertTrue(guard.check(history, today, ClaudeModel.HAIKU, 2000) is SpendGuard.Decision.Allowed)
     }
 
     @Test
