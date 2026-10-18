@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -59,6 +60,7 @@ class ListScreenTest {
             onOpenItem = { events += "open ${it.id}" },
             onFinish = { events += "finish" },
             onClearAll = { events += "clear" },
+            onNeed = { events += "need ${it.key}" },
         )
 
     private fun show(dark: Boolean = false) =
@@ -92,6 +94,21 @@ class ListScreenTest {
         assertEquals("Collapsed", header.fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
         header.performClick()
         compose.onNodeWithTag("item-1").assertExists()
+    }
+
+    @Test
+    fun inStockOpensAndNeedItAdds() {
+        val ui =
+            SAMPLE_LIST.copy(
+                aisles = SAMPLE_LIST.aisles.take(1),
+                inStock = listOf(InStockRow("cat:olive_oil", "olive oil", "2tbsp olive oil", "Weeknight chilli", AisleCode.OILS_VINEGARS)),
+            )
+        compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions) } }
+        compose.onNodeWithTag("need-cat:olive_oil").assertDoesNotExist()
+        compose.onNodeWithTag("in-stock").performScrollTo().performClick()
+        compose.onNodeWithText("2tbsp olive oil").assertExists()
+        compose.onNodeWithTag("need-cat:olive_oil").performScrollTo().performClick()
+        assertEquals(listOf("need cat:olive_oil"), events)
     }
 
     private fun showWithHeader(

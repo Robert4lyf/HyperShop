@@ -45,6 +45,7 @@ fun ListRoute(
             onFinish = vm::finishShopping,
             onClearAll = vm::clearAll,
             onOpenItem = { vm.openItem(it.id) },
+            onNeed = vm::needIt,
             onShare = {
                 val send =
                     Intent(Intent.ACTION_SEND)

@@ -3,6 +3,7 @@ package com.robert4lyf.hypershop.ui.list
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.robert4lyf.hypershop.catalog.EntryEdit
+import com.robert4lyf.hypershop.core.catalog.DisplayPolicy
 import com.robert4lyf.hypershop.core.merge.Display
 import com.robert4lyf.hypershop.core.merge.ShoppingList
 import com.robert4lyf.hypershop.core.merge.UnitsSetting
@@ -10,6 +11,7 @@ import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
+import com.robert4lyf.hypershop.data.InStockLine
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.common.webLink
@@ -24,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -72,8 +75,21 @@ data class ItemSource(
     val url: String? = null,
 )
 
+/** One ingredient you marked in stock on review, for the recipes on the list. */
+data class InStockRow(
+    val key: String,
+    val name: String,
+    /** "2tbsp olive oil", or just "Salt". */
+    val main: String,
+    /** The recipes that need it. */
+    val from: String,
+    val aisle: AisleCode,
+)
+
 data class ListUi(
     val aisles: List<Pair<AisleCode, List<ListRow>>> = emptyList(),
+    /** The "In stock" section, below the aisles. */
+    val inStock: List<InStockRow> = emptyList(),
     val loaded: Boolean = false,
     /** Imports waiting for review: the "1 recipe ready to review" card. */
     val readyJobs: List<Long> = emptyList(),
@@ -105,13 +121,55 @@ class ListViewModel(
     /** The item sheet being loaded: a newer open, or a close, cancels it. */
     private var openJob: Job? = null
 
+    /** The in-stock lines, read again on every list change (an import, a removed recipe, "Need it"). */
+    private val inStockLines = c.repository.list.map { c.repository.inStockOnList(it) }
+
     val ui: StateFlow<ListUi> =
-        combine(c.repository.list, c.settings.units, order, c.importJobs.ready, plusOne) { list, units, ord, ready, p ->
-            lastList = list
-            lastUnits = units
-            build(list, units, ord).copy(readyJobs = ready.map { it.id }, plusOne = p)
-        }.flowOn(Dispatchers.Default)
+        combine(
+            combine(c.repository.list, c.settings.units, order, c.importJobs.ready, plusOne) { list, units, ord, ready, p ->
+                lastList = list
+                lastUnits = units
+                build(list, units, ord).copy(readyJobs = ready.map { it.id }, plusOne = p) to units
+            },
+            inStockLines,
+        ) { (ui, units), lines -> ui.copy(inStock = inStockRows(lines, units)) }
+            .flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.Eagerly, ListUi())
+
+    private fun inStockRows(
+        lines: List<InStockLine>,
+        units: UnitsSetting,
+    ): List<InStockRow> =
+        lines
+            .groupBy { it.target.mergeKey }
+            .map { (key, ls) ->
+                val t = ls.first().target
+                val entry = t.catalogId?.let { c.catalog.byId[it] }
+                val name = entry?.name ?: t.displayName
+                val qty = ls.fold(QtyBase.PRESENCE) { acc, l -> acc + l.qty }
+                val presence = entry?.displayPolicy == DisplayPolicy.PRESENCE && units != UnitsSetting.AS_WRITTEN
+                val amount =
+                    if (presence) {
+                        null
+                    } else {
+                        Display.amount(
+                            qty,
+                            units,
+                            t.aisle == AisleCode.PRODUCE,
+                            Display.hintOf(ls.map { it.unitHint }),
+                            entry?.gramsPerCup,
+                            entry?.displayPolicy,
+                        )
+                    }
+                val from = ls.map { it.recipeTitle }.distinct().joinToString(", ")
+                InStockRow(key, name, listOfNotNull(amount, name).joinToString(" "), from, t.aisle)
+            }.sortedBy { it.name.lowercase() }
+
+    /** "Need it": the in-stock lines go on the list after all, under their recipes. */
+    fun needIt(row: InStockRow) =
+        viewModelScope.launch {
+            if (c.repository.needAfterAll(row.key) > 0) messages.send(UiMessage("Added ${row.name} to the list"))
+        }
 
     private fun build(
         list: ShoppingList,
