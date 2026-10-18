@@ -15,6 +15,9 @@ import com.robert4lyf.hypershop.core.sync.WatchProtocol.Key
  */
 object WatchCodec {
     const val MAX_OPS_PER_BATCH = 32
+
+    /** The largest probe either way: well past anything a watch is thought to take. */
+    const val MAX_PROBE_BYTES = 8192
     private const val MAX_TS = 4_102_444_800L // 2100-01-01
 
     fun decode(payload: Map<*, *>): WatchMessage? {
@@ -54,6 +57,38 @@ object WatchCodec {
             seenListRev = int(a[3])?.takeIf { it >= 0 } ?: return null,
             ts = long(a[4])?.takeIf { it in 0..MAX_TS } ?: return null,
         )
+    }
+
+    /** A probe request, or null for anything else or anything malformed. */
+    fun decodeProbe(payload: Map<*, *>): ProbeRequest? {
+        if (int(payload[Key.VERSION]) != WatchProtocol.VERSION) return null
+        if (payload[Key.TYPE] != WatchProtocol.Inbound.PROBE) return null
+        val install = int(payload[Key.INSTALL_ID])?.takeIf { it != 0 } ?: return null
+        val want = int(payload[Key.PROBE_SIZE])?.takeIf { it in 0..MAX_PROBE_BYTES } ?: return null
+        val pad = payload[Key.PAD]
+        if (pad != null && (pad !is String || pad.length > MAX_PROBE_BYTES)) return null
+        return ProbeRequest(install, PayloadSize.of(payload), want)
+    }
+
+    /**
+     * The reply to a probe: padded so that [PayloadSize] counts about
+     * [ProbeRequest.want] bytes, carrying what the phone measured of the
+     * request (`n`) and of this reply (`sd`).
+     */
+    fun encodeProbeReply(r: ProbeRequest): Map<String, Any> {
+        fun build(
+            pad: Int,
+            down: Int,
+        ) = mapOf<String, Any>(
+            Key.VERSION to WatchProtocol.VERSION,
+            Key.TYPE to WatchProtocol.Outbound.PROBE,
+            Key.PROBE_SIZE to r.received,
+            Key.SIZE_DOWN to down,
+            Key.PAD to "x".repeat(pad),
+        )
+        val bare = PayloadSize.of(build(0, 0))
+        val pad = (r.want - bare).coerceAtLeast(0)
+        return build(pad, PayloadSize.of(build(pad, 0)))
     }
 
     fun encode(m: WatchMessage): Map<String, Any> =

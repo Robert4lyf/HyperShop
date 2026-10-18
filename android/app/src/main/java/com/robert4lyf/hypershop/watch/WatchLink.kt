@@ -12,6 +12,9 @@ enum class WatchLinkState { NO_SDK, NOT_INSTALLED, DISCONNECTED, CONNECTED, APP_
 interface WatchLink {
     val state: StateFlow<WatchLinkState>
 
+    /** Why the link is down, in words for Settings, or null. */
+    val problem: StateFlow<String?> get() = NO_PROBLEM
+
     fun start()
 
     /** Sends one payload (a snapshot page). Only Connect IQ types inside. */
@@ -20,6 +23,8 @@ interface WatchLink {
     /** Inbound watch payloads (untrusted; decoded by WatchCodec). */
     fun onReceive(handler: (Map<*, *>) -> Unit)
 }
+
+private val NO_PROBLEM: StateFlow<String?> = MutableStateFlow(null)
 
 /** Run 1: no watch. */
 object NoWatchLink : WatchLink {

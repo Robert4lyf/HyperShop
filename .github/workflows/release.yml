@@ -193,4 +193,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload "${{ needs.publish.outputs.tag }}" \
-            garmin/build/hypershop.iq garmin/build/hypershop-fr245.prg --clobber
+            garmin/build/hypershop.iq garmin/build/hypershop-fr245.prg \
+            garmin/build/hypershop-fr245-debug.prg --clobber

@@ -94,3 +94,14 @@ data class SnapshotPage(
     /** Items left off the snapshot entirely ("+N on phone"). */
     val more: Int,
 )
+
+/**
+ * A payload-probe request from a debug watch build: [received] is the size of
+ * the request as [PayloadSize] counts it, [want] the size the reply should be.
+ * Kept out of [WatchMessage]: it touches no list state.
+ */
+data class ProbeRequest(
+    val installId: Int,
+    val received: Int,
+    val want: Int,
+)

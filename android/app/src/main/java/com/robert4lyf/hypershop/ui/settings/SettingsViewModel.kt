@@ -9,11 +9,13 @@ import com.robert4lyf.hypershop.core.merge.UnitsSetting
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.settings.ThemeMode
+import com.robert4lyf.hypershop.watch.WatchLinkState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -28,6 +30,8 @@ data class SettingsUi(
     val staples: List<String> = emptyList(),
     val aisles: List<AisleCode> = emptyList(),
     val watchVibrate: Boolean = true,
+    /** The watch link in words (Settings › Watch). */
+    val watchStatus: String = "",
     val hasKey: Boolean = false,
     /** Saved before, missing now: it didn't survive a restore. */
     val keyMissingAfterRestore: Boolean = false,
@@ -82,6 +86,7 @@ class SettingsViewModel(
         watch(s.monthlyCapUsd) { copy(monthlyCapUsd = it) }
         watch(s.dailyCalls) { copy(dailyCalls = it) }
         watch(s.watchVibrate) { copy(watchVibrate = it) }
+        watch(combine(c.watchLink.state, c.watchLink.problem) { st, why -> watchStatus(st, why) }) { copy(watchStatus = it) }
         watch(s.debugLog) { copy(debugLog = it, logLines = if (it) c.log.snapshot().takeLast(LOG_LINES) else emptyList()) }
         watch(s.keyLostNotice) { copy(keyLost = it) }
         watch(s.keyWasSet) {
@@ -269,3 +274,16 @@ internal fun cleanKey(text: String): String = text.replace(Regex("[\\s\\p{Cf}]")
 
 /** Printable ASCII only; anything else can't go in an HTTP header. */
 private val KEY_CHARS = Regex("[\\x21-\\x7e]+")
+
+/** One line for Settings › Watch. */
+fun watchStatus(
+    state: WatchLinkState,
+    problem: String?,
+): String =
+    when (state) {
+        WatchLinkState.APP_READY -> "Forerunner connected. Open HyperShop on the watch to see your list."
+        WatchLinkState.CONNECTED -> "Forerunner connected. Looking for HyperShop on it…"
+        WatchLinkState.NOT_INSTALLED -> problem ?: "Install HyperShop on the watch"
+        WatchLinkState.DISCONNECTED -> problem ?: "Watch not connected. Ticks made on it sync when it's back."
+        WatchLinkState.NO_SDK -> problem ?: "No watch: Garmin Connect isn't available"
+    }

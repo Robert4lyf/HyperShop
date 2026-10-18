@@ -8,6 +8,8 @@
 #   4. the golden CHECKSUM
 #   5. phone/watch protocol parity, once both protocol files exist
 #   6. the sync model checker, once it exists
+#   7. the watch app: argument limits, strict compile, test compile
+#      (HYPERSHOP_SKIP_WATCH=1 skips the compiles; connectiq.yml does them in CI)
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -66,6 +68,19 @@ if [ -f tools/sync-model/model.py ]; then
   python3 tools/sync-model/model.py --small
 else
   echo "skipped: not written yet"
+fi
+
+step "Watch app"
+if [ -d garmin/source ]; then
+  python3 tools/check_monkeyc_limits.py
+  if [ "${HYPERSHOP_SKIP_WATCH:-}" = "1" ]; then
+    echo "compile skipped (HYPERSHOP_SKIP_WATCH=1)"
+  else
+    tools/build_watch.sh
+    tools/build_watch.sh --test
+  fi
+else
+  echo "skipped: no garmin/source yet"
 fi
 
 printf '\nverify.sh: all checks passed\n'
