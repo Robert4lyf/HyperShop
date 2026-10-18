@@ -222,7 +222,7 @@ Nothing is added until you confirm it here.
   - **Text:** the main line is what to put in the basket. The sub-line shows context or the pack note.
   - **Partly ticked:** a half-filled tick.
   - **DONE:** sinks within its aisle, dimmed, with a tick mark (not colour alone).
-- **Actions:** tap to tick or untick (with undo), swipe to delete (with an accessibility action too), "Finish shopping" and "Clear all" (both with undo), and "Share list as text".
+- **Actions:** tap to tick or untick (no snackbar: tapping again undoes it), swipe to delete (with an accessibility action too), "Finish shopping" and "Clear all" (both with undo), and "Share list as text".
 - **Item sheet:**
   - The totals for each dimension, and the recipes that contributed.
   - The pack note.

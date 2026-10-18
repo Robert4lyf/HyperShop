@@ -119,14 +119,10 @@ class ListViewModel(
         return ListUi(grouped, loaded = true)
     }
 
-    /** Tap: tick, or untick a DONE row. Both offer Undo. */
+    /** Tap: tick, or untick a DONE row. No snackbar: tapping again is the undo. */
     fun toggle(row: ListRow) =
         viewModelScope.launch {
-            if (row.state == TickState.DONE) {
-                if (c.repository.untick(row.id)) messages.send(UiMessage("Unticked ${row.name}", undo = { c.repository.tick(row.id) }))
-            } else if (c.repository.tick(row.id)) {
-                messages.send(UiMessage("Ticked ${row.name}", undo = { c.repository.untick(row.id) }, seconds = 4))
-            }
+            if (row.state == TickState.DONE) c.repository.untick(row.id) else c.repository.tick(row.id)
         }
 
     fun delete(row: ListRow) =
