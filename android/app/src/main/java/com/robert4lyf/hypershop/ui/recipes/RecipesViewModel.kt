@@ -15,6 +15,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -24,6 +25,20 @@ import kotlinx.coroutines.launch
 data class RecipesUi(
     val uses: List<UseSummary> = emptyList(),
     val loaded: Boolean = false,
+    /** Every recipe you've added, the one added longest ago first. */
+    val library: List<LibraryRow> = emptyList(),
+)
+
+/** One recipe in "Your recipes". */
+data class LibraryRow(
+    val recipeId: Long,
+    val key: String,
+    val title: String,
+    val url: String?,
+    val lines: Int,
+    val lastAddedAt: Long,
+    /** A use of it is on the list now. */
+    val onList: Boolean,
 )
 
 /** The Recipes tab (PLAN §3.5): the uses on the list. */
@@ -32,9 +47,45 @@ class RecipesViewModel(
 ) : ViewModel() {
     /** From the shared list read; only while the tab is shown (and 5 s after, across a rotation). */
     val ui: StateFlow<RecipesUi> =
-        c.repository.list
-            .map { RecipesUi(c.repository.usesOnList(it), loaded = true) }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecipesUi())
+        combine(c.repository.list.map { c.repository.usesOnList(it) }, c.repository.observeLibrary()) { uses, lib ->
+            val onList = uses.mapNotNull { it.libraryKey }.toSet()
+            RecipesUi(
+                uses,
+                loaded = true,
+                library = lib.map { LibraryRow(it.recipeId, it.key, it.title, it.url, it.lines, it.lastAddedAt, it.key in onList) },
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecipesUi())
+
+    /**
+     * "Add to list" in Your recipes: the recipe on the review screen as it was saved,
+     * at its own servings, staples ticked as usual. It then becomes the newest.
+     */
+    fun addFromLibrary(row: LibraryRow) =
+        viewModelScope.launch {
+            val (r, lines) = c.repository.librarySource(row.recipeId) ?: return@launch
+            if (lines.isEmpty()) return@launch
+            val result =
+                ImportResult(
+                    url = r.url,
+                    title = r.title,
+                    servings = r.servingsOriginal,
+                    locale = UnitLocale.valueOf(r.unitLocale),
+                    method = "LIBRARY",
+                    lines = lines,
+                    parsedBy = runCatching { ParsedBy.valueOf(r.parsedBy) }.getOrDefault(ParsedBy.RULES),
+                    model = r.model,
+                    rawLines = lines.map { it.raw },
+                    libraryKey = row.key,
+                )
+            reviews.send(c.importJobs.enqueueReady(ImportInput(r.url ?: "", r.title), result))
+        }
+
+    /** "Remove from your recipes" (what's on the list stays). */
+    fun removeFromLibrary(row: LibraryRow) =
+        viewModelScope.launch {
+            c.repository.removeFromLibrary(row.key)
+            messages.send(UiMessage("Removed ${row.title} from your recipes"))
+        }
 
     /** Uses whose "Add the in-stock items now" is being set up: a second tap meanwhile does nothing. */
     private val addingInStock = mutableSetOf<Long>()
@@ -107,6 +158,7 @@ class RecipesViewModel(
                     preTick = false,
                     editsUse = use.useId,
                     inStockLines = src.inStockLines,
+                    libraryKey = r.libraryKey,
                 )
             reviews.send(c.importJobs.enqueueReady(ImportInput(r.url ?: "", r.title), result))
         }

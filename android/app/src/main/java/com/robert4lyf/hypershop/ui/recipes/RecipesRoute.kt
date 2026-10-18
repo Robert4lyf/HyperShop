@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.ui.recipes
 
+import android.text.format.DateUtils
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,12 +25,16 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.Inventory
 import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.People
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHostState
@@ -45,6 +50,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -82,6 +88,7 @@ fun RecipesRoute(
         onRemove = vm::remove,
         onAddInStock = vm::addInStockNow,
         onEdit = vm::edit,
+        library = LibraryActions(onAdd = vm::addFromLibrary, onRemove = vm::removeFromLibrary),
         add = AddRecipeActions(onLink = vm::addLink, onManual = { n, s, l -> vm.addManual(n, s, l) }, onPhoto = { vm.addPhoto(it) }),
     )
 }
@@ -94,8 +101,10 @@ fun RecipesScreen(
     onAddInStock: (UseSummary) -> Unit,
     onEdit: (UseSummary) -> Unit = {},
     add: AddRecipeActions = AddRecipeActions(),
+    library: LibraryActions = LibraryActions(),
 ) {
     var confirm by remember { mutableStateOf<UseSummary?>(null) }
+    var forget by remember { mutableStateOf<LibraryRow?>(null) }
     var adding by rememberSaveable { mutableStateOf(false) }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxSize()) {
@@ -117,7 +126,7 @@ fun RecipesScreen(
                             },
                     )
                 }
-                if (ui.loaded && ui.uses.isEmpty()) {
+                if (ui.loaded && ui.uses.isEmpty() && ui.library.isEmpty()) {
                     item(key = "empty") {
                         EmptyHero(
                             Icons.AutoMirrored.Rounded.MenuBook,
@@ -128,6 +137,21 @@ fun RecipesScreen(
                 }
                 items(ui.uses, key = { it.useId }) { use ->
                     UseCard(use, onRemove = { confirm = use }, onAddInStock = { onAddInStock(use) }, onEdit = { onEdit(use) })
+                }
+                if (ui.library.isNotEmpty()) {
+                    item(key = "library-title") {
+                        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp)) {
+                            Text("Your recipes", style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                "Every recipe you've added. The longest since you last made it is at the top.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    items(ui.library, key = { "lib-${it.key}" }) { row ->
+                        LibraryCard(row, onAdd = { library.onAdd(row) }, onRemove = { forget = row })
+                    }
                 }
             }
             FloatingActionButton(
@@ -140,6 +164,20 @@ fun RecipesScreen(
         }
     }
     if (adding) AddRecipeSheet(add, onDismiss = { adding = false })
+    forget?.let { row ->
+        AlertDialog(
+            onDismissRequest = { forget = null },
+            title = { Text("Remove ${row.title} from your recipes?") },
+            text = { Text("It won't be offered here again. Anything from it on the list stays.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    forget = null
+                    library.onRemove(row)
+                }) { Text("Remove") }
+            },
+            dismissButton = { TextButton(onClick = { forget = null }) { Text("Keep") } },
+        )
+    }
     confirm?.let { use ->
         AlertDialog(
             onDismissRequest = { confirm = null },
@@ -153,6 +191,76 @@ fun RecipesScreen(
             },
             dismissButton = { TextButton(onClick = { confirm = null }) { Text("Keep") } },
         )
+    }
+}
+
+private const val DAY = DateUtils.DAY_IN_MILLIS
+
+/** What "Your recipes" can do. */
+data class LibraryActions(
+    val onAdd: (LibraryRow) -> Unit = {},
+    val onRemove: (LibraryRow) -> Unit = {},
+)
+
+/** One saved recipe: its name, where it's from, how big, when last added; Add to list. */
+@Composable
+private fun LibraryCard(
+    row: LibraryRow,
+    onAdd: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    val dark = LocalDarkTheme.current
+    val hue = Brand.recipeHue(row.title)
+    val now = remember { System.currentTimeMillis() }
+    Surface(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("lib-${row.key}"),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.card,
+    ) {
+        Row(
+            Modifier.padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Brand.tint(hue, dark)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Rounded.MenuBook,
+                    contentDescription = null,
+                    tint = Brand.strong(hue, dark),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text(row.title, style = MaterialTheme.typography.titleMedium)
+                val bits =
+                    listOfNotNull(
+                        webLink(row.url)?.let { siteName(it) },
+                        if (row.lines == 1) "1 ingredient" else "${row.lines} ingredients",
+                        "added " + DateUtils.getRelativeTimeSpanString(row.lastAddedAt, now, DAY).toString().lowercase(),
+                    )
+                Text(
+                    bits.joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (row.onList) {
+                    Text("On your list", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+            FilledTonalButton(onClick = onAdd, modifier = Modifier.testTag("lib-add-${row.key}")) { Text("Add") }
+            var menu by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text("Remove from your recipes") }, onClick = {
+                        menu = false
+                        onRemove()
+                    })
+                }
+            }
+        }
     }
 }
 

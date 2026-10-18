@@ -211,7 +211,19 @@ class ReviewViewModel(
 
     private suspend fun store(r: ImportResult) {
         val old = stored
-        val s = c.repository.storeRecipe(r.url, r.title, r.servings, r.locale, "WEB", r.parsedBy, r.model, r.claudePending, r.lines)
+        val s =
+            c.repository.storeRecipe(
+                r.url,
+                r.title,
+                r.servings,
+                r.locale,
+                "WEB",
+                r.parsedBy,
+                r.model,
+                r.claudePending,
+                r.lines,
+                r.libraryKey,
+            )
         preview = c.repository.preview(s, servings, emptyMap(), aisleMoves, r.editsUse)
         stored = s
         old?.let { c.repository.discardRecipe(it.recipe.id) }
@@ -375,7 +387,8 @@ class ReviewViewModel(
         act {
             try {
                 val p = preview ?: return@act
-                when (val r = c.repository.apply(p, jobId, replacing)) {
+                // "Add the in-stock items now" is part of a recipe: the library keeps the whole one.
+                when (val r = c.repository.apply(p, jobId, replacing, toLibrary = result?.method != "IN_STOCK")) {
                     is ApplyResult.Applied -> {
                         _state.value = ReviewState.Added(r.added, r.useId, replacing?.let { result?.title ?: "Recipe" })
                     }
