@@ -22,6 +22,11 @@ data class SnapshotInput(
     val epoch: Int,
     val listRev: Int,
     val ackedThrough: Int,
+    /**
+     * Non-ok results for the seqs this reply acks (those after the watch's
+     * previous ackedThrough), in seq order. The watch reads a seq it was acked
+     * without an exception as ok, so none of these may be dropped silently.
+     */
     val ackExceptions: List<Pair<Int, OpResult>>,
     /** Aisles in store order. */
     val aisles: List<PagerAisle>,
@@ -54,7 +59,7 @@ object SnapshotPager {
         input: SnapshotInput,
         cap: PayloadCap = PayloadCap(),
     ): List<SnapshotPage> {
-        val input = input.copy(ackExceptions = fittingAcks(input, cap))
+        val input = fittingAcks(input, cap)
         var items = input.items
         var dropped = 0
         paginate(input, items, dropped, cap)?.let { return it }
@@ -89,25 +94,29 @@ object SnapshotPager {
     }
 
     /**
-     * The newest ack exceptions that fit in half of the room a page has left
-     * after the bare envelope, so acks can never crowd out the list (or make
-     * the envelope itself too big). Older ones stay stored on the phone and
-     * are no longer needed by the watch once it has moved past them.
+     * Ack exceptions take at most half of the room a page has left after the
+     * bare envelope, so they can never crowd out the list. When they don't all
+     * fit, the oldest that do are sent and ackedThrough is lowered to just before
+     * the first one left out: the watch settles what was acked, with the right
+     * results, and resends the rest, which the phone acks again from its history.
+     * (Dropping an exception instead would make the watch read that op as ok.)
      */
     private fun fittingAcks(
         input: SnapshotInput,
         cap: PayloadCap,
-    ): List<Pair<Int, OpResult>> {
-        val ax = input.ackExceptions.takeLast(MAX_AX)
-        if (ax.isEmpty()) return ax
+    ): SnapshotInput {
+        val ax = input.ackExceptions.sortedBy { it.first }
+        if (ax.isEmpty()) return input
 
         fun envelope(acks: List<Pair<Int, OpResult>>) =
             size(SnapshotPage(input.epoch, input.listRev, input.ackedThrough, acks, 0, cap.maxPages, emptyList(), 0, emptyList(), 0))
         val bare = envelope(emptyList())
         val budget = (cap.bytes - bare) / 2
-        var n = ax.size
-        while (n > 0 && envelope(ax.takeLast(n)) - bare > budget) n--
-        return ax.takeLast(n)
+        var n = minOf(ax.size, MAX_AX)
+        while (n > 0 && envelope(ax.take(n)) - bare > budget) n--
+        if (n == ax.size) return input.copy(ackExceptions = ax)
+        val through = minOf(input.ackedThrough, ax[n].first - 1)
+        return input.copy(ackedThrough = through, ackExceptions = ax.take(n))
     }
 
     /** Pages for exactly these items, or null when more than maxPages would be needed. */

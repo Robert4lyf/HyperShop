@@ -26,6 +26,23 @@ class RegressionTest {
     }
 
     @Test
+    fun aBareNumberKeepsTheItemsCountUnit() {
+        val cloves = QtyBase.of(Rational.of(2), QtyUnit.CLOVE, UnitLocale.METRIC)
+        var (l, id) = ShoppingList().manualAdd(merger.target("garlic"), cloves, QtyUnit.CLOVE, 1)
+        l = l.editQuantity(id, QtyBase.of(Rational.of(3), null, UnitLocale.METRIC), 2)
+        assertEquals(QtyBase.of(Rational.of(3), QtyUnit.CLOVE, UnitLocale.METRIC), l.total(id))
+        neverNegative(l, id)
+    }
+
+    @Test
+    fun aCatalogueChangeBumpsEveryLiveItem() {
+        val (l, id) = ShoppingList().manualAdd(merger.target("spinach"), g(200), QtyUnit.G, 1)
+        val after = l.catalogueChanged()
+        assertTrue(after.items.getValue(id).rev > l.items.getValue(id).rev)
+        assertTrue(after.listRev > l.listRev)
+    }
+
+    @Test
     fun loweringADoneItemKeepsItDone() {
         var (l, id) = ShoppingList().manualAdd(merger.target("spinach"), g(200), QtyUnit.G, 1)
         l = l.tick(id, 2)!!

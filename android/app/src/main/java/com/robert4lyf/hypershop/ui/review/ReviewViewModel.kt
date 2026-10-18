@@ -135,6 +135,9 @@ class ReviewViewModel(
         if (r.claudePending && !r.claudeTried && c.reviewGate.visible.value) {
             _state.value = ReviewState.Loading
             r = c.importer.parse(r, allowClaude = true, model = c.settings.model.first())
+            // Kept on the job, so reopening this review neither pays for Claude again nor
+            // retries a failure (claudeTried is set on those).
+            c.importJobs.finish(jobId, r)
         }
         if (r.lines.isEmpty()) return fail(r.error ?: ImportError.NO_RECIPE, candidates(r))
         result = r
@@ -217,6 +220,7 @@ class ReviewViewModel(
                         },
                     notice = notice,
                     url = webLink(r.url),
+                    busy = busy,
                 ),
             )
     }
@@ -277,39 +281,61 @@ class ReviewViewModel(
         }
 
     /** "Retry with Claude". */
-    fun retryWithClaude() =
+    fun retryWithClaude() {
+        val r = result ?: return
+        if (busy) return
+        busy = true
+        (state.value as? ReviewState.Ready)?.let { _state.value = it.copy(ui = it.ui.copy(busy = true)) }
         viewModelScope.launch {
-            val r = result ?: return@launch
-            (state.value as? ReviewState.Ready)?.let { _state.value = it.copy(ui = it.ui.copy(busy = true)) }
-            val again = c.importer.parse(r.copy(claudePending = true), allowClaude = true, model = c.settings.model.first())
-            result = again
-            store(again)
-            recompute(notice = if (again.parsedBy == ParsedBy.CLAUDE) null else "Claude is unavailable; kept the offline parse")
+            try {
+                val again = c.importer.parse(r.copy(claudePending = true), allowClaude = true, model = c.settings.model.first())
+                if (again.parsedBy == ParsedBy.CLAUDE) c.importJobs.finish(jobId, again)
+                result = again
+                store(again)
+            } finally {
+                busy = false
+            }
+            recompute(notice = if (result?.parsedBy == ParsedBy.CLAUDE) null else "Claude is unavailable; kept the offline parse")
         }
+    }
 
-    /** "Add N items": one transaction re-checking every rev shown. */
-    private var applying = false
+    /**
+     * Applying or retrying with Claude. [recompute] carries it into the UI, so a
+     * row change meanwhile can't re-enable "Add", and neither can start twice.
+     */
+    private var busy = false
 
-    /** "Add N items". Runs once: a second tap while applying (or after) does nothing. */
+    /** "Add N items": one transaction re-checking every rev shown. Runs once at a time. */
     fun confirm() {
         val ready = _state.value as? ReviewState.Ready ?: return
-        if (applying) return
-        applying = true
+        if (busy) return
+        busy = true
         _state.value = ready.copy(ui = ready.ui.copy(busy = true))
         viewModelScope.launch {
             try {
                 val p = preview ?: return@launch
-                when (val r = c.repository.apply(p)) {
+                when (val r = c.repository.apply(p, jobId)) {
                     is ApplyResult.Applied -> {
-                        c.importJobs.done(jobId)
                         _state.value = ReviewState.Added(r.added, r.useId)
                     }
-                    ApplyResult.Stale -> recompute(notice = "List changed — review updated")
+                    ApplyResult.Stale -> {
+                        busy = false
+                        recompute(notice = "List changed — review updated")
+                    }
                 }
             } finally {
-                applying = false
+                busy = false
             }
         }
+    }
+
+    /**
+     * Back or swipe away without Add or Cancel: the job stays ready to review, and
+     * the recipe stored for this preview goes (it is kept if Add made a use of it).
+     */
+    override fun onCleared() {
+        val s = stored ?: return
+        c.applicationScope.launch { c.repository.discardRecipe(s.recipe.id) }
     }
 
     fun cancel() =
@@ -416,6 +442,7 @@ class ReviewViewModel(
         always: Boolean,
     ) = viewModelScope.launch {
         if (always) {
+            aisleMoves.remove(key)
             c.repository.setOverride(key, aisle)
         } else {
             aisleMoves[key] = aisle

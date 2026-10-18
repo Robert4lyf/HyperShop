@@ -82,6 +82,7 @@ class RuleParser(
             var unit: QtyUnit? = null
             var altQty: Rational? = null
             var altUnit: QtyUnit? = null
+            var sizedCount = false
 
             if (qty != null) {
                 skipSizes()
@@ -92,14 +93,16 @@ class RuleParser(
                     altUnit = bare.second
                     unit = bare.third
                 } else if (word(i) == "x" && kind(i + 1) == Kind.NUM) {
-                    // R3.5: 2 x 400g tins
+                    // R3.5: 2 x 400g tins; without a container (4 x 150g salmon fillets)
+                    // the amount is a count of the named thing, each of the size.
                     i++
                     val size = readNumber()
                     val sizeUnit = readUnit()
                     if (size != null && sizeUnit != null) {
                         altQty = size
                         altUnit = sizeUnit
-                        unit = readUnit() ?: QtyUnit.OTHER.also { check = true }
+                        unit = readUnit()
+                        if (unit == null) sizedCount = true
                     }
                 } else {
                     unit = readUnit()
@@ -136,6 +139,13 @@ class RuleParser(
                         if (a != null && au != null) {
                             altQty = a
                             altUnit = au
+                            // 500g/1lb 2oz: the rest of a compound alt goes to the note with it.
+                            val more = i
+                            if (kind(i) == Kind.NUM && readNumber() != null && readUnit()?.dimension == au.dimension) {
+                                notes += span(save + 1, i)
+                            } else {
+                                i = more
+                            }
                         } else {
                             i = save
                         }
@@ -164,7 +174,7 @@ class RuleParser(
             }
             if (word(i) == "of") i++ // R4.5
 
-            val (name, trailingUnit, impliedQty) = nameAndNote(unit == null && qty != null)
+            val (name, trailingUnit, impliedQty) = nameAndNote(unit == null && qty != null && !sizedCount)
             if (trailingUnit != null) unit = trailingUnit
             if (qty == null && impliedQty != null) qty = impliedQty
             if (unit == QtyUnit.OTHER) check = true
@@ -330,7 +340,11 @@ class RuleParser(
                     }
                     Kind.RPAREN -> depth = maxOf(0, depth - 1)
                     Kind.COMMA, Kind.SEMI ->
-                        if (depth == 0) {
+                        if (t.kind == Kind.COMMA && adjectivesOnly(head) && kind(k + 1) == Kind.WORD) {
+                            // "boneless, skinless chicken breasts": the comma sits between adjectives.
+                            k++
+                            continue
+                        } else if (depth == 0) {
                             cut = k
                             break
                         }
@@ -403,6 +417,12 @@ class RuleParser(
             }
             return Triple(name.trim(',', '.', '-', ' ', '\''), trailing, implied)
         }
+
+        /** The name so far is only known adjectives ("boneless", "large, ripe") and no catalogue name. */
+        fun adjectivesOnly(head: List<Token>): Boolean =
+            head.isNotEmpty() &&
+                head.all { it.kind == Kind.WORD && it.text.lowercase() in COMMA_ADJECTIVES } &&
+                catalog.lookup(joinWords(head)) == null
 
         fun startsCatalogName(
             words: List<Token>,
@@ -489,6 +509,13 @@ class RuleParser(
 
         /** "a few", "a little": not an amount (R6). */
         val VAGUE = setOf("few", "little", "couple", "bit", "touch")
+
+        /** Adjectives a recipe may list with commas before the noun ("large, ripe tomatoes"). */
+        val COMMA_ADJECTIVES =
+            setOf(
+                "boneless", "skinless", "bone-in", "skin-on", "ripe", "fresh", "large", "small", "medium",
+                "extra-large", "firm", "juicy", "lean", "organic", "free-range", "thick", "thin", "plump",
+            )
     }
 }
 
@@ -502,8 +529,12 @@ internal object Regexless {
         val part = words[idx - 1]
         if (part != "juice" && part != "zest" && part != "rind") return null
         var rest = words.drop(idx + 1)
-        val n = rest.firstOrNull()?.let { w -> w.toLongOrNull()?.let { Rational.of(it) } ?: Lexicon.numberWords[w] }
-        if (n != null) rest = rest.drop(1)
+        // "2", "½", "1/2" (one number token) or a number word; "half a lemon" drops the article too.
+        val n =
+            rest.firstOrNull()?.let { w ->
+                Tokeniser.tokenise(w).singleOrNull()?.takeIf { it.kind == Kind.NUM }?.value ?: Lexicon.numberWords[w]
+            }
+        if (n != null) rest = rest.drop(if (rest[0] == "half" && rest.getOrNull(1) in setOf("a", "an")) 2 else 1)
         rest = rest.filter { it !in Lexicon.qualifiers && it !in Lexicon.prep && !it.endsWith("-scrubbed") }
         if (rest.isEmpty()) return null
         return Triple(part, rest.joinToString(" "), n)

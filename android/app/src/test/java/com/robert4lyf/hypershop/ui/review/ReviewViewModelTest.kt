@@ -99,9 +99,12 @@ class ReviewViewModelTest {
             claude.enqueue(MockResponse().setBody(File("../../testdata/claude/synthetic-ok-cake.json").readText()))
             val c = TestContainer.create(claude = claude, key = "sk-ant-test")
             c.reviewGate.set(true)
-            val vm = ReviewViewModel(c, runBlocking { c.readyJob("200g golden caster sugar", claudePending = true) })
-            val ui = ready(vm)
+            val job = runBlocking { c.readyJob("200g golden caster sugar", claudePending = true) }
+            val ui = ready(ReviewViewModel(c, job))
             assertEquals(Badge.CLAUDE, ui.badge)
+            assertEquals(1, claude.requestCount)
+            // Left with Back and opened again from the card: Claude's parse was kept, not paid for twice.
+            assertEquals(Badge.CLAUDE, ready(ReviewViewModel(c, job)).badge)
             assertEquals(1, claude.requestCount)
         } finally {
             claude.shutdown()

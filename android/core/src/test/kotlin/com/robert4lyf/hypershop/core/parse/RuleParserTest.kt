@@ -225,6 +225,62 @@ class RuleParserTest {
     }
 
     @Test
+    fun r35SizedCountWithoutAContainer() {
+        val salmon = p.parse("4 x 150g salmon fillets")
+        assertEquals(Rational.of(4), salmon.quantity)
+        assertNull(salmon.unit)
+        assertEquals(Rational.of(150), salmon.altQuantity)
+        assertEquals(QtyUnit.G, salmon.altUnit)
+        assertEquals("salmon fillets", salmon.name)
+        assertFalse(salmon.check)
+        val chicken = p.parse("2 x 200g skinless chicken breasts")
+        assertEquals(Rational.of(2), chicken.quantity)
+        assertNull(chicken.unit)
+        assertEquals(Rational.of(200), chicken.altQuantity)
+        assertEquals("skinless chicken breasts", chicken.name)
+        assertFalse(chicken.check)
+    }
+
+    @Test
+    fun adjectivesBeforeACommaStayWithTheName() {
+        val chicken = p.parse("1 lb boneless, skinless chicken breasts")
+        assertEquals("boneless skinless chicken breasts", chicken.name)
+        assertEquals(Rational.ONE, chicken.quantity)
+        assertEquals(QtyUnit.LB, chicken.unit)
+        assertEquals("cat:chicken_breast", Normaliser().mergeKey(chicken.name))
+        val tomatoes = p.parse("4 large, ripe tomatoes, chopped")
+        assertEquals("tomatoes", tomatoes.name)
+        assertEquals("large ripe, chopped", tomatoes.note)
+        // A catalogue name before the comma still ends the name.
+        assertEquals("salt", p.parse("Salt, to taste").name)
+    }
+
+    @Test
+    fun compoundImperialAltAfterASlash() {
+        val mince = p.parse("500g/1lb 2oz beef mince")
+        assertEquals(Rational.of(500), mince.quantity)
+        assertEquals(QtyUnit.G, mince.unit)
+        assertEquals(Rational.ONE, mince.altQuantity)
+        assertEquals(QtyUnit.LB, mince.altUnit)
+        assertEquals("beef mince", mince.name)
+        assertEquals("1lb 2oz", mince.note)
+        val big = p.parse("1.25kg/2lb 12oz beef mince")
+        assertEquals(QtyUnit.KG, big.unit)
+        assertEquals("beef mince", big.name)
+        assertFalse(big.check)
+    }
+
+    @Test
+    fun juiceOfAFractionOrHalf() {
+        for (line in listOf("Juice of ½ lemon", "juice of 1/2 lemon", "Juice of half a lemon")) {
+            val r = p.parse(line)
+            assertEquals("lemon", r.name, line)
+            assertEquals(Rational.of(1, 2), r.quantity, line)
+            assertEquals("juice", r.note, line)
+        }
+    }
+
+    @Test
     fun hostileLinesDoNotThrowAndStayFast() {
         val lines = listOf("", "(((((", ")))", "1/", "½-½-½", "x x x 2 x", "of of of", ",,,,", "(".repeat(3000), "1 ".repeat(3000))
         for (l in lines) p.parse(l)

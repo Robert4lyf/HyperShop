@@ -84,8 +84,9 @@ class ReviewRowSheetViewModelTest {
         vm.moveAisle("cat:onion", AisleCode.FROZEN, always = false)
         await(vm.state) { it is ReviewState.Ready && it.ui().row("cat:onion").aisle == AisleCode.FROZEN }
         assertTrue(runBlocking { c.repository.overrides() }.isEmpty())
+        // The latest choice wins: "always" replaces the earlier "just this time".
         vm.moveAisle("cat:onion", AisleCode.WORLD_FOODS, always = true)
-        await(vm.state) { it is ReviewState.Ready && it.ui().row("cat:onion").aisle == AisleCode.FROZEN }
+        await(vm.state) { it is ReviewState.Ready && it.ui().row("cat:onion").aisle == AisleCode.WORLD_FOODS }
         assertEquals(mapOf("cat:onion" to AisleCode.WORLD_FOODS), runBlocking { c.repository.overrides() })
     }
 

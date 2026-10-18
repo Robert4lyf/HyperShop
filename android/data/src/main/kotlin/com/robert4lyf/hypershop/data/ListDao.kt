@@ -26,10 +26,11 @@ interface ListDao {
     @Query("SELECT * FROM RecipeUse")
     suspend fun uses(): List<RecipeUseEntity>
 
-    @Query("SELECT * FROM Contribution")
+    @Query("SELECT * FROM Contribution ORDER BY id")
     suspend fun contributions(): List<ContributionEntity>
 
-    @Query("SELECT * FROM Tick")
+    // In id order: "untick" undoes the most recent tick, the last one in this list.
+    @Query("SELECT * FROM Tick ORDER BY id")
     suspend fun ticks(): List<TickEntity>
 
     @Query("SELECT * FROM ItemAlias")
@@ -180,13 +181,14 @@ interface ListDao {
     @Upsert
     suspend fun putJob(j: ImportJobEntity)
 
-    @Query("UPDATE ImportJob SET state = :state WHERE id = :id")
+    // A DONE job stays done: a late worker run or a second Add can't bring it back.
+    @Query("UPDATE ImportJob SET state = :state WHERE id = :id AND state != 'DONE'")
     suspend fun setJobState(
         id: Long,
         state: String,
     )
 
-    @Query("UPDATE ImportJob SET state = :state, resultJson = :resultJson, error = :error WHERE id = :id")
+    @Query("UPDATE ImportJob SET state = :state, resultJson = :resultJson, error = :error WHERE id = :id AND state != 'DONE'")
     suspend fun finishJob(
         id: Long,
         state: String,

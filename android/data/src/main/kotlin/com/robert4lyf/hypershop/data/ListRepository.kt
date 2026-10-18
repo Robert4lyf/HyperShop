@@ -290,14 +290,21 @@ class ListRepository(
         return merger.preview(snapshot(), incoming, d)
     }
 
-    /** Confirm on the review screen. Stale → "List changed — review updated". */
-    suspend fun apply(preview: Preview): ApplyResult =
+    /**
+     * "Add N items" on the review screen (Stale → "List changed — review updated"). [jobId], the import being reviewed, is marked done in the same
+     * transaction, so a crash can't leave it offered again after the items went on.
+     */
+    suspend fun apply(
+        preview: Preview,
+        jobId: Long? = null,
+    ): ApplyResult =
         db.withTransaction {
             val old = load()
             when (val r = merger.apply(old, preview, clock())) {
                 is ApplyResult.Applied -> {
                     persist(old, r.list)
                     dao.putDecisions(preview.lineStatus.map { (line, s) -> LineDecisionEntity(r.useId, line, s.name) })
+                    jobId?.let { dao.setJobState(it, "DONE") }
                     r
                 }
                 ApplyResult.Stale -> r
@@ -333,6 +340,15 @@ class ListRepository(
     suspend fun tick(itemId: Long): Boolean = write { l -> l.tick(itemId, clock(), TickSource.PHONE)?.let { it to true } } ?: false
 
     suspend fun untick(itemId: Long): Boolean = write { l -> l.untick(itemId)?.let { it to true } } ?: false
+
+    /**
+     * The tick button: unticks a DONE item, else ticks it. Decided inside the
+     * write, so a quick second tap undoes the first even before the list redraws.
+     */
+    suspend fun toggle(itemId: Long): Boolean =
+        write { l ->
+            (if (l.isDone(itemId)) l.untick(itemId) else l.tick(itemId, clock(), TickSource.PHONE))?.let { it to true }
+        } ?: false
 
     suspend fun manualAdd(
         name: String,
@@ -409,7 +425,9 @@ class ListRepository(
             if (meta.catalogVersion == catalog.version) return@withTransaction false
             val old = load()
             val r = Rekey.rekey(old, normaliser)
-            persist(old, r.list)
+            // Every live item: a row's text can change with the catalogue (pack sizes,
+            // densities) even when its key doesn't.
+            persist(old, r.list.catalogueChanged())
             val overrides = dao.overrides().associateBy { it.key }
             for ((from, to) in r.renamed) {
                 val o = overrides[from] ?: continue

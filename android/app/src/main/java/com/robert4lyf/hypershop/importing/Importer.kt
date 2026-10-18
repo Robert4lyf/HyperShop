@@ -103,8 +103,19 @@ class Importer(
         return when (val r = claude!!.parse(input, model)) {
             is ClaudeResult.Parsed ->
                 when (r.recipe.status) {
-                    RecipeStatus.NOT_A_RECIPE -> ruled.copy(error = if (base.rawLines.isEmpty()) ImportError.NOT_A_RECIPE else null)
-                    RecipeStatus.NO_INGREDIENTS -> ruled.copy(error = if (base.rawLines.isEmpty()) ImportError.NO_RECIPE else null)
+                    // Claude has answered: it isn't pending any more, and reopening the review won't ask again.
+                    RecipeStatus.NOT_A_RECIPE ->
+                        ruled.copy(
+                            claudePending = false,
+                            claudeTried = true,
+                            error = if (base.rawLines.isEmpty()) ImportError.NOT_A_RECIPE else null,
+                        )
+                    RecipeStatus.NO_INGREDIENTS ->
+                        ruled.copy(
+                            claudePending = false,
+                            claudeTried = true,
+                            error = if (base.rawLines.isEmpty()) ImportError.NO_RECIPE else null,
+                        )
                     RecipeStatus.OK ->
                         base.copy(
                             lines = r.recipe.ingredients,

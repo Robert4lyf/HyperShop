@@ -122,7 +122,7 @@ class ListViewModel(
     /** Tap: tick, or untick a DONE row. No snackbar: tapping again is the undo. */
     fun toggle(row: ListRow) =
         viewModelScope.launch {
-            if (row.state == TickState.DONE) c.repository.untick(row.id) else c.repository.tick(row.id)
+            c.repository.toggle(row.id)
         }
 
     /** "Delete" on the item card: closes it, with Undo on the list. */

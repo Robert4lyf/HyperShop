@@ -59,6 +59,9 @@ class DisplayTest {
         assertEquals("500 ml", amount(QtyBase.of(Rational.of(500), QtyUnit.ML, UnitLocale.METRIC), "milk", QtyUnit.ML))
         assertEquals("4 tbsp", amount(QtyBase.of(Rational.of(4), QtyUnit.TBSP, UnitLocale.US), "butter", QtyUnit.TBSP))
         assertEquals("6 tbsp", Display.volume(Rational.of(90), UnitsSetting.METRIC, QtyUnit.TBSP))
+        // "As written": ml stays ml, a cup stays a cup.
+        assertEquals("30 ml", Display.volume(Rational.of(30), UnitsSetting.AS_WRITTEN, QtyUnit.ML))
+        assertEquals("2 tbsp", Display.volume(Rational.of(30), UnitsSetting.IMPERIAL, QtyUnit.ML))
         assertEquals("½ tbsp", Display.volume(Rational.of(15, 2), UnitsSetting.METRIC, QtyUnit.TBSP))
     }
 

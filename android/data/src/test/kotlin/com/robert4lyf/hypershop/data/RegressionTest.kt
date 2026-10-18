@@ -1,11 +1,14 @@
 package com.robert4lyf.hypershop.data
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.robert4lyf.hypershop.core.merge.ApplyResult
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.BaseKey
+import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
+import com.robert4lyf.hypershop.core.parse.RuleParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
@@ -159,8 +162,41 @@ class RegressionTest {
             dao.finishJob(id, "READY", "{\"x\":1}", null)
             dao.setJobState(id, "DONE")
             assertEquals(ImportJobEntity(id, "DONE", "{}", "{\"x\":1}", null, 1), dao.job(id))
+            // Done stays done: a late worker run can't offer it for review again.
+            dao.setJobState(id, "RUNNING")
+            dao.finishJob(id, "READY", "{}", null)
+            assertEquals("DONE", dao.job(id)?.state)
             // A missing job is a no-op, as before.
             dao.setJobState(id + 1, "DONE")
             assertNull(dao.job(id + 1))
+        }
+
+    @Test
+    fun addMarksTheJobDoneInTheSameTransaction() =
+        runBlocking {
+            val dao = r.db.dao()
+            val job = dao.insertJob(ImportJobEntity(0, "READY", "{}", "{}", null, 1))
+            val stored =
+                r.repo.storeRecipe(
+                    null, "Soup", 4, UnitLocale.METRIC, "WEB", ParsedBy.RULES, null, false,
+                    listOf(
+                        RuleParser().parse("2 onions"),
+                    ),
+                )
+            assertTrue(r.repo.apply(r.repo.preview(stored, 4), job) is ApplyResult.Applied)
+            assertEquals("DONE", dao.job(job)?.state)
+        }
+
+    @Test
+    fun aCatalogueChangeBumpsRevsEvenWhenNothingIsRenamed() =
+        runBlocking {
+            r.import("2 onions")
+            val before = r.repo.snapshot()
+            r.db.dao().putMeta(r.db.dao().meta()!!.copy(catalogVersion = "old"))
+            assertTrue(r.repo.rekeyIfCatalogChanged())
+            val after = r.repo.snapshot()
+            val id = after.itemByKey("cat:onion")!!.id
+            assertTrue(after.items.getValue(id).rev > before.items.getValue(id).rev)
+            assertTrue(after.listRev > before.listRev)
         }
 }
