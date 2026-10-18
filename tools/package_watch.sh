@@ -57,7 +57,7 @@ cd "${ROOT}/garmin"
     --output "${BUILD}/hypershop.iq"
 
 "${SDK_DIR}/bin/monkeyc" --jungles monkey.jungle --private-key "${KEY}" \
-    --device fr245 --release --optimization 2 --warn \
+    --device fr245 --release --optimization 2 --warn --build-stats 0 \
     --output "${BUILD}/hypershop-fr245.prg"
 
 echo "Built ${BUILD}/hypershop.iq and ${BUILD}/hypershop-fr245.prg"

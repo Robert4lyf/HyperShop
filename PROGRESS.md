@@ -1,4 +1,4 @@
-# HyperShop — progress (Run 1)
+# HyperShop — progress (Runs 1–2)
 
 Legend: `[ ]` todo · `[x]` done · `[~]` stubbed · `[!]` blocked. Each item notes its check command.
 Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
@@ -74,3 +74,8 @@ Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
 Run 1 stops here. The yes/no checks are in `docs/HANDOFF.md`. No PR: there is no `main` (PLAN §6 rule 4).
 - [x] 5 Check: verify.sh green; APK link in HANDOFF.md
 - [x] Hand-off A checklist written (docs/HANDOFF.md)
+
+# Run 2 — Forerunner 245 app and sync
+
+## Step 6 — Forerunner 245 app
+- [x] 6.0 Toolchain: `tools/build_watch.sh` fetches SDK 9.2.0 + a throwaway key and the strict device-independent compile passes (launcher icon and strings added; the release job had been failing on the missing icon). `verify.sh` now runs the argument-limit check and both watch compiles (`HYPERSHOP_SKIP_WATCH=1` in android.yml; connectiq.yml compiles). connectiq.yml gains a device job (secrets only): definitions download, `tools/device_facts.py` (memory, glance) and `--build-stats 0` to the job summary, device test compile, `hypershop-fr245.prg` artifact. Facts in `garmin/README.md` — check: `tools/build_watch.sh && tools/build_watch.sh --test`
