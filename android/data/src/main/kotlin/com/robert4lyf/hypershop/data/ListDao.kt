@@ -85,6 +85,32 @@ interface ListDao {
     @Query("DELETE FROM Recipe WHERE id = :id")
     suspend fun deleteRecipe(id: Long)
 
+    /** The library: each key's latest copy, the one added longest ago first. */
+    @Query(
+        "SELECT * FROM Recipe r WHERE r.lastAddedAt IS NOT NULL AND r.id = (" +
+            "SELECT r2.id FROM Recipe r2 WHERE r2.libraryKey = r.libraryKey AND r2.lastAddedAt IS NOT NULL " +
+            "ORDER BY r2.lastAddedAt DESC, r2.id DESC LIMIT 1) ORDER BY r.lastAddedAt ASC, r.id ASC",
+    )
+    fun observeLibrary(): Flow<List<RecipeEntity>>
+
+    @Query("SELECT recipeId, COUNT(*) AS n FROM RecipeLine WHERE recipeId IN (:ids) GROUP BY recipeId")
+    suspend fun lineCounts(ids: List<Long>): List<LineCount>
+
+    @Query("SELECT * FROM Recipe WHERE libraryKey = :key")
+    suspend fun recipesByKey(key: String): List<RecipeEntity>
+
+    @Query("UPDATE Recipe SET lastAddedAt = :at, libraryKey = COALESCE(libraryKey, url, 'r:' || id) WHERE id = :id")
+    suspend fun markAdded(
+        id: Long,
+        at: Long,
+    )
+
+    @Query("UPDATE Recipe SET lastAddedAt = NULL WHERE libraryKey = :key")
+    suspend fun forgetKey(key: String)
+
+    @Query("SELECT COUNT(*) FROM RecipeUse WHERE recipeId = :id")
+    suspend fun usesOfRecipe(id: Long): Int
+
     @Query("SELECT * FROM RecipeLine WHERE recipeId = :recipeId ORDER BY id")
     suspend fun lines(recipeId: Long): List<RecipeLineEntity>
 

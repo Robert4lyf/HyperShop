@@ -45,7 +45,7 @@ data class ItemAliasEntity(
     val newId: Long,
 )
 
-@Entity(tableName = "Recipe", indices = [Index("url")])
+@Entity(tableName = "Recipe", indices = [Index("url"), Index("libraryKey")])
 data class RecipeEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val url: String?,
@@ -57,6 +57,17 @@ data class RecipeEntity(
     val parsedBy: String,
     val model: String?,
     val claudePending: Boolean,
+    /**
+     * When it last went on the list; null until then (a review not yet confirmed).
+     * Recipes with one form the recipe library, oldest first.
+     */
+    val lastAddedAt: Long? = null,
+    /**
+     * Which library entry this copy belongs to: the page's URL, or "r:<id>" of the
+     * first copy. Adding again, an edit or a re-add from the library store a new
+     * copy with the same key; the library shows the latest.
+     */
+    val libraryKey: String? = null,
 )
 
 @Entity(
@@ -255,4 +266,10 @@ data class WatchOpResultEntity(
     val installId: Int,
     val seq: Int,
     val result: String,
+)
+
+/** A recipe's number of lines (the library's "12 ingredients"). */
+data class LineCount(
+    val recipeId: Long,
+    val n: Int,
 )

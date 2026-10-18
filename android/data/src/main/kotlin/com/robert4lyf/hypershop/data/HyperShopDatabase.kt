@@ -4,12 +4,13 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.robert4lyf.hypershop.core.catalog.CatalogLoader
 import com.robert4lyf.hypershop.core.model.AisleCode
 
 @Database(
-    version = 1,
+    version = 2,
     exportSchema = true,
     entities = [
         MetaEntity::class, ItemEntity::class, ItemAliasEntity::class, RecipeEntity::class, RecipeLineEntity::class,
@@ -25,11 +26,40 @@ abstract class HyperShopDatabase : RoomDatabase() {
     companion object {
         const val NAME = "hypershop.db"
 
+        /** The live-key unique index: a partial index Room's annotations can't express. */
+        private const val LIVE_KEY_INDEX =
+            "CREATE UNIQUE INDEX IF NOT EXISTS index_Item_mergeKey_live ON Item(mergeKey) WHERE deletedAt IS NULL"
+
+        /**
+         * v2: the recipe library (Recipe.lastAddedAt, Recipe.libraryKey). Recipes already
+         * on the list join it, dated by their latest use.
+         *
+         * The live-key index isn't in Room's schema, and Room checks the tables after a
+         * migration, so it is dropped here and made again in [CALLBACK]'s onOpen, which
+         * runs after the check (KNOWN_ISSUES #9). The RecipeUse triggers aren't checked.
+         */
+        val MIGRATION_1_2 =
+            object : Migration(1, 2) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("DROP INDEX IF EXISTS index_Item_mergeKey_live")
+                    db.execSQL("ALTER TABLE Recipe ADD COLUMN lastAddedAt INTEGER")
+                    db.execSQL("ALTER TABLE Recipe ADD COLUMN libraryKey TEXT")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_Recipe_libraryKey ON Recipe(libraryKey)")
+                    db.execSQL("UPDATE Recipe SET libraryKey = COALESCE(url, 'r:' || id)")
+                    db.execSQL("UPDATE Recipe SET lastAddedAt = (SELECT MAX(addedAt) FROM RecipeUse WHERE RecipeUse.recipeId = Recipe.id)")
+                }
+            }
+
         /** Seeds aisles, the store and its aisle order, staples and Meta (PLAN §3.4, §4). */
         val CALLBACK =
             object : Callback() {
+                override fun onOpen(db: SupportSQLiteDatabase) {
+                    // Back after a migration dropped it; a no-op otherwise.
+                    db.execSQL(LIVE_KEY_INDEX)
+                }
+
                 override fun onCreate(db: SupportSQLiteDatabase) {
-                    db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_Item_mergeKey_live ON Item(mergeKey) WHERE deletedAt IS NULL")
+                    db.execSQL(LIVE_KEY_INDEX)
                     for (op in listOf("INSERT", "UPDATE")) {
                         db.execSQL(
                             "CREATE TRIGGER IF NOT EXISTS RecipeUse_kind_check_${op.lowercase()} BEFORE $op ON RecipeUse " +
@@ -58,7 +88,7 @@ abstract class HyperShopDatabase : RoomDatabase() {
             }
 
         fun build(context: Context): HyperShopDatabase =
-            Room.databaseBuilder(context, HyperShopDatabase::class.java, NAME).addCallback(CALLBACK).build()
+            Room.databaseBuilder(context, HyperShopDatabase::class.java, NAME).addCallback(CALLBACK).addMigrations(MIGRATION_1_2).build()
 
         /**
          * Tests: [queryExecutor] can run Room's background work (invalidation

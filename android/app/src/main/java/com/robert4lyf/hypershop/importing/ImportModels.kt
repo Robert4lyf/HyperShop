@@ -41,4 +41,6 @@ data class ImportResult(
     val inStockLines: List<Int> = emptyList(),
     /** A photo of a recipe ([PhotoStore]) for Claude to read, until it has been read. */
     val photo: String? = null,
+    /** The recipe-library entry this is a copy of (an edit, or "Add to list" from the library). */
+    val libraryKey: String? = null,
 )

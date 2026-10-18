@@ -47,6 +47,16 @@ data class InStockLine(
     val unitHint: QtyUnit?,
 )
 
+/** One recipe in the library (the Recipes tab's "Your recipes"). */
+data class LibraryRecipe(
+    val recipeId: Long,
+    val key: String,
+    val title: String,
+    val url: String?,
+    val lines: Int,
+    val lastAddedAt: Long,
+)
+
 /** What "Edit" on the Recipes tab reopens: see [ListRepository.editSource]. */
 data class EditSource(
     val recipe: RecipeEntity,
@@ -71,6 +81,8 @@ data class UseSummary(
     val itemCount: Int,
     /** Lines left out as in stock on import. */
     val inStockCount: Int,
+    /** Its recipe's library entry ([LibraryRecipe.key]), for "On your list" in the library. */
+    val libraryKey: String? = null,
 )
 
 /** A use's title and recipe page, for the item sheet's "From" rows. */
@@ -250,9 +262,24 @@ class ListRepository(
         model: String?,
         claudePending: Boolean,
         lines: List<ParsedIngredient>,
+        /** The library entry this is a new copy of (an edit or a re-add); null for a new recipe. */
+        libraryKey: String? = null,
     ): StoredRecipe =
         db.withTransaction {
-            val r = RecipeEntity(0, url, title, servings, locale.name, clock(), source, parsedBy.name, model, claudePending)
+            val r =
+                RecipeEntity(
+                    0,
+                    url,
+                    title,
+                    servings,
+                    locale.name,
+                    clock(),
+                    source,
+                    parsedBy.name,
+                    model,
+                    claudePending,
+                    libraryKey = libraryKey,
+                )
             val id = dao.insertRecipe(r)
             val rows = lines.map { RecipeLineEntity(0, id, it.section, it.raw, json.encodeToString(ParsedIngredient.serializer(), it)) }
             val ids = dao.insertLines(rows)
@@ -308,6 +335,7 @@ class ListRepository(
                 servings = u.servings.takeIf { r?.servingsOriginal != null },
                 itemCount = cs.map { it.itemId }.distinct().size,
                 inStockCount = inStock[u.id] ?: 0,
+                libraryKey = r?.let { it.libraryKey ?: it.url ?: "r:${it.id}" },
             )
         }
     }
@@ -381,6 +409,47 @@ class ListRepository(
             lines.size
         }
 
+    // ---- the recipe library -------------------------------------------------------------
+
+    /** Every recipe that has been on the list (its latest copy), the one added longest ago first. */
+    fun observeLibrary(): Flow<List<LibraryRecipe>> =
+        dao.observeLibrary().map { rows ->
+            val counts = rows.map { it.id }.chunked(MAX_ARGS).flatMap { dao.lineCounts(it) }.associate { it.recipeId to it.n }
+            rows.map { r ->
+                LibraryRecipe(r.id, r.libraryKey ?: "r:${r.id}", r.title ?: "Recipe", r.url, counts[r.id] ?: 0, r.lastAddedAt ?: 0)
+            }
+        }
+
+    /**
+     * In the transaction that put [recipeId] on the list: it becomes its library
+     * entry's latest copy. Older unused copies go, except the one before it, which
+     * Undo brings back.
+     */
+    private suspend fun addedToLibrary(recipeId: Long) {
+        dao.markAdded(recipeId, clock())
+        val key = dao.recipe(recipeId)?.libraryKey ?: return
+        val older =
+            dao.recipesByKey(key)
+                .filter { it.id != recipeId && it.lastAddedAt != null }
+                .sortedWith(compareByDescending<RecipeEntity> { it.lastAddedAt }.thenByDescending { it.id })
+        for (r in older.drop(1)) if (dao.usesOfRecipe(r.id) == 0) dao.deleteRecipe(r.id)
+    }
+
+    /** "Remove from your recipes": leaves the library; copies nothing on the list uses go. */
+    suspend fun removeFromLibrary(key: String) =
+        db.withTransaction {
+            val copies = dao.recipesByKey(key).filter { it.lastAddedAt != null }
+            dao.forgetKey(key)
+            for (r in copies) if (dao.usesOfRecipe(r.id) == 0) dao.deleteRecipe(r.id)
+        }
+
+    /** "Add to list" from the library: the recipe and its lines, as stored. */
+    suspend fun librarySource(recipeId: Long): Pair<RecipeEntity, List<ParsedIngredient>>? =
+        db.withTransaction {
+            val recipe = dao.recipe(recipeId) ?: return@withTransaction null
+            recipe to dao.lines(recipeId).map { json.decodeFromString(ParsedIngredient.serializer(), it.parsedJson) }
+        }
+
     /** "Add the in-stock items now": the lines of [useId] that were left out as in stock. */
     suspend fun inStockLines(useId: Long): Pair<RecipeEntity, List<ParsedIngredient>>? =
         db.withTransaction {
@@ -448,6 +517,8 @@ class ListRepository(
         jobId: Long? = null,
         /** An edit: this use (and its items, ticks and decisions) is replaced by the new one. */
         replacing: Long? = null,
+        /** False for part of a recipe ("Add the in-stock items now"): the library keeps the whole one. */
+        toLibrary: Boolean = true,
     ): ApplyResult =
         db.withTransaction {
             val old = load()
@@ -457,6 +528,7 @@ class ListRepository(
                     persist(old, r.list)
                     dao.putDecisions(preview.lineStatus.map { (line, s) -> LineDecisionEntity(r.useId, line, s.name) })
                     jobId?.let { dao.setJobState(it, "DONE") }
+                    if (toLibrary) preview.incoming.recipeId?.let { addedToLibrary(it) }
                     // The edited recipe was stored afresh; the old one goes once nothing uses it.
                     if (oldRecipe != null && oldRecipe != preview.incoming.recipeId && dao.uses().none { it.recipeId == oldRecipe }) {
                         db.openHelper.writableDatabase.execSQL("DELETE FROM Recipe WHERE id = ?", arrayOf(oldRecipe))

@@ -30,6 +30,11 @@ private val USES =
             UseSummary(3, null, "Added by hand", null, null, 2, 0),
         ),
         loaded = true,
+        library =
+            listOf(
+                LibraryRow(9, "r:9", "Red lentil dal", null, 11, 1_700_000_000_000, onList = false),
+                LibraryRow(1, "r:1", "Weeknight chilli", "https://example.com/chilli", 14, 1_760_000_000_000, onList = true),
+            ),
     )
 
 @RunWith(AndroidJUnit4::class)
