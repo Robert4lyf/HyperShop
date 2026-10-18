@@ -87,7 +87,7 @@ fun LibraryRoute(
     var editing by rememberSaveable { mutableStateOf<String?>(null) }
     var form by remember { mutableStateOf<EntryForm?>(null) }
     LaunchedEffect(editing) { form = editing?.let { vm.form(it.ifEmpty { null }) } }
-    LibraryScreen(ui, onBack = onBack, onSearch = vm::search, onOpen = { editing = it }, onAdd = { editing = "" })
+    LibraryScreen(ui, vm.query, onBack = onBack, onSearch = vm::search, onOpen = { editing = it }, onAdd = { editing = "" })
     val f = form
     if (editing != null && f != null) {
         EntrySheet(
@@ -106,6 +106,7 @@ fun LibraryRoute(
 @Composable
 fun LibraryScreen(
     ui: LibraryUi,
+    query: String,
     onBack: () -> Unit,
     onSearch: (String) -> Unit,
     onOpen: (String) -> Unit,
@@ -133,12 +134,12 @@ fun LibraryScreen(
                     }
                 }
                 OutlinedTextField(
-                    value = ui.query,
+                    value = query,
                     onValueChange = onSearch,
                     placeholder = { Text("Search, e.g. coriander") },
                     leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
                     trailingIcon = {
-                        if (ui.query.isNotEmpty()) {
+                        if (query.isNotEmpty()) {
                             IconButton(
                                 onClick = { onSearch("") },
                             ) { Icon(Icons.Rounded.Close, contentDescription = "Clear search") }

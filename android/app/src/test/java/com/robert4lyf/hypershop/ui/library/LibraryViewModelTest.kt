@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.ui.library
 
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.testutil.TestContainer
@@ -43,6 +44,21 @@ class LibraryViewModelTest {
         val watching = CoroutineScope(Dispatchers.Main).launch { vm.ui.collect {} }
         val ui = await(vm.ui) { u -> u.rows.any { it.id == "user_zorbleberry" } }
         assertTrue(ui.rows.single { it.id == "user_zorbleberry" }.custom)
+        watching.cancel()
+    }
+
+    @Test
+    fun searchKeepsWhatYouTypedAndFilters() {
+        val c = TestContainer.create()
+        val vm = LibraryViewModel(c)
+        val watching = CoroutineScope(Dispatchers.Main).launch { vm.ui.collect {} }
+        await(vm.ui) { it.rows.size == it.total && it.total > 0 }
+        vm.search("corian")
+        // The field reads this back at once, before any filtering.
+        assertEquals("corian", vm.query)
+        Snapshot.sendApplyNotifications()
+        val ui = await(vm.ui) { u -> u.rows.size < u.total }
+        assertTrue(ui.rows.any { it.id == "coriander" })
         watching.cancel()
     }
 
