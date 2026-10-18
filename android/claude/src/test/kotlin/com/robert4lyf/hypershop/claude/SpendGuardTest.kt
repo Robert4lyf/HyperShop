@@ -65,4 +65,13 @@ class SpendGuardTest {
             val r = g.parse(ClaudeInput.Lines(listOf("1 egg")), ClaudeModel.HAIKU) as ClaudeResult.Failed
             assertEquals(ClaudeResult.Reason.CAP_REACHED, r.reason)
         }
+
+    @Test
+    fun callsStillRunningCountTowardsTheCaps() {
+        assertTrue(guard.check(emptyList(), today, ClaudeModel.HAIKU, 2000, reservedCalls = 50) is SpendGuard.Decision.DailyCapReached)
+        assertTrue(
+            guard.check(emptyList(), today, ClaudeModel.HAIKU, 2000, reservedCalls = 1, reservedUsd = 1.999) is
+                SpendGuard.Decision.MonthlyCapReached,
+        )
+    }
 }

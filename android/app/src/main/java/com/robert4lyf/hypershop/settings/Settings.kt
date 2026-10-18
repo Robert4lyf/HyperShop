@@ -13,6 +13,7 @@ import com.robert4lyf.hypershop.claude.ClaudeModel
 import com.robert4lyf.hypershop.claude.SpendGuard
 import com.robert4lyf.hypershop.core.merge.UnitsSetting
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
@@ -25,13 +26,15 @@ val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(na
 class Settings(
     private val store: DataStore<Preferences>,
 ) {
+    // Distinct: any other setting's write re-emits store.data, and these redraw the list or the whole app.
     val units: Flow<UnitsSetting> =
-        store.data.map {
-                p ->
+        store.data.map { p ->
             p[UNITS]?.let { runCatching { UnitsSetting.valueOf(it) }.getOrNull() } ?: UnitsSetting.METRIC
-        }
+        }.distinctUntilChanged()
     val theme: Flow<ThemeMode> =
-        store.data.map { p -> p[THEME]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.SYSTEM }
+        store.data
+            .map { p -> p[THEME]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.SYSTEM }
+            .distinctUntilChanged()
     val model: Flow<ClaudeModel> = store.data.map { p -> p[MODEL]?.let { ClaudeModel.fromId(it) } ?: ClaudeModel.DEFAULT }
     val monthlyCapUsd: Flow<Double> = store.data.map { it[MONTHLY_CAP] ?: SpendGuard.DEFAULT_MONTHLY_CAP_USD }
     val dailyCalls: Flow<Int> = store.data.map { it[DAILY_CALLS] ?: SpendGuard.DEFAULT_DAILY_CALLS }

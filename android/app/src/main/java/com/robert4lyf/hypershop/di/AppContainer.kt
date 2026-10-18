@@ -32,6 +32,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.time.Instant
@@ -143,6 +144,9 @@ class AppContainer(
 
     /** Start-up housekeeping: the epoch marker, a catalogue re-key, the 7-day purge. */
     fun startUp(marker: EpochMarker) {
+        // The first frame waits for the theme setting; start reading the settings file now,
+        // while the activity is still being created, rather than when it first asks.
+        applicationScope.launch { settings.theme.first() }
         applicationScope.launch {
             repository.checkEpoch(marker)
             repository.rekeyIfCatalogChanged()

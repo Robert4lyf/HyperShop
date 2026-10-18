@@ -75,7 +75,15 @@ data class ShoppingList(
 ) {
     val liveItems: List<ListItem> get() = items.values.filter { it.deletedAt == null }
 
-    fun contributionsOf(itemId: Long): List<Contribution> = contributions.filter { it.itemId == itemId }
+    // Built once per list, on first use: the list screen asks for every item's
+    // contributions several times per redraw. Same order as [contributions].
+    private val byItem: Map<Long, List<Contribution>> by lazy { contributions.groupBy { it.itemId } }
+    private val byUse: Map<Long, List<Contribution>> by lazy { contributions.groupBy { it.useId } }
+
+    fun contributionsOf(itemId: Long): List<Contribution> = byItem[itemId] ?: emptyList()
+
+    /** A use's contributions, in id order. */
+    fun contributionsOfUse(useId: Long): List<Contribution> = byUse[useId] ?: emptyList()
 
     fun isDone(itemId: Long): Boolean = contributionsOf(itemId).let { cs -> cs.isNotEmpty() && cs.all { it.coveredBy != null } }
 
@@ -142,12 +150,13 @@ data class ShoppingList(
      */
     fun finishShopping(now: Long): ShoppingList {
         val done = liveItems.filter { isDone(it.id) }.map { it.id }.toSet()
+        val tickAt = HashMap<Long, Long>(ticks.size).also { m -> ticks.forEach { m.putIfAbsent(it.id, it.at) } }
         val archived =
             uses.mapValues { (id, u) ->
-                val cs = contributions.filter { it.useId == id }
+                val cs = contributionsOfUse(id)
                 val coveredFor7Days =
                     cs.isNotEmpty() &&
-                        cs.all { c -> c.coveredBy != null && (ticks.firstOrNull { it.id == c.coveredBy }?.at ?: now) <= now - SEVEN_DAYS }
+                        cs.all { c -> c.coveredBy != null && (tickAt[c.coveredBy] ?: now) <= now - SEVEN_DAYS }
                 if (u.archivedAt == null && coveredFor7Days) u.copy(archivedAt = now) else u
             }
         return copy(items = items.mapValues { (id, i) -> if (id in done) i.copy(deletedAt = now) else i }, uses = archived).bumped(done)

@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.ui.settings
 
+import android.os.Looper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.robert4lyf.hypershop.claude.ClaudeModel
 import com.robert4lyf.hypershop.core.model.AisleCode
@@ -16,7 +17,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34])
@@ -55,6 +58,49 @@ class SettingsViewModelTest {
         } finally {
             claude.shutdown()
         }
+    }
+
+    @Test
+    fun aTestThatEndsAfterRemoveKeyIsIgnored() {
+        val claude = MockWebServer().apply { start() }
+        try {
+            claude.enqueue(MockResponse().setResponseCode(200).setBody("""{"data":[]}""").setHeadersDelay(300, TimeUnit.MILLISECONDS))
+            val c = TestContainer.create(claude = claude, key = "test-key")
+            val vm = SettingsViewModel(c)
+            await(vm.ui) { it.loaded && it.hasKey }
+            vm.testKey()
+            await(vm.ui) { it.keyStatus == KeyStatus.TESTING }
+            vm.removeKey()
+            await(vm.ui) { !it.hasKey && it.keyStatus == null }
+            claude.takeRequest()
+            // The answer arrives after the removal: it must not show "OK" for a key that's gone.
+            val end = System.currentTimeMillis() + 1000
+            while (System.currentTimeMillis() < end) {
+                shadowOf(Looper.getMainLooper()).idle()
+                assertNull(vm.ui.value.keyStatus)
+                Thread.sleep(10)
+            }
+        } finally {
+            claude.shutdown()
+        }
+    }
+
+    @Test
+    fun twoQuickAisleMovesBothCount() {
+        val c = TestContainer.create()
+        val vm = SettingsViewModel(c)
+        val start = await(vm.ui) { it.loaded && it.aisles.size > 3 }.aisles
+        val third = start[2]
+        // Two taps before either write lands.
+        vm.moveAisle(third, -1)
+        vm.moveAisle(third, -1)
+        assertEquals(third, vm.ui.value.aisles.first())
+        val end = System.currentTimeMillis() + 5000
+        while (runBlocking { c.repository.aisleOrder() }.first() != third && System.currentTimeMillis() < end) {
+            shadowOf(Looper.getMainLooper()).idle()
+            Thread.sleep(10)
+        }
+        assertEquals(listOf(third, start[0], start[1]) + start.drop(3), runBlocking { c.repository.aisleOrder() })
     }
 
     @Test

@@ -1,5 +1,9 @@
 package com.robert4lyf.hypershop.claude
 
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
 /** One `ClaudeUsage` row: a day's tokens on one model. */
@@ -49,10 +53,13 @@ class SpendGuard(
         today: LocalDate,
         model: ClaudeModel,
         inputChars: Int,
+        /** Calls already allowed but not yet recorded (running now), with their estimates. */
+        reservedCalls: Int = 0,
+        reservedUsd: Double = 0.0,
     ): Decision {
-        val calls = callsToday(history, today)
+        val calls = callsToday(history, today) + reservedCalls
         if (calls >= dailyCallCap) return Decision.DailyCapReached(calls)
-        val spent = spentThisMonth(history, today)
+        val spent = spentThisMonth(history, today) + reservedUsd
         val estimate = estimateUsd(model, inputChars)
         if (spent + estimate > monthlyCapUsd) return Decision.MonthlyCapReached(spent)
         return Decision.Allowed(estimate)
@@ -99,9 +106,34 @@ class GuardedClaude(
                 is ClaudeInput.Lines -> input.lines.sumOf { it.length + 1 }
                 is ClaudeInput.PageText -> minOf(input.text.length, ClaudeRequest.INPUT_CAP)
             }
-        return when (guard().check(history(), today(), model, chars)) {
-            is SpendGuard.Decision.Allowed -> client.parse(input, model)
-            else -> ClaudeResult.Failed(ClaudeResult.Reason.CAP_REACHED)
+        // Check and reserve together: two imports at once (a background share while a
+        // review is open) can't both pass on the same history and overshoot a cap.
+        val estimate =
+            lock.withLock {
+                when (val d = guard().check(history(), today(), model, chars, reservedCalls, reservedUsd)) {
+                    is SpendGuard.Decision.Allowed -> {
+                        reservedCalls++
+                        reservedUsd += d.estimatedUsd
+                        d.estimatedUsd
+                    }
+                    else -> return ClaudeResult.Failed(ClaudeResult.Reason.CAP_REACHED)
+                }
+            }
+        return try {
+            client.parse(input, model)
+        } finally {
+            // By now the call's real usage is recorded (or it failed unbilled). Released even
+            // when the caller was cancelled, or the reservation would block calls for ever.
+            withContext(NonCancellable) {
+                lock.withLock {
+                    reservedCalls--
+                    reservedUsd -= estimate
+                }
+            }
         }
     }
+
+    private val lock = Mutex()
+    private var reservedCalls = 0
+    private var reservedUsd = 0.0
 }

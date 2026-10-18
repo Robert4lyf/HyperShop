@@ -34,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -103,12 +104,15 @@ private fun ListBody(
     // Collapsed aisles, by name: kept across tab switches and rotation.
     var collapsed by rememberSaveable { mutableStateOf(emptyList<String>()) }
     // An aisle that gains something to buy opens again, so new items are never hidden.
-    val leftByAisle = ui.aisles.associate { (a, rows) -> a.name to rows.count { it.state != TickState.DONE } }
-    var lastLeft by remember { mutableStateOf(leftByAisle) }
-    if (leftByAisle != lastLeft) {
-        val grew = leftByAisle.filter { (a, n) -> n > (lastLeft[a] ?: 0) }.keys
+    // Compared after composition, against a plain (non-state) memo: a tick doesn't
+    // cost a second composition, only an aisle that has to open again does.
+    val leftByAisle = remember(ui.aisles) { ui.aisles.associate { (a, rows) -> a.name to rows.count { it.state != TickState.DONE } } }
+    val lastLeft = remember { LeftMemo(leftByAisle) }
+    LaunchedEffect(leftByAisle) {
+        val before = lastLeft.counts
+        lastLeft.counts = leftByAisle
+        val grew = leftByAisle.filter { (a, n) -> n > (before[a] ?: 0) }.keys
         if (grew.any { it in collapsed }) collapsed = collapsed - grew
-        lastLeft = leftByAisle
     }
     LazyColumn(Modifier.fillMaxSize().testTag("list"), contentPadding = PaddingValues(bottom = 24.dp)) {
         header()
@@ -116,7 +120,7 @@ private fun ListBody(
         for ((aisle, rows) in ui.aisles) {
             val open = aisle.name !in collapsed
             val count = if (open) rows.size + 1 else 1
-            item(key = "aisle-${aisle.name}") {
+            item(key = "aisle-${aisle.name}", contentType = "aisle") {
                 AisleTitle(
                     aisle,
                     rows,
@@ -126,13 +130,18 @@ private fun ListBody(
                 )
             }
             if (open) {
-                itemsIndexed(rows, key = { _, r -> r.id }) { i, r ->
+                itemsIndexed(rows, key = { _, r -> r.id }, contentType = { _, _ -> "row" }) { i, r ->
                     ListRowItem(r, actions, Modifier.sectionItem(sectionPosition(i + 1, count), card))
                 }
             }
         }
     }
 }
+
+/** The left-to-buy count per aisle as last seen; deliberately not snapshot state. */
+private class LeftMemo(
+    var counts: Map<String, Int>,
+)
 
 @Composable
 private fun ListTop(

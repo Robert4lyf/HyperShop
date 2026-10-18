@@ -65,6 +65,33 @@ class UsesTest {
         }
 
     @Test
+    fun finishCountsWhatItRemoved() =
+        runBlocking {
+            r.import("2 onions", "1 carrot", "200 ml milk")
+            val l = r.repo.snapshot()
+            r.repo.tick(l.itemByKey("cat:onion")!!.id)
+            r.repo.tick(l.itemByKey("cat:carrot")!!.id)
+            assertEquals(2, r.repo.finish().removed)
+            assertEquals(0, r.repo.finish().removed)
+        }
+
+    @Test
+    fun usesFromALoadedListMatchAFreshRead() =
+        runBlocking {
+            val a = r.import("2 onions", "Salt, to taste")
+            r.import("1 carrot", url = "https://example.com/b")
+            r.repo.manualAdd("milk", com.robert4lyf.hypershop.core.model.QtyBase.PRESENCE, null)
+            val l = r.repo.snapshot()
+            val uses = r.repo.usesOnList(l)
+            assertEquals(r.repo.usesOnList(), uses)
+            assertEquals(3, uses.size)
+            val links = r.repo.useLinks(l, uses.map { it.useId })
+            assertEquals(uses.map { it.title to it.url }, uses.map { links.getValue(it.useId).let { k -> k.title to k.url } })
+            assertTrue("Added by hand" in links.values.map { it.title })
+            assertEquals(1, uses.single { it.useId == a.useId }.inStockCount)
+        }
+
+    @Test
     fun softDeleteUndoAndPurge() =
         runBlocking {
             r.import("1 carrot")

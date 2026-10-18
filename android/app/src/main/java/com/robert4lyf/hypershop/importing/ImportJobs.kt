@@ -41,10 +41,26 @@ class ImportJobs(
             dao.insertJob(
                 ImportJobEntity(0, JobState.QUEUED.name, json.encodeToString(ImportInput.serializer(), input), null, null, clock()),
             )
-        val req = OneTimeWorkRequestBuilder<ImportWorker>().setInputData(ImportWorker.input(id)).build()
-        workManager().enqueueUniqueWork("import-$id", ExistingWorkPolicy.KEEP, req)
+        schedule(id)
         return id
     }
+
+    /** Unique per job, so calling it again (see [ensureScheduled]) never runs a job twice. */
+    private fun schedule(id: Long) {
+        val req = OneTimeWorkRequestBuilder<ImportWorker>().setInputData(ImportWorker.input(id)).build()
+        workManager().enqueueUniqueWork("import-$id", ExistingWorkPolicy.KEEP, req)
+    }
+
+    /**
+     * A job still QUEUED when its review opens is scheduled again: the process may
+     * have died between saving the job and handing it to WorkManager.
+     */
+    suspend fun ensureScheduled(id: Long) {
+        if (dao.job(id)?.state == JobState.QUEUED.name) schedule(id)
+    }
+
+    /** The worker's claim; false when the job is already finished (a WorkManager re-run). */
+    suspend fun claim(id: Long): Boolean = dao.claimJob(id) > 0
 
     /** A job that needs no fetch, straight to review ("Add the in-stock items now"). */
     suspend fun enqueueReady(
@@ -82,14 +98,20 @@ class ImportJobs(
 
     suspend fun done(id: Long) = setState(id, JobState.DONE)
 
-    val ready: Flow<List<Job>> = dao.observeJobs(JobState.READY.name).map { it.map(::map) }
+    /**
+     * Jobs ready to review, for the list's card: their results are not decoded (a
+     * page's text can be tens of KB and this re-emits with every job change).
+     */
+    val ready: Flow<List<Job>> = dao.observeJobs(JobState.READY.name).map { rows -> rows.map { map(it, withResult = false) } }
 
-    private fun map(e: ImportJobEntity) =
-        Job(
-            e.id,
-            JobState.valueOf(e.state),
-            json.decodeFromString(ImportInput.serializer(), e.inputRefs),
-            e.resultJson?.let { json.decodeFromString(ImportResult.serializer(), it) },
-            e.createdAt,
-        )
+    private fun map(
+        e: ImportJobEntity,
+        withResult: Boolean = true,
+    ) = Job(
+        e.id,
+        JobState.valueOf(e.state),
+        json.decodeFromString(ImportInput.serializer(), e.inputRefs),
+        e.resultJson?.takeIf { withResult }?.let { json.decodeFromString(ImportResult.serializer(), it) },
+        e.createdAt,
+    )
 }

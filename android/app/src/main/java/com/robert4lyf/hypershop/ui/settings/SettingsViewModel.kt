@@ -9,12 +9,15 @@ import com.robert4lyf.hypershop.core.merge.UnitsSetting
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.settings.ThemeMode
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** "Test key": null until tried. */
 enum class KeyStatus { TESTING, OK, BAD_KEY, OFFLINE, ERROR }
@@ -50,38 +53,29 @@ class SettingsViewModel(
     private val _ui = MutableStateFlow(SettingsUi())
     val ui: StateFlow<SettingsUi> = _ui
 
+    // Main thread only (viewModelScope), so plain fields.
     private var keyWasSet = false
+
+    /** The key store's hasKey has changed since this screen opened: newer than the start-up read. */
+    private var hasKeyMoved = false
+
+    /** The walking order was changed here: the start-up read must not undo it. */
+    private var aislesMoved = false
+
+    /** Each key test, save and removal takes a new number; a test result for an older one is dropped. */
+    private var keyGen = 0
+
+    /** Aisle moves are written in tap order. */
+    private val aisleWrites = Mutex()
+
+    /** Completed by each watcher's first value: the screen shows once all have arrived. */
+    private val firsts = mutableListOf<CompletableDeferred<Unit>>()
 
     init {
         val s = c.settings
-        // Everything the screen shows first, read once before anything is drawn; the
-        // watchers below keep it current afterwards.
-        viewModelScope.launch {
-            val first =
-                SettingsUi(
-                    units = s.units.first(),
-                    theme = s.theme.first(),
-                    model = s.model.first(),
-                    monthlyCapUsd = s.monthlyCapUsd.first(),
-                    dailyCalls = s.dailyCalls.first(),
-                    watchVibrate = s.watchVibrate.first(),
-                    hasKey = c.apiKeyStore.isSaved(),
-                    aisles = c.repository.aisleOrder(),
-                )
-            _ui.update {
-                it.copy(
-                    units = first.units,
-                    theme = first.theme,
-                    model = first.model,
-                    monthlyCapUsd = first.monthlyCapUsd,
-                    dailyCalls = first.dailyCalls,
-                    watchVibrate = first.watchVibrate,
-                    hasKey = first.hasKey,
-                    aisles = first.aisles,
-                    loaded = true,
-                )
-            }
-        }
+        // Every watcher fills its own field, and the screen is drawn (loaded) only once
+        // each has given its first value, so it never shows defaults and then jumps. The
+        // two start-up reads below fill only what nothing newer has filled since.
         watch(s.units) { copy(units = it) }
         watch(s.theme) { copy(theme = it) }
         watch(s.model) { copy(model = it) }
@@ -94,17 +88,44 @@ class SettingsViewModel(
             keyWasSet = it
             copy(keyMissingAfterRestore = it && !hasKey)
         }
-        watch(c.apiKeyStore.hasKey) { copy(hasKey = it, keyMissingAfterRestore = keyWasSet && !it) }
+        // hasKey can lag the store at start-up (isSaved reads it now); any later value is current.
+        var firstHasKey = true
+        viewModelScope.launch {
+            c.apiKeyStore.hasKey.collect { v ->
+                if (!firstHasKey) hasKeyMoved = true
+                firstHasKey = false
+                _ui.update { it.copy(hasKey = v, keyMissingAfterRestore = keyWasSet && !v) }
+            }
+        }
         watch(c.repository.observeStaples()) { keys -> copy(staples = keys.map(::stapleName).sorted()) }
-        viewModelScope.launch { _ui.update { it.copy(aisles = c.repository.aisleOrder()) } }
-        // Spend changes with each import, and each import moves the list rev.
-        viewModelScope.launch { c.repository.observe().collect { refreshSpend() } }
+        val startUp =
+            viewModelScope.launch {
+                val saved = c.apiKeyStore.isSaved()
+                if (!hasKeyMoved) _ui.update { it.copy(hasKey = saved, keyMissingAfterRestore = keyWasSet && !saved) }
+                val aisles = c.repository.aisleOrder()
+                if (!aislesMoved) _ui.update { it.copy(aisles = aisles) }
+            }
+        viewModelScope.launch {
+            startUp.join()
+            firsts.toList().awaitAll()
+            _ui.update { it.copy(loaded = true) }
+        }
+        // Spend changes only when a Claude call is recorded.
+        viewModelScope.launch { c.repository.observeUsage().collect { refreshSpend() } }
     }
 
     private fun <T> watch(
         flow: Flow<T>,
         apply: SettingsUi.(T) -> SettingsUi,
-    ) = viewModelScope.launch { flow.collect { v -> _ui.update { it.apply(v) } } }
+    ) {
+        val first = CompletableDeferred<Unit>().also { firsts += it }
+        viewModelScope.launch {
+            flow.collect { v ->
+                _ui.update { it.apply(v) }
+                first.complete(Unit)
+            }
+        }
+    }
 
     private fun stapleName(key: String): String =
         key.removePrefix("cat:").removePrefix("name:").let { id -> c.catalog.byId[id]?.name ?: id.replace('_', ' ') }
@@ -137,14 +158,16 @@ class SettingsViewModel(
     fun moveAisle(
         aisle: AisleCode,
         delta: Int,
-    ) = viewModelScope.launch {
+    ) {
+        // Applied to the screen at once, so a second quick tap builds on this one.
         val order = _ui.value.aisles.toMutableList()
         val i = order.indexOf(aisle)
         val j = i + delta
-        if (i < 0 || j !in order.indices) return@launch
+        if (i < 0 || j !in order.indices) return
         order[i] = order[j].also { order[j] = order[i] }
-        c.repository.setAisleOrder(order)
+        aislesMoved = true
         _ui.update { it.copy(aisles = order) }
+        viewModelScope.launch { aisleWrites.withLock { c.repository.setAisleOrder(order) } }
     }
 
     // ---- Watch -----------------------------------------------------------------------------
@@ -154,28 +177,36 @@ class SettingsViewModel(
     // ---- Claude ----------------------------------------------------------------------------
 
     /** Saves the key and tests it straight away. */
-    fun saveKey(text: String) =
+    fun saveKey(text: String) {
+        // Pasted keys can carry invisible characters (zero-width spaces, line breaks).
+        val key = cleanKey(text)
+        if (key.isEmpty()) return
+        val gen = ++keyGen
         viewModelScope.launch {
-            // Pasted keys can carry invisible characters (zero-width spaces, line breaks).
-            val key = cleanKey(text)
-            if (key.isEmpty()) return@launch
             if (!KEY_CHARS.matches(key)) {
-                _ui.update { it.copy(keyStatus = KeyStatus.BAD_KEY) }
+                keyStatus(gen, KeyStatus.BAD_KEY)
                 return@launch
             }
             if (!c.apiKeyStore.set(key)) {
-                _ui.update { it.copy(keyStatus = KeyStatus.ERROR) }
+                keyStatus(gen, KeyStatus.ERROR)
                 return@launch
             }
             c.settings.setKeyWasSet(true)
             c.settings.setKeyLostNotice(false)
-            test(key)
+            test(gen, key)
         }
+    }
 
-    fun testKey() = viewModelScope.launch { c.apiKeyStore.get()?.let { test(it) } }
+    fun testKey() {
+        val gen = ++keyGen
+        viewModelScope.launch { c.apiKeyStore.get()?.let { test(gen, it) } }
+    }
 
-    private suspend fun test(key: String) {
-        _ui.update { it.copy(keyStatus = KeyStatus.TESTING) }
+    private suspend fun test(
+        gen: Int,
+        key: String,
+    ) {
+        keyStatus(gen, KeyStatus.TESTING)
         val r =
             when (c.claudeClient.testKey(key)) {
                 KeyCheck.OK -> KeyStatus.OK
@@ -183,16 +214,27 @@ class SettingsViewModel(
                 KeyCheck.OFFLINE -> KeyStatus.OFFLINE
                 KeyCheck.ERROR -> KeyStatus.ERROR
             }
-        _ui.update { it.copy(keyStatus = r) }
+        keyStatus(gen, r)
     }
 
-    /** "Remove key": from disk and from memory. */
-    fun removeKey() =
+    /** Shows [status] unless a newer save, test or removal has started since [gen]. */
+    private fun keyStatus(
+        gen: Int,
+        status: KeyStatus?,
+    ) {
+        if (gen == keyGen) _ui.update { it.copy(keyStatus = status) }
+    }
+
+    /** "Remove key": from disk and from memory. A test still running is ignored when it ends. */
+    fun removeKey() {
+        val gen = ++keyGen
+        _ui.update { it.copy(keyStatus = null) }
         viewModelScope.launch {
             c.apiKeyStore.clear()
             c.settings.setKeyWasSet(false)
-            _ui.update { it.copy(keyStatus = null) }
+            keyStatus(gen, null)
         }
+    }
 
     fun dismissKeyLost() = viewModelScope.launch { c.settings.setKeyLostNotice(false) }
 

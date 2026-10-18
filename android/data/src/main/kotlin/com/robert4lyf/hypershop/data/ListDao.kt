@@ -76,6 +76,9 @@ interface ListDao {
     @Query("SELECT * FROM Recipe WHERE id = :id")
     suspend fun recipe(id: Long): RecipeEntity?
 
+    @Query("SELECT * FROM Recipe WHERE id IN (:ids)")
+    suspend fun recipes(ids: List<Long>): List<RecipeEntity>
+
     @Query("SELECT * FROM Recipe WHERE url = :url ORDER BY importedAt DESC")
     suspend fun recipesByUrl(url: String): List<RecipeEntity>
 
@@ -98,6 +101,9 @@ interface ListDao {
 
     @Query("SELECT * FROM LineDecision WHERE useId = :useId")
     suspend fun decisions(useId: Long): List<LineDecisionEntity>
+
+    @Query("SELECT * FROM LineDecision WHERE useId IN (:useIds)")
+    suspend fun decisionsFor(useIds: List<Long>): List<LineDecisionEntity>
 
     // ---- aisles, store, overrides, staples ----------------------------------------
     @Query("SELECT * FROM Aisle ORDER BY defaultOrder")
@@ -201,6 +207,10 @@ interface ListDao {
 
     @Query("SELECT * FROM ImportJob WHERE state = :state ORDER BY createdAt")
     fun observeJobs(state: String): Flow<List<ImportJobEntity>>
+
+    /** The worker's claim: only a job still waiting (or interrupted mid-run) is run; 0 rows otherwise. */
+    @Query("UPDATE ImportJob SET state = 'RUNNING' WHERE id = :id AND state IN ('QUEUED', 'RUNNING')")
+    suspend fun claimJob(id: Long): Int
 
     // ---- watch ----------------------------------------------------------------
     @Query("SELECT * FROM WatchInstall WHERE installId = :id")
