@@ -5,7 +5,9 @@ import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.data.ImportJobEntity
 import com.robert4lyf.hypershop.importing.ImportError
+import com.robert4lyf.hypershop.importing.ImportInput
 import com.robert4lyf.hypershop.importing.ImportResult
+import com.robert4lyf.hypershop.importing.PhotoStore
 import com.robert4lyf.hypershop.testutil.CHILLI
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.testutil.await
@@ -124,6 +126,41 @@ class ReviewViewModelTest {
         } finally {
             claude.shutdown()
         }
+    }
+
+    @Test
+    fun aPhotoIsReadByClaudeOnTheReviewScreen() {
+        val claude = MockWebServer().apply { start() }
+        try {
+            claude.enqueue(MockResponse().setBody(File("../../testdata/claude/synthetic-ok-cake.json").readText()))
+            val c = TestContainer.create(claude = claude, key = "sk-ant-test")
+            c.reviewGate.set(true)
+            val photo = PhotoStore.saveBytes(c.context, byteArrayOf(1, 2, 3))
+            val result = ImportResult(null, null, null, UnitLocale.METRIC, "PHOTO", claudePending = true, photo = photo.path)
+            val job = runBlocking { c.importJobs.enqueueReady(ImportInput("", "Photo of a recipe"), result) }
+            val ui = ready(ReviewViewModel(c, job))
+            assertEquals(Badge.CLAUDE, ui.badge)
+            assertTrue(ui.aisles.isNotEmpty())
+            val body = claude.takeRequest().body.readUtf8()
+            assertTrue(body.contains("\"type\":\"image\""))
+            assertTrue(body.contains("\"data\":\"AQID\""))
+            // Read once: the photo is gone and the lines are kept as text.
+            assertFalse(photo.exists())
+        } finally {
+            claude.shutdown()
+        }
+    }
+
+    @Test
+    fun aPhotoWithoutAKeyAsksForOne() {
+        val c = TestContainer.create()
+        c.reviewGate.set(true)
+        val photo = PhotoStore.saveBytes(c.context, byteArrayOf(1, 2, 3))
+        val result = ImportResult(null, null, null, UnitLocale.METRIC, "PHOTO", claudePending = true, photo = photo.path)
+        val job = runBlocking { c.importJobs.enqueueReady(ImportInput("", "Photo of a recipe"), result) }
+        val vm = ReviewViewModel(c, job)
+        val failed = await(vm.state) { it is ReviewState.Failed } as ReviewState.Failed
+        assertEquals(ImportError.PHOTO_NEEDS_KEY, failed.error)
     }
 
     @Test

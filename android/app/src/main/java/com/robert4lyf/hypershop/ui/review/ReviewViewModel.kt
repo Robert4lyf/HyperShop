@@ -17,6 +17,7 @@ import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.importing.ImportError
 import com.robert4lyf.hypershop.importing.ImportResult
 import com.robert4lyf.hypershop.importing.JobState
+import com.robert4lyf.hypershop.importing.PhotoStore
 import com.robert4lyf.hypershop.ui.common.webLink
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -405,6 +406,7 @@ class ReviewViewModel(
     fun cancel() =
         act {
             stored?.let { c.repository.discardRecipe(it.recipe.id) }
+            PhotoStore.delete((result ?: failedFrom)?.photo)
             c.importJobs.done(jobId)
             _state.value = ReviewState.Cancelled
         }

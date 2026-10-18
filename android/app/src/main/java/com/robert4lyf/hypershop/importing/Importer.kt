@@ -90,8 +90,12 @@ class Importer(
     ): ImportResult {
         val ruled = base.copy(lines = rules.parseLines(base.rawLines), parsedBy = ParsedBy.RULES)
         val keyed = claude != null && hasKey()
+        val photo = base.photo?.takeIf { base.rawLines.isEmpty() }
+        if (photo != null && !keyed) return ruled.copy(claudePending = false, error = ImportError.PHOTO_NEEDS_KEY)
         val input =
             when {
+                photo != null ->
+                    PhotoStore.read(photo)?.let { ClaudeInput.Photo(it, base.title) } ?: return ruled.copy(error = ImportError.NO_RECIPE)
                 base.rawLines.isNotEmpty() -> ClaudeInput.Lines(base.rawLines, base.title, base.servings)
                 !base.pageText.isNullOrBlank() -> ClaudeInput.PageText(base.pageText, base.title)
                 else -> return ruled.copy(error = ImportError.NO_RECIPE)
@@ -119,6 +123,9 @@ class Importer(
                     RecipeStatus.OK ->
                         base.copy(
                             lines = r.recipe.ingredients,
+                            // A photo's lines are kept as text from now on ("Retry with Claude" re-reads those).
+                            rawLines = base.rawLines.ifEmpty { r.recipe.ingredients.map { it.raw } },
+                            photo = null,
                             title = base.title ?: r.recipe.title,
                             servings = base.servings ?: r.recipe.servings,
                             parsedBy = ParsedBy.CLAUDE,
@@ -126,7 +133,7 @@ class Importer(
                             claudePending = false,
                             sourceUrls = r.recipe.sourceUrls,
                             locale = localeFor(base.url, r.recipe.ingredients.map { it.raw }),
-                        )
+                        ).also { PhotoStore.delete(photo) }
                 }
             is ClaudeResult.Refused -> ruled.copy(claudePending = true, claudeTried = true, claudeNote = "Claude declined; parsed offline")
             is ClaudeResult.Failed ->

@@ -114,4 +114,5 @@ fun errorText(e: ImportError): String =
         ImportError.OFFLINE -> "You're offline. Share the link again when you're connected, or paste the lines."
         ImportError.NO_RECIPE -> "No ingredient list found on that page."
         ImportError.NOT_A_RECIPE -> "That page doesn't look like a recipe."
+        ImportError.PHOTO_NEEDS_KEY -> "Reading a photo needs your Claude key (Settings › Claude). Or type the ingredients below."
     }

@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 enum class JobState { QUEUED, RUNNING, READY, FAILED, DONE }
 
 /** Why an import could not produce lines; each has its own message and a way out. */
-enum class ImportError { BLOCKED, NOT_HTML, TOO_LARGE, HTTP, OFFLINE, NO_RECIPE, NOT_A_RECIPE }
+enum class ImportError { BLOCKED, NOT_HTML, TOO_LARGE, HTTP, OFFLINE, NO_RECIPE, NOT_A_RECIPE, PHOTO_NEEDS_KEY }
 
 /** What an import produced, kept in `ImportJob.resultJson` until it is reviewed. */
 @Serializable
@@ -39,4 +39,6 @@ data class ImportResult(
     val editsUse: Long? = null,
     /** With [editsUse]: the indices of [lines] that were marked in stock. */
     val inStockLines: List<Int> = emptyList(),
+    /** A photo of a recipe ([PhotoStore]) for Claude to read, until it has been read. */
+    val photo: String? = null,
 )
