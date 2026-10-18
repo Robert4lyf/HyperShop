@@ -6,6 +6,7 @@
 <full-backup-content>
     <include domain="database" path="." />
     <include domain="file" path="datastore" />
+    <include domain="file" path="library" />
     <exclude domain="file" path="datastore/claude_key.preferences_pb" />
     <exclude domain="database" path="hypershop.db-shm" />
 </full-backup-content>

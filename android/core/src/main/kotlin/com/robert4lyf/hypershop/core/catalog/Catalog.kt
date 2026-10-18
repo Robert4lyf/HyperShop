@@ -44,24 +44,49 @@ object CatalogKey {
     }
 }
 
-/** An immutable catalogue with key lookups. */
+/**
+ * The catalogue with key lookups. Its contents can be swapped as a whole
+ * ([replace]) when you edit the ingredient library; every reader sees either
+ * the old set or the new one, never a mix.
+ */
 class Catalog(
-    val version: String,
-    val entries: List<CatalogEntry>,
+    version: String,
+    entries: List<CatalogEntry>,
 ) {
-    val byId: Map<String, CatalogEntry> = entries.associateBy { it.id }
-
-    private val byKey: Map<String, CatalogEntry> =
-        buildMap {
-            for (e in this@Catalog.entries) {
-                for (n in listOf(e.name, e.plural) + e.synonyms) put(CatalogKey.of(n), e)
+    private class Snapshot(
+        val version: String,
+        val entries: List<CatalogEntry>,
+    ) {
+        val byId: Map<String, CatalogEntry> = entries.associateBy { it.id }
+        val byKey: Map<String, CatalogEntry> =
+            buildMap {
+                for (e in this@Snapshot.entries) {
+                    for (n in listOf(e.name, e.plural) + e.synonyms) put(CatalogKey.of(n), e)
+                }
             }
-        }
+    }
+
+    @Volatile private var s = Snapshot(version, entries)
+
+    val version: String get() = s.version
+    val entries: List<CatalogEntry> get() = s.entries
+    val byId: Map<String, CatalogEntry> get() = s.byId
 
     /** The entry whose name, plural or synonym has this name's key. */
-    fun lookup(name: String): CatalogEntry? = byKey[CatalogKey.of(name)]
+    fun lookup(name: String): CatalogEntry? = s.byKey[CatalogKey.of(name)]
 
-    fun containsKey(key: String): Boolean = byKey.containsKey(key)
+    fun containsKey(key: String): Boolean = s.byKey.containsKey(key)
+
+    /** Swaps in a new set of entries (the bundled ones with your edits applied). */
+    fun replace(
+        version: String,
+        entries: List<CatalogEntry>,
+    ) {
+        s = Snapshot(version, entries)
+    }
+
+    /** An independent copy, so editing it leaves [CatalogLoader.default] alone. */
+    fun copy(): Catalog = Catalog(version, entries)
 
     companion object {
         /** Parses the generated `catalog.tsv` (see tools/catalog/build_catalog.py). */

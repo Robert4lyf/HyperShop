@@ -148,6 +148,14 @@ Shared components (`ui/common/`):
   - **Type it in:** a name, an optional "serves" and the ingredients, one per line.
 - A typed recipe is rule-parsed and opens the usual review screen. Claude is called only there, with a key, as for a shared page.
 
+## Ingredient library (Settings)
+- **Where:** Settings › Ingredients › Ingredient library lists every catalogue ingredient, with search.
+- **Editing:** tap an ingredient to edit its name, plural, synonyms ("Also called"), aisle, how amounts are shown, usual pack and grams per cup, and to switch "Always in stock".
+- **Adding:** "Add ingredient" adds your own.
+- **Undoing:** "Reset to default" or "Delete" undoes an edit.
+- **Storage:** edits live in `files/library/edits.json`, which is backed up. They are applied over the bundled catalogue at start-up, and the catalogue version includes them.
+- **Saving:** a save re-keys the list, so an item whose name now matches merges into the ingredient. It also redraws every row, and moves an item already on the list to the new aisle.
+
 ## Not changing
 - Navigation, view models, data, strings that tests or TalkBack depend on,
   the one-node-per-row semantics, and swipe-to-delete with its accessible

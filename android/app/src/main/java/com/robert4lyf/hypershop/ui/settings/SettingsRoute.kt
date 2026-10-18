@@ -3,6 +3,7 @@ package com.robert4lyf.hypershop.ui.settings
 import android.app.Activity
 import android.view.WindowManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,11 +26,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.LocalDining
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Route
@@ -106,6 +109,7 @@ data class SettingsActions(
     val onDailyCalls: (String) -> Boolean = { true },
     val onDebugLog: (Boolean) -> Unit = {},
     val onRefreshLog: () -> Unit = {},
+    val onLibrary: () -> Unit = {},
     /** Debug builds only. */
     val onDebug: (() -> Unit)? = null,
 )
@@ -114,6 +118,7 @@ data class SettingsActions(
 fun SettingsRoute(
     container: AppContainer,
     onDebug: (() -> Unit)?,
+    onLibrary: () -> Unit = {},
 ) {
     val vm: SettingsViewModel = viewModel(factory = factoryFor { SettingsViewModel(container) })
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -135,6 +140,7 @@ fun SettingsRoute(
             onDebugLog = { vm.setDebugLog(it) },
             onRefreshLog = { vm.refreshLog() },
             onDebug = onDebug,
+            onLibrary = onLibrary,
         ),
     )
 }
@@ -157,6 +163,7 @@ fun SettingsScreen(
             card("Appearance", Icons.Rounded.Palette, hue = 300f) { AppearanceGroup(ui, actions) }
             card("List", Icons.Rounded.Tune, hue = 140f) { ListGroup(ui, actions) }
             card("Aisles", Icons.Rounded.Route, hue = 30f) { AislesGroup(ui, actions) }
+            card("Ingredients", Icons.Rounded.LocalDining, hue = 95f) { IngredientsGroup(actions) }
             card("Watch", Icons.Rounded.Watch, hue = 205f) { WatchGroup(ui, actions) }
             card("Claude", Icons.Rounded.AutoAwesome, hue = 265f) {
                 KeySection(ui, actions)
@@ -225,6 +232,24 @@ private fun SwitchRow(
 @Composable
 private fun Hint(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@Composable
+private fun IngredientsGroup(actions: SettingsActions) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .clickable(role = Role.Button, onClick = actions.onLibrary)
+            .testTag("open-library"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Ingredient library", style = MaterialTheme.typography.bodyLarge)
+            Hint("Names, aisles and units the app knows. Edit them or add your own.")
+        }
+        Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
