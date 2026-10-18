@@ -1,0 +1,182 @@
+# Voice mode — design plan (not built yet)
+
+Status: **plan only**. Goal: do a whole shop with headphones on and the phone in a
+pocket, asking for the next items, saying "done" to tick, and asking simple
+questions.
+
+## 1. What it does
+
+| You say (examples) | The app does | It says |
+| --- | --- | --- |
+| "next", "what's next", "next item" | Reads the current item (the first unticked one in walking order) | "Next: 2 onions." |
+| "next three", "what's coming up" | Reads up to 3, the first one becomes current | "Next: 2 onions, then carrots, then a pack of basil." |
+| "done", "got it", "tick", "yes" | Ticks the current item | "Ticked onions. Next: carrots." |
+| "got the milk", "done milk", "tick milk" | Ticks the named item (fuzzy match among unticked) | "Ticked milk. Next: …" |
+| "undo", "untick that" | Unticks the last item ticked by voice | "Unticked milk." |
+| "skip", "later" | Moves on and leaves the item unticked. Skipped items come back at the end | "Skipping basil. Next: …" |
+| "repeat", "say that again", "remind me" | Reads the current item again | "2 onions." |
+| "how much", "what quantity", "how many" | Reads the full amount and the pack note | "700 millilitres of milk. Usually a 4 pint bottle." |
+| "how many left", "how many items" | Counts | "12 left, 5 ticked." |
+| "what's left in this aisle", "anything else here" | Reads the unticked items in the current aisle | "In Produce: carrots and basil." |
+| "which aisle" | — | "Milk is in Dairy and eggs." |
+| "swaps", "what can I use instead", "they're out" | Reads the swaps from the ingredient library | "Instead of agave syrup: maple syrup, honey or golden syrup. Say 'swap for' and a name, or 'skip'." |
+| "swap for maple syrup" | Swaps the item just this time (`ListRepository.swapItem`) | "Swapped agave syrup for maple syrup." |
+| "help", "what can I say" | — | A short list of commands |
+| "stop", "pause voice" | Ends voice mode | "Voice mode off." |
+| "finish shopping" | Asks to confirm, then runs the same Finish as the button | "Finish and clear 14 ticked items? Say yes or no." |
+
+Not in v1:
+- Adding items by voice.
+- Partial ticks ("got 2 of 3").
+- Reading recipes.
+- Anything that calls Claude.
+
+## 2. Key decisions (recommended)
+
+1. **Everything runs on the phone, and Claude is never involved.** The command set is small and fixed, so a
+   simple on-device parser is enough. Calling Claude would add cost, take seconds per command,
+   and fail where signal is poor. It would also break the rule that Claude runs only while the review screen is open.
+2. **Speech in: Android `SpeechRecognizer`.**
+   - Prefer the **on-device** recognizer: `createOnDeviceSpeechRecognizer`, available from API 31; our minSdk is 34.
+   - Use the `en-GB` language model. Supermarkets often have weak signal, so speech must not depend on the network.
+   - Settings will check `checkRecognitionSupport` and offer `triggerModelDownload`.
+   - Fall back to the normal (network) recognizer if the on-device one is unavailable, and say so in Settings.
+3. **Speech out: Android `TextToSpeech`.**
+   - Use `en-GB`, with audio attributes `USAGE_ASSISTANT`.
+   - Request short-lived audio focus (`AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK`), so other audio dips while the app talks and then returns.
+4. **How listening starts** (needs your choice, §6 Q3). Recommended: a **conversation window plus a headset button**.
+   - After the app speaks, it listens for about 6 seconds. That covers the normal "next → done → next" exchange.
+   - If nothing is heard, it stops listening. A **headset button press** (or the notification's "Listen" button) starts listening again at any time.
+   - An optional **"Always listening"** setting keeps restarting the recognizer. This is not the default: it uses more battery and the official documentation says the API isn't meant for continuous use.
+5. **Runs with the screen off.**
+   - Voice mode runs as a **foreground service** of type `microphone`.
+   - It must start while the app is open (Android 14 grants "while-in-use" microphone access only then). So you tap the mic button on the List tab before pocketing the phone. It keeps working with the screen locked.
+   - A persistent notification offers **Listen**, **Next** and **Stop**.
+6. **Ticks use the existing path.** Voice ticks call `ListRepository.tick`/`untick`/`swapItem`. Revision bumps, watch sync and undo then work exactly as for a tap. The service never writes to the database directly.
+
+## 3. Architecture
+
+`:core/voice` is pure JVM and fully unit-tested:
+- `VoiceGrammar`: turns the recognizer's best guesses (with confidence scores) into a `Command`:
+  - `Next(n)`, `Done(name?)`, `Undo`, `Skip`, `Repeat`, `Quantity`, `Left`, `AisleLeft`, `WhichAisle`,
+  - `Swaps`, `SwapFor(name)`, `Help`, `Stop`, `Finish`, `Yes`, `No`, `Unknown`.
+  - It tries each best guess in turn, and accepts near-miss words the recognizer often hears instead: "dun", "don", "dumb" for "done"; "text" for "next"; "thick" for "tick".
+- `VoiceSession`: a state machine.
+  - Input: the latest list snapshot and a `Command`.
+  - Output: the text to speak plus the actions to run.
+  - State: the current item id, the items just read out, the skipped ids, the last voice tick (for undo), and any pending "Finish?" confirmation.
+- `SpeechText`: turns list text into words to speak.
+  - "700ml" → "700 millilitres", "1½tbsp" → "one and a half tablespoons", "1 × 400 g tin" → "a 400 gram tin".
+  - Also handles "2 cloves", "1 pack", and fractions.
+- `ItemMatcher`: matches a spoken name against the unticked items. It uses the same catalogue keys, synonyms and plurals as the parser, then word overlap, then edit distance with a threshold. When two items match equally, it asks: "Did you mean red onions or spring onions?"
+
+`:app/voice` holds the Android parts. Each sits behind an interface, so tests can use fakes:
+- `VoiceService`: the foreground service (type `microphone`, not exported). It owns the session, the speech input and output, the media session and the notification.
+- `SpeechInput`: wraps `SpeechRecognizer` (main thread only, one at a time). It:
+  - asks for several best guesses and their confidence scores;
+  - where available, biases the recognizer towards the current item names and the commands (`EXTRA_BIASING_STRINGS`, API 33+);
+  - treats `NO_MATCH` and `SPEECH_TIMEOUT` as silence;
+  - backs off when it gets `RECOGNIZER_BUSY`.
+- `SpeechOutput`: wraps TTS, with a queue. Listening starts only after speech has finished (`onDone`), so the app never hears itself.
+- `HeadsetButton`: a `MediaSession` whose play/pause means "listen".
+- Settings:
+  - voice on or off;
+  - read 1 or 3 items for "next";
+  - listening mode (conversation window or always);
+  - "say the aisle when it changes".
+
+Entry points:
+- A mic button in the List header starts voice mode. It asks for microphone permission the first time.
+- The notification has Stop, Listen and Next.
+- A small "Voice on" chip shows on the List while voice mode is running.
+
+## 4. Pitfalls and how the plan handles them
+
+1. **Headset buttons go to the last app that played audio, not to the active media session.** Developers report this, along with "TTS doesn't count as playing".
+   - Fix: when voice mode starts (and after each spoken reply), play a ~100 ms silent clip through `MediaPlayer` so we become the target.
+   - If you're playing music, Spotify or similar will keep the buttons. The notification's Listen button and the conversation window still work.
+   - This is the biggest uncertainty; it is checked in the device test, step 0.
+2. **Bluetooth headset microphone.**
+   - By default the recognizer uses the **phone's** microphone, even with Bluetooth earbuds. With the phone in a pocket that's muffled, but usually workable for single words.
+   - Using the earbuds' own mic needs the call audio route (HFP/SCO). That lowers audio quality, pauses or degrades music, and on Android 12+ probably needs the `BLUETOOTH_CONNECT` permission. That breaks the CLAUDE.md "No Bluetooth permissions" rule (written for the Garmin link).
+   - v1: phone mic only. If it isn't good enough in practice, decide in v2 whether to allow `BLUETOOTH_CONNECT` (§6 Q4).
+   - Wired headsets with a mic just work.
+3. **Background microphone limits (Android 14).**
+   - The service must be started from a visible screen, with `RECORD_AUDIO` granted and `FOREGROUND_SERVICE_MICROPHONE` declared. If the system kills it, it can't restart itself in the background. On restart we post a notification: "Voice mode stopped, tap to resume".
+   - Some phones (notably Samsung, Xiaomi) stop background work aggressively. Settings will explain how to exempt the app from battery optimisation; we won't request the exemption automatically.
+4. **Listening beeps.** The recognizer plays start and stop tones, and there is no official way to mute them. We keep them: they tell you "speak now". We won't use stream-muting workarounds; those break other audio.
+5. **Hearing ourselves or other people.** We never listen while speaking. Other shoppers saying "done" could tick an item:
+   - every tick is spoken back ("Ticked milk"), so you notice;
+   - "undo" is always available;
+   - in Always-listening mode, a plain "done" counts only within about 10 s of the app reading an item; otherwise it needs the item name.
+6. **Recognition errors in a noisy shop.**
+   - Use all the best guesses, plus confidence thresholds.
+   - Below the threshold, the app says "Sorry, say that again", and makes no change to the list.
+   - Commands are tiny words; aliases and the near-miss words cover the usual errors.
+7. **The on-device language model may be missing.**
+   - Settings shows "Offline speech: ready / download (size)" before you go shopping.
+   - If it's missing and you're offline, the app says "Voice needs the speech pack: download it in Settings", rather than failing silently.
+8. **The list changes during voice mode** (a tap on the phone, the watch, an edit). The session reads the shared list flow:
+   - if the current item disappears or gets ticked elsewhere, the next "next" moves on;
+   - nothing is held from earlier reads except item ids, and ticks go through the repository (rev bumps, watch sync).
+9. **Partly ticked items.** These are read as the list shows them ("1 more onion"). "done" ticks the remainder: same behaviour as tapping the tick.
+10. **Odd amounts read aloud.** Text like "½", "×", "tbsp", "2.27 l" and "1 × 30 g pack" would sound wrong if spoken as written. `SpeechText` gets its own unit tests, built from the existing `Display` test cases.
+11. **Battery and privacy.**
+    - No audio is stored and, with the on-device recognizer, nothing leaves the phone.
+    - Android shows its microphone indicator while listening.
+    - Voice mode turns itself off after 30 minutes with no commands, and when "Finish shopping" runs.
+12. **Audio focus.** We take short-lived focus while speaking and give it straight back. If a phone call starts, voice mode pauses and says "Voice paused" when the call ends.
+13. **Permissions and the manifest check.**
+    - New: `RECORD_AUDIO` (runtime), `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MICROPHONE`, and `POST_NOTIFICATIONS` (runtime, for the notification). `MODIFY_AUDIO_SETTINGS` only if needed.
+    - Still none: `CAMERA` and Bluetooth.
+    - `tools/check_manifest.py` gains rules:
+      - the voice service is not exported;
+      - `RECORD_AUDIO` is the only microphone permission;
+      - still no `CAMERA` and no `BLUETOOTH*`.
+14. **Ordering.** "Next" follows the List tab exactly: walking order, then the categorised groups if that view is on, unticked items first. Skipped items come last, so you aren't sent back across the shop.
+15. **Overlap with the watch app (Run 2).** Both are in-store ticking interfaces on the same repository path, so there's no conflict, but it's the same need met twice. Worth deciding whether Run 2 is still wanted (§6 Q8).
+16. **Testing reality.** Real speech can't be unit-tested.
+    - Parser, session and speech text: JVM tests, including a scripted "whole shop" walk-through.
+    - Service wiring: Robolectric with fake speech input and output.
+    - A manual device checklist (§5, step 4) is required before calling it done.
+
+## 5. Build order
+
+0. **Device test on your phone, about an hour, throwaway branch.** It must prove four things before any real work:
+   - (a) the on-device en-GB recognizer works and how fast;
+   - (b) recognition works from a microphone foreground service with the screen locked;
+   - (c) the headset button reaches us with your headphones, including the silent-clip trick;
+   - (d) how well the phone mic hears you with the phone in a pocket.
+
+   If (b) fails, voice mode needs the screen on. That would change the plan.
+1. `:core/voice`: `SpeechText`, `ItemMatcher`, `VoiceGrammar`, `VoiceSession`, with tests (the bulk of the logic).
+2. `:app/voice`: the service, speech input and output, the notification, the mic button and permissions, settings, and the manifest-check update.
+3. Conversation window and headset button. Then the optional Always-listening mode.
+4. Device checklist:
+   - wired headset and Bluetooth earbuds;
+   - screen locked;
+   - music playing;
+   - airplane mode;
+   - a noisy room;
+   - a phone call mid-shop;
+   - the app killed in the background;
+   - 45 minutes of battery drain.
+
+## 6. Questions for you
+
+1. **Which phone and headphones?** For example, Pixel or Samsung; AirPods, Pixel Buds, Galaxy Buds or wired. Button gestures, and whether the earbuds' mic can be used, depend on this.
+2. **Do you listen to music or podcasts while shopping?** If so, the headset button usually stays with the music app. You'd rely on the conversation window or Always-listening instead.
+3. **How should listening start?** Recommended: listen for a few seconds after each reply, and press the headset button otherwise. Alternatively, always listening: fully hands-free, with more battery and more false triggers.
+4. **Earbuds' microphone.** If the phone mic in a pocket isn't good enough, do you accept the Bluetooth (`BLUETOOTH_CONNECT`) permission and "call quality" audio while voice mode is on?
+5. **"Next" reads one item or three by default?** Recommended: one, and "next three" when you ask.
+6. **Should "swap for …" change the list by voice, or only read the swaps?**
+7. **"They're out of stock" should skip the item (left unticked) or delete it?** Recommended: skip.
+8. **Is the watch app (Run 2) still wanted** once voice mode exists?
+
+## 7. Sources
+
+- Foreground service types and the Android 14 while-in-use rules: <https://developer.android.com/develop/background-work/services/fgs/service-types>, <https://developer.android.com/about/versions/12/foreground-services>
+- `SpeechRecognizer` (on-device, recognition support, model download; "not intended for continuous recognition"): <https://developer.android.com/reference/android/speech/SpeechRecognizer>
+- Headset buttons go to the app that last played audio: <https://issuetracker.google.com/issues/65175978>, <https://community.audiorelay.net/t/blocked-media-key/975>
+- Bluetooth mic routing and `BLUETOOTH_CONNECT`: <https://forasoft.com/blog/article/implement-audio-output-switching-on-android-575>, <https://docs.eyeson.com/docs/android/usage/audio-manager>
+- Recognizer restart loops, beeps and `RECOGNIZER_BUSY`: <https://community.appinventor.mit.edu/t/error-messages-in-non-legacy-speech-recognition/73163>
