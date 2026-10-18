@@ -76,6 +76,8 @@ data class ReviewUi(
     val notice: String? = null,
     /** The recipe's page, to open in the browser. */
     val url: String? = null,
+    /** Editing a recipe already on the list ("Save changes" rather than "Add"). */
+    val editing: Boolean = false,
 ) {
     val addCount: Int get() = aisles.sumOf { (_, rows) -> rows.count { !it.inStock && it.adds } }
 }
@@ -96,6 +98,8 @@ sealed interface ReviewState {
     data class Added(
         val count: Int,
         val useId: Long,
+        /** An edit was saved: no Undo, "Updated <title>". */
+        val edited: String? = null,
     ) : ReviewState
 
     data object Cancelled : ReviewState
@@ -124,6 +128,9 @@ class ReviewViewModel(
     private var servings: Int? = null
     private var units = UnitsSetting.METRIC
     private val aisleMoves = mutableMapOf<String, AisleCode>()
+
+    /** The use an edit replaces ([ImportResult.editsUse]). */
+    private val replacing: Long? get() = result?.editsUse
 
     /** See [act]. Declared before init, which uses it. */
     private val ops = Mutex()
@@ -195,13 +202,20 @@ class ReviewViewModel(
         store(r)
         decisions = c.repository.merger.defaultDecisions(preview!!.incoming, c.repository.staples()).toMutableMap()
         if (!r.preTick) decisions.replaceAll { _, d -> d.copy(inStock = false) }
+        if (r.editsUse != null) {
+            // As it went on the list: a row is in stock when its lines were (and none was added).
+            val lines = preview!!.incoming.lines
+            val (inStock, added) = lines.indices.partition { it in r.inStockLines }
+            val keys = inStock.map { lines[it].target.mergeKey }.toSet() - added.map { lines[it].target.mergeKey }.toSet()
+            for (k in keys) decisions[k] = (decisions[k] ?: RowDecision()).copy(inStock = true)
+        }
         recompute()
     }
 
     private suspend fun store(r: ImportResult) {
         val old = stored
         val s = c.repository.storeRecipe(r.url, r.title, r.servings, r.locale, "WEB", r.parsedBy, r.model, r.claudePending, r.lines)
-        preview = c.repository.preview(s, servings, emptyMap(), aisleMoves)
+        preview = c.repository.preview(s, servings, emptyMap(), aisleMoves, r.editsUse)
         stored = s
         old?.let { c.repository.discardRecipe(it.recipe.id) }
     }
@@ -243,7 +257,7 @@ class ReviewViewModel(
         // thread. (Under [ops], so nothing else touches these fields meanwhile.)
         val grouped =
             withContext(Dispatchers.Default) {
-                val p = c.repository.preview(s, servings, decisions.toMap(), aisleMoves.toMap())
+                val p = c.repository.preview(s, servings, decisions.toMap(), aisleMoves.toMap(), replacing)
                 preview = p
                 val order = c.repository.aisleOrder()
                 p.rows.map { row(it) }.groupBy { it.aisle }.toList().sortedBy { (a, _) ->
@@ -266,6 +280,7 @@ class ReviewViewModel(
                     notice = notice,
                     url = webLink(r.url),
                     busy = busy,
+                    editing = r.editsUse != null,
                 ),
             )
     }
@@ -363,9 +378,9 @@ class ReviewViewModel(
         act {
             try {
                 val p = preview ?: return@act
-                when (val r = c.repository.apply(p, jobId)) {
+                when (val r = c.repository.apply(p, jobId, replacing)) {
                     is ApplyResult.Applied -> {
-                        _state.value = ReviewState.Added(r.added, r.useId)
+                        _state.value = ReviewState.Added(r.added, r.useId, replacing?.let { result?.title ?: "Recipe" })
                     }
                     ApplyResult.Stale -> {
                         busy = false
@@ -538,6 +553,43 @@ class ReviewViewModel(
         result = edited
         recompute()
     }
+
+    /** The recipe's name, as shown on the Recipes tab. */
+    fun setTitle(title: String) =
+        act {
+            val t = title.trim().take(200)
+            val r = result ?: return@act
+            if (t.isEmpty() || t == r.title) return@act
+            val edited = r.copy(title = t)
+            store(edited)
+            result = edited
+            recompute()
+        }
+
+    /** "Add an ingredient": a line typed in, rule-parsed, at the end of the recipe. */
+    fun addLine(text: String) =
+        act {
+            val t = text.trim()
+            val r = result ?: return@act
+            if (t.isEmpty()) return@act
+            val edited = r.copy(lines = r.lines + c.ruleParser.parse(t), rawLines = r.rawLines + t)
+            store(edited)
+            result = edited
+            recompute()
+        }
+
+    /** "Remove from recipe": the line goes from this recipe (the last one stays). */
+    fun removeLine(lineId: Long) =
+        act {
+            val s = stored ?: return@act
+            val r = result ?: return@act
+            val index = s.lines.indexOfFirst { it.first.id == lineId }
+            if (index !in r.lines.indices || r.lines.size < 2) return@act
+            val edited = r.copy(lines = r.lines.filterIndexed { i, _ -> i != index })
+            store(edited)
+            result = edited
+            recompute()
+        }
 
     /** The row's parse. */
     fun previewRow(key: String): PreviewRow? = preview?.rows?.firstOrNull { it.target.mergeKey == key }

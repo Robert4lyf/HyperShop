@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.Inventory
 import androidx.compose.material.icons.rounded.Link
@@ -80,6 +81,7 @@ fun RecipesRoute(
         ui,
         onRemove = vm::remove,
         onAddInStock = vm::addInStockNow,
+        onEdit = vm::edit,
         add = AddRecipeActions(onLink = vm::addLink, onManual = { n, s, l -> vm.addManual(n, s, l) }),
     )
 }
@@ -90,6 +92,7 @@ fun RecipesScreen(
     ui: RecipesUi,
     onRemove: (UseSummary) -> Unit,
     onAddInStock: (UseSummary) -> Unit,
+    onEdit: (UseSummary) -> Unit = {},
     add: AddRecipeActions = AddRecipeActions(),
 ) {
     var confirm by remember { mutableStateOf<UseSummary?>(null) }
@@ -124,7 +127,7 @@ fun RecipesScreen(
                     }
                 }
                 items(ui.uses, key = { it.useId }) { use ->
-                    UseCard(use, onRemove = { confirm = use }, onAddInStock = { onAddInStock(use) })
+                    UseCard(use, onRemove = { confirm = use }, onAddInStock = { onAddInStock(use) }, onEdit = { onEdit(use) })
                 }
             }
             FloatingActionButton(
@@ -159,6 +162,7 @@ private fun UseCard(
     use: UseSummary,
     onRemove: () -> Unit,
     onAddInStock: () -> Unit,
+    onEdit: () -> Unit,
 ) {
     val url = webLink(use.url)
     val open = rememberOpenLink()
@@ -213,6 +217,14 @@ private fun UseCard(
                             Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.size(8.dp))
                             Text("Open recipe")
+                        }
+                    }
+                    // Only recipes can be edited ("Added by hand" items are edited on the list).
+                    if (use.recipeId != null) {
+                        OutlinedButton(onClick = onEdit, modifier = Modifier.testTag("edit-${use.useId}")) {
+                            Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.size(8.dp))
+                            Text("Edit")
                         }
                     }
                     OutlinedButton(onClick = onRemove) { Text("Remove from list") }

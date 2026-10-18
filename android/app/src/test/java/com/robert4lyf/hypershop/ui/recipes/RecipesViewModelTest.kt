@@ -43,6 +43,39 @@ class RecipesViewModelTest {
     }
 
     @Test
+    fun editReopensTheRecipeAndSavingReplacesIt() {
+        val c = TestContainer.create()
+        val first = ReviewViewModel(c, runBlocking { c.readyJob("2 onions", "1 tsp ground cumin", "200g rice") })
+        await(first.state) { it is ReviewState.Ready }
+        first.setInStock("cat:cumin", true)
+        await(first.state) { it is ReviewState.Ready && it.ui.addCount == 2 }
+        first.confirm()
+        await(first.state) { it is ReviewState.Added }
+        val vm = RecipesViewModel(c).shown()
+        val use = await(vm.ui) { it.uses.isNotEmpty() }.uses.single()
+        vm.edit(use)
+        val edit = ReviewViewModel(c, nextReview(vm))
+        val keys = { s: ReviewState -> (s as? ReviewState.Ready)?.ui?.aisles?.flatMap { it.second }?.map { it.key }.orEmpty() }
+        val ready = (await(edit.state) { it is ReviewState.Ready } as ReviewState.Ready).ui
+        assertTrue(ready.editing)
+        // As it went on the list: cumin still in stock.
+        assertTrue(ready.aisles.flatMap { it.second }.single { it.key == "cat:cumin" }.inStock)
+        edit.addLine("3 carrots")
+        await(edit.state) { "cat:carrot" in keys(it) }
+        edit.removeLine(edit.sheet("cat:onion")!!.lines.single().id)
+        await(edit.state) { "cat:onion" !in keys(it) }
+        edit.setTitle("Rice and carrots")
+        await(edit.state) { it is ReviewState.Ready && it.ui.title == "Rice and carrots" }
+        edit.confirm()
+        assertEquals("Rice and carrots", (await(edit.state) { it is ReviewState.Added } as ReviewState.Added).edited)
+        // The recipe's items were replaced, not added again.
+        val list = runBlocking { c.repository.snapshot() }
+        assertEquals(setOf("cat:rice", "cat:carrot"), list.liveItems.map { it.mergeKey }.toSet())
+        val after = await(vm.ui) { u -> u.uses.singleOrNull()?.title == "Rice and carrots" }.uses.single()
+        assertEquals(1, after.inStockCount)
+    }
+
+    @Test
     fun usesInStockNowAndRemove() {
         val c = TestContainer.create()
         c.add(*CHILLI)

@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.ui.recipes
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.di.AppContainer
@@ -80,6 +81,33 @@ class RecipesViewModel(
             )
         reviews.send(c.importJobs.enqueueReady(ImportInput(recipe.url ?: "", recipe.title), result))
     }
+
+    /**
+     * "Edit": the recipe back on the review screen as it went on the list (its lines,
+     * servings and in-stock rows). Saving replaces this use; leaving changes nothing.
+     */
+    fun edit(use: UseSummary) =
+        viewModelScope.launch {
+            val src = c.repository.editSource(use.useId) ?: return@launch
+            val r = src.recipe
+            val result =
+                ImportResult(
+                    url = r.url,
+                    title = r.title,
+                    servings = r.servingsOriginal,
+                    targetServings = src.servings.takeIf { r.servingsOriginal != null },
+                    locale = UnitLocale.valueOf(r.unitLocale),
+                    method = "EDIT",
+                    lines = src.lines,
+                    parsedBy = runCatching { ParsedBy.valueOf(r.parsedBy) }.getOrDefault(ParsedBy.RULES),
+                    model = r.model,
+                    rawLines = src.lines.map { it.raw },
+                    preTick = false,
+                    editsUse = use.useId,
+                    inStockLines = src.inStockLines,
+                )
+            reviews.send(c.importJobs.enqueueReady(ImportInput(r.url ?: "", r.title), result))
+        }
 
     /** "+ › Paste a link": the same path as sharing a page to the app (the review screen opens when it is ready). */
     fun addLink(text: String) {

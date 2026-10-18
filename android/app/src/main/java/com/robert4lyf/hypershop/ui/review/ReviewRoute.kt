@@ -67,6 +67,7 @@ fun ReviewRoute(
                 onRetryClaude = vm::retryWithClaude,
                 onAisleInStock = vm::aisleInStock,
                 onClearInStock = vm::clearInStock,
+                edits = ReviewEdits(onTitle = vm::setTitle, onAddLine = vm::addLine),
             )
         is ReviewState.Failed ->
             ManualLinesView(
@@ -81,6 +82,10 @@ fun ReviewRoute(
         is ReviewState.Added ->
             LaunchedEffect(s) {
                 onDone()
+                if (s.edited != null) {
+                    container.applicationScope.launch(Dispatchers.Main) { snackbar.showTimed("Updated ${s.edited}", null, 4) }
+                    return@LaunchedEffect
+                }
                 // Outlives this screen: the snackbar and its Undo belong to the list.
                 container.applicationScope.launch(Dispatchers.Main) {
                     val r = snackbar.showTimed("Added ${s.count} items", "Undo", 10)
