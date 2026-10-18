@@ -1,5 +1,8 @@
 package com.robert4lyf.hypershop.ui
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -118,16 +121,28 @@ fun HyperShopApp(
                         Tab(Routes.SETTINGS, "Settings", Icons.Rounded.Settings, Icons.Outlined.Settings),
                     )
                 CompactNavBar(tabs, route) { r ->
+                    // Each tab keeps its state (and its view model) while you are on another,
+                    // so coming back doesn't rebuild it.
                     nav.navigate(r) {
-                        popUpTo(Routes.LIST)
+                        popUpTo(Routes.LIST) { saveState = true }
                         launchSingleTop = true
+                        restoreState = true
                     }
                 }
             }
         },
     ) { padding ->
         val openReview: (Long) -> Unit = { nav.navigate(Routes.review(it)) { launchSingleTop = true } }
-        NavHost(nav, startDestination = Routes.LIST, modifier = Modifier.padding(padding)) {
+        // A quick fade, not Navigation's default 700 ms cross-fade, which made tab switches feel slow.
+        NavHost(
+            nav,
+            startDestination = Routes.LIST,
+            modifier = Modifier.padding(padding),
+            enterTransition = { fadeIn(tween(150)) },
+            exitTransition = { fadeOut(tween(100)) },
+            popEnterTransition = { fadeIn(tween(150)) },
+            popExitTransition = { fadeOut(tween(100)) },
+        ) {
             composable(Routes.LIST) { ListRoute(container, snackbar, onReview = openReview) }
             composable(Routes.RECIPES) { RecipesRoute(container, snackbar, onReview = openReview) }
             composable(Routes.SETTINGS) { SettingsRoute(container, onDebug = debugScreen?.let { { nav.navigate(Routes.DEBUG) } }) }

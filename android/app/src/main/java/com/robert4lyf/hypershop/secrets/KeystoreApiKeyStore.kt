@@ -104,6 +104,8 @@ class KeystoreApiKeyStore(
         scope.launch { lock.withLock { has.value = store.data.first()[BLOB] != null } }
     }
 
+    override suspend fun isSaved(): Boolean = lock.withLock { store.data.first()[BLOB] != null }
+
     override suspend fun get(): String? =
         lock.withLock {
             cached?.let { return it }

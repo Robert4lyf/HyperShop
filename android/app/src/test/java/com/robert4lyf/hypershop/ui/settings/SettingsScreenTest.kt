@@ -27,6 +27,7 @@ import org.robolectric.annotation.GraphicsMode
 
 private val UI =
     SettingsUi(
+        loaded = true,
         staples = listOf("olive oil", "pepper", "salt", "water"),
         aisles = AisleCode.entries.take(4),
         spentThisMonthUsd = 0.04,
