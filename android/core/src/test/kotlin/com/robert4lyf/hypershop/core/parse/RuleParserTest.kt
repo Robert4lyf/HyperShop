@@ -274,6 +274,17 @@ class RuleParserTest {
 
 
     @Test
+    fun juiceOfAFractionOrHalf() {
+        for (line in listOf("Juice of ½ lemon", "juice of 1/2 lemon", "Juice of half a lemon")) {
+            val r = p.parse(line)
+            assertEquals("lemon", r.name, line)
+            assertEquals(Rational.of(1, 2), r.quantity, line)
+            assertEquals("juice", r.note, line)
+        }
+    }
+
+
+    @Test
     fun hostileLinesDoNotThrowAndStayFast() {
         val lines = listOf("", "(((((", ")))", "1/", "½-½-½", "x x x 2 x", "of of of", ",,,,", "(".repeat(3000), "1 ".repeat(3000))
         for (l in lines) p.parse(l)

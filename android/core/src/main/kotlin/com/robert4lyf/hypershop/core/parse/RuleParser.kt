@@ -529,8 +529,12 @@ internal object Regexless {
         val part = words[idx - 1]
         if (part != "juice" && part != "zest" && part != "rind") return null
         var rest = words.drop(idx + 1)
-        val n = rest.firstOrNull()?.let { w -> w.toLongOrNull()?.let { Rational.of(it) } ?: Lexicon.numberWords[w] }
-        if (n != null) rest = rest.drop(1)
+        // "2", "½", "1/2" (one number token) or a number word; "half a lemon" drops the article too.
+        val n =
+            rest.firstOrNull()?.let { w ->
+                Tokeniser.tokenise(w).singleOrNull()?.takeIf { it.kind == Kind.NUM }?.value ?: Lexicon.numberWords[w]
+            }
+        if (n != null) rest = rest.drop(if (rest[0] == "half" && rest.getOrNull(1) in setOf("a", "an")) 2 else 1)
         rest = rest.filter { it !in Lexicon.qualifiers && it !in Lexicon.prep && !it.endsWith("-scrubbed") }
         if (rest.isEmpty()) return null
         return Triple(part, rest.joinToString(" "), n)
