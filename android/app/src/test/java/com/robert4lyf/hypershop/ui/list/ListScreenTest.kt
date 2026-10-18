@@ -85,6 +85,19 @@ class ListScreenTest {
         assertEquals(listOf("toggle 1", "delete 4", "finish"), events)
     }
 
+    @Test
+    fun aislesCollapseAndExpand() {
+        show()
+        val header = compose.onNodeWithTag("aisle-PRODUCE")
+        assertEquals("Expanded", header.fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
+        header.performClick()
+        compose.onNodeWithTag("item-1").assertDoesNotExist()
+        compose.onNodeWithTag("item-4").assertExists()
+        assertEquals("Collapsed", header.fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
+        header.performClick()
+        compose.onNodeWithTag("item-1").assertExists()
+    }
+
     private fun showWithHeader(
         ui: ListUi,
         dark: Boolean = false,

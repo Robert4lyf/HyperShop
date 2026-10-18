@@ -29,6 +29,7 @@ import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Route
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Watch
@@ -74,6 +75,7 @@ import com.robert4lyf.hypershop.claude.ClaudeModel
 import com.robert4lyf.hypershop.core.merge.UnitsSetting
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.di.AppContainer
+import com.robert4lyf.hypershop.settings.ThemeMode
 import com.robert4lyf.hypershop.ui.common.AisleBadge
 import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
@@ -85,6 +87,7 @@ import java.util.Locale
 
 data class SettingsActions(
     val onUnits: (UnitsSetting) -> Unit = {},
+    val onTheme: (ThemeMode) -> Unit = {},
     val onRemoveStaple: (String) -> Unit = {},
     val onMoveAisle: (AisleCode, Int) -> Unit = { _, _ -> },
     val onWatchVibrate: (Boolean) -> Unit = {},
@@ -118,6 +121,7 @@ fun SettingsRoute(
         ui,
         SettingsActions(
             onUnits = { vm.setUnits(it) },
+            onTheme = { vm.setTheme(it) },
             onRemoveStaple = { vm.removeStaple(it) },
             onMoveAisle = { a, d -> vm.moveAisle(a, d) },
             onWatchVibrate = { vm.setWatchVibrate(it) },
@@ -148,6 +152,7 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item(key = "top") { ScreenHeader(title = "Settings", subtitle = "Your list, your shop, your watch") }
+            card("Appearance", Icons.Rounded.Palette) { AppearanceGroup(ui, actions) }
             card("List", Icons.Rounded.Tune) { ListGroup(ui, actions) }
             card("Aisles", Icons.Rounded.Route) { AislesGroup(ui, actions) }
             card("Watch", Icons.Rounded.Watch) { WatchGroup(ui, actions) }
@@ -209,6 +214,24 @@ private fun SwitchRow(
 @Composable
 private fun Hint(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AppearanceGroup(
+    ui: SettingsUi,
+    actions: SettingsActions,
+) {
+    Text("Theme", style = MaterialTheme.typography.bodyLarge)
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().testTag("theme")) {
+        THEME_LABELS.forEachIndexed { i, (t, label) ->
+            SegmentedButton(
+                selected = ui.theme == t,
+                onClick = { actions.onTheme(t) },
+                shape = SegmentedButtonDefaults.itemShape(i, THEME_LABELS.size),
+            ) { Text(label) }
+        }
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
@@ -468,6 +491,8 @@ private fun CapField(
         FilledTonalButton(onClick = { bad = !onSet(text) }, enabled = text != current) { Text("Set") }
     }
 }
+
+private val THEME_LABELS = listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark")
 
 private val UNIT_LABELS =
     listOf(UnitsSetting.METRIC to "Metric", UnitsSetting.IMPERIAL to "Imperial", UnitsSetting.AS_WRITTEN to "As written")

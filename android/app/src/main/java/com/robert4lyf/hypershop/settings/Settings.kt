@@ -16,6 +16,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
+/** Light, dark, or following the phone. */
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
+
 val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
 /** Settings (PLAN §3.5): list, aisles, watch, Claude, advanced. Backed up with the database. */
@@ -27,6 +30,8 @@ class Settings(
                 p ->
             p[UNITS]?.let { runCatching { UnitsSetting.valueOf(it) }.getOrNull() } ?: UnitsSetting.METRIC
         }
+    val theme: Flow<ThemeMode> =
+        store.data.map { p -> p[THEME]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.SYSTEM }
     val model: Flow<ClaudeModel> = store.data.map { p -> p[MODEL]?.let { ClaudeModel.fromId(it) } ?: ClaudeModel.DEFAULT }
     val monthlyCapUsd: Flow<Double> = store.data.map { it[MONTHLY_CAP] ?: SpendGuard.DEFAULT_MONTHLY_CAP_USD }
     val dailyCalls: Flow<Int> = store.data.map { it[DAILY_CALLS] ?: SpendGuard.DEFAULT_DAILY_CALLS }
@@ -46,6 +51,8 @@ class Settings(
 
     suspend fun setUnits(u: UnitsSetting) = store.edit { it[UNITS] = u.name }
 
+    suspend fun setTheme(t: ThemeMode) = store.edit { it[THEME] = t.name }
+
     suspend fun setModel(m: ClaudeModel) = store.edit { it[MODEL] = m.id }
 
     suspend fun setMonthlyCap(usd: Double) = store.edit { it[MONTHLY_CAP] = usd.coerceIn(0.0, 100.0) }
@@ -63,6 +70,7 @@ class Settings(
     private companion object {
         val UNITS = stringPreferencesKey("units")
         val MODEL = stringPreferencesKey("claude_model")
+        val THEME = stringPreferencesKey("theme")
         val MONTHLY_CAP = doublePreferencesKey("claude_monthly_cap_usd")
         val DAILY_CALLS = intPreferencesKey("claude_daily_calls")
         val WATCH_VIBRATE = booleanPreferencesKey("watch_vibrate")

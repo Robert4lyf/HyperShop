@@ -22,6 +22,8 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.DoneAll
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -40,12 +42,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
@@ -102,16 +106,27 @@ private fun ListBody(
 ) {
     val card = MaterialTheme.colorScheme.card
     val delete = MaterialTheme.colorScheme.errorContainer
+    // Collapsed aisles, by name: kept across tab switches and rotation.
+    var collapsed by rememberSaveable { mutableStateOf(emptyList<String>()) }
     LazyColumn(Modifier.fillMaxSize().testTag("list"), contentPadding = PaddingValues(bottom = 24.dp)) {
         header()
         if (ui.isEmpty) item { empty() }
         for ((aisle, rows) in ui.aisles) {
-            val count = rows.size + 1
+            val open = aisle.name !in collapsed
+            val count = if (open) rows.size + 1 else 1
             item(key = "aisle-${aisle.name}") {
-                AisleTitle(aisle, rows, Modifier.padding(top = 16.dp).sectionItem(sectionPosition(0, count), card))
+                AisleTitle(
+                    aisle,
+                    rows,
+                    open,
+                    onToggle = { collapsed = if (open) collapsed + aisle.name else collapsed - aisle.name },
+                    modifier = Modifier.padding(top = 16.dp).sectionItem(sectionPosition(0, count), card),
+                )
             }
-            itemsIndexed(rows, key = { _, r -> r.id }) { i, r ->
-                ListRowItem(r, actions, Modifier.sectionItem(sectionPosition(i + 1, count), delete))
+            if (open) {
+                itemsIndexed(rows, key = { _, r -> r.id }) { i, r ->
+                    ListRowItem(r, actions, Modifier.sectionItem(sectionPosition(i + 1, count), delete))
+                }
             }
         }
     }
@@ -176,11 +191,21 @@ private fun ListTop(
 private fun AisleTitle(
     aisle: AisleCode,
     rows: List<ListRow>,
+    open: Boolean,
+    onToggle: () -> Unit,
     modifier: Modifier,
 ) {
     val left = rows.count { it.state != TickState.DONE }
     Row(
-        modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).semantics(mergeDescendants = true) { heading() },
+        modifier
+            .fillMaxWidth()
+            .clickable(onClickLabel = if (open) "Collapse" else "Expand", role = Role.Button, onClick = onToggle)
+            .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
+            .semantics(mergeDescendants = true) {
+                heading()
+                stateDescription = if (open) "Expanded" else "Collapsed"
+            }
+            .testTag("aisle-${aisle.name}"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -197,6 +222,11 @@ private fun AisleTitle(
         } else {
             Text("$left left", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        Icon(
+            if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
