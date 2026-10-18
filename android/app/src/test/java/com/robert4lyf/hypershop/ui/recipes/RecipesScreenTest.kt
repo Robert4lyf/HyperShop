@@ -1,6 +1,7 @@
 package com.robert4lyf.hypershop.ui.recipes
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -102,6 +103,55 @@ class RecipesScreenTest {
     }
 
     @Test
+    fun aRecipeAlreadyOnTheListAsksBeforeAddingAgain() {
+        val added = mutableListOf<String>()
+        compose.setContent {
+            HyperShopTheme(dynamicColor = false) {
+                RecipesScreen(USES, onRemove = {}, onAddInStock = {}, library = LibraryActions(onAdd = { added += it.key }))
+            }
+        }
+        val list = compose.onNodeWithTag("recipes")
+        // Not on the list: straight in.
+        list.performScrollToNode(hasTestTag("lib-add-r:9"))
+        compose.onNodeWithTag("lib-add-r:9").performClick()
+        // On the list: "Add again", after a word about the amounts.
+        list.performScrollToNode(hasTestTag("lib-add-r:1"))
+        compose.onNodeWithTag("lib-add-r:1").performClick()
+        compose.onNodeWithText("The amounts will be added on top of what is already there.").assertExists()
+        compose.onNodeWithText("Cancel").performClick()
+        compose.onNodeWithTag("lib-add-r:1").performClick()
+        compose.onNodeWithTag("add-again-confirm").performClick()
+        assertEquals(listOf("r:9", "r:1"), added)
+    }
+
+    @Test
+    fun anEmptyListWithSavedRecipesSaysSo() {
+        compose.setContent {
+            HyperShopTheme(dynamicColor = false) { RecipesScreen(USES.copy(uses = emptyList()), onRemove = {}, onAddInStock = {}) }
+        }
+        compose.onNodeWithTag("nothing-yet").assertExists()
+        compose.onNodeWithText("Nothing on the list yet — add a recipe below or tap +").assertExists()
+    }
+
+    @Test
+    fun thePhotoOptionNeedsAKey() {
+        compose.setContent { HyperShopTheme { AddRecipeContent(AddRecipeActions(), onDone = {}, hasKey = false) } }
+        compose.onNodeWithText("Needs your Claude key (Settings › Claude)").assertExists()
+        compose.onNodeWithTag("add-photo").performClick()
+        compose.onNodeWithTag("photo-camera").assertIsNotEnabled()
+        compose.onNodeWithTag("photo-pick").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithText("Needs your Claude key (Settings › Claude)").assertExists()
+    }
+
+    @Test
+    fun withAKeyThePhotoButtonsWork() {
+        compose.setContent { HyperShopTheme { AddRecipeContent(AddRecipeActions(), onDone = {}, start = "PHOTO") } }
+        compose.onNodeWithTag("photo-camera").assertIsEnabled()
+        compose.onNodeWithTag("photo-pick").assertIsEnabled()
+    }
+
+    @Test
     fun tapASavedRecipeToSeeItsIngredients() {
         val opened = mutableListOf<String>()
         compose.setContent {
@@ -117,11 +167,16 @@ class RecipesScreenTest {
     @Test
     fun recipeDetailShowsTheIngredientsUnderTheirHeadings() {
         var added = 0
-        compose.setContent { HyperShopTheme(dynamicColor = false) { RecipeDetailContent(DETAIL, onAdd = { added++ }) } }
+        var removed = 0
+        compose.setContent {
+            HyperShopTheme(dynamicColor = false) { RecipeDetailContent(DETAIL, onAdd = { added++ }, onRemove = { removed++ }) }
+        }
         compose.onNodeWithText("For the dressing").assertExists()
         compose.onNodeWithText("200g red lentils").assertExists()
         compose.onNodeWithTag("detail-add").performClick()
+        compose.onNodeWithTag("detail-remove").performClick()
         assertEquals(1, added)
+        assertEquals(1, removed)
         compose.onRoot().captureRoboImage(Shots.path("recipe-detail-light.png"))
     }
 

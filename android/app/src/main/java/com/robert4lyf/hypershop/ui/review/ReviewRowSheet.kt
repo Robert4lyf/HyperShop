@@ -4,11 +4,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -17,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.TrendingFlat
 import androidx.compose.material.icons.rounded.Inventory
 import androidx.compose.material.icons.rounded.LocalMall
+import androidx.compose.material.icons.rounded.ReportProblem
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -31,6 +35,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -39,11 +44,14 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.SectionLabel
@@ -62,16 +70,27 @@ data class SheetActions(
     val onRename: (String) -> Unit = {},
     /** "Remove from recipe": the line goes from this recipe. */
     val onRemoveLine: (Long) -> Unit = {},
+    /** The "In stock" switch. */
+    val onInStock: (Boolean) -> Unit = {},
+    /** Where a new name would go: "Joins maple syrup in Baking". */
+    val renamePreview: (String) -> String? = { null },
 )
 
+/**
+ * The sheet over the review. It reads the row again after every change, so an
+ * edit, a swap or a rename keeps it open (the row's key can change: [onKey]);
+ * it closes when the row is gone, and after an aisle move or "Always in stock".
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ReviewRowSheetHost(
     vm: ReviewViewModel,
     key: String,
+    onKey: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheet = vm.sheet(key) ?: return onDismiss()
+    val state by vm.state.collectAsStateWithLifecycle()
+    val sheet = remember(state, key) { vm.sheet(key) } ?: return onDismiss()
     ModalBottomSheet(onDismissRequest = onDismiss) {
         ReviewRowSheet(
             sheet,
@@ -80,27 +99,17 @@ internal fun ReviewRowSheetHost(
                     vm.alwaysInStock(key)
                     onDismiss()
                 },
-                onSwap = {
-                    vm.swap(it)
-                    onDismiss()
-                },
+                onSwap = { vm.swap(it, onKey) },
                 onMoveAisle = { a, always ->
                     vm.moveAisle(key, a, always)
                     onDismiss()
                 },
-                onEditLine = { id, t ->
-                    vm.editLine(id, t)
-                    onDismiss()
-                },
+                onEditLine = { id, t -> vm.editLine(id, t, onKey) },
                 reparse = vm::reparse,
-                onRename = {
-                    vm.rename(key, it)
-                    onDismiss()
-                },
-                onRemoveLine = {
-                    vm.removeLine(it)
-                    onDismiss()
-                },
+                onRename = { vm.rename(key, it, onKey) },
+                onRemoveLine = vm::removeLine,
+                onInStock = { vm.setInStock(key, it) },
+                renamePreview = vm::renamePreview,
             ),
         )
     }
@@ -114,15 +123,19 @@ fun ReviewRowSheet(
 ) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).imePadding().padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             SheetHeader(sheet.name, sheet.aisle)
             InfoBanner(sheet.effect, Icons.AutoMirrored.Rounded.TrendingFlat, Modifier.testTag("effect"), Tone.PRIMARY)
             sheet.packNote?.let { InfoBanner("Usually sold as $it", Icons.Rounded.LocalMall) }
-            key(sheet.key) { Rename(sheet.name, actions.onRename) }
+            for (reason in sheet.lines.mapNotNull { it.checkReason }.distinct()) {
+                InfoBanner("Check: $reason", Icons.Rounded.ReportProblem, tone = Tone.WARNING)
+            }
+            SwitchRow("In stock", sheet.inStock, actions.onInStock)
+            key(sheet.key) { Rename(sheet.name, actions.onRename, actions.renamePreview) }
             SectionLabel(if (sheet.lines.size == 1) "From the recipe" else "From the recipe (${sheet.lines.size} lines)")
-            for (line in sheet.lines) key(line.id) { LineEditor(line, actions) }
+            for (line in sheet.lines) key(line.id) { LineEditor(line, actions, canRemove = sheet.canRemove) }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             if (!sheet.isStaple) {
                 FilledTonalButton(onClick = actions.onAlwaysInStock) {
@@ -131,8 +144,28 @@ fun ReviewRowSheet(
                     Text("Always in stock")
                 }
             }
-            MoveAisle(sheet.aisle, actions.onMoveAisle)
+            MoveAisle(sheet.aisle, actions.onMoveAisle, immediate = true)
         }
+    }
+}
+
+/** A labelled switch, one TalkBack node. */
+@Composable
+private fun SwitchRow(
+    label: String,
+    on: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .toggleable(value = on, role = Role.Switch, onValueChange = onChange)
+            .padding(vertical = 4.dp)
+            .testTag("switch-$label"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+        Switch(checked = on, onCheckedChange = null)
     }
 }
 
@@ -141,6 +174,7 @@ fun ReviewRowSheet(
 private fun Rename(
     current: String,
     onRename: (String) -> Unit,
+    preview: (String) -> String?,
 ) {
     var text by remember { mutableStateOf(current.replaceFirstChar { it.uppercase() }) }
     val changed = text.isNotBlank() && !text.trim().equals(current, ignoreCase = true)
@@ -156,10 +190,12 @@ private fun Rename(
             modifier = Modifier.fillMaxWidth().testTag("rename"),
         )
         Text(
-            "Just for this recipe. To change it everywhere, use Settings › Ingredient library.",
+            // Where the new name would go, as soon as it is typed; else what a rename means.
+            (if (changed) preview(text) else null)
+                ?: "Just for this recipe. To change it everywhere, use Settings › Ingredient library.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 4.dp),
+            modifier = Modifier.padding(horizontal = 4.dp).testTag("rename-preview"),
         )
         if (changed) Button(onClick = { onRename(text) }, modifier = Modifier.testTag("rename-go")) { Text("Rename") }
     }
@@ -170,14 +206,19 @@ private fun Rename(
 private fun LineEditor(
     line: SheetLine,
     actions: SheetActions,
+    canRemove: Boolean,
 ) {
     var text by remember(line.id) { mutableStateOf(line.raw) }
+    val use = { if (text != line.raw && text.isNotBlank()) actions.onEditLine(line.id, text) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         OutlinedTextField(
             value = text,
             onValueChange = { text = it },
             label = { Text("Source line") },
+            singleLine = true,
             shape = RoundedCornerShape(16.dp),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { use() }),
             modifier = Modifier.fillMaxWidth().testTag("line-${line.id}"),
         )
         Text(
@@ -187,9 +228,11 @@ private fun LineEditor(
             modifier = Modifier.padding(horizontal = 4.dp),
         )
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (text != line.raw) Button(onClick = { actions.onEditLine(line.id, text) }) { Text("Use this line") }
-            TextButton(onClick = { actions.onRemoveLine(line.id) }, modifier = Modifier.testTag("remove-${line.id}")) {
-                Text("Remove from recipe")
+            if (text != line.raw) Button(onClick = use) { Text("Use this line") }
+            if (canRemove) {
+                TextButton(onClick = { actions.onRemoveLine(line.id) }, modifier = Modifier.testTag("remove-${line.id}")) {
+                    Text("Remove from recipe")
+                }
             }
             line.alternative?.let { alt ->
                 OutlinedButton(onClick = { actions.onSwap(line.id) }) {
@@ -202,21 +245,32 @@ private fun LineEditor(
     }
 }
 
-/** The aisle picker, shared with the list's item sheet: a chip per aisle with its icon. */
+/**
+ * The aisle picker, shared with the list's item sheet: a chip per aisle with its
+ * icon. By default a tap asks "always or just this time?"; with [immediate] a
+ * tap moves just this time at once, and an "Always put it here" switch above the
+ * chips makes it an always move instead.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun MoveAisle(
     current: AisleCode,
     onMove: (AisleCode, Boolean) -> Unit,
+    immediate: Boolean = false,
 ) {
     var picked by remember { mutableStateOf<AisleCode?>(null) }
+    var always by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionLabel("Aisle")
+        if (immediate) SwitchRow("Always put it here", always) { always = it }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (a in AisleCode.entries) {
                 FilterChip(
                     selected = a == current,
-                    onClick = { if (a != current) picked = a },
+                    onClick = {
+                        if (a == current) return@FilterChip
+                        if (immediate) onMove(a, always) else picked = a
+                    },
                     label = { Text(a.displayName) },
                     leadingIcon = { Icon(a.icon, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) },
                     shape = RoundedCornerShape(50),

@@ -14,10 +14,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -27,6 +30,7 @@ import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Edit
@@ -37,8 +41,6 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.ReportProblem
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -53,9 +55,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -63,14 +68,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -109,13 +119,24 @@ fun ReviewScreen(
     onAisleInStock: (AisleCode) -> Unit,
     onClearInStock: () -> Unit,
     edits: ReviewEdits = ReviewEdits(),
+    onStopRetry: () -> Unit = {},
 ) {
+    val list = rememberLazyListState()
+    val addFocus = remember { FocusRequester() }
+    // "Add an ingredient" in the menu: the field is the last item, so scroll it in, then focus it.
+    var focusAdd by remember { mutableIntStateOf(0) }
+    val itemCount = 1 + (if (ui.notice != null) 1 else 0) + ui.aisles.sumOf { it.second.size + 1 } + 1
+    LaunchedEffect(focusAdd) {
+        if (focusAdd == 0) return@LaunchedEffect
+        list.animateScrollToItem(itemCount - 1)
+        runCatching { addFocus.requestFocus() }
+    }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxSize()) {
-            TopBar(onCancel, onClearInStock)
+        Column(Modifier.fillMaxSize().imePadding()) {
+            TopBar(onCancel, onClearInStock, onAddIngredient = { focusAdd++ })
             val card = MaterialTheme.colorScheme.card
-            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
-                item(key = "hero") { Hero(ui, onServings, onRetryClaude, edits.onTitle) }
+            LazyColumn(Modifier.weight(1f), state = list, contentPadding = PaddingValues(bottom = 16.dp)) {
+                item(key = "hero") { Hero(ui, onServings, onRetryClaude, onStopRetry, edits.onTitle) }
                 ui.notice?.let { n ->
                     item(key = "notice") {
                         InfoBanner(
@@ -140,7 +161,7 @@ fun ReviewScreen(
                         ReviewRowItem(r, onInStock, onRow, sectionPosition(i + 1, count), card)
                     }
                 }
-                item(key = "add-line") { AddLine(edits.onAddLine, enabled = !ui.busy) }
+                item(key = "add-line") { AddLine(edits.onAddLine, enabled = !ui.busy, focus = addFocus) }
             }
             BottomActionBar {
                 Button(
@@ -158,10 +179,13 @@ fun ReviewScreen(
                     Text(
                         when {
                             ui.editing -> "Save changes"
+                            ui.addCount == 0 && ui.inStockCount > 0 -> "Nothing to add — all in stock"
+                            ui.addCount == 0 -> "Nothing to add"
                             ui.addCount == 1 -> "Add 1 item"
                             else -> "Add ${ui.addCount} items"
                         },
                         style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center,
                     )
                 }
             }
@@ -173,6 +197,7 @@ fun ReviewScreen(
 private fun TopBar(
     onCancel: () -> Unit,
     onClearInStock: () -> Unit,
+    onAddIngredient: () -> Unit,
 ) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         // Cancel discards the import, so it says so in words (system Back keeps it ready to review).
@@ -191,6 +216,10 @@ private fun TopBar(
         Box {
             IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(text = { Text("Add an ingredient") }, onClick = {
+                    menu = false
+                    onAddIngredient()
+                })
                 DropdownMenuItem(text = { Text("Clear in stock") }, onClick = {
                     menu = false
                     onClearInStock()
@@ -200,17 +229,34 @@ private fun TopBar(
     }
 }
 
-/** The recipe: who read it, its title and site, and how many it serves. */
+/** The recipe: who read it, its title and site, what will happen, and how many it serves. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Hero(
     ui: ReviewUi,
     onServings: (Int) -> Unit,
     onRetryClaude: () -> Unit,
+    onStopRetry: () -> Unit,
     onTitle: (String) -> Unit,
 ) {
     var renaming by remember { mutableStateOf(false) }
     if (renaming) TitleDialog(ui.title, onDismiss = { renaming = false }) { onTitle(it) }
+    var explainOffline by remember { mutableStateOf(false) }
+    if (explainOffline) {
+        AlertDialog(
+            onDismissRequest = { explainOffline = false },
+            icon = { Icon(Icons.Rounded.CloudOff, contentDescription = null) },
+            title = { Text("Parsed offline") },
+            text = {
+                Text(
+                    ui.claudeNote
+                        ?: "The lines were read by the app's own rules. Add a Claude key in Settings › Claude to read tricky recipes " +
+                        "(\"A or B\", \"juice of a lemon\").",
+                )
+            },
+            confirmButton = { TextButton(onClick = { explainOffline = false }) { Text("OK") } },
+        )
+    }
     val open = rememberOpenLink()
     val onHero = ButtonDefaults.textButtonColors(contentColor = Brand.OnHero)
     CompositionLocalProvider(LocalContentColor provides Brand.OnHero) {
@@ -229,38 +275,54 @@ private fun Hero(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
+                val centred = Modifier.align(Alignment.CenterVertically)
                 when (ui.badge) {
-                    Badge.CLAUDE -> Badge("Parsed by Claude", Icons.Rounded.AutoAwesome)
+                    Badge.CLAUDE -> Badge("Parsed by Claude", Icons.Rounded.AutoAwesome, centred)
                     Badge.CLAUDE_PENDING -> {
-                        Badge("Claude pending", Icons.Rounded.HourglassTop)
-                        TextButton(onClick = onRetryClaude, enabled = !ui.busy, colors = onHero) {
-                            Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.size(6.dp))
-                            Text("Retry with Claude")
+                        Badge("Claude pending", Icons.Rounded.HourglassTop, centred)
+                        if (!ui.retrying) {
+                            TextButton(onClick = onRetryClaude, enabled = !ui.busy, colors = onHero, modifier = centred) {
+                                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.size(6.dp))
+                                Text("Retry with Claude")
+                            }
                         }
                     }
-                    Badge.RULES -> Badge("Parsed offline", Icons.Rounded.CloudOff)
+                    Badge.RULES -> Badge("Parsed offline", Icons.Rounded.CloudOff, centred, onClick = { explainOffline = true })
                 }
-                if (ui.busy) CircularProgressIndicator(Modifier.size(20.dp), color = Brand.OnHero, strokeWidth = 2.dp)
+                if (ui.retrying) {
+                    CircularProgressIndicator(centred.size(20.dp), color = Brand.OnHero, strokeWidth = 2.dp)
+                    Text("Asking Claude…", centred.progressSemantics(), style = MaterialTheme.typography.labelLarge)
+                    TextButton(onClick = onStopRetry, colors = onHero, modifier = centred.testTag("stop-retry")) { Text("Stop") }
+                } else if (ui.busy) {
+                    CircularProgressIndicator(centred.size(20.dp), color = Brand.OnHero, strokeWidth = 2.dp)
+                }
+            }
+            if (ui.badge != Badge.CLAUDE) {
+                ui.claudeNote?.let {
+                    Text(it, Modifier.testTag("claude-note"), style = MaterialTheme.typography.bodySmall, color = Brand.OnHero)
+                }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    ui.title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = Brand.OnHero,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
+                Column(Modifier.weight(1f, fill = false)) {
+                    Text(ui.title, style = MaterialTheme.typography.headlineMedium, color = Brand.OnHero)
+                    if (ui.summary.isNotEmpty()) {
+                        Text(ui.summary, Modifier.testTag("summary"), style = MaterialTheme.typography.bodyMedium, color = Brand.OnHero)
+                    }
+                }
                 IconButton(onClick = { renaming = true }, modifier = Modifier.testTag("edit-title")) {
                     Icon(Icons.Rounded.Edit, contentDescription = "Rename recipe", tint = Brand.OnHero)
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)) {
-                ui.servings?.let { s -> Servings(s, onServings) }
-                Spacer(Modifier.weight(1f))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Servings(ui.servings, ui.originalServings, onServings, Modifier.align(Alignment.CenterVertically))
                 ui.url?.let { url ->
                     TextButton(
                         onClick = { open(url) },
-                        modifier = Modifier.weight(1f, fill = false).testTag("open-recipe"),
+                        modifier = Modifier.align(Alignment.CenterVertically).testTag("open-recipe"),
                         colors = onHero,
                     ) {
                         Text(
@@ -285,23 +347,30 @@ private fun TitleDialog(
     onSave: (String) -> Unit,
 ) {
     var text by remember { mutableStateOf(current) }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    val save = {
+        if (text.isNotBlank()) {
+            onSave(text)
+            onDismiss()
+        }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Recipe name") },
+        title = { Text("Rename recipe") },
         text = {
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
+                label = { Text("Recipe name") },
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                modifier = Modifier.fillMaxWidth().testTag("title-field"),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { save() }),
+                modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag("title-field"),
             )
         },
         confirmButton = {
-            TextButton(enabled = text.isNotBlank(), onClick = {
-                onSave(text)
-                onDismiss()
-            }, modifier = Modifier.testTag("title-save")) { Text("Save") }
+            TextButton(enabled = text.isNotBlank(), onClick = save, modifier = Modifier.testTag("title-save")) { Text("Save") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
@@ -312,6 +381,7 @@ private fun TitleDialog(
 private fun AddLine(
     onAdd: (String) -> Unit,
     enabled: Boolean,
+    focus: FocusRequester,
 ) {
     var text by rememberSaveable { mutableStateOf("") }
     val submit = {
@@ -328,12 +398,13 @@ private fun AddLine(
         OutlinedTextField(
             value = text,
             onValueChange = { text = it },
-            placeholder = { Text("Add an ingredient, e.g. 2 tbsp honey") },
+            label = { Text("Add an ingredient") },
+            placeholder = { Text("e.g. 2 tbsp honey") },
             singleLine = true,
             shape = RoundedCornerShape(50),
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { submit() }),
-            modifier = Modifier.weight(1f).testTag("add-line"),
+            modifier = Modifier.weight(1f).focusRequester(focus).testTag("add-line"),
         )
         FilledTonalButton(
             onClick = submit,
@@ -343,42 +414,107 @@ private fun AddLine(
     }
 }
 
+/** A chip-shaped label. Only a chip with something to do (an explanation) is a button. */
 @Composable
 private fun Badge(
     text: String,
     icon: ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
 ) {
-    AssistChip(
-        onClick = {},
-        label = { Text(text) },
-        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize)) },
-        shape = RoundedCornerShape(50),
-        colors =
-            AssistChipDefaults.assistChipColors(
-                containerColor = Color.White,
-                labelColor = HERO_INK,
-                leadingIconContentColor = HERO_INK,
-            ),
-        border = null,
-    )
-}
-
-/** − Serves 4 + */
-@Composable
-private fun Servings(
-    s: Int,
-    onServings: (Int) -> Unit,
-) {
-    Surface(shape = RoundedCornerShape(50), color = Color.White, contentColor = HERO_INK) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(
-                onClick = { onServings(s - 1) },
-                enabled = s > 1,
-            ) { Icon(Icons.Rounded.Remove, contentDescription = "Fewer servings") }
-            Text("Serves $s", Modifier.testTag("servings"), style = MaterialTheme.typography.titleSmall)
-            IconButton(onClick = { onServings(s + 1) }) { Icon(Icons.Rounded.Add, contentDescription = "More servings") }
+    val content: @Composable () -> Unit = {
+        Row(
+            Modifier.heightIn(min = 32.dp).padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text(text, style = MaterialTheme.typography.labelLarge)
         }
     }
+    if (onClick != null) {
+        Surface(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(50), color = Color.White, contentColor = HERO_INK) {
+            content()
+        }
+    } else {
+        Surface(modifier, shape = RoundedCornerShape(50), color = Color.White, contentColor = HERO_INK) { content() }
+    }
+}
+
+/** − Serves 4 +, with the number tappable to type one; "Serves ?" when the recipe gives none. */
+@Composable
+private fun Servings(
+    s: Int?,
+    original: Int?,
+    onServings: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var typing by remember { mutableStateOf(false) }
+    if (typing) ServingsDialog(s, onDismiss = { typing = false }, onSet = onServings)
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Surface(shape = RoundedCornerShape(50), color = Color.White, contentColor = HERO_INK) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { onServings((s ?: 1) - 1) },
+                    enabled = s != null && s > 1,
+                ) { Icon(Icons.Rounded.Remove, contentDescription = "Fewer servings") }
+                Text(
+                    if (s == null) "Serves ?" else "Serves $s",
+                    Modifier
+                        .clip(RoundedCornerShape(50))
+                        .clickable(onClickLabel = "Type the servings") { typing = true }
+                        .padding(horizontal = 6.dp, vertical = 8.dp)
+                        .testTag("servings"),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                IconButton(onClick = { onServings(if (s == null) 1 else s + 1) }) {
+                    Icon(Icons.Rounded.Add, contentDescription = "More servings")
+                }
+            }
+        }
+        if (s != null && original != null && s != original) {
+            Text("(recipe: $original)", Modifier.testTag("servings-original"), style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
+
+@Composable
+private fun ServingsDialog(
+    current: Int?,
+    onDismiss: () -> Unit,
+    onSet: (Int) -> Unit,
+) {
+    var text by remember { mutableStateOf(current?.toString().orEmpty()) }
+    val value = text.trim().toIntOrNull()?.takeIf { it in 1..99 }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    val save = {
+        value?.let {
+            onSet(it)
+            onDismiss()
+        }
+        Unit
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Servings") },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it.filter { ch -> ch.isDigit() }.take(2) },
+                label = { Text("Serves") },
+                supportingText = { Text("1 to 99") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { save() }),
+                modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag("servings-field"),
+            )
+        },
+        confirmButton = {
+            TextButton(enabled = value != null, onClick = save, modifier = Modifier.testTag("servings-save")) { Text("Set") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable
@@ -389,7 +525,8 @@ private fun AisleHeader(
     modifier: Modifier,
 ) {
     var menu by remember { mutableStateOf(false) }
-    val adding = rows.count { !it.inStock }
+    // The same rule as the Add button: a row already covered by the list adds nothing.
+    val adding = rows.count { !it.inStock && it.adds }
     Row(
         modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -402,7 +539,11 @@ private fun AisleHeader(
             modifier = Modifier.weight(1f).semantics { heading() },
         )
         Text(
-            if (adding == 0) "All in stock" else "$adding to add",
+            when {
+                adding > 0 -> "$adding to add"
+                rows.all { it.inStock } -> "All in stock"
+                else -> "Nothing to add"
+            },
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -433,17 +574,18 @@ private fun ReviewRowItem(
 ) {
     val struck = if (row.inStock) TextDecoration.LineThrough else TextDecoration.None
     val faded = if (row.inStock) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+    val name = row.name.replaceFirstChar { it.uppercase() }
     Row(
         Modifier
             .sectionItem(position, card)
             .fillMaxWidth()
             .heightIn(min = 64.dp)
-            .clickable(role = Role.Button) { onRow(row.key) }
+            .clickable(role = Role.Button, onClickLabel = "Edit") { onRow(row.key) }
             .semantics(mergeDescendants = true) {}
             .testTag("row-${row.key}")
-            .padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
+            .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -456,13 +598,20 @@ private fun ReviewRowItem(
                     )
                 }
                 Text(
-                    row.name.replaceFirstChar { it.uppercase() },
+                    name,
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (row.check && !row.inStock) MaterialTheme.colorScheme.tertiary else faded,
                     textDecoration = struck,
                 )
             }
-            row.quantity?.let {
+            // What this row does: "+200 ml" goes on, "needs 200 ml" is in stock, or the list has it already.
+            val sub =
+                when {
+                    row.inStock -> row.quantity?.let { "needs $it" }
+                    !row.adds -> "Already on your list"
+                    else -> row.quantity?.let { "+$it" }
+                }
+            sub?.let {
                 Text(
                     it,
                     style = MaterialTheme.typography.bodyMedium,
@@ -470,27 +619,49 @@ private fun ReviewRowItem(
                     textDecoration = struck,
                 )
             }
+            if (row.check && !row.inStock) {
+                Text(
+                    row.checkReason?.let { "Check: $it" } ?: "Check this line",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            }
         }
-        InStockPill(row.inStock) { onInStock(row.key, it) }
+        InStockPill(row.inStock, name) { onInStock(row.key, it) }
+        Icon(
+            Icons.Rounded.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(22.dp),
+        )
     }
 }
 
-/** "In stock" as a pill: outlined when off, filled with a tick when on. */
+/** "In stock" as a pill: outlined when off, filled with a tick when on. A 48 dp target either way. */
 @Composable
 private fun InStockPill(
     on: Boolean,
+    name: String,
     onChange: (Boolean) -> Unit,
 ) {
     val shape = RoundedCornerShape(50)
     Surface(
         shape = shape,
-        color = if (on) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+        color = if (on) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
         contentColor = if (on) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-        border = if (on) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier.clip(shape).toggleable(value = on, role = Role.Checkbox, onValueChange = onChange),
+        border = if (on) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier =
+            Modifier
+                .minimumInteractiveComponentSize()
+                .clip(shape)
+                .toggleable(value = on, role = Role.Checkbox, onValueChange = onChange)
+                .semantics {
+                    contentDescription = "In stock: $name"
+                    stateDescription = if (on) "In stock" else "Not in stock"
+                },
     ) {
         Row(
-            Modifier.heightIn(min = 40.dp).padding(horizontal = 14.dp),
+            Modifier.heightIn(min = 48.dp).padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {

@@ -156,6 +156,25 @@ class Importer(
     ) = ImportResult(url, title, null, locale, Method.MANUAL.name, error = error)
 
     companion object {
+        /**
+         * [ImportResult.claudeNote] (a [ClaudeResult.Reason] name, or the refusal note) in
+         * plain words for the review screen, each saying what to do about it.
+         */
+        fun claudeNoteText(note: String?): String? =
+            when (note) {
+                null -> null
+                "NO_KEY" -> "No Claude key — add one in Settings › Claude"
+                "BAD_KEY" -> "Claude rejected the key — check it in Settings › Claude"
+                "CAP_REACHED" -> "Monthly cap reached — raise it in Settings › Claude"
+                "OFFLINE" -> "Offline — retry when connected"
+                "RATE_LIMITED", "OVERLOADED" -> "Claude is busy — try again in a minute"
+                "SERVER" -> "Claude had a problem — try again in a minute"
+                "MAX_TOKENS" -> "The recipe was too long for Claude to answer"
+                "INVALID_RESPONSE" -> "Claude's answer couldn't be read — try again"
+                "REQUEST" -> "Claude turned the request down — try again later"
+                else -> if (note.startsWith("Claude declined")) "Claude declined this page" else note
+            }
+
         private val ML_IN_LINE = Regex("""(\d+(?:,\d{3})*(?:[.,]\d+)?)\s*(ml|l)\b""", RegexOption.IGNORE_CASE)
 
         /** "1,000": a comma before exactly three digits groups thousands (as the tokeniser reads it). */

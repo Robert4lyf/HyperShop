@@ -1,9 +1,13 @@
 package com.robert4lyf.hypershop.ui.voicetest
 
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
@@ -72,6 +76,25 @@ class VoiceTestScreenTest {
             got,
         )
         compose.onNodeWithTag("voice-test").performScrollToNode(hasText("10:02:02 button: KEYCODE_MEDIA_PLAY_PAUSE"))
+    }
+
+    @Test
+    fun downloadWaitsWhileOneRunsAndTheRowsAreSwitches() {
+        compose.setContent {
+            HyperShopTheme(dynamicColor = false) {
+                VoiceTestScreen(sample.copy(downloading = true, packStatus = "Downloading… 40%"), VoiceTestActions())
+            }
+        }
+        compose.onNodeWithTag("download-pack").assertIsNotEnabled()
+        compose.onNodeWithText("Downloading… 40%").assertExists()
+        compose.onNodeWithTag("voice-test").performScrollToNode(hasText("Use the headset microphone"))
+        compose.onNodeWithText("Use the headset microphone").assertIsOn()
+    }
+
+    @Test
+    fun downloadIsOfferedWhenNoneRuns() {
+        compose.setContent { HyperShopTheme(dynamicColor = false) { VoiceTestScreen(sample, VoiceTestActions()) } }
+        compose.onNodeWithTag("download-pack").assertIsEnabled()
     }
 
     @Test

@@ -43,11 +43,17 @@ object PostProcess {
 
     fun ingredient(i: ClaudeIngredient): ParsedIngredient {
         var check = false
+        var reason: String? = null
+
+        fun flag(why: String) {
+            check = true
+            if (reason == null) reason = why
+        }
 
         fun amount(d: Double?): Rational? {
             if (d == null) return null
             if (!d.isFinite() || d < 0 || d > MAX_QTY) {
-                check = true
+                flag("an amount that made no sense")
                 return null
             }
             return if (d == 0.0) null else Rational.fromDouble(d)
@@ -56,14 +62,14 @@ object PostProcess {
         fun unit(s: String?): QtyUnit? =
             s?.let {
                 QtyUnit.fromSerial(it) ?: run {
-                    check = true
+                    flag("an unknown unit")
                     QtyUnit.OTHER
                 }
             }
         val q = amount(i.quantity)
         var qMax = amount(i.quantityMax)
         if (qMax != null && (q == null || qMax <= q)) {
-            if (q == null || qMax < q) check = true
+            if (q == null || qMax < q) flag("a range that goes down")
             qMax = null
         }
         return ParsedIngredient(
@@ -81,6 +87,7 @@ object PostProcess {
             estimated = i.estimated,
             aisleSuggestion = i.aisleSuggestion?.let { a -> AisleCode.entries.firstOrNull { it.name == a } },
             check = check,
+            checkReason = reason,
         )
     }
 }

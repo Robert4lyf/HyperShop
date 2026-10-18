@@ -108,6 +108,20 @@ interface ListDao {
     @Query("UPDATE Recipe SET lastAddedAt = NULL WHERE libraryKey = :key")
     suspend fun forgetKey(key: String)
 
+    /** Undo of [forgetKey], one copy at a time. */
+    @Query("UPDATE Recipe SET lastAddedAt = :at WHERE id = :id")
+    suspend fun setLastAdded(
+        id: Long,
+        at: Long,
+    )
+
+    /** Forgotten library copies nothing on the list uses: gone at start-up, once Undo is long past. */
+    @Query(
+        "DELETE FROM Recipe WHERE lastAddedAt IS NULL AND libraryKey IS NOT NULL " +
+            "AND id NOT IN (SELECT recipeId FROM RecipeUse WHERE recipeId IS NOT NULL)",
+    )
+    suspend fun deleteForgottenRecipes()
+
     @Query("SELECT COUNT(*) FROM RecipeUse WHERE recipeId = :id")
     suspend fun usesOfRecipe(id: Long): Int
 
@@ -233,6 +247,13 @@ interface ListDao {
 
     @Query("SELECT * FROM ImportJob WHERE id = :id")
     suspend fun job(id: Long): ImportJobEntity?
+
+    /** The review screen's edits, kept with the job so leaving and coming back loses nothing. */
+    @Query("UPDATE ImportJob SET resultJson = :resultJson WHERE id = :id AND state != 'DONE'")
+    suspend fun updateJobResult(
+        id: Long,
+        resultJson: String,
+    )
 
     /** Re-emitted whenever the row changes: the review screen waits on it rather than polling. */
     @Query("SELECT * FROM ImportJob WHERE id = :id")

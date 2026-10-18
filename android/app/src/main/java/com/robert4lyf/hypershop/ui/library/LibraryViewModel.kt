@@ -42,6 +42,8 @@ data class LibraryRow(
 data class LibraryUi(
     val rows: List<LibraryRow> = emptyList(),
     val total: Int = 0,
+    /** The catalogue has been read: before that, no count and no "Nothing matches". */
+    val loaded: Boolean = false,
 )
 
 /** What the edit sheet shows and saves. */
@@ -80,25 +82,48 @@ class LibraryViewModel(
      */
     var query by mutableStateOf("")
         private set
+
+    /** The aisle chip chosen above the list, or null for all. */
+    var aisle by mutableStateOf<AisleCode?>(null)
+        private set
+
     private val messages = Channel<UiMessage>(Channel.BUFFERED)
     val events: Flow<UiMessage> = messages.receiveAsFlow()
 
     val ui: StateFlow<LibraryUi> =
-        combine(c.library.edits, snapshotFlow { query }) { edits, q ->
+        combine(c.library.edits, snapshotFlow { query }, snapshotFlow { aisle }) { edits, q, a ->
             val all = c.catalog.entries
             val key = CatalogKey.of(q)
             val rows =
                 all
                     .asSequence()
+                    .filter { e -> a == null || e.aisle == a }
                     .filter { e -> key.isEmpty() || (listOf(e.name, e.plural) + e.synonyms).any { CatalogKey.of(it).contains(key) } }
                     .sortedBy { it.name.lowercase() }
                     .map { e -> row(e, edited = e.id in edits && c.library.isBundled(e.id), custom = !c.library.isBundled(e.id)) }
                     .toList()
-            LibraryUi(rows, all.size)
+            LibraryUi(rows, all.size, loaded = true)
         }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUi())
 
     fun search(text: String) {
         query = text
+    }
+
+    fun filterAisle(a: AisleCode?) {
+        aisle = a
+    }
+
+    /**
+     * Ingredient names starting with (then containing) what is being typed, for the
+     * Swaps and "Always replace with" fields: up to five, none when it is typed in full.
+     */
+    fun suggest(typed: String): List<String> {
+        val key = CatalogKey.of(typed)
+        if (key.isEmpty()) return emptyList()
+        val names = c.catalog.entries.asSequence().map { it.name }.filter { CatalogKey.of(it) != key }
+        val starts = names.filter { CatalogKey.of(it).startsWith(key) }.sorted().take(SUGGESTIONS).toList()
+        if (starts.size == SUGGESTIONS) return starts
+        return starts + names.filter { it !in starts && CatalogKey.of(it).contains(key) }.sorted().take(SUGGESTIONS - starts.size)
     }
 
     private fun row(
@@ -193,14 +218,22 @@ class LibraryViewModel(
         }
     }
 
-    /** "Reset to default" for an edited ingredient, or "Delete" for one you added. */
+    /** "Reset to default" for an edited ingredient, or "Delete" for one you added; Undo re-saves the edit. */
     fun reset(id: String) =
         viewModelScope.launch {
             val name = c.catalog.byId[id]?.name ?: return@launch
             val bundled = c.library.isBundled(id)
+            val previous = c.library.edits.value[id]
             c.library.reset(id)
             c.repository.rekeyIfCatalogChanged()
-            messages.send(UiMessage(if (bundled) "Reset $name" else "Deleted $name"))
+            val undo: (suspend () -> Unit)? =
+                previous?.let {
+                    {
+                        c.library.save(it)
+                        c.repository.rekeyIfCatalogChanged()
+                    }
+                }
+            messages.send(UiMessage(if (bundled) "Reset $name" else "Deleted $name", undo = undo))
         }
 
     private suspend fun apply(
@@ -216,5 +249,9 @@ class LibraryViewModel(
             c.repository.snapshot().itemByKey(key)?.let { c.repository.moveAisle(it.id, movedTo, always = false) }
         }
         c.repository.setStaple(key, staple)
+    }
+
+    private companion object {
+        const val SUGGESTIONS = 5
     }
 }

@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.ui.list
 
+import android.content.ClipboardManager
 import android.content.Intent
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
@@ -37,6 +38,14 @@ fun ListRoute(
             suggestions = vm::suggestions,
             onReview = onReview,
             onSample = vm::addSample,
+            onPick = vm::addSuggested,
+            onPasteLink = {
+                // Read only when tapped, so Android shows no "pasted from your clipboard" for nothing.
+                // Nothing, or no https link, ends in the usual "no link" snackbar.
+                val clip = context.getSystemService(ClipboardManager::class.java)?.primaryClip
+                val text = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
+                container.applicationScope.launch { container.importShared(text, null) }
+            },
         )
     ListScreen(
         ui,
@@ -56,7 +65,7 @@ fun ListRoute(
             },
         ),
         header = { listHeader(ui, header) },
-        empty = { EmptyState(header.onSample) },
+        empty = { EmptyState(header.onSample, header.onPasteLink) },
     )
     val sheet by vm.sheet.collectAsStateWithLifecycle()
     sheet?.let { s ->
@@ -67,6 +76,11 @@ fun ListRoute(
                 onEditQuantity = { vm.editQuantity(s.id, it) },
                 onDelete = { vm.delete(s.id, s.name) },
                 onSwap = { to, always -> vm.swapItem(s.id, to, always) },
+                onToggle = {
+                    // The sheet shows the state it opened with, so it closes; the list (and the snackbar) show the result.
+                    vm.toggle(s.id, s.name)
+                    vm.closeItem()
+                },
             ),
             onDismiss = vm::closeItem,
         )
@@ -118,6 +132,7 @@ private class TimedVisuals(
     override val message: String,
     override val actionLabel: String?,
 ) : SnackbarVisuals {
-    override val withDismissAction: Boolean = false
+    // Every snackbar can be swiped away or closed, not only waited out.
+    override val withDismissAction: Boolean = true
     override val duration: SnackbarDuration = SnackbarDuration.Indefinite
 }

@@ -23,8 +23,10 @@ data class ParsedIngredient(
     val optional: Boolean = false,
     val estimated: Boolean = false,
     val aisleSuggestion: AisleCode? = null,
-    /** Rule parser only: an unhandled pattern (R7). */
+    /** An unhandled pattern (R7), or an amount Claude gave that made no sense: look at the line. */
     val check: Boolean = false,
+    /** Why [check] is set, in a few words for the review screen ("has 'or'"). */
+    val checkReason: String? = null,
 ) {
     /** R1 derived flag. */
     val garnish: Boolean

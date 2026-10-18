@@ -108,4 +108,53 @@ class UsesTest {
             r.repo.purgeDeleted()
             assertEquals(1, r.repo.snapshot().items.size)
         }
+
+    @Test
+    fun removeUseThenRestoreBringsBackItemsTicksAndContributions() =
+        runBlocking {
+            val a = r.import("2 onions", "1 carrot")
+            val l0 = r.repo.snapshot()
+            r.repo.tick(l0.itemByKey("cat:carrot")!!.id)
+            val before = r.dump()
+            val removed = r.repo.removeUse(a.useId)!!
+            assertTrue(r.repo.snapshot().liveItems.isEmpty())
+            assertEquals(2, removed.removed.items.size)
+            assertEquals(1, removed.removed.ticks.size)
+            assertTrue(r.repo.restoreUse(removed))
+            assertEquals(before, r.dump())
+            val l = r.repo.snapshot()
+            assertTrue(l.isDone(l.itemByKey("cat:carrot")!!.id))
+            // Restoring twice does nothing.
+            assertTrue(!r.repo.restoreUse(removed))
+        }
+
+    @Test
+    fun restoreJoinsAnItemReAddedMeanwhile() =
+        runBlocking {
+            val a = r.import("2 onions")
+            val removed = r.repo.removeUse(a.useId)!!
+            r.import("1 onion", url = "https://example.com/b")
+            assertTrue(r.repo.restoreUse(removed))
+            val l = r.repo.snapshot()
+            val onion = l.itemByKey("cat:onion")!!
+            assertEquals(1, l.liveItems.size)
+            assertEquals(Rational.of(3), l.total(onion.id)[BaseKey.ITEMS])
+        }
+
+    @Test
+    fun forgottenRecipesComeBackOnUndoAndGoAtPurge() =
+        runBlocking {
+            val a = r.import("2 onions", url = "https://example.com/soup")
+            val recipeId = r.repo.snapshot().uses[a.useId]!!.recipeId!!
+            r.repo.removeUse(a.useId)
+            val key = r.db.dao().recipe(recipeId)!!.libraryKey!!
+            val copies = r.repo.removeFromLibrary(key)
+            assertEquals(1, copies.size)
+            assertTrue(r.db.dao().recipesByKey(key).all { it.lastAddedAt == null })
+            r.repo.restoreToLibrary(copies)
+            assertTrue(r.db.dao().recipesByKey(key).all { it.lastAddedAt != null })
+            r.repo.removeFromLibrary(key)
+            r.repo.purgeDeleted()
+            assertTrue(r.db.dao().recipesByKey(key).isEmpty())
+        }
 }

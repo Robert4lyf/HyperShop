@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.ui.review
 
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -103,8 +104,13 @@ class ReviewRowSheetViewModelTest {
         val (_, vm) = vm("2 onoins")
         assertEquals("2 red onion", vm.reparse("2 red onions").replace("onions", "onion"))
         val id = vm.sheet("name:onoins")!!.lines.single().id
-        vm.editLine(id, "2 red onions")
+        var newKey: String? = null
+        vm.editLine(id, "2 red onions") { newKey = it }
         await(vm.state) { s -> s is ReviewState.Ready && s.ui().aisles.flatMap { it.second }.any { it.key == "cat:red_onion" } }
+        // The sheet follows the line to its new row.
+        assertEquals("cat:red_onion", newKey)
+        assertEquals("Joins maple syrup in Tins & Jars", vm.renamePreview("Maple syrup"))
+        assertEquals("A new item in Other", vm.renamePreview("Banana shallots from the market"))
     }
 }
 
@@ -120,7 +126,7 @@ class ReviewRowSheetScreenTest {
             name = "milk",
             effect = "milk: +200ml → 700ml on list",
             packNote = "1 × 4 pint (2.27 l) bottle",
-            lines = listOf(SheetLine(7, "200ml whole milk or oat milk", "200 ml whole milk (or oat milk)", "oat milk")),
+            lines = listOf(SheetLine(7, "200ml whole milk or oat milk", "200 ml whole milk (or oat milk)", "oat milk", "has 'or'")),
             aisle = AisleCode.DAIRY_EGGS,
             inStock = false,
             isStaple = false,
@@ -134,6 +140,8 @@ class ReviewRowSheetScreenTest {
             onEditLine = { id, t -> events += "edit $id $t" },
             reparse = { "parsed:$it" },
             onRename = { events += "rename $it" },
+            onInStock = { events += "stock $it" },
+            renamePreview = { "preview:$it" },
         )
 
     private fun show(dark: Boolean = false) =
@@ -149,11 +157,25 @@ class ReviewRowSheetScreenTest {
         compose.onNodeWithTag("line-7").performTextReplacement("300ml milk")
         compose.onNodeWithText("Read as: parsed:300ml milk").fetchSemanticsNode()
         compose.onNodeWithText("Use this line").performClick()
+        // A chip moves just this time at once; with the switch on, for good.
         compose.onNodeWithText("Frozen").performClick()
-        compose.onNodeWithText("Just this time").performClick()
+        compose.onNodeWithTag("switch-Always put it here").performClick()
+        compose.onNodeWithText("Chilled").performClick()
+        compose.onNodeWithTag("switch-In stock").performClick()
         compose.onNodeWithTag("rename").performTextReplacement("Oat milk")
+        compose.onNodeWithTag("rename-preview").assertTextEquals("preview:Oat milk")
         compose.onNodeWithTag("rename-go").performClick()
-        assertEquals(listOf("swap 7", "always", "edit 7 300ml milk", "move FROZEN false", "rename Oat milk"), events)
+        assertEquals(
+            listOf("swap 7", "always", "edit 7 300ml milk", "move FROZEN false", "move CHILLED true", "stock true", "rename Oat milk"),
+            events,
+        )
+    }
+
+    @Test
+    fun theLastLineCannotBeRemoved() {
+        compose.setContent { HyperShopTheme(dark = false, dynamicColor = false) { ReviewRowSheet(sheet.copy(canRemove = false), actions) } }
+        compose.onNodeWithText("Remove from recipe").assertDoesNotExist()
+        compose.onNodeWithText("Check: has 'or'").fetchSemanticsNode()
     }
 
     @Test

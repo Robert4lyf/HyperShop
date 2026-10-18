@@ -89,6 +89,8 @@ class ListViewModelTest {
         assertEquals(listOf(AisleCode.PRODUCE, AisleCode.MEAT_FISH, AisleCode.SPICES_CONDIMENTS), ui.aisles.map { it.first })
         assertEquals(listOf("onion", "carrot"), ui.aisles.first().second.map { it.name })
         assertEquals("2 onions", ui.row("onion").main)
+        // Each came from the one recipe, so the row says so.
+        assertEquals("Weeknight chilli", ui.row("onion").from)
         vm.toggle(ui.row("onion"))
         ui = await(vm.ui) { it.row("onion").state == TickState.DONE }
         assertEquals(listOf("carrot", "onion"), ui.aisles.first().second.map { it.name })
@@ -101,10 +103,17 @@ class ListViewModelTest {
         c.add("2 onions")
         val vm = ListViewModel(c)
         val ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
-        // Tapping again is the undo.
+        // A tick is announced, with Undo; tapping again is the undo too.
         vm.toggle(ui.row("onion"))
+        var m = nextMessage(vm)
+        assertEquals("Ticked onion", m.text)
         val done = await(vm.ui) { it.row("onion").state == TickState.DONE }
         vm.toggle(done.row("onion"))
+        await(vm.ui) { it.row("onion").state == TickState.OPEN }
+        vm.toggle(ui.row("onion"))
+        await(vm.ui) { it.row("onion").state == TickState.DONE }
+        m = nextMessage(vm)
+        runBlocking { m.undo!!() }
         await(vm.ui) { it.row("onion").state == TickState.OPEN }
         vm.toggle(ui.row("onion"))
         await(vm.ui) { it.row("onion").state == TickState.DONE }
@@ -126,6 +135,7 @@ class ListViewModelTest {
         runBlocking { m.undo!!() }
         ui = await(vm.ui) { u -> u.aisles.flatMap { it.second }.any { it.name == "carrot" } }
         vm.toggle(ui.row("onion"))
+        assertEquals("Ticked onion", nextMessage(vm).text)
         await(vm.ui) { it.doneCount == 1 }
         vm.finishShopping()
         m = nextMessage(vm)
@@ -149,15 +159,31 @@ class ListViewModelTest {
         vm.addTyped("milk\n\n6 eggs\n")
         assertEquals("Added 2 items", nextMessage(vm).text)
         await(vm.ui) { u -> u.aisles.flatMap { it.second }.size == 3 }
+        // Typed by hand: no recipe to name.
+        assertNull(await(vm.ui) { it.aisles.isNotEmpty() }.row("onion").from)
         vm.addTyped("1 onion")
         val asked = await(vm.ui) { it.plusOne != null }
         assertEquals("onion", asked.plusOne!!.name)
+        assertEquals("1", asked.plusOne!!.amount)
         vm.confirmPlusOne()
         await(vm.ui) { it.plusOne == null && it.row("onion").main == "3 onions" }
         vm.addTyped("onion")
-        await(vm.ui) { it.plusOne != null }
+        assertNull(await(vm.ui) { it.plusOne != null }.plusOne!!.amount)
         vm.dismissPlusOne()
         assertEquals("3 onions", await(vm.ui) { it.plusOne == null }.row("onion").main)
+    }
+
+    @Test
+    fun suggestionsSkipTheAmountAndKeepItWhenPicked() {
+        val c = TestContainer.create()
+        val vm = ListViewModel(c)
+        await(vm.ui) { it.isEmpty }
+        assertTrue(vm.suggestions("2 oni").contains("onion"))
+        assertTrue(vm.suggestions("200 g oni").contains("onion"))
+        vm.addSuggested("2 oni", "onion")
+        assertEquals("2 onions", await(vm.ui) { it.aisles.isNotEmpty() }.row("onion").main)
+        vm.addSuggested("cor", "coriander")
+        assertEquals("coriander", await(vm.ui) { u -> u.aisles.flatMap { it.second }.size == 2 }.row("coriander").main)
     }
 
     @Test
@@ -185,6 +211,7 @@ class ListViewModelTest {
         val ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
         vm.openItem(ui.row("onion").id)
         val sheet = await(vm.sheet) { it != null }!!
+        assertTrue(!sheet.done)
         assertEquals(listOf("2", "200g"), sheet.totals)
         assertEquals(listOf("Weeknight chilli" to "2 + 200g"), sheet.sources.map { it.title to it.amount })
         assertEquals(AisleCode.PRODUCE, sheet.aisle)

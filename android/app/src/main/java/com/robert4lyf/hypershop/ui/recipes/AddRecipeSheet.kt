@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -80,11 +81,14 @@ data class AddRecipeActions(
 fun AddRecipeSheet(
     actions: AddRecipeActions,
     onDismiss: () -> Unit,
+    hasKey: Boolean = true,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        AddRecipeContent(actions, onDone = onDismiss)
+        AddRecipeContent(actions, onDone = onDismiss, hasKey = hasKey)
     }
 }
+
+private const val NEEDS_KEY = "Needs your Claude key (Settings › Claude)"
 
 /** The sheet's content, stateless apart from what is being typed (so tests and screenshots can show it). */
 @Composable
@@ -92,6 +96,8 @@ fun AddRecipeContent(
     actions: AddRecipeActions,
     onDone: () -> Unit,
     start: String = "CHOOSE",
+    /** A Claude key is saved; without one a photo can't be read. */
+    hasKey: Boolean = true,
 ) {
     var mode by rememberSaveable { mutableStateOf(start) }
     Column(
@@ -125,6 +131,7 @@ fun AddRecipeContent(
                     title = "Photo of a recipe",
                     body = "A cookbook page: Claude reads the ingredients from the photo.",
                     tag = "add-photo",
+                    note = NEEDS_KEY.takeIf { !hasKey },
                 ) { mode = AddMode.PHOTO.name }
             }
             AddMode.LINK ->
@@ -138,7 +145,7 @@ fun AddRecipeContent(
                     onDone()
                 }
             AddMode.PHOTO ->
-                PhotoForm(onBack = { mode = AddMode.CHOOSE.name }) { uri ->
+                PhotoForm(hasKey, onBack = { mode = AddMode.CHOOSE.name }) { uri ->
                     actions.onPhoto(uri)
                     onDone()
                 }
@@ -153,6 +160,8 @@ private fun Choice(
     title: String,
     body: String,
     tag: String,
+    /** Why it won't work yet, shown in the warning colour. */
+    note: String? = null,
     onClick: () -> Unit,
 ) {
     val dark = LocalDarkTheme.current
@@ -173,6 +182,7 @@ private fun Choice(
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium)
                 Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                note?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary) }
             }
             Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -206,6 +216,7 @@ private fun LinkForm(
         singleLine = true,
         shape = MaterialTheme.shapes.medium,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+        keyboardActions = KeyboardActions(onGo = { if (url.isNotBlank()) onSubmit(url) }),
         trailingIcon = {
             // Read only when tapped, so Android shows no "pasted from your clipboard" for nothing.
             IconButton(onClick = {
@@ -228,6 +239,7 @@ private fun LinkForm(
  */
 @Composable
 private fun PhotoForm(
+    hasKey: Boolean,
     onBack: () -> Unit,
     onPicked: (Uri) -> Unit,
 ) {
@@ -247,7 +259,9 @@ private fun PhotoForm(
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+    if (!hasKey) Text(NEEDS_KEY, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.tertiary)
     Button(
+        enabled = hasKey,
         onClick = {
             val file = File(File(context.cacheDir, "camera").apply { mkdirs() }, "shot.jpg")
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.photos", file)
@@ -262,6 +276,7 @@ private fun PhotoForm(
         Text("Take a photo")
     }
     OutlinedButton(
+        enabled = hasKey,
         onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
         modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("photo-pick"),
     ) {

@@ -4,17 +4,23 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -40,9 +46,14 @@ import com.robert4lyf.hypershop.ui.common.sectionItem
 import com.robert4lyf.hypershop.ui.common.sectionPosition
 import com.robert4lyf.hypershop.ui.theme.card
 
+/** Errors a second fetch may well fix: the page can be tried again. */
+val ImportError.transient: Boolean
+    get() = this == ImportError.OFFLINE || this == ImportError.HTTP || this == ImportError.TOO_LARGE
+
 /**
  * An import that found no ingredients: what went wrong, then "Select lines
- * manually" (pick from the page's lines, or paste them) or back to the list.
+ * manually" (paste them, or pick from the page's lines), "Try again" for a
+ * fetch that may work next time, or back to the list.
  */
 @Composable
 fun ManualLinesView(
@@ -50,12 +61,13 @@ fun ManualLinesView(
     candidates: List<String>,
     onUse: (List<String>) -> Unit,
     onBack: () -> Unit,
+    onRetry: (() -> Unit)? = null,
 ) {
     val picked = remember(candidates) { mutableStateListOf<Int>() }
     var pasted by remember { mutableStateOf("") }
     val count = picked.size + pasted.lines().count { it.isNotBlank() }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().imePadding()) {
             val card = MaterialTheme.colorScheme.card
             LazyColumn(
                 Modifier.weight(1f).testTag("manual"),
@@ -68,16 +80,44 @@ fun ManualLinesView(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         InfoBanner(errorText(error), Icons.Rounded.ErrorOutline, Modifier.testTag("error"), Tone.WARNING)
+                        if (onRetry != null) {
+                            FilledTonalButton(onClick = onRetry, modifier = Modifier.testTag("retry-fetch")) {
+                                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.size(8.dp))
+                                Text("Try again")
+                            }
+                        }
                         Column(Modifier.padding(horizontal = 4.dp)) {
                             Text("Select lines manually", style = MaterialTheme.typography.headlineSmall)
                             Text(
                                 if (candidates.isNotEmpty()) {
-                                    "Tick the ingredient lines from the page:"
+                                    "Paste the ingredients, or tick the lines from the page below."
                                 } else {
                                     "Paste the recipe's ingredients below."
                                 },
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        OutlinedTextField(
+                            value = pasted,
+                            onValueChange = { pasted = it },
+                            label = { Text("Paste the ingredient lines") },
+                            minLines = 4,
+                            shape = MaterialTheme.shapes.large,
+                            colors =
+                                OutlinedTextFieldDefaults.colors(
+                                    unfocusedContainerColor = card,
+                                    focusedContainerColor = card,
+                                ),
+                            modifier = Modifier.fillMaxWidth().testTag("paste-lines"),
+                        )
+                        if (candidates.isNotEmpty()) {
+                            Text(
+                                "Or tick the ingredient lines from the page:",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 4.dp),
                             )
                         }
                     }
@@ -97,29 +137,30 @@ fun ManualLinesView(
                         Text(line, Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodyLarge)
                     }
                 }
-                item {
-                    OutlinedTextField(
-                        value = pasted,
-                        onValueChange = { pasted = it },
-                        label = { Text(if (candidates.isEmpty()) "Paste the ingredient lines" else "Or paste lines") },
-                        minLines = 4,
-                        shape = MaterialTheme.shapes.large,
-                        colors =
-                            OutlinedTextFieldDefaults.colors(
-                                unfocusedContainerColor = MaterialTheme.colorScheme.card,
-                                focusedContainerColor = MaterialTheme.colorScheme.card,
-                            ),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 16.dp).testTag("paste-lines"),
-                    )
-                }
             }
             BottomActionBar {
-                TextButton(onClick = onBack) { Text("Back to the list") }
-                Button(
-                    onClick = { onUse(picked.sorted().map { candidates[it] } + pasted) },
-                    enabled = count > 0,
-                    modifier = Modifier.weight(1f).heightIn(min = 52.dp),
-                ) { Text(if (count == 1) "Use 1 line" else "Use $count lines", style = MaterialTheme.typography.titleSmall) }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = onBack) { Text("Back to the list") }
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            if (count == 1) "1 selected" else "$count selected",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.testTag("selected-count"),
+                        )
+                        if (picked.isNotEmpty()) {
+                            TextButton(onClick = { picked.clear() }, modifier = Modifier.testTag("clear-selection")) {
+                                Text("Clear selection")
+                            }
+                        }
+                    }
+                    Button(
+                        onClick = { onUse(picked.sorted().map { candidates[it] } + pasted) },
+                        enabled = count > 0,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                    ) { Text(if (count == 1) "Use 1 line" else "Use $count lines", style = MaterialTheme.typography.titleSmall) }
+                }
             }
         }
     }

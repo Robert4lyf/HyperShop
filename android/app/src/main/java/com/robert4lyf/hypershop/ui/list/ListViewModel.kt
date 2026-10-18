@@ -7,7 +7,9 @@ import com.robert4lyf.hypershop.core.catalog.DisplayPolicy
 import com.robert4lyf.hypershop.core.merge.Display
 import com.robert4lyf.hypershop.core.merge.ShoppingList
 import com.robert4lyf.hypershop.core.merge.UnitsSetting
+import com.robert4lyf.hypershop.core.merge.UseKind
 import com.robert4lyf.hypershop.core.model.AisleCode
+import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
@@ -45,6 +47,8 @@ data class ListRow(
     val aisle: AisleCode,
     /** Its group within the aisle ("Herbs"), shown in the categorised view. */
     val group: String? = null,
+    /** The recipe it came from, when exactly one recipe put it on the list. */
+    val from: String? = null,
 )
 
 /** "Onion is on the list. +1?" */
@@ -52,6 +56,8 @@ data class PlusOne(
     val itemId: Long,
     val name: String,
     val line: String,
+    /** The amount typed ("200 g"), or null when only the name was: the dialog says what it will add. */
+    val amount: String? = null,
 )
 
 /** The item sheet (PLAN §3.5). */
@@ -68,6 +74,8 @@ data class ItemSheet(
     val swaps: List<String> = emptyList(),
     /** It is a catalogue ingredient, so "Always use instead" can be set on it. */
     val canAlways: Boolean = false,
+    /** Ticked when the sheet opened: the sheet's main button is "Untick" then. */
+    val done: Boolean = false,
 )
 
 /** One "From" row: "Weeknight chilli · 400 g", linked to the recipe's page when it has one. */
@@ -129,19 +137,32 @@ class ListViewModel(
     private val view = combine(order, c.settings.listCategorised) { o, cat -> o to cat }
 
     /**
-     * The list with its in-stock lines, read together on every list change (an
-     * import, a removed recipe, "Need it"): one emission per change, so the aisles
-     * and the "In stock" section never show two different lists for a frame.
+     * The list with its in-stock lines and recipe titles, read together on every
+     * list change (an import, a removed recipe, "Need it"): one emission per
+     * change, so the aisles and the "In stock" section never show two different
+     * lists for a frame.
      */
-    private val listWithInStock = c.repository.list.map { it to c.repository.inStockOnList(it) }
+    private val listWithInStock = c.repository.list.map { Triple(it, c.repository.inStockOnList(it), fromTitles(it)) }
 
     val ui: StateFlow<ListUi> =
-        combine(listWithInStock, c.settings.units, view, c.importJobs.ready, plusOne) { (list, lines), units, (ord, cat), ready, p ->
+        combine(listWithInStock, c.settings.units, view, c.importJobs.ready, plusOne) { (list, lines, from), units, (ord, cat), ready, p ->
             lastList = list
             lastUnits = units
-            build(list, units, ord, cat).copy(readyJobs = ready.map { it.id }, plusOne = p, inStock = inStockRows(lines, units))
+            build(list, units, ord, cat, from).copy(readyJobs = ready.map { it.id }, plusOne = p, inStock = inStockRows(lines, units))
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.Eagerly, ListUi())
+
+    /** The recipe title for each live item that exactly one use put on the list, when that use is a recipe: one query. */
+    private suspend fun fromTitles(list: ShoppingList): Map<Long, String> {
+        val single =
+            list.liveItems.mapNotNull { item ->
+                val use = list.contributionsOf(item.id).map { it.useId }.distinct().singleOrNull() ?: return@mapNotNull null
+                if (list.uses[use]?.kind == UseKind.RECIPE) item.id to use else null
+            }
+        if (single.isEmpty()) return emptyMap()
+        val links = c.repository.useLinks(list, single.map { it.second }.toSet())
+        return single.mapNotNull { (item, use) -> links[use]?.let { item to it.title } }.toMap()
+    }
 
     private fun inStockRows(
         lines: List<InStockLine>,
@@ -183,6 +204,7 @@ class ListViewModel(
         units: UnitsSetting,
         ord: List<AisleCode>,
         categorised: Boolean = false,
+        from: Map<Long, String> = emptyMap(),
     ): ListUi {
         val rows =
             list.liveItems.map { item ->
@@ -194,7 +216,7 @@ class ListViewModel(
                         list.isPartial(item.id) -> TickState.PARTIAL
                         else -> TickState.OPEN
                     }
-                ListRow(item.id, item.displayName, text.main, text.sub, state, item.aisle, entry?.group) to item.position
+                ListRow(item.id, item.displayName, text.main, text.sub, state, item.aisle, entry?.group, from[item.id]) to item.position
             }
         // Categorised: by group (the catalogue's order), then as usual within it.
         val order =
@@ -221,11 +243,22 @@ class ListViewModel(
             c.settings.setListCategorised(!c.settings.listCategorised.first())
         }
 
-    /** Tap: tick, or untick a DONE row. No snackbar: tapping again is the undo. */
-    fun toggle(row: ListRow) =
-        viewModelScope.launch {
-            c.repository.toggle(row.id)
-        }
+    /** The round tick: tick, or untick a DONE row. */
+    fun toggle(row: ListRow) = toggle(row.id, row.name)
+
+    /**
+     * Tick, or untick a DONE item (the item sheet's button too). A tick gets a
+     * snackbar with Undo, since the row slides away; an untick doesn't, as
+     * tapping again is its undo.
+     */
+    fun toggle(
+        id: Long,
+        name: String,
+    ) = viewModelScope.launch {
+        if (!c.repository.toggle(id)) return@launch
+        // Read back rather than trusting the row on screen: a quick second tap unticks before the list redraws.
+        if (c.repository.snapshot().isDone(id)) messages.send(UiMessage("Ticked $name", undo = { c.repository.untick(id) }))
+    }
 
     /** "Delete" on the item card: closes it, with Undo on the list. */
     fun delete(
@@ -276,7 +309,8 @@ class ListViewModel(
             ensureActive()
             val swaps = entry?.swaps.orEmpty().mapNotNull { c.catalog.byId[it]?.name }
             val pack = entry?.packNote?.let(Display::compactUnits)
-            _sheet.value = ItemSheet(id, entry?.name ?: item.displayName, totals, sources, pack, item.aisle, swaps, entry != null)
+            _sheet.value =
+                ItemSheet(id, entry?.name ?: item.displayName, totals, sources, pack, item.aisle, swaps, entry != null, list.isDone(id))
         }.also { openJob = it }
     }
 
@@ -337,9 +371,9 @@ class ListViewModel(
 
     // ---- the "Add item" field (5.6b) ----------------------------------------------------
 
-    /** Autocomplete: recent items first, then catalogue names; at most 6. */
+    /** Autocomplete on the name typed (a leading amount is skipped): recent items first, then catalogue names; at most 6. */
     fun suggestions(query: String): List<String> {
-        val q = query.trim().lowercase()
+        val q = nameOf(query).lowercase()
         if (q.length < 2) return emptyList()
         val recent = lastList.items.values.sortedByDescending { it.id }.map { it.displayName }
         val catalogue = c.catalog.entries.map { it.name }
@@ -348,6 +382,23 @@ class ListViewModel(
             .filter { it.lowercase().startsWith(q) || it.lowercase().contains(" $q") }
             .take(6)
     }
+
+    /** The name part of a typed line: "2 oni" is a search for "oni". */
+    private fun nameOf(typed: String): String {
+        val t = typed.trim()
+        val p = c.ruleParser.parse(t)
+        return if (p.quantity != null && p.name.isNotBlank()) p.name.trim() else t
+    }
+
+    /** The amount typed before the name, as typed ("200 g", "1 1/2"), or null when there was none. */
+    private fun amountOf(p: ParsedIngredient): String? =
+        if (p.quantity == null) null else listOfNotNull(p.quantityText ?: p.quantity.toString(), p.unit?.serial).joinToString(" ")
+
+    /** A suggestion tapped: the amount typed in front of it stays, so "2 oni" + "onion" adds "2 onions". */
+    fun addSuggested(
+        typed: String,
+        suggestion: String,
+    ) = addTyped(listOfNotNull(amountOf(c.ruleParser.parse(typed.trim())), suggestion).joinToString(" "))
 
     /**
      * Enter in the field. Typed items are rule-parsed (no Claude) and skip
@@ -361,7 +412,7 @@ class ListViewModel(
                 val p = c.ruleParser.parse(lines.single())
                 val existing = lastList.itemByKey(c.repository.target(p.name).mergeKey)
                 if (existing != null) {
-                    plusOne.value = PlusOne(existing.id, existing.displayName, lines.single())
+                    plusOne.value = PlusOne(existing.id, existing.displayName, lines.single(), amountOf(p))
                     return@launch
                 }
             }

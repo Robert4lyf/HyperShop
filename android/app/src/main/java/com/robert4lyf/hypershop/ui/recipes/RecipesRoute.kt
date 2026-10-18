@@ -73,6 +73,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.EmptyHero
+import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
 import com.robert4lyf.hypershop.ui.common.rememberOpenLink
 import com.robert4lyf.hypershop.ui.common.siteName
@@ -95,6 +96,7 @@ fun RecipesRoute(
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
     LaunchedEffect(vm) { vm.openReview.collect(onReview) }
     val chips by vm.searchChips.collectAsStateWithLifecycle()
+    val hasKey by container.apiKeyStore.hasKey.collectAsStateWithLifecycle()
     RecipesScreen(
         ui,
         onRemove = vm::remove,
@@ -111,18 +113,28 @@ fun RecipesRoute(
                 onClear = vm::clearSearch,
             ),
         add = AddRecipeActions(onLink = vm::addLink, onManual = { n, s, l -> vm.addManual(n, s, l) }, onPhoto = { vm.addPhoto(it) }),
+        hasKey = hasKey,
     )
     val detail by vm.detail.collectAsStateWithLifecycle()
+    // The sheet's own confirmations: the sheet closes first, so the dialog is not under it.
+    var addAgain by remember { mutableStateOf<LibraryRow?>(null) }
+    var forget by remember { mutableStateOf<LibraryRow?>(null) }
     detail?.let { d ->
         RecipeDetailSheet(
             d,
             onAdd = {
                 vm.closeDetail()
-                vm.addFromLibrary(d.row)
+                if (d.row.onList) addAgain = d.row else vm.addFromLibrary(d.row)
+            },
+            onRemove = {
+                vm.closeDetail()
+                forget = d.row
             },
             onDismiss = vm::closeDetail,
         )
     }
+    addAgain?.let { row -> AddAgainDialog(row, onConfirm = { vm.addFromLibrary(row) }, onDismiss = { addAgain = null }) }
+    forget?.let { row -> ForgetRecipeDialog(row, onConfirm = { vm.removeFromLibrary(row) }, onDismiss = { forget = null }) }
 }
 
 /** The Recipes tab, stateless. */
@@ -135,16 +147,19 @@ fun RecipesScreen(
     add: AddRecipeActions = AddRecipeActions(),
     library: LibraryActions = LibraryActions(),
     search: SearchBox = SearchBox(),
+    /** A Claude key is saved: the photo option needs one. */
+    hasKey: Boolean = true,
 ) {
     var confirm by remember { mutableStateOf<UseSummary?>(null) }
     var forget by remember { mutableStateOf<LibraryRow?>(null) }
+    var addAgain by remember { mutableStateOf<LibraryRow?>(null) }
     var adding by rememberSaveable { mutableStateOf(false) }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxSize()) {
             LazyColumn(
                 Modifier.fillMaxSize().testTag("recipes"),
-                // Room under the last card for the + button.
-                contentPadding = PaddingValues(bottom = 96.dp),
+                // Room under the last card's buttons for the + button.
+                contentPadding = PaddingValues(bottom = 112.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item(key = "top") {
@@ -168,6 +183,15 @@ fun RecipesScreen(
                         )
                     }
                 }
+                if (ui.loaded && ui.uses.isEmpty() && ui.hasLibrary) {
+                    item(key = "nothing-yet") {
+                        InfoBanner(
+                            "Nothing on the list yet — add a recipe below or tap +",
+                            Icons.AutoMirrored.Rounded.MenuBook,
+                            Modifier.padding(horizontal = 16.dp).testTag("nothing-yet"),
+                        )
+                    }
+                }
                 items(ui.uses, key = { it.useId }) { use ->
                     UseCard(use, onRemove = { confirm = use }, onAddInStock = { onAddInStock(use) }, onEdit = { onEdit(use) })
                 }
@@ -181,7 +205,7 @@ fun RecipesScreen(
                                 Text("Your recipes", style = MaterialTheme.typography.titleLarge)
                                 Text(
                                     when {
-                                        ui.terms.isEmpty() -> "Every recipe you've added. The longest since you last made it is at the top."
+                                        ui.terms.isEmpty() -> "Every recipe you've added. The one you added longest ago is at the top."
                                         ui.library.isEmpty() -> "Nothing uses ${ui.terms.joinToString(" or ")}."
                                         else -> "Using the most of ${ui.terms.joinToString(", ")} first."
                                     },
@@ -193,7 +217,12 @@ fun RecipesScreen(
                         }
                     }
                     items(ui.library, key = { "lib-${it.key}" }) { row ->
-                        LibraryCard(row, onAdd = { library.onAdd(row) }, onRemove = { forget = row }, onOpen = { library.onOpen(row) })
+                        LibraryCard(
+                            row,
+                            onAdd = { if (row.onList) addAgain = row else library.onAdd(row) },
+                            onRemove = { forget = row },
+                            onOpen = { library.onOpen(row) },
+                        )
                     }
                 }
             }
@@ -206,21 +235,9 @@ fun RecipesScreen(
             ) { Icon(Icons.Rounded.Add, contentDescription = "Add a recipe", modifier = Modifier.size(28.dp)) }
         }
     }
-    if (adding) AddRecipeSheet(add, onDismiss = { adding = false })
-    forget?.let { row ->
-        AlertDialog(
-            onDismissRequest = { forget = null },
-            title = { Text("Remove ${row.title} from your recipes?") },
-            text = { Text("It won't be offered here again. Anything from it on the list stays.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    forget = null
-                    library.onRemove(row)
-                }) { Text("Remove") }
-            },
-            dismissButton = { TextButton(onClick = { forget = null }) { Text("Keep") } },
-        )
-    }
+    if (adding) AddRecipeSheet(add, onDismiss = { adding = false }, hasKey = hasKey)
+    forget?.let { row -> ForgetRecipeDialog(row, onConfirm = { library.onRemove(row) }, onDismiss = { forget = null }) }
+    addAgain?.let { row -> AddAgainDialog(row, onConfirm = { library.onAdd(row) }, onDismiss = { addAgain = null }) }
     confirm?.let { use ->
         AlertDialog(
             onDismissRequest = { confirm = null },
@@ -235,6 +252,48 @@ fun RecipesScreen(
             dismissButton = { TextButton(onClick = { confirm = null }) { Text("Keep") } },
         )
     }
+}
+
+/** "Remove from your recipes": asks first. [onDismiss] runs whichever way it closes. */
+@Composable
+private fun ForgetRecipeDialog(
+    row: LibraryRow,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Remove ${row.title} from your recipes?") },
+        text = { Text("It won't be offered here again. Anything from it on the list stays.") },
+        confirmButton = {
+            TextButton(onClick = {
+                onDismiss()
+                onConfirm()
+            }) { Text("Remove") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Keep") } },
+    )
+}
+
+/** "Add again" for a recipe already on the list: its amounts would double up, so it asks. */
+@Composable
+private fun AddAgainDialog(
+    row: LibraryRow,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add ${row.title} again?") },
+        text = { Text("The amounts will be added on top of what is already there.") },
+        confirmButton = {
+            TextButton(onClick = {
+                onDismiss()
+                onConfirm()
+            }, modifier = Modifier.testTag("add-again-confirm")) { Text("Add again") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 private const val DAY = DateUtils.DAY_IN_MILLIS
@@ -353,7 +412,9 @@ private fun LibraryCard(
                     Text("On your list", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 }
             }
-            FilledTonalButton(onClick = onAdd, modifier = Modifier.testTag("lib-add-${row.key}")) { Text("Add") }
+            FilledTonalButton(onClick = onAdd, modifier = Modifier.testTag("lib-add-${row.key}")) {
+                Text(if (row.onList) "Add again" else "Add")
+            }
             var menu by remember { mutableStateOf(false) }
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
@@ -422,30 +483,31 @@ private fun UseCard(
                     Fact(Icons.Rounded.ShoppingCart, if (use.itemCount == 1) "1 item" else "${use.itemCount} items", bg, fg)
                     if (use.inStockCount > 0) Fact(Icons.Rounded.Inventory, "${use.inStockCount} in stock", bg, fg)
                 }
-                // Wraps on narrow phones and large text instead of squeezing the second button.
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // One filled button for the main thing, the rest as text; wraps on narrow
+                // phones and large text instead of squeezing the last button.
+                // Only recipes can be edited ("Added by hand" items are edited on the list).
+                val canEdit = use.recipeId != null
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                     if (url != null) {
                         FilledTonalButton(onClick = { open(url) }, modifier = Modifier.testTag("open-${use.useId}")) {
                             Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.size(8.dp))
                             Text("Open recipe")
                         }
-                    }
-                    // Only recipes can be edited ("Added by hand" items are edited on the list).
-                    if (use.recipeId != null) {
-                        OutlinedButton(onClick = onEdit, modifier = Modifier.testTag("edit-${use.useId}")) {
+                        if (canEdit) TextButton(onClick = onEdit, modifier = Modifier.testTag("edit-${use.useId}")) { Text("Edit") }
+                    } else if (canEdit) {
+                        FilledTonalButton(onClick = onEdit, modifier = Modifier.testTag("edit-${use.useId}")) {
                             Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.size(8.dp))
                             Text("Edit")
                         }
                     }
-                    OutlinedButton(onClick = onRemove) { Text("Remove from list") }
-                }
-                if (use.inStockCount > 0) {
-                    TextButton(
-                        onClick = onAddInStock,
-                        contentPadding = PaddingValues(horizontal = 4.dp),
-                    ) { Text("Add the in-stock items now") }
+                    if (use.inStockCount > 0) TextButton(onClick = onAddInStock) { Text("Add the in-stock items now") }
+                    TextButton(onClick = onRemove) { Text("Remove from list") }
                 }
             }
         }
@@ -487,16 +549,18 @@ private fun Fact(
 private fun RecipeDetailSheet(
     detail: RecipeDetail,
     onAdd: () -> Unit,
+    onRemove: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) { RecipeDetailContent(detail, onAdd) }
+    ModalBottomSheet(onDismissRequest = onDismiss) { RecipeDetailContent(detail, onAdd, onRemove) }
 }
 
-/** A saved recipe's ingredients, as written, with "Add to list" and its page. */
+/** A saved recipe's ingredients, as written, with "Add to list", its page and "Remove from your recipes". */
 @Composable
 fun RecipeDetailContent(
     detail: RecipeDetail,
     onAdd: () -> Unit,
+    onRemove: () -> Unit = {},
 ) {
     val open = rememberOpenLink()
     val url = webLink(detail.row.url)
@@ -519,7 +583,8 @@ fun RecipeDetailContent(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                DetailButtons(onAdd, url?.let { { open(it) } })
+                DetailButtons(onAdd, url?.let { { open(it) } }, onList = detail.row.onList)
+                OutlinedButton(onClick = onRemove, modifier = Modifier.testTag("detail-remove")) { Text("Remove from your recipes") }
             }
         }
         detail.sections.forEachIndexed { i, (heading, lines) ->
@@ -543,16 +608,17 @@ fun RecipeDetailContent(
 private fun DetailButtons(
     onAdd: () -> Unit,
     onOpen: (() -> Unit)?,
+    onList: Boolean,
 ) {
     FlowRow(
-        Modifier.padding(top = 8.dp, bottom = 8.dp),
+        Modifier.padding(top = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Button(onClick = onAdd, modifier = Modifier.testTag("detail-add")) {
             Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.size(8.dp))
-            Text("Add to list")
+            Text(if (onList) "Add again" else "Add to list")
         }
         onOpen?.let {
             OutlinedButton(onClick = it) {

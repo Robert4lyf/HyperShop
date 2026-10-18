@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.ShoppingBasket
@@ -27,6 +28,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -35,7 +37,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.ui.common.EmptyHero
@@ -56,19 +59,25 @@ data class HeaderActions(
     val suggestions: (String) -> List<String>,
     val onReview: (Long) -> Unit,
     val onSample: () -> Unit,
+    /** A suggestion tapped: what was typed (it may start with an amount) and the suggestion. */
+    val onPick: (String, String) -> Unit = { _, s -> onAdd(s) },
+    /** "Paste a link" on the empty state: imports the link on the clipboard. */
+    val onPasteLink: () -> Unit = {},
 )
 
 /**
  * "Add item": Enter adds and keeps the keyboard up (focus stays in the field).
  * A paste of several lines adds one item per line. Suggestions sit under the
- * field as plain rows, so TalkBack reads them in order.
+ * field as plain rows, so TalkBack reads them in order. The draft survives a
+ * tab switch and rotation.
  */
 @Composable
 fun AddItemField(
     onAdd: (String) -> Unit,
     suggestions: (String) -> List<String>,
+    onPick: (String, String) -> Unit = { _, s -> onAdd(s) },
 ) {
-    var text by remember { mutableStateOf("") }
+    var text by rememberSaveable { mutableStateOf("") }
     val submit = {
         if (text.isNotBlank()) onAdd(text)
         text = ""
@@ -120,7 +129,7 @@ fun AddItemField(
                             Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    onAdd(s)
+                                    onPick(text, s)
                                     text = ""
                                 }.padding(horizontal = 16.dp, vertical = 14.dp)
                                 .testTag("suggestion-$s"),
@@ -142,7 +151,7 @@ fun AddItemField(
     }
 }
 
-/** "2 recipes ready to review". */
+/** "2 recipes ready to review": one button; with several waiting, it opens the oldest and the card says so. */
 @Composable
 fun ReadyCard(
     jobs: List<Long>,
@@ -155,7 +164,7 @@ fun ReadyCard(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .clip(MaterialTheme.shapes.large)
-            .clickable { onReview(jobs.first()) }
+            .clickable(onClickLabel = if (n == 1) "Review" else "Review the first", role = Role.Button) { onReview(jobs.first()) }
             .testTag("ready-card"),
         shape = MaterialTheme.shapes.large,
         color = Color.Transparent,
@@ -177,16 +186,22 @@ fun ReadyCard(
                     if (n == 1) "1 recipe ready to review" else "$n recipes ready to review",
                     style = MaterialTheme.typography.titleMedium,
                 )
-                Text("Check the ingredients before they go on the list", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    if (n == 1) "Check the ingredients before they go on the list" else "Tap to review the first; the rest follow",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
             Icon(Icons.Rounded.ChevronRight, contentDescription = null)
         }
     }
 }
 
-/** First run: what the app does, in two steps, and a sample list to try. */
+/** First run: what the app does, in two steps, a sample list to try, and a paste of a copied link. */
 @Composable
-fun EmptyState(onSample: () -> Unit) {
+fun EmptyState(
+    onSample: () -> Unit,
+    onPasteLink: () -> Unit = {},
+) {
     EmptyHero(
         icon = Icons.Rounded.ShoppingBasket,
         title = "Your list is empty",
@@ -200,7 +215,14 @@ fun EmptyState(onSample: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Button(onClick = onSample) { Text("Try a sample list") }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onSample) { Text("Try a sample list") }
+            OutlinedButton(onClick = onPasteLink, modifier = Modifier.testTag("paste-link")) {
+                Icon(Icons.Rounded.ContentPaste, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(6.dp))
+                Text("Paste a link")
+            }
+        }
     }
 }
 
@@ -231,18 +253,20 @@ private fun Step(
     }
 }
 
+/** "Onion is already on the list": the button says what goes on ("Add 200 g", or "Add" for one more). */
 @Composable
 fun PlusOneDialog(
     p: PlusOne,
     onYes: () -> Unit,
     onNo: () -> Unit,
 ) {
+    val amount = p.amount
     AlertDialog(
         onDismissRequest = onNo,
         icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
         title = { Text("${p.name.replaceFirstChar { it.uppercase() }} is already on the list") },
-        text = { Text("Add \"${p.line}\" to it?") },
-        confirmButton = { TextButton(onClick = onYes) { Text("+1") } },
+        text = { Text(if (amount == null) "Add one more ${p.name} to it?" else "Add $amount more ${p.name} to it?") },
+        confirmButton = { TextButton(onClick = onYes) { Text(if (amount == null) "Add" else "Add $amount") } },
         dismissButton = { TextButton(onClick = onNo) { Text("No") } },
     )
 }
@@ -252,6 +276,6 @@ fun androidx.compose.foundation.lazy.LazyListScope.listHeader(
     ui: ListUi,
     actions: HeaderActions,
 ) {
-    item(key = "add") { AddItemField(actions.onAdd, actions.suggestions) }
+    item(key = "add") { AddItemField(actions.onAdd, actions.suggestions, actions.onPick) }
     item(key = "ready") { ReadyCard(ui.readyJobs, actions.onReview) }
 }

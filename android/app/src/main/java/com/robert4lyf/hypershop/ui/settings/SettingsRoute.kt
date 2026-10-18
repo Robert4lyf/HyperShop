@@ -1,6 +1,7 @@
 package com.robert4lyf.hypershop.ui.settings
 
 import android.app.Activity
+import android.content.ClipboardManager
 import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,23 +24,29 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.LocalDining
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Route
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Watch
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -53,15 +60,19 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,9 +82,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -89,9 +103,11 @@ import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
 import com.robert4lyf.hypershop.ui.common.SectionCard
 import com.robert4lyf.hypershop.ui.common.Tone
+import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.util.factoryFor
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 data class SettingsActions(
@@ -99,6 +115,9 @@ data class SettingsActions(
     val onTheme: (ThemeMode) -> Unit = {},
     val onRemoveStaple: (String) -> Unit = {},
     val onMoveAisle: (AisleCode, Int) -> Unit = { _, _ -> },
+    /** "Move to top" (0) / "Move to bottom" (last). */
+    val onMoveAisleTo: (AisleCode, Int) -> Unit = { _, _ -> },
+    val onResetAisles: () -> Unit = {},
     val onWatchVibrate: (Boolean) -> Unit = {},
     val onSaveKey: (String) -> Unit = {},
     val onTestKey: () -> Unit = {},
@@ -122,9 +141,14 @@ fun SettingsRoute(
     onDebug: (() -> Unit)?,
     onLibrary: () -> Unit = {},
     onVoiceTest: () -> Unit = {},
+    /** The app's snackbar host; without one the screen shows its own. */
+    snackbar: SnackbarHostState? = null,
 ) {
     val vm: SettingsViewModel = viewModel(factory = factoryFor { SettingsViewModel(container) })
     val ui by vm.ui.collectAsStateWithLifecycle()
+    val own = remember { SnackbarHostState() }
+    val host = snackbar ?: own
+    LaunchedEffect(vm, host) { vm.events.collect { show(container, host, it) } }
     SettingsScreen(
         ui,
         SettingsActions(
@@ -132,6 +156,8 @@ fun SettingsRoute(
             onTheme = { vm.setTheme(it) },
             onRemoveStaple = { vm.removeStaple(it) },
             onMoveAisle = { a, d -> vm.moveAisle(a, d) },
+            onMoveAisleTo = { a, i -> vm.moveAisleTo(a, i) },
+            onResetAisles = { vm.resetAisleOrder() },
             onWatchVibrate = { vm.setWatchVibrate(it) },
             onSaveKey = { vm.saveKey(it) },
             onTestKey = { vm.testKey() },
@@ -146,6 +172,7 @@ fun SettingsRoute(
             onLibrary = onLibrary,
             onVoiceTest = onVoiceTest,
         ),
+        snackbar = own.takeIf { snackbar == null },
     )
 }
 
@@ -154,29 +181,41 @@ fun SettingsRoute(
 fun SettingsScreen(
     ui: SettingsUi,
     actions: SettingsActions,
+    /** A host to draw at the bottom, when the app's isn't in reach. */
+    snackbar: SnackbarHostState? = null,
 ) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        LazyColumn(
-            Modifier.fillMaxSize().testTag("settings"),
-            contentPadding = PaddingValues(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            item(key = "top") { ScreenHeader(title = "Settings", subtitle = "Your list, your shop, your watch") }
-            // Nothing below the header until the saved settings are in, so no control jumps.
-            if (!ui.loaded) return@LazyColumn
-            card("Appearance", Icons.Rounded.Palette, hue = 300f) { AppearanceGroup(ui, actions) }
-            card("List", Icons.Rounded.Tune, hue = 140f) { ListGroup(ui, actions) }
-            card("Aisles", Icons.Rounded.Route, hue = 30f) { AislesGroup(ui, actions) }
-            card("Ingredients", Icons.Rounded.LocalDining, hue = 95f) { IngredientsGroup(actions) }
-            card("Watch", Icons.Rounded.Watch, hue = 205f) { WatchGroup(ui, actions) }
-            card("Claude", Icons.Rounded.AutoAwesome, hue = 265f) {
-                KeySection(ui, actions)
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                ModelSection(ui, actions)
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                CapsSection(ui, actions)
+        Box(Modifier.fillMaxSize()) {
+            LazyColumn(
+                Modifier.fillMaxSize().testTag("settings"),
+                contentPadding = PaddingValues(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                item(key = "top") { ScreenHeader(title = "Settings", subtitle = "Your list, your shop, your watch") }
+                // Nothing below the header until the saved settings are in, so no control jumps.
+                if (!ui.loaded) {
+                    item(key = "loading") {
+                        Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(Modifier.testTag("settings-loading"))
+                        }
+                    }
+                    return@LazyColumn
+                }
+                card("Appearance", Icons.Rounded.Palette, hue = 300f) { AppearanceGroup(ui, actions) }
+                card("List", Icons.Rounded.Tune, hue = 140f) { ListGroup(ui, actions) }
+                card("Aisles", Icons.Rounded.Route, hue = 30f) { AislesGroup(ui, actions) }
+                card("Ingredients", Icons.Rounded.LocalDining, hue = 95f) { IngredientsGroup(actions) }
+                card("Watch", Icons.Rounded.Watch, hue = 205f) { WatchGroup(ui, actions) }
+                card("Claude", Icons.Rounded.AutoAwesome, hue = 265f) {
+                    KeySection(ui, actions)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    ModelSection(ui, actions)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    CapsSection(ui, actions)
+                }
+                card("Advanced", Icons.Rounded.Code, hue = 180f) { AdvancedGroup(ui, actions) }
             }
-            card("Advanced", Icons.Rounded.Code, hue = 180f) { AdvancedGroup(ui, actions) }
+            snackbar?.let { SnackbarHost(it, Modifier.align(Alignment.BottomCenter)) }
         }
     }
     if (ui.keyLost) {
@@ -220,16 +259,22 @@ private fun SwitchRow(
     label: String,
     checked: Boolean,
     onChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
 ) {
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .toggleable(value = checked, role = Role.Switch, onValueChange = onChange),
+            .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-        Switch(checked = checked, onCheckedChange = null)
+        Text(
+            label,
+            Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
     }
 }
 
@@ -301,7 +346,7 @@ private fun ListGroup(
     }
 }
 
-/** A staple: its name, and an × that is the only way to remove it. */
+/** A staple: its name, and an × that is the only way to remove it (a full 48 dp target). */
 @Composable
 private fun StapleChip(
     name: String,
@@ -313,7 +358,7 @@ private fun StapleChip(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 14.dp)) {
             Text(name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelLarge)
-            IconButton(onClick = onRemove, modifier = Modifier.size(40.dp)) {
+            IconButton(onClick = onRemove) {
                 Icon(Icons.Rounded.Close, contentDescription = "Remove $name", modifier = Modifier.size(18.dp))
             }
         }
@@ -325,6 +370,7 @@ private fun AislesGroup(
     ui: SettingsUi,
     actions: SettingsActions,
 ) {
+    var confirmReset by remember { mutableStateOf(false) }
     Hint("The order you walk the shop in. The list follows it.")
     Column {
         ui.aisles.forEachIndexed { i, a ->
@@ -337,8 +383,37 @@ private fun AislesGroup(
                 IconButton(onClick = { actions.onMoveAisle(a, 1) }, enabled = i < ui.aisles.lastIndex) {
                     Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Move ${a.displayName} down")
                 }
+                var menu by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More for ${a.displayName}") }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(text = { Text("Move to top") }, enabled = i > 0, onClick = {
+                            menu = false
+                            actions.onMoveAisleTo(a, 0)
+                        })
+                        DropdownMenuItem(text = { Text("Move to bottom") }, enabled = i < ui.aisles.lastIndex, onClick = {
+                            menu = false
+                            actions.onMoveAisleTo(a, ui.aisles.lastIndex)
+                        })
+                    }
+                }
             }
         }
+    }
+    TextButton(onClick = { confirmReset = true }, modifier = Modifier.testTag("reset-aisles")) { Text("Reset order") }
+    if (confirmReset) {
+        AlertDialog(
+            onDismissRequest = { confirmReset = false },
+            title = { Text("Reset the aisle order?") },
+            text = { Text("The aisles go back to the order the app came with.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmReset = false
+                    actions.onResetAisles()
+                }) { Text("Reset") }
+            },
+            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Keep") } },
+        )
     }
 }
 
@@ -348,7 +423,13 @@ private fun WatchGroup(
     actions: SettingsActions,
 ) {
     InfoBanner("Forerunner 245: not connected. The watch app comes in a later update.", Icons.Rounded.Watch)
-    SwitchRow("Vibrate on the watch when an aisle is done", ui.watchVibrate, actions.onWatchVibrate)
+    // Nothing reads it yet: shown so the setting is known, off until the watch app lands.
+    SwitchRow(
+        "Vibrate on the watch when an aisle is done (coming with the watch app)",
+        ui.watchVibrate,
+        actions.onWatchVibrate,
+        enabled = false,
+    )
 }
 
 @Composable
@@ -356,10 +437,11 @@ private fun KeySection(
     ui: SettingsUi,
     actions: SettingsActions,
 ) {
+    var confirmRemove by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         InfoBanner(
-            "Recipe pages you import are sent to Anthropic for reading, under your own account and key. " +
-                "Items you type never leave the phone.",
+            "Recipe pages, photos and typed recipes you review are sent to Anthropic under your own key. " +
+                "Items you add on the list never leave the phone.",
             Icons.Rounded.Lock,
             Modifier.testTag("privacy"),
             Tone.PRIMARY,
@@ -383,16 +465,18 @@ private fun KeySection(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilledTonalButton(onClick = actions.onTestKey, enabled = ui.keyStatus != KeyStatus.TESTING) { Text("Test key") }
-                OutlinedButton(onClick = actions.onRemoveKey) { Text("Remove key") }
+                OutlinedButton(onClick = { confirmRemove = true }) { Text("Remove key") }
             }
         } else {
             // While the key field is on screen: no screenshots, no recents thumbnail. (Only
             // then: toggling the window flag on every visit to Settings made the tab janky.)
-            val activity = LocalContext.current as? Activity
+            val context = LocalContext.current
+            val activity = context as? Activity
             DisposableEffect(activity) {
                 activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
                 onDispose { activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
             }
+            // Not rememberSaveable: a secret has no place in the saved instance state.
             var key by remember { mutableStateOf("") }
             OutlinedTextField(
                 value = key,
@@ -402,6 +486,13 @@ private fun KeySection(
                 visualTransformation = PasswordVisualTransformation(),
                 // No autofill: this Compose version has none for text fields, and nothing opts in.
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
+                trailingIcon = {
+                    // Read only when tapped, so Android shows no "pasted from your clipboard" for nothing.
+                    IconButton(onClick = {
+                        val clip = context.getSystemService(ClipboardManager::class.java)?.primaryClip
+                        clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()?.let { key = it.trim() }
+                    }, modifier = Modifier.testTag("key-paste")) { Icon(Icons.Rounded.ContentPaste, contentDescription = "Paste") }
+                },
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth().testTag("key-field"),
             )
@@ -412,7 +503,7 @@ private fun KeySection(
                 },
                 enabled = key.isNotBlank(),
             ) { Text("Save and test") }
-            Hint("Without a key, recipes are read by the offline parser.")
+            Hint("Without a key, recipes are read by the built-in parser, which gets simple lists right and struggles with unusual ones.")
         }
         ui.keyStatus?.let {
             Text(
@@ -420,6 +511,7 @@ private fun KeySection(
                     KeyStatus.TESTING -> "Testing…"
                     KeyStatus.OK -> "✓ The key works"
                     KeyStatus.BAD_KEY -> "✗ Anthropic didn't accept that key"
+                    KeyStatus.MALFORMED -> "✗ That doesn't look like a key — paste it again"
                     KeyStatus.OFFLINE -> "Couldn't reach Anthropic. Check your connection."
                     KeyStatus.ERROR -> "Anthropic returned an error. Try again later."
                 },
@@ -428,11 +520,25 @@ private fun KeySection(
                 color =
                     when (it) {
                         KeyStatus.OK -> MaterialTheme.colorScheme.primary
-                        KeyStatus.BAD_KEY -> MaterialTheme.colorScheme.error
+                        KeyStatus.BAD_KEY, KeyStatus.MALFORMED -> MaterialTheme.colorScheme.error
                         else -> MaterialTheme.colorScheme.onSurface
                     },
             )
         }
+    }
+    if (confirmRemove) {
+        AlertDialog(
+            onDismissRequest = { confirmRemove = false },
+            title = { Text("Remove your Claude key?") },
+            text = { Text("Recipes will be read offline until you enter one again.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmRemove = false
+                    actions.onRemoveKey()
+                }) { Text("Remove") }
+            },
+            dismissButton = { TextButton(onClick = { confirmRemove = false }) { Text("Keep") } },
+        )
     }
 }
 
@@ -468,6 +574,8 @@ private fun ModelSection(
     }
 }
 
+private val RESET_DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM", Locale.getDefault())
+
 @Composable
 private fun CapsSection(
     ui: SettingsUi,
@@ -481,19 +589,45 @@ private fun CapsSection(
             Modifier.testTag("spend"),
             style = MaterialTheme.typography.bodyMedium,
         )
-        Meter("This month", (ui.spentThisMonthUsd / ui.monthlyCapUsd.coerceAtLeast(0.01)).toFloat())
-        Meter("Today", ui.callsToday / ui.dailyCalls.coerceAtLeast(1).toFloat())
-        CapField("Monthly cap (US$)", String.format(Locale.US, "%.2f", ui.monthlyCapUsd), "cap-month", actions.onMonthlyCap)
-        CapField("Calls a day", ui.dailyCalls.toString(), "cap-day", actions.onDailyCalls)
+        Meter(
+            "This month",
+            (ui.spentThisMonthUsd / ui.monthlyCapUsd.coerceAtLeast(0.01)).toFloat(),
+            "This month: ${usd(ui.spentThisMonthUsd)} of ${usd(ui.monthlyCapUsd)}",
+        )
+        Meter("Today", ui.callsToday / ui.dailyCalls.coerceAtLeast(1).toFloat(), "Today: ${ui.callsToday} of ${ui.dailyCalls} calls")
+        val nextMonth = ui.today.withDayOfMonth(1).plusMonths(1).format(RESET_DAY)
+        Hint("At the cap, recipes are read offline until $nextMonth for the month, or until tomorrow for the day.")
+        CapField(
+            "Monthly cap (US$)",
+            String.format(Locale.US, "%.2f", ui.monthlyCapUsd),
+            "cap-month",
+            help = "Between $0 and $100",
+            keyboard = KeyboardType.Decimal,
+            onSet = actions.onMonthlyCap,
+        )
+        CapField(
+            "Calls a day",
+            ui.dailyCalls.toString(),
+            "cap-day",
+            help = "0 to 1000 a day (0 turns Claude off)",
+            keyboard = KeyboardType.Number,
+            onSet = actions.onDailyCalls,
+        )
     }
 }
 
+/** A progress bar read by TalkBack as one sentence ([description]), not as a bar and a label. */
 @Composable
 private fun Meter(
     label: String,
     fraction: Float,
+    description: String,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(
+        Modifier.clearAndSetSemantics { contentDescription = description },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Text(
             label,
             Modifier.padding(end = 4.dp),
@@ -517,10 +651,13 @@ private fun CapField(
     label: String,
     current: String,
     tag: String,
+    help: String,
+    keyboard: KeyboardType,
     onSet: (String) -> Boolean,
 ) {
-    var text by remember(current) { mutableStateOf(current) }
-    var bad by remember { mutableStateOf(false) }
+    var text by rememberSaveable(current) { mutableStateOf(current) }
+    var bad by rememberSaveable { mutableStateOf(false) }
+    val set = { if (text != current) bad = !onSet(text) }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(
             value = text,
@@ -530,12 +667,14 @@ private fun CapField(
             },
             label = { Text(label) },
             isError = bad,
+            supportingText = { Text(help) },
             singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            keyboardOptions = KeyboardOptions(keyboardType = keyboard, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { set() }),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.weight(1f).testTag(tag),
         )
-        FilledTonalButton(onClick = { bad = !onSet(text) }, enabled = text != current) { Text("Set") }
+        FilledTonalButton(onClick = set, enabled = text != current) { Text("Set") }
     }
 }
 
@@ -564,6 +703,9 @@ private fun AdvancedGroup(
             TextButton(onClick = actions.onRefreshLog) { Text("Refresh") }
         }
     }
-    OutlinedButton(onClick = actions.onVoiceTest, modifier = Modifier.testTag("open-voice-test")) { Text("Voice test") }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        OutlinedButton(onClick = actions.onVoiceTest, modifier = Modifier.testTag("open-voice-test")) { Text("Voice test") }
+        Hint("An experiment: checks whether hands-free shopping would work on this phone")
+    }
     actions.onDebug?.let { open -> OutlinedButton(onClick = open) { Text("Debug tools") } }
 }

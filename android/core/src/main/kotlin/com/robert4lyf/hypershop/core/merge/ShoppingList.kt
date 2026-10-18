@@ -245,18 +245,60 @@ data class ShoppingList(
      * ticks left covering nothing, and items left with no contributions. This
      * is also Undo of an import.
      */
-    fun removeUse(useId: Long): ShoppingList {
+    fun removeUse(useId: Long): ShoppingList = removeUseKeeping(useId).first
+
+    /**
+     * [removeUse], also returning what went (null when there was no such use),
+     * so "Remove from list" can offer Undo through [restoreUse].
+     */
+    fun removeUseKeeping(useId: Long): Pair<ShoppingList, RemovedUse?> {
+        val use = uses[useId]
         val gone = contributions.filter { it.useId == useId }
         val affected = gone.map { it.itemId }.toSet()
         val rest = contributions.filter { it.useId != useId }
-        val liveTicks = ticks.filter { t -> rest.any { it.coveredBy == t.id } }
+        val covering = rest.mapNotNull { it.coveredBy }.toSet()
+        val liveTicks = ticks.filter { it.id in covering }
         val empty = affected.filter { id -> rest.none { it.itemId == id } }.toSet()
+        val removed =
+            use?.let {
+                RemovedUse(
+                    use = it,
+                    items = empty.mapNotNull { id -> items[id] },
+                    contributions = gone,
+                    ticks = ticks.filter { t -> t.id !in covering },
+                )
+            }
         return copy(
             uses = uses - useId,
             contributions = rest,
             ticks = liveTicks,
             items = items - empty,
-        ).bumped(affected - empty)
+        ).bumped(affected - empty) to removed
+    }
+
+    /**
+     * Undo of [removeUse]: the use, its contributions and the ticks that only
+     * covered them come back. An item removed with it comes back too, unless its
+     * key is live again (re-added since), in which case its contributions join that
+     * item. Ids are never reused, so the old ids are free. Null when the use is
+     * back already.
+     */
+    fun restoreUse(r: RemovedUse): ShoppingList? {
+        if (r.use.id in uses) return null
+        var items = this.items
+        val redirect = HashMap<Long, Long>()
+        for (i in r.items) {
+            val live = itemByKey(i.mergeKey)
+            if (live != null) redirect[i.id] = live.id else items = items + (i.id to i)
+        }
+        val cs = r.contributions.map { c -> redirect[c.itemId]?.let { c.copy(itemId = it) } ?: c }
+        val ts = r.ticks.map { t -> redirect[t.itemId]?.let { t.copy(itemId = it) } ?: t }
+        return copy(
+            uses = uses + (r.use.id to r.use),
+            items = items,
+            contributions = contributions + cs,
+            ticks = ticks + ts,
+        ).bumped(cs.map { it.itemId }.toSet())
     }
 
     /** Rescales a recipe use to new servings; `noScale` contributions stay. */
@@ -461,6 +503,16 @@ data class ShoppingList(
 }
 
 enum class WatchTickResult { OK, NOOP, PARTIAL, STILL_DONE }
+
+/** What [ShoppingList.removeUseKeeping] took off the list, for Undo. */
+data class RemovedUse(
+    val use: RecipeUse,
+    /** Items left with nothing, removed with the use. */
+    val items: List<ListItem>,
+    val contributions: List<Contribution>,
+    /** Ticks that covered nothing else. */
+    val ticks: List<Tick>,
+)
 
 /** What an incoming line needs to become an item. */
 data class NewItem(

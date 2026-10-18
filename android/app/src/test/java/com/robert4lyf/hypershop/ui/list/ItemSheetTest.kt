@@ -1,14 +1,19 @@
 package com.robert4lyf.hypershop.ui.list
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -56,6 +61,7 @@ class ItemSheetTest {
                         },
                         onDelete = { events += "delete" },
                         onSwap = { to, always -> events += "swap $to $always" },
+                        onToggle = { events += "toggle" },
                     ),
                 )
             }
@@ -103,9 +109,38 @@ class ItemSheetTest {
         compose.onNodeWithText("Set").performClick()
         compose.onNodeWithText("Enter an amount, like 2 or 200 ml").assertExists()
         compose.onNodeWithText(AisleCode.DAIRY_EGGS.displayName).performClick()
+        // The aisle dialog can be backed out of.
+        compose.onNodeWithText("Cancel").performClick()
+        compose.onNodeWithText("Just this time").assertDoesNotExist()
+        compose.onNodeWithText(AisleCode.DAIRY_EGGS.displayName).performClick()
         compose.onNodeWithText("Always").performClick()
-        compose.onNodeWithContentDescription("Delete onion").performClick()
+        compose.onNodeWithTag("delete-item").performScrollTo().performClick()
+        compose.onNodeWithText("Remove from list").assertExists()
+        compose.onNodeWithContentDescription("Delete onion").assertDoesNotExist()
         assertEquals(listOf("qty lots", "move DAIRY_EGGS true", "delete"), events)
+    }
+
+    @Test
+    fun tickAtTheTopFollowsTheRowsState() {
+        var sheet by mutableStateOf(SHEET)
+        compose.setContent {
+            HyperShopTheme(dynamicColor = false) {
+                val actions = ItemSheetActions(onMove = { _, _ -> }, onEditQuantity = { true }, onToggle = { events += "toggle" })
+                ItemSheetContent(sheet, actions)
+            }
+        }
+        compose.onNodeWithText("Tick").performClick()
+        assertEquals(listOf("toggle"), events)
+        sheet = SHEET.copy(done = true)
+        compose.onNodeWithTag("toggle-item").assertTextEquals("Untick")
+    }
+
+    @Test
+    fun doneOnTheKeyboardSetsTheAmount() {
+        show()
+        compose.onNodeWithTag("edit-qty").performTextInput("3")
+        compose.onNodeWithTag("edit-qty").performImeAction()
+        assertEquals(listOf("qty 3"), events)
     }
 
     @Test
@@ -127,8 +162,11 @@ class ItemSheetTest {
         compose.onNodeWithText("Always").performClick()
         compose.onNodeWithTag("swap-other").performScrollTo().performTextInput("leek")
         compose.onNodeWithText("Swap").performScrollTo().performClick()
-        // Something typed isn't in the swaps, so only "Just this time" is offered.
+        // Something typed isn't in the swaps, so only "Just this time" is offered, and Cancel backs out.
         compose.onNodeWithText("Always").assertDoesNotExist()
+        compose.onNodeWithText("Cancel").performClick()
+        compose.onNodeWithText("Just this time").assertDoesNotExist()
+        compose.onNodeWithText("Swap").performScrollTo().performClick()
         compose.onNodeWithText("Just this time").performClick()
         assertEquals(listOf("swap shallot true", "swap leek false"), events)
     }

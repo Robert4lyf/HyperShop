@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.ui.library
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,8 +16,11 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -24,7 +28,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -42,6 +49,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,6 +57,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -59,6 +69,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -87,7 +98,16 @@ fun LibraryRoute(
     var editing by rememberSaveable { mutableStateOf<String?>(null) }
     var form by remember { mutableStateOf<EntryForm?>(null) }
     LaunchedEffect(editing) { form = editing?.let { vm.form(it.ifEmpty { null }) } }
-    LibraryScreen(ui, vm.query, onBack = onBack, onSearch = vm::search, onOpen = { editing = it }, onAdd = { editing = "" })
+    LibraryScreen(
+        ui,
+        vm.query,
+        onBack = onBack,
+        onSearch = vm::search,
+        onOpen = { editing = it },
+        onAdd = { editing = "" },
+        aisle = vm.aisle,
+        onAisle = vm::filterAisle,
+    )
     val f = form
     if (editing != null && f != null) {
         EntrySheet(
@@ -98,6 +118,7 @@ fun LibraryRoute(
                 editing = null
             },
             onDismiss = { editing = null },
+            suggest = vm::suggest,
         )
     }
 }
@@ -111,6 +132,9 @@ fun LibraryScreen(
     onSearch: (String) -> Unit,
     onOpen: (String) -> Unit,
     onAdd: () -> Unit,
+    /** The aisle chip chosen, or null for all. */
+    aisle: AisleCode? = null,
+    onAisle: (AisleCode?) -> Unit = {},
 ) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxSize()) {
@@ -127,7 +151,7 @@ fun LibraryScreen(
                             modifier = Modifier.semantics { heading() },
                         )
                         Text(
-                            "${ui.total} ingredients · names, aisles and units",
+                            if (ui.loaded) "${ui.total} ingredients · names, aisles and units" else "Names, aisles and units",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -149,10 +173,12 @@ fun LibraryScreen(
                     shape = RoundedCornerShape(50),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).testTag("library-search"),
                 )
+                AisleChips(aisle, onAisle)
                 val card = MaterialTheme.colorScheme.card
                 LazyColumn(Modifier.fillMaxSize().testTag("library"), contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp)) {
-                    if (ui.rows.isEmpty()) {
-                        item { Text("Nothing matches. Add it with the button below.", Modifier.padding(24.dp)) }
+                    // Only once the catalogue is in: an empty list before that is just loading.
+                    if (ui.loaded && ui.rows.isEmpty() && (query.isNotEmpty() || aisle != null)) {
+                        item { Text("Nothing matches. Tap Add ingredient to create it.", Modifier.padding(24.dp)) }
                     }
                     itemsIndexed(ui.rows, key = { _, r -> r.id }) { i, r ->
                         Row(
@@ -175,6 +201,7 @@ fun LibraryScreen(
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
                                     )
                                 }
                             }
@@ -199,6 +226,37 @@ fun LibraryScreen(
     }
 }
 
+/** "All", then one chip per aisle, to narrow the list to one aisle. */
+@Composable
+private fun AisleChips(
+    aisle: AisleCode?,
+    onAisle: (AisleCode?) -> Unit,
+) {
+    LazyRow(
+        Modifier.fillMaxWidth().testTag("aisle-chips"),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item(key = "all") {
+            FilterChip(
+                selected = aisle == null,
+                onClick = { onAisle(null) },
+                label = { Text("All") },
+                modifier = Modifier.testTag("aisle-all"),
+            )
+        }
+        items(AisleCode.entries, key = { it.name }) { a ->
+            FilterChip(
+                selected = aisle == a,
+                onClick = { onAisle(if (aisle == a) null else a) },
+                label = { Text(a.displayName) },
+                leadingIcon = { Icon(a.icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                modifier = Modifier.testTag("aisle-${a.name}"),
+            )
+        }
+    }
+}
+
 private val POLICIES =
     listOf(
         DisplayPolicy.COUNT to "Count",
@@ -214,11 +272,63 @@ private fun EntrySheet(
     onSave: suspend (EntryForm) -> String?,
     onReset: () -> Unit,
     onDismiss: () -> Unit,
+    suggest: (String) -> List<String>,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        EntryEditor(start, onSave, onReset)
+        EntryEditor(start, onSave, onReset, onCancel = onDismiss, suggest = suggest)
     }
 }
+
+/** The form across a rotation: its fields in order, as plain values. */
+private val EntryFormSaver: Saver<EntryForm, Any> =
+    listSaver(
+        save = { f ->
+            listOf(
+                f.id,
+                f.name,
+                f.plural,
+                f.synonyms,
+                f.aisle.name,
+                f.policy.name,
+                f.packNote,
+                f.gramsPerCup,
+                f.alwaysInStock,
+                f.swaps,
+                f.replaceWith,
+                f.group,
+                f.edited,
+                f.custom,
+            )
+        },
+        restore = { v ->
+            EntryForm(
+                id = v[0] as String,
+                name = v[1] as String,
+                plural = v[2] as String,
+                synonyms = v[3] as String,
+                aisle = AisleCode.valueOf(v[4] as String),
+                policy = DisplayPolicy.valueOf(v[5] as String),
+                packNote = v[6] as String,
+                gramsPerCup = v[7] as String,
+                alwaysInStock = v[8] as Boolean,
+                swaps = v[9] as String,
+                replaceWith = v[10] as String,
+                group = v[11] as String,
+                edited = v[12] as Boolean,
+                custom = v[13] as Boolean,
+            )
+        },
+    )
+
+/** The fields under "Advanced" have something in them, so it opens expanded. */
+private val EntryForm.hasAdvanced: Boolean
+    get() =
+        policy != DisplayPolicy.COUNT ||
+            packNote.isNotBlank() ||
+            gramsPerCup.isNotBlank() ||
+            group.isNotBlank() ||
+            swaps.isNotBlank() ||
+            replaceWith.isNotBlank()
 
 /** The edit form, stateless apart from what is being typed (tests and screenshots show it directly). */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
@@ -227,63 +337,89 @@ fun EntryEditor(
     start: EntryForm,
     onSave: suspend (EntryForm) -> String?,
     onReset: () -> Unit,
+    onCancel: () -> Unit = {},
+    /** Ingredient names for what is being typed in Swaps and "Always replace with". */
+    suggest: (String) -> List<String> = { emptyList() },
 ) {
-    var f by remember(start) { mutableStateOf(start) }
+    var f by rememberSaveable(start, stateSaver = EntryFormSaver) { mutableStateOf(start) }
     var error by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
+    var advanced by rememberSaveable(start) { mutableStateOf(start.hasAdvanced) }
+    var confirmReset by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    // Any edit clears the last save's complaint: it was about the form as it was.
+    val edit = { next: EntryForm ->
+        f = next
+        error = null
+    }
     Column(
         Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).imePadding().padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text(if (f.isNew) "Add ingredient" else "Edit ingredient", style = MaterialTheme.typography.headlineSmall)
-        Field("Name", f.name, "entry-name") { f = f.copy(name = it) }
-        Field("Plural (optional)", f.plural, "entry-plural") { f = f.copy(plural = it) }
-        Field("Also called, separated by commas", f.synonyms, "entry-synonyms", lines = 2) { f = f.copy(synonyms = it) }
+        Field("Name", f.name, "entry-name") { edit(f.copy(name = it)) }
+        Field("Plural (optional)", f.plural, "entry-plural") { edit(f.copy(plural = it)) }
+        Field("Also called, separated by commas", f.synonyms, "entry-synonyms", lines = 2) { edit(f.copy(synonyms = it)) }
         Text("Aisle", style = MaterialTheme.typography.titleSmall)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             for (a in AisleCode.entries) {
                 FilterChip(
                     selected = f.aisle == a,
-                    onClick = { f = f.copy(aisle = a) },
+                    onClick = { edit(f.copy(aisle = a)) },
                     label = { Text(a.displayName) },
                     leadingIcon = { Icon(a.icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 )
             }
         }
-        Text("Amounts shown as", style = MaterialTheme.typography.titleSmall)
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            POLICIES.forEachIndexed { i, (p, label) ->
-                SegmentedButton(
-                    selected = f.policy == p,
-                    onClick = { f = f.copy(policy = p) },
-                    shape = SegmentedButtonDefaults.itemShape(i, POLICIES.size),
-                ) { Text(label, maxLines = 1) }
-            }
-        }
-        if (f.policy == DisplayPolicy.PRESENCE) {
-            Text(
-                "None: the list shows just the name, as for salt or herbs you buy in a pack.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Field("Group in the aisle, e.g. Herbs (optional)", f.group, "entry-group") { f = f.copy(group = it) }
-        Field("Swaps, separated by commas", f.swaps, "entry-swaps", lines = 2) { f = f.copy(swaps = it) }
-        Text(
-            "Offered on the list as \"Swap for\", e.g. maple syrup for agave syrup.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Field("Always use instead (optional)", f.replaceWith, "entry-replace") { f = f.copy(replaceWith = it) }
-        Field("Usually sold as, e.g. 1 kg bag", f.packNote, "entry-pack") { f = f.copy(packNote = it) }
-        Field("Grams per cup (turns cups into grams)", f.gramsPerCup, "entry-grams", number = true) { f = f.copy(gramsPerCup = it) }
         Row(
-            Modifier.fillMaxWidth().clickable(role = Role.Switch) { f = f.copy(alwaysInStock = !f.alwaysInStock) },
+            Modifier.fillMaxWidth().toggleable(value = f.alwaysInStock, role = Role.Switch) { edit(f.copy(alwaysInStock = it)) },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Always in stock", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Switch(checked = f.alwaysInStock, onCheckedChange = null)
+        }
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .toggleable(value = advanced, role = Role.Button) { advanced = it }
+                .testTag("entry-advanced"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Advanced", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+            Icon(if (advanced) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, contentDescription = null)
+        }
+        AnimatedVisibility(advanced) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text("Amounts shown as", style = MaterialTheme.typography.titleSmall)
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    POLICIES.forEachIndexed { i, (p, label) ->
+                        SegmentedButton(
+                            selected = f.policy == p,
+                            onClick = { edit(f.copy(policy = p)) },
+                            shape = SegmentedButtonDefaults.itemShape(i, POLICIES.size),
+                        ) { Text(label, maxLines = 1) }
+                    }
+                }
+                if (f.policy == DisplayPolicy.PRESENCE) {
+                    Help("None: the list shows just the name, as for salt or herbs you buy in a pack.")
+                }
+                Field("Usually sold as, e.g. 1 kg bag", f.packNote, "entry-pack") { edit(f.copy(packNote = it)) }
+                Field("Grams per cup (turns cups into grams)", f.gramsPerCup, "entry-grams", number = true) {
+                    edit(f.copy(gramsPerCup = it))
+                }
+                Field("Group in the aisle, e.g. Herbs (optional)", f.group, "entry-group") { edit(f.copy(group = it)) }
+                Field("Swaps, separated by commas", f.swaps, "entry-swaps", lines = 2) { edit(f.copy(swaps = it)) }
+                // Suggestions for the term after the last comma; picking one completes that term.
+                Suggestions(suggestFor(f.swaps.substringAfterLast(','), suggest)) { name ->
+                    val kept = f.swaps.substringBeforeLast(',', missingDelimiterValue = "").trim()
+                    edit(f.copy(swaps = if (kept.isEmpty()) name else "$kept, $name"))
+                }
+                Help("Offered on the list as \"Swap for\", e.g. maple syrup for agave syrup.")
+                Field("Always replace with (optional)", f.replaceWith, "entry-replace") { edit(f.copy(replaceWith = it)) }
+                Suggestions(suggestFor(f.replaceWith, suggest)) { edit(f.copy(replaceWith = it)) }
+                Help("Recipes asking for this get the other ingredient instead; one already on the list is swapped now.")
+            }
         }
         error?.let {
             Text(
@@ -294,6 +430,7 @@ fun EntryEditor(
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 52.dp).testTag("entry-cancel")) { Text("Cancel") }
             Button(
                 onClick = {
                     saving = true
@@ -305,10 +442,69 @@ fun EntryEditor(
                 enabled = f.name.isNotBlank() && !saving,
                 modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("entry-save"),
             ) { Text("Save") }
-            if (start.edited || start.custom) {
-                OutlinedButton(onClick = onReset, modifier = Modifier.heightIn(min = 52.dp).testTag("entry-reset")) {
-                    Text(if (start.custom) "Delete" else "Reset to default")
-                }
+        }
+        if (start.edited || start.custom) {
+            OutlinedButton(
+                onClick = { confirmReset = true },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("entry-reset"),
+            ) { Text(if (start.custom) "Delete" else "Reset to default") }
+        }
+    }
+    if (confirmReset) {
+        val name = start.name.replaceFirstChar { it.uppercase() }
+        AlertDialog(
+            onDismissRequest = { confirmReset = false },
+            title = { Text(if (start.custom) "Delete $name?" else "Reset $name to default?") },
+            text = {
+                Text(
+                    if (start.custom) {
+                        "It leaves the library. Anything on the list keeps its name."
+                    } else {
+                        "Your changes go, and the ingredient is as the app came with it."
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmReset = false
+                    onReset()
+                }, modifier = Modifier.testTag("entry-reset-confirm")) { Text(if (start.custom) "Delete" else "Reset") }
+            },
+            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Keep") } },
+        )
+    }
+}
+
+/** Nothing until something is typed, whatever [suggest] does with a blank. */
+private fun suggestFor(
+    typed: String,
+    suggest: (String) -> List<String>,
+): List<String> = if (typed.isBlank()) emptyList() else suggest(typed)
+
+@Composable
+private fun Help(text: String) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+/** Up to five ingredient names under a field, each a row that fills it in. */
+@Composable
+private fun Suggestions(
+    names: List<String>,
+    onPick: (String) -> Unit,
+) {
+    if (names.isEmpty()) return
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerHighest) {
+        Column(Modifier.fillMaxWidth()) {
+            for (n in names) {
+                Text(
+                    n,
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable(role = Role.Button) { onPick(n) }
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .testTag("suggest-$n"),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
             }
         }
     }
