@@ -88,7 +88,7 @@ class ListViewModelTest {
         c.add("2 onions", "1 carrot")
         val vm = ListViewModel(c)
         var ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
-        vm.delete(ui.row("carrot"))
+        ui.row("carrot").let { vm.delete(it.id, it.name) }
         var m = nextMessage(vm)
         await(vm.ui) { u -> u.aisles.flatMap { it.second }.none { it.name == "carrot" } }
         runBlocking { m.undo!!() }

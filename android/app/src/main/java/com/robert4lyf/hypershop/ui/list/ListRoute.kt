@@ -62,7 +62,6 @@ fun ListRoute(
         ui,
         ListActions(
             onToggle = vm::toggle,
-            onDelete = vm::delete,
             onFinish = vm::finishShopping,
             onClearAll = vm::clearAll,
             onOpenItem = { vm.openItem(it.id) },
@@ -81,7 +80,11 @@ fun ListRoute(
     sheet?.let { s ->
         ItemSheetHost(
             s,
-            ItemSheetActions(onMove = { a, always -> vm.moveItem(s.id, a, always) }, onEditQuantity = { vm.editQuantity(s.id, it) }),
+            ItemSheetActions(
+                onMove = { a, always -> vm.moveItem(s.id, a, always) },
+                onEditQuantity = { vm.editQuantity(s.id, it) },
+                onDelete = { vm.delete(s.id, s.name) },
+            ),
             onDismiss = vm::closeItem,
         )
     }

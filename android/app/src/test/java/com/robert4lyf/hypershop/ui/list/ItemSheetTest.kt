@@ -4,6 +4,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -50,6 +51,7 @@ class ItemSheetTest {
                             events += "qty $t"
                             t != "lots"
                         },
+                        onDelete = { events += "delete" },
                     ),
                 )
             }
@@ -98,7 +100,8 @@ class ItemSheetTest {
         compose.onNodeWithText("Enter an amount, like 2 or 200 ml").assertExists()
         compose.onNodeWithText(AisleCode.DAIRY_EGGS.displayName).performClick()
         compose.onNodeWithText("Always").performClick()
-        assertEquals(listOf("qty lots", "move DAIRY_EGGS true"), events)
+        compose.onNodeWithContentDescription("Delete onion").performClick()
+        assertEquals(listOf("qty lots", "move DAIRY_EGGS true", "delete"), events)
     }
 
     @Test

@@ -138,6 +138,10 @@ Shared components (`ui/common/`):
 - **Other screens:** "Ready to review" is a warm tomato-to-berry card. Each settings group has its own coloured icon tile. The empty state's circle uses the hero gradient.
 - **Contrast:** white text on every gradient clears 4.5:1, and the gradients are darker in dark mode. State is still never shown by colour alone.
 
+## Rows (after phone testing: accidental ticks)
+- Only the round tick (a 56 dp target) ticks; the rest of the row opens the item card. TalkBack reads the tick as a checkbox named after the item.
+- Swipe-to-delete is gone. Delete is the bin at the item card's top right, with Undo on the list.
+
 ## Not changing
 - Navigation, view models, data, strings that tests or TalkBack depend on,
   the one-node-per-row semantics, and swipe-to-delete with its accessible
