@@ -22,6 +22,9 @@ class Screens {
     private const GLANCE_KEY = "g";
     private const DEBOUNCE_MS = 700;
     private const SUB_CHARS = 18;
+    //! An aisle's rows: the focused one is taller, for the larger name and its sub-line.
+    private const ROW_H = 48;
+    private const FOCUS_ROW_H = 72;
 
     private enum Screen { AISLES, AISLE, DONE, SETTINGS }
 
@@ -244,12 +247,15 @@ class Screens {
 
     function openAisle(a as Lang.Number, focus as Lang.Number, transition as WatchUi.SlideType) as Void {
         var sync = link.sync;
-        var menu = new WatchUi.CheckboxMenu({:title => sync.aisles[a][1] as Lang.String});
+        var menu = new WatchUi.CustomMenu(ROW_H, Graphics.COLOR_BLACK, {
+            :title => new AisleTitle(sync.aisles[a][1] as Lang.String),
+            :focusItemHeight => FOCUS_ROW_H
+        });
         var view = sync.view();
         var list = aisleItems(a, view);
         for (var i = 0; i < list.size(); i++) {
             var id = list[i][0] as Lang.Number;
-            menu.addItem(new WatchUi.CheckboxMenuItem(list[i][1] as Lang.String, itemSub(list[i]), id, view.get(id) == true, {}));
+            menu.addItem(new ItemRow(id, list[i][1] as Lang.String, itemSub(list[i]), view.get(id) == true));
         }
         if (list.size() > 0) {
             menu.setFocus(focus < list.size() ? focus : list.size() - 1);
@@ -276,13 +282,11 @@ class Screens {
         return sub.length() > SUB_CHARS ? sub.substring(0, SUB_CHARS) : sub;
     }
 
-    //! Select on a row. CheckboxMenu has already flipped the box; it is put
-    //! back whenever the tick does not happen.
-    function onItemSelected(item as WatchUi.CheckboxMenuItem) as Void {
+    //! Select on a row. The row only changes once the tick has happened.
+    function onItemSelected(item as ItemRow) as Void {
         var id = item.getId() as Lang.Number;
         var now = System.getTimer();
         if (now - _lastPress < DEBOUNCE_MS) {
-            item.setChecked(link.sync.viewOf(id) == true);
             return;
         }
         _lastPress = now;
@@ -299,7 +303,6 @@ class Screens {
             }
         }
         if (!link.toggle(id)) {
-            item.setChecked(link.sync.viewOf(id) == true);
             WatchUi.pushView(
                 new MessageView(text(link.sync.outboxFull() ? Rez.Strings.SyncWithPhone : Rez.Strings.NoticeChanged)),
                 new MessageDelegate(),
@@ -503,9 +506,8 @@ class Screens {
                 continue;
             }
             var row = menu.getItem(index);
-            if (row instanceof WatchUi.CheckboxMenuItem) {
-                (row as WatchUi.CheckboxMenuItem).setChecked(view.get(id) == true);
-                row.setSubLabel(itemSub(items[i]));
+            if (row instanceof ItemRow) {
+                (row as ItemRow).setState(view.get(id) == true, itemSub(items[i]));
             }
         }
     }
@@ -570,8 +572,8 @@ class AisleDelegate extends WatchUi.Menu2InputDelegate {
     }
 
     function onSelect(item as WatchUi.MenuItem) as Void {
-        if (item instanceof WatchUi.CheckboxMenuItem) {
-            _screens.onItemSelected(item as WatchUi.CheckboxMenuItem);
+        if (item instanceof ItemRow) {
+            _screens.onItemSelected(item as ItemRow);
         }
     }
 
