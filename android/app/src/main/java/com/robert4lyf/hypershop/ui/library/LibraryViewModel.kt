@@ -15,7 +15,9 @@ import com.robert4lyf.hypershop.core.merge.Display
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.UiMessage
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -167,6 +169,12 @@ class LibraryViewModel(
             custom = !c.library.isBundled(e.id),
         )
     }
+
+    /**
+     * [save] for the edit sheet: the work runs in this scope, so a sheet dismissed
+     * mid-save still leaves the list re-keyed; the sheet only awaits the answer.
+     */
+    fun saveFromSheet(f: EntryForm): Deferred<String?> = viewModelScope.async { save(f) }
 
     /**
      * Saves the form, then brings the list in line: items whose names now match

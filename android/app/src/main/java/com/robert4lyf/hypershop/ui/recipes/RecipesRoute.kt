@@ -74,7 +74,11 @@ import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.EmptyHero
 import com.robert4lyf.hypershop.ui.common.InfoBanner
+import com.robert4lyf.hypershop.ui.common.PillShape
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
+import com.robert4lyf.hypershop.ui.common.cardLift
+import com.robert4lyf.hypershop.ui.common.fieldLift
+import com.robert4lyf.hypershop.ui.common.pillFieldColors
 import com.robert4lyf.hypershop.ui.common.rememberOpenLink
 import com.robert4lyf.hypershop.ui.common.siteName
 import com.robert4lyf.hypershop.ui.common.webLink
@@ -122,25 +126,29 @@ fun RecipesRoute(
     )
     val detail by vm.detail.collectAsStateWithLifecycle()
     // The sheet's own confirmations: the sheet closes first, so the dialog is not under it.
-    var addAgain by remember { mutableStateOf<LibraryRow?>(null) }
-    var forget by remember { mutableStateOf<LibraryRow?>(null) }
+    // Kept as the recipe's key (saveable), and looked up again after a rotation.
+    var addAgain by rememberSaveable { mutableStateOf<String?>(null) }
+    var forget by rememberSaveable { mutableStateOf<String?>(null) }
     detail?.let { d ->
         RecipeDetailSheet(
             d,
             onAdd = {
                 vm.closeDetail()
-                if (d.row.onList) addAgain = d.row else vm.addFromLibrary(d.row)
+                if (d.row.onList) addAgain = d.row.key else vm.addFromLibrary(d.row)
             },
             onRemove = {
                 vm.closeDetail()
-                forget = d.row
+                forget = d.row.key
             },
             onDismiss = vm::closeDetail,
         )
     }
-    addAgain?.let { row -> AddAgainDialog(row, onConfirm = { vm.addFromLibrary(row) }, onDismiss = { addAgain = null }) }
-    forget?.let { row -> ForgetRecipeDialog(row, onConfirm = { vm.removeFromLibrary(row) }, onDismiss = { forget = null }) }
+    ui.libraryRow(addAgain)?.let { row -> AddAgainDialog(row, onConfirm = { vm.addFromLibrary(row) }, onDismiss = { addAgain = null }) }
+    ui.libraryRow(forget)?.let { row -> ForgetRecipeDialog(row, onConfirm = { vm.removeFromLibrary(row) }, onDismiss = { forget = null }) }
 }
+
+/** The saved recipe a dialog is about, by its key; null for no dialog (or one whose row has gone). */
+private fun RecipesUi.libraryRow(key: String?): LibraryRow? = key?.let { k -> library.firstOrNull { it.key == k } }
 
 /** The Recipes tab, stateless. */
 @Composable
@@ -155,9 +163,10 @@ fun RecipesScreen(
     /** A Claude key is saved: the photo option needs one. */
     hasKey: Boolean = true,
 ) {
-    var confirm by remember { mutableStateOf<UseSummary?>(null) }
-    var forget by remember { mutableStateOf<LibraryRow?>(null) }
-    var addAgain by remember { mutableStateOf<LibraryRow?>(null) }
+    // Which use or saved recipe a dialog is about, by id or key, so it survives a rotation.
+    var confirm by rememberSaveable { mutableStateOf<Long?>(null) }
+    var forget by rememberSaveable { mutableStateOf<String?>(null) }
+    var addAgain by rememberSaveable { mutableStateOf<String?>(null) }
     var adding by rememberSaveable { mutableStateOf(false) }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxSize()) {
@@ -197,7 +206,7 @@ fun RecipesScreen(
                     }
                 }
                 items(ui.uses, key = { it.useId }) { use ->
-                    UseCard(use, onRemove = { confirm = use }, onAddInStock = { onAddInStock(use) }, onEdit = { onEdit(use) })
+                    UseCard(use, onRemove = { confirm = use.useId }, onAddInStock = { onAddInStock(use) }, onEdit = { onEdit(use) })
                 }
                 if (ui.hasLibrary) {
                     item(key = "library-title") {
@@ -221,8 +230,8 @@ fun RecipesScreen(
                     items(ui.library, key = { "lib-${it.key}" }) { row ->
                         LibraryCard(
                             row,
-                            onAdd = { if (row.onList) addAgain = row else library.onAdd(row) },
-                            onRemove = { forget = row },
+                            onAdd = { if (row.onList) addAgain = row.key else library.onAdd(row) },
+                            onRemove = { forget = row.key },
                             onOpen = { library.onOpen(row) },
                         )
                     }
@@ -231,16 +240,16 @@ fun RecipesScreen(
             FloatingActionButton(
                 onClick = { adding = true },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp).testTag("add-recipe"),
-                shape = RoundedCornerShape(20.dp),
+                shape = MaterialTheme.shapes.large,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
             ) { Icon(Icons.Rounded.Add, contentDescription = "Add a recipe", modifier = Modifier.size(28.dp)) }
         }
     }
     if (adding) AddRecipeSheet(add, onDismiss = { adding = false }, hasKey = hasKey, lastBook = ui.lastBook)
-    forget?.let { row -> ForgetRecipeDialog(row, onConfirm = { library.onRemove(row) }, onDismiss = { forget = null }) }
-    addAgain?.let { row -> AddAgainDialog(row, onConfirm = { library.onAdd(row) }, onDismiss = { addAgain = null }) }
-    confirm?.let { use ->
+    ui.libraryRow(forget)?.let { row -> ForgetRecipeDialog(row, onConfirm = { library.onRemove(row) }, onDismiss = { forget = null }) }
+    ui.libraryRow(addAgain)?.let { row -> AddAgainDialog(row, onConfirm = { library.onAdd(row) }, onDismiss = { addAgain = null }) }
+    confirm?.let { id -> ui.uses.firstOrNull { it.useId == id } }?.let { use ->
         AlertDialog(
             onDismissRequest = { confirm = null },
             title = { Text("Remove ${use.title}?") },
@@ -326,10 +335,11 @@ private fun RecipeSearchBox(s: SearchBox) {
                 }
             },
             singleLine = true,
-            shape = RoundedCornerShape(50),
+            shape = PillShape,
+            colors = pillFieldColors(),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { s.onCommit() }),
-            modifier = Modifier.fillMaxWidth().testTag("recipe-search"),
+            modifier = Modifier.fillMaxWidth().fieldLift().testTag("recipe-search"),
         )
         if (s.chips.isNotEmpty()) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -370,6 +380,7 @@ private fun LibraryCard(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
+            .cardLift(MaterialTheme.shapes.large)
             .clip(MaterialTheme.shapes.large)
             .clickable(onClickLabel = "Show ingredients", onClick = onOpen)
             .testTag("lib-${row.key}"),
@@ -380,15 +391,16 @@ private fun LibraryCard(
             Modifier.padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // The recipe's hue as a badge, the same shape as an aisle badge.
             Box(
-                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Brand.tint(hue, dark)),
+                Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(Brand.tint(hue, dark)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     Icons.AutoMirrored.Rounded.MenuBook,
                     contentDescription = null,
                     tint = Brand.strong(hue, dark),
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(22.dp),
                 )
             }
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
@@ -439,7 +451,7 @@ private fun UseCard(
     val url = webLink(use.url)
     val open = rememberOpenLink()
     Surface(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("use-${use.useId}"),
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp).cardLift(MaterialTheme.shapes.large).testTag("use-${use.useId}"),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.card,
     ) {
@@ -533,13 +545,13 @@ private fun Fact(
     bg: Color,
     fg: Color,
 ) {
-    Surface(shape = RoundedCornerShape(50), color = bg) {
+    Surface(shape = PillShape, color = bg, contentColor = fg) {
         Row(
             Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(16.dp))
+            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
             Text(text, style = MaterialTheme.typography.labelLarge)
         }
     }

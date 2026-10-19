@@ -31,17 +31,31 @@ abstract class HyperShopDatabase : RoomDatabase() {
             "CREATE UNIQUE INDEX IF NOT EXISTS index_Item_mergeKey_live ON Item(mergeKey) WHERE deletedAt IS NULL"
 
         /**
+         * Every migration starts by dropping the live-key index. It isn't in Room's
+         * schema, and Room checks the tables after a migration, so an install that
+         * has been opened at the old version (onOpen made the index) would fail the
+         * check on Item with it still there. [CALLBACK]'s onOpen makes it again
+         * after the check (KNOWN_ISSUES #9). The RecipeUse triggers aren't checked.
+         */
+        private abstract class LiveKeyMigration(
+            from: Int,
+            to: Int,
+        ) : Migration(from, to) {
+            final override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP INDEX IF EXISTS index_Item_mergeKey_live")
+                migrateTables(db)
+            }
+
+            abstract fun migrateTables(db: SupportSQLiteDatabase)
+        }
+
+        /**
          * v2: the recipe library (Recipe.lastAddedAt, Recipe.libraryKey). Recipes already
          * on the list join it, dated by their latest use.
-         *
-         * The live-key index isn't in Room's schema, and Room checks the tables after a
-         * migration, so it is dropped here and made again in [CALLBACK]'s onOpen, which
-         * runs after the check (KNOWN_ISSUES #9). The RecipeUse triggers aren't checked.
          */
-        val MIGRATION_1_2 =
-            object : Migration(1, 2) {
-                override fun migrate(db: SupportSQLiteDatabase) {
-                    db.execSQL("DROP INDEX IF EXISTS index_Item_mergeKey_live")
+        val MIGRATION_1_2: Migration =
+            object : LiveKeyMigration(1, 2) {
+                override fun migrateTables(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE Recipe ADD COLUMN lastAddedAt INTEGER")
                     db.execSQL("ALTER TABLE Recipe ADD COLUMN libraryKey TEXT")
                     db.execSQL("CREATE INDEX IF NOT EXISTS index_Recipe_libraryKey ON Recipe(libraryKey)")
@@ -51,9 +65,9 @@ abstract class HyperShopDatabase : RoomDatabase() {
             }
 
         /** v3: a cookbook recipe's book and page. */
-        val MIGRATION_2_3 =
-            object : Migration(2, 3) {
-                override fun migrate(db: SupportSQLiteDatabase) {
+        val MIGRATION_2_3: Migration =
+            object : LiveKeyMigration(2, 3) {
+                override fun migrateTables(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE Recipe ADD COLUMN book TEXT")
                     db.execSQL("ALTER TABLE Recipe ADD COLUMN page TEXT")
                 }

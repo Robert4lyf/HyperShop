@@ -35,8 +35,19 @@ build size to the job summary, compiles the tests for the device, and uploads
 - **Release build size** (fr245, `--build-stats 0`, step 6.5 commit): code
   16.1 KB, data 2.5 KB, PRG 25 KB — about 14% of the 128 KB.
 - Glance: "14 left · Produce next", read from Storage `g`, which the app
-  writes whenever the list changes. Only `getGlanceView` and the glance view
+  writes when a snapshot is adopted or an item is ticked on the watch (not
+  per received page). Only `getGlanceView` and the glance view
   are `(:glance)`; the foreground entry points carry
   `(:typecheck(disableGlanceCheck))` because they build the link and screens.
 - Messages may be capped in the low hundreds of bytes (unverified; the
   payload probe in the debug build measures it at Hand-off B).
+- Storage: one value may take 32 KB, so the snapshot is stored as the aisles
+  (`sa`) plus the items 48 to a key (`si0`, `si1`, …), each tagged with its
+  listRev; see "Watch rules › Storage" in `docs/garmin-protocol.md`.
+- Screens keep the open aisle by *code*, not index: a snapshot can reorder or
+  drop aisles, and the aisle list takes over when the open one is gone.
+- Link retries: an unanswered hello backs off and is sent again (cached list
+  or not), and a hello goes out whenever `phoneConnected` turns true. On the
+  phone, `WatchLink.retry()` restarts the Connect IQ SDK after a failure or
+  shutdown; `ConnectIqWatchLink` calls it on every return to the foreground
+  while the SDK is down, and Settings › Watch can call it from a button.

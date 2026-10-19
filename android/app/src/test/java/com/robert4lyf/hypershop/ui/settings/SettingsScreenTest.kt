@@ -17,7 +17,9 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.testutil.Shots
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
+import com.robert4lyf.hypershop.watch.WatchLinkState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -30,6 +32,8 @@ private val UI =
         loaded = true,
         staples = listOf("olive oil", "pepper", "salt", "water"),
         aisles = AisleCode.entries.take(4),
+        watchStatus = "Watch not connected",
+        watchCanRetry = true,
         spentThisMonthUsd = 0.04,
         callsToday = 3,
     )
@@ -48,6 +52,7 @@ class SettingsScreenTest {
             onMoveAisleTo = { a, i -> events += "aisle $a to $i" },
             onResetAisles = { events += "reset aisles" },
             onWatchVibrate = { events += "vibrate $it" },
+            onWatchRetry = { events += "watch retry" },
             onSaveKey = { events += "key ${it.length}" },
             onRemoveKey = { events += "remove key" },
             onDebugLog = { events += "log $it" },
@@ -64,6 +69,8 @@ class SettingsScreenTest {
         compose.onNodeWithContentDescription("Remove salt").performClick()
         compose.onNodeWithContentDescription("Move ${AisleCode.entries[1].displayName} up").performClick()
         val list = compose.onNodeWithTag("settings")
+        list.performScrollToNode(hasTestTag("watch-retry"))
+        compose.onNodeWithTag("watch-retry").performClick()
         list.performScrollToNode(hasTestTag("key-field"))
         val field = compose.onNodeWithTag("key-field")
         assertTrue(field.fetchSemanticsNode().config.contains(SemanticsProperties.Password))
@@ -74,7 +81,7 @@ class SettingsScreenTest {
         compose.onNodeWithText("Spent this month: $0.04 of $2.00 · 3 of 50 calls today").assertExists()
         list.performScrollToNode(hasText("Show the debug log"))
         compose.onNodeWithText("Show the debug log").assertIsOff().performClick()
-        assertEquals(listOf("staple salt", "aisle ${AisleCode.entries[1]} -1", "key 6", "log true"), events)
+        assertEquals(listOf("staple salt", "aisle ${AisleCode.entries[1]} -1", "watch retry", "key 6", "log true"), events)
     }
 
     @Test
@@ -122,6 +129,15 @@ class SettingsScreenTest {
         compose.onNodeWithContentDescription("This month: $0.04 of $2.00").assertExists()
         compose.onNodeWithContentDescription("Today: 3 of 50 calls").assertExists()
         compose.onNodeWithText("Between $0 and $100").assertExists()
+    }
+
+    @Test
+    fun tryAgainOnlyWhileTheWatchIsDown() {
+        show(UI.copy(watchStatus = "Watch connected", watchCanRetry = false))
+        compose.onNodeWithTag("watch-retry").assertDoesNotExist()
+        assertTrue(watchCanRetry(WatchLinkState.DISCONNECTED, null))
+        assertTrue(watchCanRetry(WatchLinkState.CONNECTED, "The watch app didn't answer"))
+        assertFalse(watchCanRetry(WatchLinkState.APP_READY, null))
     }
 
     @Test

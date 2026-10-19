@@ -36,6 +36,8 @@ data class SettingsUi(
     val watchVibrate: Boolean = true,
     /** The watch link in words (Settings › Watch). */
     val watchStatus: String = "",
+    /** The link is down or reports a problem, so "Try again" is offered. */
+    val watchCanRetry: Boolean = false,
     val hasKey: Boolean = false,
     /** Saved before, missing now: it didn't survive a restore. */
     val keyMissingAfterRestore: Boolean = false,
@@ -97,7 +99,8 @@ class SettingsViewModel(
         watch(s.monthlyCapUsd) { copy(monthlyCapUsd = it) }
         watch(s.dailyCalls) { copy(dailyCalls = it) }
         watch(s.watchVibrate) { copy(watchVibrate = it) }
-        watch(combine(c.watchLink.state, c.watchLink.problem) { st, why -> watchStatus(st, why) }) { copy(watchStatus = it) }
+        val link = combine(c.watchLink.state, c.watchLink.problem) { st, why -> watchStatus(st, why) to watchCanRetry(st, why) }
+        watch(link) { (text, can) -> copy(watchStatus = text, watchCanRetry = can) }
         watch(s.debugLog) { copy(debugLog = it, logLines = if (it) c.log.snapshot().takeLast(LOG_LINES) else emptyList()) }
         watch(s.keyLostNotice) { copy(keyLost = it) }
         watch(s.keyWasSet) {
@@ -214,6 +217,9 @@ class SettingsViewModel(
 
     fun setWatchVibrate(on: Boolean) = viewModelScope.launch { c.settings.setWatchVibrate(on) }
 
+    /** "Try again": the link starts over from wherever it stopped. */
+    fun retryWatch() = c.watchLink.retry()
+
     // ---- Claude ----------------------------------------------------------------------------
 
     /** Saves the key and tests it straight away. */
@@ -309,6 +315,12 @@ internal fun cleanKey(text: String): String = text.replace(Regex("[\\s\\p{Cf}]")
 
 /** Printable ASCII only; anything else can't go in an HTTP header. */
 private val KEY_CHARS = Regex("[\\x21-\\x7e]+")
+
+/** Whether "Try again" is offered: the link is down, or up but reporting a problem. */
+fun watchCanRetry(
+    state: WatchLinkState,
+    problem: String?,
+): Boolean = problem != null || (state != WatchLinkState.CONNECTED && state != WatchLinkState.APP_READY)
 
 /** One line for Settings › Watch. */
 fun watchStatus(

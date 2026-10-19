@@ -14,9 +14,13 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import timber.log.Timber
 import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 import java.security.MessageDigest
 
 /** One ingredient as you edited or added it: it replaces the bundled entry with the same id. */
@@ -159,7 +163,12 @@ class IngredientLibrary(
         withContext(Dispatchers.IO) {
             file.parentFile?.mkdirs()
             val tmp = File(file.parentFile, file.name + ".tmp")
-            tmp.writeText(json.encodeToString(ListSerializer(EntryEdit.serializer()), next.values.sortedBy { it.id }))
+            // Flushed to disk before it takes the file's place: a rename alone can
+            // survive a power cut while the new contents don't, leaving an empty file.
+            FileOutputStream(tmp).use { out ->
+                out.write(json.encodeToString(ListSerializer(EntryEdit.serializer()), next.values.sortedBy { it.id }).toByteArray())
+                out.fd.sync()
+            }
             if (!tmp.renameTo(file)) {
                 file.delete()
                 tmp.renameTo(file)
@@ -170,11 +179,26 @@ class IngredientLibrary(
         _edits.value = next
     }
 
-    private fun read(): Map<String, EntryEdit> =
-        runCatching {
-            if (!file.exists()) return emptyMap()
-            json.decodeFromString(ListSerializer(EntryEdit.serializer()), file.readText()).associateBy { it.id }
-        }.getOrDefault(emptyMap())
+    /** At start-up, on the main thread (the file is small). Never throws: an unreadable library is an empty one. */
+    private fun read(): Map<String, EntryEdit> {
+        if (!file.exists()) return emptyMap()
+        val text =
+            try {
+                file.readText()
+            } catch (e: IOException) {
+                Timber.w(e, "Could not read the ingredient library")
+                return emptyMap()
+            }
+        return try {
+            json.decodeFromString(ListSerializer(EntryEdit.serializer()), text).associateBy { it.id }
+        } catch (e: SerializationException) {
+            // Kept aside rather than overwritten by the next save, so the edits aren't lost without a trace.
+            val kept = File(file.parentFile, file.name + ".corrupt")
+            val moved = file.renameTo(kept)
+            Timber.e(e, "Ingredient library unreadable; %s", if (moved) "kept as ${kept.name}" else "could not move it aside")
+            emptyMap()
+        }
+    }
 
     private fun apply(edits: Map<String, EntryEdit>) {
         val entries = base.entries.map { edits[it.id]?.toEntry() ?: it } + edits.values.filter { !isBundled(it.id) }.map { it.toEntry() }

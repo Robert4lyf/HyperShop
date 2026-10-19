@@ -23,14 +23,21 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SegmentedButtonColors
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SelectableChipColors
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -40,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -50,7 +58,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.ui.theme.Brand
+import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.theme.card
+import com.robert4lyf.hypershop.ui.theme.cardEdge
 import com.robert4lyf.hypershop.ui.theme.heroBrush
 import com.robert4lyf.hypershop.ui.theme.heroGlow
 import com.robert4lyf.hypershop.ui.theme.style
@@ -85,8 +95,21 @@ fun sectionPosition(
         else -> SectionPosition.MIDDLE
     }
 
-private val CARD = 24.dp
+private val CARD = 22.dp
 private val JOIN = 6.dp
+
+/**
+ * Lifts a standalone card off the page: a soft shadow in the light theme (the
+ * page is nearly white, so the edge needs it) and a hairline edge in both.
+ */
+@Composable
+fun Modifier.cardLift(shape: Shape = RoundedCornerShape(CARD)): Modifier {
+    val dark = LocalDarkTheme.current
+    val edge = MaterialTheme.colorScheme.cardEdge
+    return this
+        .shadow(if (dark) 0.dp else 2.dp, shape, clip = false, ambientColor = Color(0x1A1F3324), spotColor = Color(0x261F3324))
+        .border(1.dp, edge, shape)
+}
 
 fun SectionPosition.shape(): Shape =
     when (this) {
@@ -117,7 +140,7 @@ fun SectionCard(
     color: Color = MaterialTheme.colorScheme.card,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Surface(modifier.fillMaxWidth().padding(horizontal = 16.dp), shape = RoundedCornerShape(CARD), color = color) {
+    Surface(modifier.fillMaxWidth().padding(horizontal = 16.dp).cardLift(), shape = RoundedCornerShape(CARD), color = color) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
     }
 }
@@ -153,7 +176,7 @@ fun ScreenHeader(
         modifier
             .fillMaxWidth()
             .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
-            .clip(RoundedCornerShape(28.dp))
+            .clip(RoundedCornerShape(24.dp))
             .background(heroBrush)
             .heroGlow(),
     ) {
@@ -162,7 +185,8 @@ fun ScreenHeader(
                 Row(verticalAlignment = Alignment.Top) {
                     Column(Modifier.weight(1f).padding(top = 4.dp)) {
                         overline?.let {
-                            Text(it.uppercase(), style = MaterialTheme.typography.labelMedium, color = Brand.Citrus)
+                            // Soft white, not citrus: citrus only clears 3:1 on the brighter hero.
+                            Text(it.uppercase(), style = MaterialTheme.typography.labelMedium, color = Brand.OnHeroSoft)
                         }
                         Text(title, style = MaterialTheme.typography.headlineLarge, color = Brand.OnHero)
                         subtitle?.let {
@@ -187,7 +211,7 @@ fun HeroButton(
     Button(
         onClick = onClick,
         modifier = modifier,
-        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF0B6B3E)),
+        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF178040)),
         contentPadding = PaddingValues(horizontal = 14.dp),
         content = content,
     )
@@ -212,7 +236,8 @@ fun TickMark(
         },
         label = "tick",
     )
-    val ring = if (done || partial) color else MaterialTheme.colorScheme.outline
+    // An open tick is a green ring, not grey: it reads as "tap me" rather than as decoration.
+    val ring = if (done || partial) color else color.copy(alpha = 0.7f)
     Box(
         modifier.size(size).clip(CircleShape).background(fill).border(2.dp, ring, CircleShape),
         contentAlignment = Alignment.Center,
@@ -362,4 +387,66 @@ fun AmountField(
             ) { Text(button) }
         }
     }
+}
+
+/** The pill shape: the add and search fields, and the small counts on tinted headers. */
+val PillShape: Shape = RoundedCornerShape(50)
+
+/** A field's shadow alone (none in the dark theme): the field keeps its own edge, so its floating label still cuts a gap in it. */
+@Composable
+fun Modifier.fieldLift(shape: Shape = PillShape): Modifier {
+    val dark = LocalDarkTheme.current
+    return shadow(if (dark) 0.dp else 2.dp, shape, clip = false, ambientColor = Color(0x1A1F3324), spotColor = Color(0x261F3324))
+}
+
+/** A field drawn as a white pill: the card colour inside, a hairline edge ([cardEdge]), basil once focused. Pair with [fieldLift]. */
+@Composable
+fun pillFieldColors(): TextFieldColors =
+    OutlinedTextFieldDefaults.colors(
+        unfocusedContainerColor = MaterialTheme.colorScheme.card,
+        focusedContainerColor = MaterialTheme.colorScheme.card,
+        unfocusedBorderColor = MaterialTheme.colorScheme.cardEdge,
+        focusedBorderColor = MaterialTheme.colorScheme.primary,
+    )
+
+/** A filter chip's selected state in basil (primaryContainer), the same on every screen. */
+@Composable
+fun basilChipColors(): SelectableChipColors =
+    FilterChipDefaults.filterChipColors(
+        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    )
+
+/** A segmented button's selected state in basil (primaryContainer). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun basilSegmentedColors(): SegmentedButtonColors =
+    SegmentedButtonDefaults.colors(
+        activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+        activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    )
+
+/** A small count or status on a tinted header ("3 left"): a white pill (the lowest surface) with [color] text. */
+@Composable
+fun CountPill(
+    text: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text,
+        modifier
+            .clip(PillShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .padding(horizontal = 10.dp, vertical = 3.dp),
+        style = MaterialTheme.typography.labelMedium,
+        color = color,
+    )
+}
+
+/** A hairline divider in the card edge colour. */
+@Composable
+fun EdgeDivider(modifier: Modifier = Modifier) {
+    HorizontalDivider(modifier, color = MaterialTheme.colorScheme.cardEdge)
 }

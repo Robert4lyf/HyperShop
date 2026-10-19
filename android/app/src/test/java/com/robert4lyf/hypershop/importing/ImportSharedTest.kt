@@ -5,6 +5,7 @@ import com.robert4lyf.hypershop.di.ShareOutcome
 import com.robert4lyf.hypershop.testutil.TestContainer
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -19,16 +20,22 @@ class ImportSharedTest {
         runBlocking {
             val c = TestContainer.create()
             assertNull(c.importShared("just some words", "Subject"))
-            assertEquals(ShareOutcome.NoLink, c.shares.value)
+            val first = c.shares.value as ShareOutcome.NoLink
+            // Two "no link" shares in a row are two notices, not one (a StateFlow drops an equal value).
+            assertNull(c.importShared("more words", null))
+            c.shareHandled(first)
+            val second = c.shares.value as ShareOutcome.NoLink
+            assertNotEquals(first, second)
+            c.shareHandled(second)
+            assertNull(c.shares.value)
             val id = c.importShared("Lasagne https://recipes.example/lasagne?utm_source=ig&serves=4", "Best lasagne")!!
-            // Not shown until the UI has dealt with the one before it.
-            assertEquals(ShareOutcome.NoLink, c.shares.value)
-            c.shareHandled(ShareOutcome.NoLink)
-            assertEquals(ShareOutcome.Review(id), c.shares.value)
             val job = c.importJobs.get(id)!!
             assertEquals(ImportInput("https://recipes.example/lasagne?serves=4", "Best lasagne"), job.input)
-            c.shareHandled(ShareOutcome.Review(id))
-            assertNull(c.shares.value)
+            // Waits in the container (not the UI) until its review opens.
+            val next = c.importShared("https://recipes.example/soup", null)!!
+            assertEquals(listOf(id, next), c.pendingReviews.value)
+            c.reviewOpened(id)
+            assertEquals(listOf(next), c.pendingReviews.value)
         }
 
     @Test
@@ -36,7 +43,7 @@ class ImportSharedTest {
         runBlocking {
             val c = TestContainer.create()
             val id = c.importShared("2 eggs\n100 g plain flour\n300 ml milk", "Pancakes")!!
-            assertEquals(ShareOutcome.Review(id), c.shares.value)
+            assertEquals(listOf(id), c.pendingReviews.value)
             val job = c.importJobs.get(id)!!
             assertEquals(JobState.READY, job.state)
             assertEquals("Pancakes", job.result!!.title)

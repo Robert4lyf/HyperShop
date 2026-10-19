@@ -388,7 +388,8 @@ class ListRepository(
 
     /**
      * What you marked in stock for the recipes on the list ([usesOnList]'s
-     * recipes), line by line: one query for the decisions, one per recipe.
+     * recipes), line by line: one query for the decisions, one for the recipes
+     * and one for their lines (chunked), each line parsed once.
      */
     suspend fun inStockOnList(l: ShoppingList): List<InStockLine> {
         val live = l.liveItems.map { it.id }.toSet()
@@ -402,15 +403,23 @@ class ListRepository(
                 .filter { it.status == LineStatus.IN_STOCK.name }
                 .groupBy({ it.useId }, { it.recipeLineId })
         if (inStock.isEmpty()) return emptyList()
-        val recipes = recipesById(uses.mapNotNull { it.recipeId })
+        val withInStock = uses.filter { it.id in inStock }
+        val recipes = recipesById(withInStock.mapNotNull { it.recipeId })
         val ov = overrides()
         // A line already on the list ("Add the in-stock items now", "Need it") isn't in stock any more.
         val onList = l.contributions.filter { it.itemId in live }.mapNotNull { it.recipeLineId }.toSet()
-        return uses.sortedBy { it.addedAt }.flatMap { u ->
-            val ids = inStock[u.id]?.toSet()?.minus(onList) ?: return@flatMap emptyList()
+        val wanted = inStock.values.flatten().toSet() - onList
+        val rows = recipes.keys.toList().chunked(MAX_ARGS).flatMap { dao.linesFor(it) }.filter { it.id in wanted }.groupBy { it.recipeId }
+        // Two uses of one recipe share its parsed lines.
+        val parsedByRecipe = HashMap<Long, List<Pair<Long, ParsedIngredient>>>()
+        return withInStock.sortedBy { it.addedAt }.flatMap { u ->
+            val ids = inStock.getValue(u.id).toSet() - onList
             val r = recipes[u.recipeId] ?: return@flatMap emptyList()
             val parsed =
-                dao.lines(r.id).filter { it.id in ids }.map { it.id to json.decodeFromString(ParsedIngredient.serializer(), it.parsedJson) }
+                parsedByRecipe.getOrPut(r.id) {
+                    rows[r.id].orEmpty().map { it.id to json.decodeFromString(ParsedIngredient.serializer(), it.parsedJson) }
+                }.filter { it.first in ids }
+            if (parsed.isEmpty()) return@flatMap emptyList()
             val locale = UnitLocale.valueOf(r.unitLocale)
             val inc = merger.incoming(r.id, r.servingsOriginal, u.servings, locale, parsed, ov)
             inc.lines.map { line ->
@@ -618,13 +627,28 @@ class ListRepository(
             UseRemoval(removed, decisions)
         }
 
-    /** Undo of [removeUse]. False when the use was back already. */
+    /**
+     * Undo of [removeUse]. False when the use was back already, or its recipe copy
+     * has gone meanwhile (the start-up purge; a use must have its recipe).
+     */
     suspend fun restoreUse(r: UseRemoval): Boolean =
         db.withTransaction {
+            val recipeId = r.removed.use.recipeId
+            if (recipeId != null && dao.recipe(recipeId) == null) return@withTransaction false
             val old = load()
-            val next = old.restoreUse(r.removed) ?: return@withTransaction false
+            var next = old.restoreUse(r.removed) ?: return@withTransaction false
+            // An item that came back under a key the catalogue has since moved on from
+            // (an ingredient edit) joins the item now at the new key, or takes it.
+            for (item in r.removed.items) {
+                val restored = next.items[item.id] ?: continue
+                if (restored.normName.isEmpty()) continue
+                val target = merger.target(restored.normName, null, overrides())
+                if (target.mergeKey != restored.mergeKey) next = next.swapItem(item.id, target) ?: next
+            }
             persist(old, next)
-            dao.putDecisions(r.decisions)
+            // Only decisions of lines the copy still has: a decision's line is a foreign key.
+            val lines = recipeId?.let { id -> dao.lines(id).map { it.id }.toSet() }.orEmpty()
+            dao.putDecisions(r.decisions.filter { it.recipeLineId in lines })
             true
         }
 
@@ -719,16 +743,21 @@ class ListRepository(
             l.swapItem(item.id, target)?.let { it to target.displayName }
         }
 
-    /** Purges soft deletes older than 7 days, and recipes forgotten from the library that nothing uses. */
+    /**
+     * Purges soft deletes older than 7 days, and recipes forgotten from the library
+     * that nothing uses, imported more than 7 days ago (a newer one may be a review
+     * still open, or restored after process death).
+     */
     suspend fun purgeDeleted() =
         db.withTransaction {
-            val ids = dao.deletedBefore(clock() - ShoppingList.SEVEN_DAYS)
+            val before = clock() - ShoppingList.SEVEN_DAYS
+            val ids = dao.deletedBefore(before)
             if (ids.isNotEmpty()) {
                 val old = load()
                 persist(old, old.copy(items = old.items - ids.toSet(), contributions = old.contributions.filter { it.itemId !in ids }))
                 dao.undelete(ids)
             }
-            dao.deleteForgottenRecipes()
+            dao.deleteForgottenRecipes(before)
         }
 
     /** Move to another aisle; "Always put X in Y?" yes → a user override. */
@@ -750,13 +779,18 @@ class ListRepository(
 
     // ---- catalogue re-key (5.2d) ---------------------------------------------------------
 
-    /** Run when the catalogue version changed. Overrides you set win over seeded ones. */
+    /**
+     * Run when the catalogue version changed. Overrides you set win over seeded ones.
+     * One snapshot of the catalogue throughout: an ingredient edit saved meanwhile
+     * swaps the live one, and Meta must name the version the list was re-keyed with.
+     */
     suspend fun rekeyIfCatalogChanged(): Boolean =
         db.withTransaction {
+            val snap = catalog.copy()
             val meta = dao.meta()!!
-            if (meta.catalogVersion == catalog.version) return@withTransaction false
+            if (meta.catalogVersion == snap.version) return@withTransaction false
             val old = load()
-            val r = Rekey.rekey(old, normaliser)
+            val r = Rekey.rekey(old, Normaliser(snap))
             // Every live item: a row's text can change with the catalogue (pack sizes,
             // densities) even when its key doesn't.
             persist(old, r.list.catalogueChanged())
@@ -774,7 +808,7 @@ class ListRepository(
                 if (existing == null || (existing.source != "USER" && st.source == "USER")) dao.putStaple(st.copy(key = to))
                 dao.deleteStaple(from)
             }
-            dao.putMeta(dao.meta()!!.copy(catalogVersion = catalog.version))
+            dao.putMeta(dao.meta()!!.copy(catalogVersion = snap.version))
             true
         }
 
@@ -902,6 +936,18 @@ class ListRepository(
         }
 
     suspend fun listEpoch(): Long = dao.meta()!!.listEpoch
+
+    /** The epoch and listRev together, from one Meta read (the watch bridge's ack-only reply needs nothing else). */
+    suspend fun epochAndRev(): Pair<Long, Long> = dao.meta()!!.let { it.listEpoch to it.listRev }
+
+    /** Every listRev change, without loading the list: for a subscriber that only needs to know "something changed". */
+    fun observeListRev(): Flow<Long> = dao.observeListRev().filterNotNull().distinctUntilChanged()
+
+    /** The watch install last recorded, so a push after the phone process restarted need not wait for the watch to speak. */
+    suspend fun lastInstall(): Int? = dao.lastInstall()
+
+    /** Import jobs long finished (reviewed, cancelled or failed) go: their result text is the page, tens of KB each. */
+    suspend fun purgeOldJobs(before: Long) = dao.deleteFinishedJobsBefore(before)
 
     companion object {
         const val RESULT_HISTORY = 64

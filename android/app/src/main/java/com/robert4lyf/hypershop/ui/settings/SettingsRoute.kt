@@ -3,6 +3,7 @@ package com.robert4lyf.hypershop.ui.settings
 import android.app.Activity
 import android.content.ClipboardManager
 import android.view.WindowManager
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -49,7 +50,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -99,13 +99,18 @@ import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.settings.ThemeMode
 import com.robert4lyf.hypershop.ui.common.AisleBadge
+import com.robert4lyf.hypershop.ui.common.EdgeDivider
 import com.robert4lyf.hypershop.ui.common.InfoBanner
+import com.robert4lyf.hypershop.ui.common.PillShape
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
 import com.robert4lyf.hypershop.ui.common.SectionCard
+import com.robert4lyf.hypershop.ui.common.SectionLabel
 import com.robert4lyf.hypershop.ui.common.Tone
+import com.robert4lyf.hypershop.ui.common.basilSegmentedColors
 import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
+import com.robert4lyf.hypershop.ui.theme.cardEdge
 import com.robert4lyf.hypershop.ui.util.factoryFor
 import java.util.Locale
 
@@ -118,6 +123,8 @@ data class SettingsActions(
     val onMoveAisleTo: (AisleCode, Int) -> Unit = { _, _ -> },
     val onResetAisles: () -> Unit = {},
     val onWatchVibrate: (Boolean) -> Unit = {},
+    /** "Try again" under the watch status, offered while the link is down. */
+    val onWatchRetry: () -> Unit = {},
     val onSaveKey: (String) -> Unit = {},
     val onTestKey: () -> Unit = {},
     val onRemoveKey: () -> Unit = {},
@@ -158,6 +165,7 @@ fun SettingsRoute(
             onMoveAisleTo = { a, i -> vm.moveAisleTo(a, i) },
             onResetAisles = { vm.resetAisleOrder() },
             onWatchVibrate = { vm.setWatchVibrate(it) },
+            onWatchRetry = { vm.retryWatch() },
             onSaveKey = { vm.saveKey(it) },
             onTestKey = { vm.testKey() },
             onRemoveKey = { vm.removeKey() },
@@ -207,9 +215,9 @@ fun SettingsScreen(
                 card("Watch", Icons.Rounded.Watch, hue = 205f) { WatchGroup(ui, actions) }
                 card("Claude", Icons.Rounded.AutoAwesome, hue = 265f) {
                     KeySection(ui, actions)
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    EdgeDivider()
                     ModelSection(ui, actions)
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    EdgeDivider()
                     CapsSection(ui, actions)
                 }
                 card("Advanced", Icons.Rounded.Code, hue = 180f) { AdvancedGroup(ui, actions) }
@@ -298,13 +306,14 @@ private fun AppearanceGroup(
     ui: SettingsUi,
     actions: SettingsActions,
 ) {
-    Text("Theme", style = MaterialTheme.typography.bodyLarge)
+    SectionLabel("Theme")
     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().testTag("theme")) {
         THEME_LABELS.forEachIndexed { i, (t, label) ->
             SegmentedButton(
                 selected = ui.theme == t,
                 onClick = { actions.onTheme(t) },
                 shape = SegmentedButtonDefaults.itemShape(i, THEME_LABELS.size),
+                colors = basilSegmentedColors(),
             ) { Text(label) }
         }
     }
@@ -316,18 +325,19 @@ private fun ListGroup(
     ui: SettingsUi,
     actions: SettingsActions,
 ) {
-    Text("Units", style = MaterialTheme.typography.bodyLarge)
+    SectionLabel("Units")
     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
         UNIT_LABELS.forEachIndexed { i, (u, label) ->
             SegmentedButton(
                 selected = ui.units == u,
                 onClick = { actions.onUnits(u) },
                 shape = SegmentedButtonDefaults.itemShape(i, UNIT_LABELS.size),
+                colors = basilSegmentedColors(),
             ) { Text(label) }
         }
     }
     Spacer(Modifier.height(4.dp))
-    Text("Always in stock", style = MaterialTheme.typography.bodyLarge)
+    SectionLabel("Always in stock")
     if (ui.staples.isEmpty()) {
         Hint("None")
     } else {
@@ -343,9 +353,11 @@ private fun StapleChip(
     name: String,
     onRemove: () -> Unit,
 ) {
+    // A soft green, not grey: these are live settings, not disabled chips.
     Surface(
-        shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        shape = PillShape,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 14.dp)) {
             Text(name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelLarge)
@@ -361,12 +373,13 @@ private fun AislesGroup(
     ui: SettingsUi,
     actions: SettingsActions,
 ) {
-    var confirmReset by remember { mutableStateOf(false) }
-    Column {
+    var confirmReset by rememberSaveable { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         ui.aisles.forEachIndexed { i, a ->
-            Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
-                AisleBadge(a, size = 32.dp)
-                Text(a.displayName, Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.bodyLarge)
+            // One badge size and one column, so the names line up down the card.
+            Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
+                AisleBadge(a, size = 48.dp)
+                Text(a.displayName, Modifier.weight(1f).padding(start = 14.dp), style = MaterialTheme.typography.bodyLarge)
                 IconButton(onClick = { actions.onMoveAisle(a, -1) }, enabled = i > 0) {
                     Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "Move ${a.displayName} up")
                 }
@@ -412,6 +425,9 @@ private fun WatchGroup(
     actions: SettingsActions,
 ) {
     InfoBanner(ui.watchStatus, Icons.Rounded.Watch, Modifier.testTag("watch-status"))
+    if (ui.watchCanRetry) {
+        TextButton(onClick = actions.onWatchRetry, modifier = Modifier.testTag("watch-retry")) { Text("Try again") }
+    }
 }
 
 @Composable
@@ -419,7 +435,7 @@ private fun KeySection(
     ui: SettingsUi,
     actions: SettingsActions,
 ) {
-    var confirmRemove by remember { mutableStateOf(false) }
+    var confirmRemove by rememberSaveable { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (ui.keyMissingAfterRestore) {
             InfoBanner(
@@ -468,7 +484,7 @@ private fun KeySection(
                         clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()?.let { key = it.trim() }
                     }, modifier = Modifier.testTag("key-paste")) { Icon(Icons.Rounded.ContentPaste, contentDescription = "Paste") }
                 },
-                shape = RoundedCornerShape(16.dp),
+                shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.fillMaxWidth().testTag("key-field"),
             )
             Button(
@@ -528,7 +544,7 @@ private fun ModelSection(
     actions: SettingsActions,
 ) {
     Column {
-        Text("Model", style = MaterialTheme.typography.bodyLarge)
+        SectionLabel("Model")
         for (m in ClaudeModel.entries) {
             Row(
                 Modifier
@@ -553,7 +569,7 @@ private fun CapsSection(
     actions: SettingsActions,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Spending", style = MaterialTheme.typography.bodyLarge)
+        SectionLabel("Spending")
         Text(
             "Spent this month: ${usd(ui.spentThisMonthUsd)} of ${usd(ui.monthlyCapUsd)} · " +
                 "${ui.callsToday} of ${ui.dailyCalls} calls today",
@@ -603,11 +619,13 @@ private fun Meter(
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        // Basil on its own container; tomato once the cap is near.
+        val near = fraction >= 0.9f
         LinearProgressIndicator(
             progress = { fraction.coerceIn(0f, 1f) },
             modifier = Modifier.weight(1f).height(8.dp),
-            color = if (fraction >= 0.9f) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
-            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            color = if (near) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+            trackColor = if (near) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.primaryContainer,
             strokeCap = StrokeCap.Round,
             gapSize = 4.dp,
             drawStopIndicator = {},
@@ -640,7 +658,7 @@ private fun CapField(
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = keyboard, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { set() }),
-            shape = RoundedCornerShape(16.dp),
+            shape = MaterialTheme.shapes.medium,
             modifier = Modifier.weight(1f).testTag(tag),
         )
         FilledTonalButton(onClick = set, enabled = text != current) { Text("Set") }
@@ -662,7 +680,11 @@ private fun AdvancedGroup(
     SwitchRow("Show the debug log", ui.debugLog, actions.onDebugLog)
     if (ui.debugLog) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest) {
+            Surface(
+                shape = MaterialTheme.shapes.small,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.cardEdge),
+            ) {
                 Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     if (ui.logLines.isEmpty()) Text("Nothing logged yet", style = MaterialTheme.typography.bodySmall)
                     for (l in ui.logLines) Text(l, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)

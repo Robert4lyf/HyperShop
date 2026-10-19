@@ -61,6 +61,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import com.robert4lyf.hypershop.ui.common.cardLift
 import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.theme.card
@@ -168,6 +169,7 @@ private fun Choice(
     Surface(
         Modifier
             .fillMaxWidth()
+            .cardLift(MaterialTheme.shapes.large)
             .clip(MaterialTheme.shapes.large)
             .clickable(role = Role.Button, onClick = onClick)
             .testTag(tag),
@@ -264,6 +266,7 @@ private fun PhotoForm(
             onValueChange = { book = it },
             label = { Text("Book (optional)") },
             singleLine = true,
+            shape = MaterialTheme.shapes.medium,
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
             modifier = Modifier.weight(1f).testTag("photo-book"),
         )
@@ -272,6 +275,7 @@ private fun PhotoForm(
             onValueChange = { page = it.take(20) },
             label = { Text("Page") },
             singleLine = true,
+            shape = MaterialTheme.shapes.medium,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
             modifier = Modifier.width(96.dp).testTag("photo-page"),
         )

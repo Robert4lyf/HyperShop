@@ -40,34 +40,35 @@ private data class Hue(
 /** Exhaustive, so a new [AisleCode] doesn't compile until it has a style. */
 private fun AisleCode.hue(): Hue =
     when (this) {
-        AisleCode.PRODUCE -> Hue(Icons.Rounded.Eco, 128f, 0.55f)
-        AisleCode.BAKERY -> Hue(Icons.Rounded.BakeryDining, 34f, 0.70f)
-        AisleCode.MEAT_FISH -> Hue(Icons.Rounded.SetMeal, 356f, 0.60f)
-        AisleCode.DAIRY_EGGS -> Hue(Icons.Rounded.Egg, 46f, 0.75f)
-        AisleCode.CHILLED -> Hue(Icons.Rounded.Kitchen, 192f, 0.55f)
-        AisleCode.FROZEN -> Hue(Icons.Rounded.AcUnit, 210f, 0.65f)
-        AisleCode.TINS_JARS -> Hue(Icons.Rounded.Inventory2, 18f, 0.60f)
-        AisleCode.PASTA_RICE_GRAINS -> Hue(Icons.Rounded.RiceBowl, 40f, 0.55f)
-        AisleCode.WORLD_FOODS -> Hue(Icons.Rounded.Public, 268f, 0.45f)
-        AisleCode.BAKING -> Hue(Icons.Rounded.Cake, 330f, 0.55f)
-        AisleCode.NUTS_DRIED_FRUIT -> Hue(Icons.Rounded.Grain, 28f, 0.35f)
-        AisleCode.OILS_VINEGARS -> Hue(Icons.Rounded.WaterDrop, 68f, 0.50f)
-        AisleCode.SPICES_CONDIMENTS -> Hue(Icons.Rounded.Whatshot, 10f, 0.70f)
-        AisleCode.FREE_FROM -> Hue(Icons.Rounded.NoFood, 168f, 0.45f)
-        AisleCode.DRINKS -> Hue(Icons.Rounded.LocalDrink, 228f, 0.50f)
-        AisleCode.HOUSEHOLD -> Hue(Icons.Rounded.CleaningServices, 200f, 0.15f)
-        AisleCode.OTHER -> Hue(Icons.Rounded.Category, 120f, 0.05f)
+        AisleCode.PRODUCE -> Hue(Icons.Rounded.Eco, 128f, 0.60f)
+        AisleCode.BAKERY -> Hue(Icons.Rounded.BakeryDining, 34f, 0.75f)
+        AisleCode.MEAT_FISH -> Hue(Icons.Rounded.SetMeal, 356f, 0.65f)
+        AisleCode.DAIRY_EGGS -> Hue(Icons.Rounded.Egg, 46f, 0.80f)
+        AisleCode.CHILLED -> Hue(Icons.Rounded.Kitchen, 192f, 0.60f)
+        AisleCode.FROZEN -> Hue(Icons.Rounded.AcUnit, 210f, 0.70f)
+        AisleCode.TINS_JARS -> Hue(Icons.Rounded.Inventory2, 18f, 0.65f)
+        AisleCode.PASTA_RICE_GRAINS -> Hue(Icons.Rounded.RiceBowl, 40f, 0.60f)
+        AisleCode.WORLD_FOODS -> Hue(Icons.Rounded.Public, 268f, 0.50f)
+        AisleCode.BAKING -> Hue(Icons.Rounded.Cake, 330f, 0.60f)
+        AisleCode.NUTS_DRIED_FRUIT -> Hue(Icons.Rounded.Grain, 28f, 0.40f)
+        AisleCode.OILS_VINEGARS -> Hue(Icons.Rounded.WaterDrop, 68f, 0.55f)
+        AisleCode.SPICES_CONDIMENTS -> Hue(Icons.Rounded.Whatshot, 10f, 0.75f)
+        AisleCode.FREE_FROM -> Hue(Icons.Rounded.NoFood, 168f, 0.50f)
+        AisleCode.DRINKS -> Hue(Icons.Rounded.LocalDrink, 228f, 0.55f)
+        AisleCode.HOUSEHOLD -> Hue(Icons.Rounded.CleaningServices, 200f, 0.18f)
+        AisleCode.OTHER -> Hue(Icons.Rounded.Category, 120f, 0.06f)
     }
 
 private val LIGHT =
     AisleCode.entries.associateWith { a ->
         a.hue().let {
-            AisleStyle(it.icon, Color.hsl(it.hue, it.saturation, 0.90f), Color.hsl(it.hue, it.saturation, 0.28f))
+            // A lighter tint and a slightly brighter mark than the first pass; the mark clears 4.5:1 on the tint.
+            AisleStyle(it.icon, Color.hsl(it.hue, it.saturation, 0.93f), Color.hsl(it.hue, it.saturation, 0.30f))
         }
     }
 private val DARK =
     AisleCode.entries.associateWith { a ->
-        a.hue().let { AisleStyle(it.icon, Color.hsl(it.hue, it.saturation * 0.45f, 0.22f), Color.hsl(it.hue, it.saturation, 0.80f)) }
+        a.hue().let { AisleStyle(it.icon, Color.hsl(it.hue, it.saturation * 0.45f, 0.24f), Color.hsl(it.hue, it.saturation, 0.80f)) }
     }
 
 /** The aisle's style in the current theme (computed once per theme, not per row). */

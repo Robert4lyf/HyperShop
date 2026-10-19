@@ -87,8 +87,15 @@ Every change bumps `listRev` and the item's `rev`.
   so assigned seqs are always a contiguous prefix of the outbox.
 - **Seqs.** Assigned when an op is first put in a batch; `nextSeq` is written
   to Storage before sending and never reset (not even by an epoch change).
+  When Storage refuses the write, the cached snapshot is removed from Storage
+  to make room and the write tried once more; if it still fails the batch is
+  not sent at all, the seqs are taken back, and the watch says "Watch storage
+  full" (a restart would otherwise reuse a seq, which the phone drops as a
+  duplicate).
 - **Sending.** One batch (≤ 8, or the measured limit) in flight. No reply →
-  back off 5 s → 15 s → 60 s and resend from `ackedThrough + 1`. Flush on
+  back off 5 s → 15 s → 60 s and resend from `ackedThrough + 1`. An
+  unanswered `hello` is retried the same way, cached list or not, and a
+  `hello` is sent whenever `phoneConnected` goes false → true. Flush on
   `onStop`. Outbox full → ticking blocked ("Sync with phone").
 - **Acks.** Any reply ends the in-flight batch. Ops with `seq ≤ at` leave the
   outbox; results come from `ax` (default `ok`): `partial` → "1 more",
@@ -104,6 +111,20 @@ Every change bumps `listRev` and the item's `rev`.
   seqs on the phone (phone rule 1), so go-back-N never waits on a seq that will
   not come.
 - **View.** Snapshot, then acked-`ok` ops not yet in a snapshot, then the outbox.
+- **Storage.** `m` meta `[installId, epoch, listRev, ackedThrough, more,
+  hasSnapshot, itemKeys]`, `o` `[nextSeq, outbox, settled]`, `sa`
+  `[listRev, aisles]`, `si0`, `si1`, … `[listRev, 48 items each]` (a value
+  may take 32 KB; a snapshot at a raised cap could not fit one). A part whose
+  `listRev` is not the meta's voids the whole snapshot on reload. An empty
+  list reloads as a snapshot (`hasSnapshot` is stored, not inferred).
+
+## Phone pushes
+
+The coordinator observes `listRev` alone (no list load until a watch is
+`APP_READY` and the push is due) and pushes to the install that spoke last,
+or, after the phone process restarted, to the last install the `WatchInstall`
+table holds (`ListRepository.lastInstall()`): neither side has to speak
+first. Ack-only replies read `epochAndRev()` rather than the list.
 
 ## Payload size and paging
 

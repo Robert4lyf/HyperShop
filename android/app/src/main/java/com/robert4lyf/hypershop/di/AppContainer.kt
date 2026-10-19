@@ -21,6 +21,7 @@ import com.robert4lyf.hypershop.extract.SafeFetcher
 import com.robert4lyf.hypershop.importing.HyperShopWorkerFactory
 import com.robert4lyf.hypershop.importing.ImportInput
 import com.robert4lyf.hypershop.importing.ImportJobs
+import com.robert4lyf.hypershop.importing.ImportResult
 import com.robert4lyf.hypershop.importing.Importer
 import com.robert4lyf.hypershop.importing.ReviewGate
 import com.robert4lyf.hypershop.importing.SharedText
@@ -33,10 +34,13 @@ import com.robert4lyf.hypershop.watch.WatchLink
 import com.robert4lyf.hypershop.watch.WatchSyncCoordinator
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.io.File
@@ -49,7 +53,10 @@ sealed interface ShareOutcome {
         val jobId: Long,
     ) : ShareOutcome
 
-    data object NoLink : ShareOutcome
+    /** [seq] tells two "no link" shares in a row apart (a StateFlow drops an equal value). */
+    data class NoLink(
+        val seq: Long,
+    ) : ShareOutcome
 }
 
 /**
@@ -126,12 +133,28 @@ class AppContainer(
         )
 
     /**
-     * The share or paste waiting for the UI: a job to review, or "no link". One at
-     * a time: the UI calls [shareHandled] once it has acted on it, and the next
-     * share that arrived meanwhile (two quick shares) takes its place.
+     * Shares waiting for their review, in order. Held here, not in the UI, so a
+     * rotation loses none; the UI opens the head when no review is showing and
+     * then calls [reviewOpened].
+     */
+    val pendingReviews = MutableStateFlow<List<Long>>(emptyList())
+
+    fun queueReview(jobId: Long) {
+        pendingReviews.update { if (jobId in it) it else it + jobId }
+    }
+
+    fun reviewOpened(jobId: Long) {
+        pendingReviews.update { it - jobId }
+    }
+
+    /**
+     * A share's outcome the UI has to show: "no link", or (from the debug screen)
+     * a job to review. One at a time: the UI calls [shareHandled] once it has
+     * acted on it, and the next that arrived meanwhile takes its place.
      */
     val shares = MutableStateFlow<ShareOutcome?>(null)
     private val waitingShares = ArrayDeque<ShareOutcome>()
+    private var shareSeq = 0L
 
     private fun offer(outcome: ShareOutcome) {
         synchronized(waitingShares) { if (!shares.compareAndSet(null, outcome)) waitingShares.addLast(outcome) }
@@ -143,6 +166,25 @@ class AppContainer(
             if (shares.compareAndSet(outcome, null)) waitingShares.removeFirstOrNull()?.let { shares.value = it }
         }
     }
+
+    /** Claude parses in flight, by job: a review reopened mid-call joins it rather than paying for a second. */
+    private val parsesInFlight = HashMap<Long, Deferred<ImportResult>>()
+
+    /**
+     * Runs [parse] in [applicationScope] (leaving the screen mid-call still records
+     * the usage and keeps the answer), unless one is already running for [jobId],
+     * which is returned instead. Cancelling a waiter never cancels the call.
+     */
+    fun claudeParse(
+        jobId: Long,
+        parse: suspend () -> ImportResult,
+    ): Deferred<ImportResult> =
+        synchronized(parsesInFlight) {
+            parsesInFlight[jobId]?.takeIf { it.isActive } ?: applicationScope.async { parse() }.also { d ->
+                parsesInFlight[jobId] = d
+                d.invokeOnCompletion { synchronized(parsesInFlight) { if (parsesInFlight[jobId] === d) parsesInFlight.remove(jobId) } }
+            }
+        }
 
     /**
      * A share or a paste: queue the import, or say there was no link. Text with no
@@ -160,14 +202,14 @@ class AppContainer(
             } else {
                 val lines = SharedText.lines(text)
                 if (lines == null) {
-                    offer(ShareOutcome.NoLink)
+                    offer(ShareOutcome.NoLink(synchronized(waitingShares) { ++shareSeq }))
                     return null
                 }
                 val title = subject?.trim()?.takeIf { it.isNotEmpty() }
                 val parsed = importer.fromLines(lines, title, allowClaude = false, model = settings.model.first())
                 importJobs.enqueueReady(ImportInput("", title), parsed)
             }
-        offer(ShareOutcome.Review(id))
+        queueReview(id)
         return id
     }
 
@@ -200,9 +242,16 @@ class AppContainer(
             repository.checkEpoch(marker)
             repository.rekeyIfCatalogChanged()
             repository.purgeDeleted()
+            importJobs.finishDiscards()
+            repository.purgeOldJobs(clock() - JOB_KEEP_MS)
         }
         // The receiver first, so nothing the link hears is missed.
         watchSync.start()
         watchLink.start()
+    }
+
+    companion object {
+        /** Finished and failed jobs are purged after this. */
+        private const val JOB_KEEP_MS = 7 * 24 * 60 * 60 * 1000L
     }
 }

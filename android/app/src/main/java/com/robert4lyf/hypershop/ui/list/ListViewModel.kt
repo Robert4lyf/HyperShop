@@ -3,6 +3,7 @@ package com.robert4lyf.hypershop.ui.list
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.robert4lyf.hypershop.catalog.EntryEdit
+import com.robert4lyf.hypershop.core.catalog.CatalogEntry
 import com.robert4lyf.hypershop.core.catalog.DisplayPolicy
 import com.robert4lyf.hypershop.core.merge.Display
 import com.robert4lyf.hypershop.core.merge.ShoppingList
@@ -284,8 +285,8 @@ class ListViewModel(
     fun openItem(id: Long): Job {
         openJob?.cancel()
         return viewModelScope.launch {
-            // The list on screen; a read only when the item isn't in it yet.
-            val list = lastList.takeIf { id in it.items } ?: c.repository.snapshot()
+            // Read, not the list on screen: a tap right after a tick would otherwise show the sheet as still open.
+            val list = c.repository.snapshot()
             val item = list.items[id] ?: return@launch
             val entry = item.catalogId?.let { c.catalog.byId[it] }
             val units = lastUnits ?: c.settings.units.first()
@@ -371,13 +372,21 @@ class ListViewModel(
 
     // ---- the "Add item" field (5.6b) ----------------------------------------------------
 
+    /** The catalogue's names, mapped once per catalogue state (a library edit swaps the entries list). */
+    @Volatile private var catalogueNames: Pair<List<CatalogEntry>, List<String>>? = null
+
+    private fun catalogueNames(): List<String> {
+        val entries = c.catalog.entries
+        catalogueNames?.let { (e, names) -> if (e === entries) return names }
+        return entries.map { it.name }.also { catalogueNames = entries to it }
+    }
+
     /** Autocomplete on the name typed (a leading amount is skipped): recent items first, then catalogue names; at most 6. */
     fun suggestions(query: String): List<String> {
         val q = nameOf(query).lowercase()
         if (q.length < 2) return emptyList()
         val recent = lastList.items.values.sortedByDescending { it.id }.map { it.displayName }
-        val catalogue = c.catalog.entries.map { it.name }
-        return (recent + catalogue)
+        return (recent + catalogueNames())
             .distinct()
             .filter { it.lowercase().startsWith(q) || it.lowercase().contains(" $q") }
             .take(6)

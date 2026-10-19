@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.Button
@@ -53,6 +52,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.robert4lyf.hypershop.ui.common.SectionCard
+import com.robert4lyf.hypershop.ui.common.basilSegmentedColors
 import com.robert4lyf.hypershop.voice.VoiceTestLog
 import com.robert4lyf.hypershop.voice.VoiceTestService
 import com.robert4lyf.hypershop.voice.VoiceTestTools
@@ -152,13 +153,14 @@ fun VoiceTestScreen(
     var onDevice by rememberSaveable { mutableStateOf(true) }
     var segmented by rememberSaveable { mutableStateOf(true) }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        // The cards bring their own 16 dp gutter; the title and the log lines pad themselves.
         LazyColumn(
             Modifier.fillMaxSize().testTag("voice-test"),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp),
+            contentPadding = PaddingValues(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.padding(start = 4.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") }
                     Text("Voice test", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
                 }
@@ -200,11 +202,13 @@ fun VoiceTestScreen(
                             selected = segmented,
                             onClick = { segmented = true },
                             shape = SegmentedButtonDefaults.itemShape(0, 2),
+                            colors = basilSegmentedColors(),
                         ) { Text("Long session") }
                         SegmentedButton(
                             selected = !segmented,
                             onClick = { segmented = false },
                             shape = SegmentedButtonDefaults.itemShape(1, 2),
+                            colors = basilSegmentedColors(),
                         ) { Text("Restart each phrase") }
                     }
                     if (ui.running) {
@@ -223,15 +227,16 @@ fun VoiceTestScreen(
                 }
             }
             item {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("Log", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                     OutlinedButton(onClick = actions.onShare, modifier = Modifier.testTag("share-log")) { Text("Share log") }
                     TextButton(onClick = actions.onClear) { Text("Clear") }
                 }
             }
-            if (ui.log.isEmpty()) item { Text("Nothing yet", style = MaterialTheme.typography.bodySmall) }
+            val gutter = Modifier.padding(horizontal = 16.dp)
+            if (ui.log.isEmpty()) item { Text("Nothing yet", gutter, style = MaterialTheme.typography.bodySmall) }
             items(ui.log.asReversed()) { line ->
-                Text(line, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                Text(line, gutter, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
             }
         }
     }
@@ -243,12 +248,12 @@ private fun Step(
     hint: String,
     content: @Composable () -> Unit,
 ) {
-    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    SectionCard {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            content()
         }
+        content()
     }
 }
 

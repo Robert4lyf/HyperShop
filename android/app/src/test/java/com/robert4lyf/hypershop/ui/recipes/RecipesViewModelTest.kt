@@ -3,6 +3,8 @@ package com.robert4lyf.hypershop.ui.recipes
 import android.os.Looper
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.robert4lyf.hypershop.catalog.EntryEdit
+import com.robert4lyf.hypershop.catalog.SaveResult
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.parse.RuleParser
 import com.robert4lyf.hypershop.importing.ImportInput
@@ -138,6 +140,73 @@ class RecipesViewModelTest {
         runBlocking { got[1].undo!!.invoke() }
         assertEquals("Weeknight chilli", await(vm.ui) { it.library.size == 1 }.library.single().title)
         watching.cancel()
+    }
+
+    @Test
+    fun undoOfRemoveSaysSoWhenTheRecipeIsGone() {
+        val c = TestContainer.create()
+        c.add(*CHILLI)
+        val vm = RecipesViewModel(c).shown()
+        val got = mutableListOf<UiMessage>()
+        val watching = CoroutineScope(Dispatchers.Main).launch { vm.events.collect { got += it } }
+        val use = await(vm.ui) { it.uses.isNotEmpty() }.uses.single()
+        vm.remove(use)
+        await(vm.ui) { it.uses.isEmpty() && got.size == 1 }
+        // The copy went meanwhile, as the start-up purge does once it is forgotten and old.
+        runBlocking { c.db.dao().deleteRecipe(use.recipeId!!) }
+        runBlocking { got[0].undo!!.invoke() }
+        assertEquals("Can't undo: the recipe is gone", await(vm.ui) { got.size == 2 }.let { got[1].text })
+        assertTrue(vm.ui.value.uses.isEmpty())
+        assertTrue(runBlocking { c.repository.snapshot() }.liveItems.isEmpty())
+        watching.cancel()
+    }
+
+    @Test
+    fun editingThePartAddedFromInStockKeepsOneLibraryEntry() {
+        val c = TestContainer.create()
+        // A typed-in recipe has no URL: its library key is "r:<id>" of the first copy.
+        val vm = RecipesViewModel(c).shown()
+        vm.addManual("Soup", 2, "2 onions\nSalt, to taste")
+        val first = ReviewViewModel(c, nextReview(vm))
+        await(first.state) { it is ReviewState.Ready }
+        first.confirm()
+        await(first.state) { it is ReviewState.Added }
+        val use = await(vm.ui) { it.uses.isNotEmpty() && it.library.isNotEmpty() }.uses.single()
+        vm.addInStockNow(use)
+        val part = ReviewViewModel(c, nextReview(vm))
+        await(part.state) { it is ReviewState.Ready }
+        part.confirm()
+        await(part.state) { it is ReviewState.Added }
+        vm.edit(await(vm.ui) { it.uses.size == 2 }.uses.first { it.useId != use.useId })
+        val edit = ReviewViewModel(c, nextReview(vm))
+        await(edit.state) { it is ReviewState.Ready }
+        edit.confirm()
+        await(edit.state) { it is ReviewState.Added }
+        // Still one entry, under the recipe's key (its latest copy is now the edited part, as for a URL recipe).
+        val lib = await(vm.ui) { it.uses.size == 2 && it.library.size == 1 }.library
+        assertEquals(use.libraryKey, lib.single().key)
+        assertEquals("Soup", lib.single().title)
+    }
+
+    @Test
+    fun aSynonymSavedInTheLibraryIsFoundBySearch() {
+        val c = TestContainer.create()
+        c.add(*CHILLI)
+        val vm = RecipesViewModel(c).shown()
+        await(vm.ui) { it.library.isNotEmpty() }
+        vm.onSearchText("zorble")
+        Snapshot.sendApplyNotifications()
+        assertTrue(await(vm.ui) { it.terms == listOf("zorble") }.library.isEmpty())
+        val onion = EntryEdit.of(c.catalog.byId.getValue("onion"))
+        assertTrue(runBlocking { c.library.save(onion.copy(synonyms = onion.synonyms + "zorble")) } is SaveResult.Saved)
+        // Searched again: the index was built before the edit and must not be reused.
+        vm.clearSearch()
+        Snapshot.sendApplyNotifications()
+        await(vm.ui) { it.terms.isEmpty() }
+        vm.onSearchText("zorble")
+        Snapshot.sendApplyNotifications()
+        val hits = await(vm.ui) { it.terms == listOf("zorble") && it.library.isNotEmpty() }
+        assertEquals(listOf("Weeknight chilli"), hits.library.map { it.title })
     }
 
     @Test

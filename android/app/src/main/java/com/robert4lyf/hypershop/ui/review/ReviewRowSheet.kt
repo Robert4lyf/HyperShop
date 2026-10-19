@@ -39,10 +39,12 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,7 +92,12 @@ internal fun ReviewRowSheetHost(
     onDismiss: () -> Unit,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
-    val sheet = remember(state, key) { vm.sheet(key) } ?: return onDismiss()
+    val sheet = remember(state, key) { vm.sheet(key) }
+    if (sheet == null) {
+        // The row is gone: closed from an effect, not by writing state during composition.
+        LaunchedEffect(key) { onDismiss() }
+        return
+    }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         ReviewRowSheet(
             sheet,
@@ -176,7 +183,7 @@ private fun Rename(
     onRename: (String) -> Unit,
     preview: (String) -> String?,
 ) {
-    var text by remember { mutableStateOf(current.replaceFirstChar { it.uppercase() }) }
+    var text by rememberSaveable { mutableStateOf(current.replaceFirstChar { it.uppercase() }) }
     val changed = text.isNotBlank() && !text.trim().equals(current, ignoreCase = true)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         OutlinedTextField(
@@ -210,7 +217,7 @@ private fun LineEditor(
     actions: SheetActions,
     canRemove: Boolean,
 ) {
-    var text by remember(line.id) { mutableStateOf(line.raw) }
+    var text by rememberSaveable(line.id) { mutableStateOf(line.raw) }
     val use = { if (text != line.raw && text.isNotBlank()) actions.onEditLine(line.id, text) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         OutlinedTextField(
@@ -260,8 +267,8 @@ internal fun MoveAisle(
     onMove: (AisleCode, Boolean) -> Unit,
     immediate: Boolean = false,
 ) {
-    var picked by remember { mutableStateOf<AisleCode?>(null) }
-    var always by remember { mutableStateOf(false) }
+    var picked by rememberSaveable { mutableStateOf<AisleCode?>(null) }
+    var always by rememberSaveable { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionLabel("Aisle")
         if (immediate) SwitchRow("Always put it here", always) { always = it }

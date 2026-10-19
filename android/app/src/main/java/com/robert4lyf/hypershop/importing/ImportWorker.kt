@@ -47,7 +47,7 @@ class ImportWorker(
                 // those go to "Select lines manually"); WorkManager would not run the job again.
                 ImportResult(input.url, input.subject, null, UnitLocale.METRIC, "MANUAL", error = ImportError.NO_RECIPE)
             }
-        jobs.finish(jobId, result)
+        jobs.finishRun(jobId, result)
         return Result.success()
     }
 

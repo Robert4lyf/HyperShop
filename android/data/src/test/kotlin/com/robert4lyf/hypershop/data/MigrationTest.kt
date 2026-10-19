@@ -5,6 +5,7 @@ import androidx.room.testing.MigrationTestHelper
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -13,7 +14,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
-/** v1 → v2 (the recipe library), with the live-key index that isn't in Room's schema (KNOWN_ISSUES #9); v2 → v3 (book and page). */
+/**
+ * v1 → v2 (the recipe library) and v2 → v3 (book and page), each from an opened
+ * install, which has the live-key index that isn't in Room's schema (KNOWN_ISSUES #9).
+ */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34])
 class MigrationTest {
@@ -50,6 +54,33 @@ class MigrationTest {
                 .addMigrations(HyperShopDatabase.MIGRATION_1_2, HyperShopDatabase.MIGRATION_2_3)
                 .allowMainThreadQueries()
                 .build()
+        val idx =
+            room.openHelper.readableDatabase
+                .query("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'index_Item_mergeKey_live'")
+        assertTrue(idx.moveToFirst())
+        idx.close()
+        room.close()
+    }
+
+    @Test
+    fun anOpenedV2InstallUpgradesWithTheLiveKeyIndexInPlace() {
+        helper.createDatabase(name, 2).apply {
+            // As a real v2 install has it once opened: onOpen made the index, outside Room's schema.
+            execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_Item_mergeKey_live ON Item(mergeKey) WHERE deletedAt IS NULL")
+            execSQL("INSERT INTO Meta VALUES (1, 7, 12, 'old', 'marker', 99)")
+            execSQL("INSERT INTO Item VALUES (1,'cat:onion','onion','onion','onion','PRODUCE',0,1,NULL,0)")
+            close()
+        }
+        // Opened by the app: Room runs 2 → 3, then checks Item against its schema.
+        val room =
+            Room.databaseBuilder(ApplicationProvider.getApplicationContext(), HyperShopDatabase::class.java, name)
+                .addCallback(HyperShopDatabase.CALLBACK)
+                .addMigrations(HyperShopDatabase.MIGRATION_1_2, HyperShopDatabase.MIGRATION_2_3)
+                .allowMainThreadQueries()
+                .build()
+        val meta = runBlocking { room.dao().meta() }
+        assertEquals(MetaEntity(1, 7, 12, "old", "marker", 99), meta)
+        assertEquals(1, runBlocking { room.dao().items() }.size)
         val idx =
             room.openHelper.readableDatabase
                 .query("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'index_Item_mergeKey_live'")

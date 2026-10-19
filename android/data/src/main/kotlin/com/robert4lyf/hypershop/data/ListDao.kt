@@ -115,12 +115,16 @@ interface ListDao {
         at: Long,
     )
 
-    /** Forgotten library copies nothing on the list uses: gone at start-up, once Undo is long past. */
+    /**
+     * Forgotten library copies nothing on the list uses: gone at start-up, once Undo is
+     * long past. Only copies imported before [before]: a review not yet confirmed (an
+     * edit or a re-add stores its copy with a key and no lastAddedAt) has the same shape.
+     */
     @Query(
-        "DELETE FROM Recipe WHERE lastAddedAt IS NULL AND libraryKey IS NOT NULL " +
+        "DELETE FROM Recipe WHERE lastAddedAt IS NULL AND libraryKey IS NOT NULL AND importedAt < :before " +
             "AND id NOT IN (SELECT recipeId FROM RecipeUse WHERE recipeId IS NOT NULL)",
     )
-    suspend fun deleteForgottenRecipes()
+    suspend fun deleteForgottenRecipes(before: Long)
 
     @Query("SELECT COUNT(*) FROM RecipeUse WHERE recipeId = :id")
     suspend fun usesOfRecipe(id: Long): Int
@@ -245,6 +249,18 @@ interface ListDao {
         error: String?,
     )
 
+    /** The worker's finish: lands only while the job is still the worker's (QUEUED or RUNNING); 0 rows otherwise. */
+    @Query(
+        "UPDATE ImportJob SET state = :state, resultJson = :resultJson, error = :error " +
+            "WHERE id = :id AND state IN ('QUEUED', 'RUNNING')",
+    )
+    suspend fun finishRunningJob(
+        id: Long,
+        state: String,
+        resultJson: String?,
+        error: String?,
+    ): Int
+
     @Query("SELECT * FROM ImportJob WHERE id = :id")
     suspend fun job(id: Long): ImportJobEntity?
 
@@ -261,6 +277,9 @@ interface ListDao {
 
     @Query("SELECT * FROM ImportJob WHERE state = :state ORDER BY createdAt")
     fun observeJobs(state: String): Flow<List<ImportJobEntity>>
+
+    @Query("DELETE FROM ImportJob WHERE state IN ('DONE', 'FAILED') AND createdAt < :before")
+    suspend fun deleteFinishedJobsBefore(before: Long)
 
     /** The worker's claim: only a job still waiting (or interrupted mid-run) is run; 0 rows otherwise. */
     @Query("UPDATE ImportJob SET state = 'RUNNING' WHERE id = :id AND state IN ('QUEUED', 'RUNNING')")
@@ -287,6 +306,10 @@ interface ListDao {
 
     @Query("DELETE FROM WatchInstall")
     suspend fun clearInstalls()
+
+    /** The install most recently added (the table has no clock; one watch is the case). */
+    @Query("SELECT installId FROM WatchInstall ORDER BY rowid DESC LIMIT 1")
+    suspend fun lastInstall(): Int?
 
     @Query("DELETE FROM WatchOpResult")
     suspend fun clearOpResults()

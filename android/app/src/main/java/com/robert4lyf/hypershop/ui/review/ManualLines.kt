@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Refresh
@@ -31,8 +32,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -41,7 +45,9 @@ import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.importing.ImportError
 import com.robert4lyf.hypershop.ui.common.BottomActionBar
 import com.robert4lyf.hypershop.ui.common.InfoBanner
+import com.robert4lyf.hypershop.ui.common.SectionLabel
 import com.robert4lyf.hypershop.ui.common.Tone
+import com.robert4lyf.hypershop.ui.common.cardLift
 import com.robert4lyf.hypershop.ui.common.sectionItem
 import com.robert4lyf.hypershop.ui.common.sectionPosition
 import com.robert4lyf.hypershop.ui.theme.card
@@ -63,8 +69,9 @@ fun ManualLinesView(
     onBack: () -> Unit,
     onRetry: (() -> Unit)? = null,
 ) {
-    val picked = remember(candidates) { mutableStateListOf<Int>() }
-    var pasted by remember { mutableStateOf("") }
+    // Both survive rotation: a long paste, or a dozen ticks, is not lost to it.
+    val picked = rememberSaveable(candidates, saver = PICKED) { mutableStateListOf<Int>() }
+    var pasted by rememberSaveable { mutableStateOf("") }
     val count = picked.size + pasted.lines().count { it.isNotBlank() }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().imePadding()) {
@@ -72,12 +79,11 @@ fun ManualLinesView(
             LazyColumn(
                 Modifier.weight(1f).testTag("manual"),
                 contentPadding = PaddingValues(vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
-                item {
+                item(key = "error") {
                     Column(
-                        Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        Modifier.padding(horizontal = 16.dp).padding(bottom = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         InfoBanner(errorText(error), Icons.Rounded.ErrorOutline, Modifier.testTag("error"), Tone.WARNING)
                         if (onRetry != null) {
@@ -87,30 +93,35 @@ fun ManualLinesView(
                                 Text("Try again")
                             }
                         }
-                        Column(Modifier.padding(horizontal = 4.dp)) {
-                            Text("Select lines manually", style = MaterialTheme.typography.headlineSmall)
-                        }
-                        OutlinedTextField(
-                            value = pasted,
-                            onValueChange = { pasted = it },
-                            label = { Text("Paste the ingredient lines") },
-                            minLines = 4,
-                            shape = MaterialTheme.shapes.large,
-                            colors =
-                                OutlinedTextFieldDefaults.colors(
-                                    unfocusedContainerColor = card,
-                                    focusedContainerColor = card,
-                                ),
-                            modifier = Modifier.fillMaxWidth().testTag("paste-lines"),
-                        )
-                        if (candidates.isNotEmpty()) {
-                            Text(
-                                "Or tick lines from the page",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 4.dp),
+                    }
+                }
+                item(key = "paste") {
+                    Surface(
+                        Modifier.padding(horizontal = 16.dp).padding(bottom = 12.dp).fillMaxWidth().cardLift(),
+                        shape = RoundedCornerShape(22.dp),
+                        color = card,
+                    ) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("Select lines manually", style = MaterialTheme.typography.titleLarge)
+                            OutlinedTextField(
+                                value = pasted,
+                                onValueChange = { pasted = it },
+                                label = { Text("Paste the ingredient lines") },
+                                minLines = 4,
+                                shape = MaterialTheme.shapes.medium,
+                                colors =
+                                    OutlinedTextFieldDefaults.colors(
+                                        unfocusedContainerColor = card,
+                                        focusedContainerColor = card,
+                                    ),
+                                modifier = Modifier.fillMaxWidth().testTag("paste-lines"),
                             )
                         }
+                    }
+                }
+                if (candidates.isNotEmpty()) {
+                    item(key = "from-page") {
+                        SectionLabel("Or tick lines from the page", Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp))
                     }
                 }
                 itemsIndexed(candidates) { i, line ->
@@ -156,3 +167,5 @@ fun ManualLinesView(
         }
     }
 }
+
+private val PICKED = listSaver<SnapshotStateList<Int>, Int>({ it.toList() }, { it.toMutableStateList() })

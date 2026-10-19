@@ -21,6 +21,7 @@
     <string id="NoticeMore">1 more on phone</string>
     <string id="NoticeChanged">Changed on phone</string>
     <string id="NoticeDiscarded">$1$ ticks discarded</string>
+    <string id="NoticeStorage">Watch storage full</string>
 
     <!-- Aisles -->
     <string id="Left">$1$ left</string>

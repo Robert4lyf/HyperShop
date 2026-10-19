@@ -27,6 +27,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34])
@@ -120,7 +121,7 @@ class ReviewViewModelTest {
         try {
             claude.enqueue(MockResponse().setBody(File("../../testdata/claude/synthetic-ok-cake.json").readText()))
             val c = TestContainer.create(claude = claude, key = "sk-ant-test")
-            c.reviewGate.set(true)
+            c.reviewGate.acquire()
             val job = runBlocking { c.readyJob("200g golden caster sugar", claudePending = true) }
             val ui = ready(ReviewViewModel(c, job))
             assertEquals(Badge.CLAUDE, ui.badge)
@@ -139,7 +140,7 @@ class ReviewViewModelTest {
         try {
             claude.enqueue(MockResponse().setBody(File("../../testdata/claude/synthetic-ok-cake.json").readText()))
             val c = TestContainer.create(claude = claude, key = "sk-ant-test")
-            c.reviewGate.set(true)
+            c.reviewGate.acquire()
             val photo = PhotoStore.saveBytes(c.context, byteArrayOf(1, 2, 3))
             val result = ImportResult(null, null, null, UnitLocale.METRIC, "PHOTO", claudePending = true, photo = photo.path)
             val job = runBlocking { c.importJobs.enqueueReady(ImportInput("", "Photo of a recipe"), result) }
@@ -159,7 +160,7 @@ class ReviewViewModelTest {
     @Test
     fun aPhotoWithoutAKeyAsksForOne() {
         val c = TestContainer.create()
-        c.reviewGate.set(true)
+        c.reviewGate.acquire()
         val photo = PhotoStore.saveBytes(c.context, byteArrayOf(1, 2, 3))
         val result = ImportResult(null, null, null, UnitLocale.METRIC, "PHOTO", claudePending = true, photo = photo.path)
         val job = runBlocking { c.importJobs.enqueueReady(ImportInput("", "Photo of a recipe"), result) }
@@ -177,10 +178,78 @@ class ReviewViewModelTest {
         vm.cancel()
         await(vm.state) { it == ReviewState.Cancelled }
         assertTrue(runBlocking { c.db.dao().recipesByUrl("https://example.com/chilli") }.isEmpty())
-        // Still ready: Undo on the snackbar can open it again.
+        // Off the ready card while Undo shows, but not yet done: Undo puts it back.
+        assertEquals(JobState.DISCARDING, runBlocking { c.importJobs.get(job) }!!.state)
+        runBlocking { c.importJobs.restore(job) }
         assertEquals(JobState.READY, runBlocking { c.importJobs.get(job) }!!.state)
+        // The timer of the undone discard finds the job back and leaves it alone.
+        runBlocking { vm.discardForGood() }
+        assertEquals(JobState.READY, runBlocking { c.importJobs.get(job) }!!.state)
+        runBlocking { c.importJobs.discarding(job) }
         runBlocking { vm.discardForGood() }
         assertEquals(JobState.DONE, runBlocking { c.importJobs.get(job) }!!.state)
+    }
+
+    @Test
+    fun aReviewReopenedMidCallJoinsTheClaudeCallRatherThanPayingTwice() {
+        val claude = MockWebServer().apply { start() }
+        try {
+            claude.enqueue(
+                MockResponse()
+                    .setHeadersDelay(700, TimeUnit.MILLISECONDS)
+                    .setBody(File("../../testdata/claude/synthetic-ok-cake.json").readText()),
+            )
+            val c = TestContainer.create(claude = claude, key = "sk-ant-test")
+            c.reviewGate.acquire()
+            val job = runBlocking { c.readyJob("200g golden caster sugar", claudePending = true) }
+            val first = ReviewViewModel(c, job)
+            await(first.state) { it is ReviewState.Loading && it.stage == ReviewViewModel.STAGE_CLAUDE }
+            // Back and straight in again while Claude is still answering.
+            val second = ReviewViewModel(c, job)
+            assertEquals(Badge.CLAUDE, ready(first).badge)
+            assertEquals(Badge.CLAUDE, ready(second).badge)
+            assertEquals(1, claude.requestCount)
+        } finally {
+            claude.shutdown()
+        }
+    }
+
+    @Test
+    fun stopWhileRetryingClearsTheSpinner() {
+        val claude = MockWebServer().apply { start() }
+        try {
+            claude.enqueue(
+                MockResponse()
+                    .setHeadersDelay(5, TimeUnit.SECONDS)
+                    .setBody(File("../../testdata/claude/synthetic-ok-cake.json").readText()),
+            )
+            val c = TestContainer.create(claude = claude, key = "sk-ant-test")
+            c.reviewGate.acquire()
+            val job = runBlocking { c.readyJob("200g golden caster sugar", claudePending = true) }
+            // Already tried once in the worker: opening doesn't ask again, "Retry with Claude" does.
+            runBlocking { c.importJobs.update(job, c.importJobs.get(job)!!.result!!.copy(claudeTried = true)) }
+            val vm = ReviewViewModel(c, job)
+            ready(vm)
+            vm.retryWithClaude()
+            await(vm.state) { it is ReviewState.Ready && it.ui.retrying }
+            vm.stopRetry()
+            val ui = (await(vm.state) { it is ReviewState.Ready && !it.ui.retrying } as ReviewState.Ready).ui
+            assertFalse(ui.busy)
+            assertEquals(Badge.CLAUDE_PENDING, ui.badge)
+        } finally {
+            claude.shutdown()
+        }
+    }
+
+    @Test
+    fun bookAndPageCountAsAChange() {
+        val c = TestContainer.create()
+        val vm = ReviewViewModel(c, runBlocking { c.readyJob("2 onions", url = "") })
+        assertFalse(ready(vm).changed)
+        vm.setBook("Roasting Tin", "12")
+        val ui = (await(vm.state) { it is ReviewState.Ready && it.ui.book == "Roasting Tin" } as ReviewState.Ready).ui
+        assertTrue(ui.changed)
+        assertEquals("12", ui.page)
     }
 
     @Test

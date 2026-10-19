@@ -84,8 +84,14 @@ class RecipesViewModel(
     private val terms =
         combine(chips, snapshotFlow { searchText }) { cs, t -> cs + listOfNotNull(t.trim().takeIf { it.isNotEmpty() }) }
 
-    /** The search index, rebuilt when the library's recipes change. */
-    private var index: Pair<List<Long>, List<RecipeSearch.Recipe>>? = null
+    /** What the search index was built from: the library's recipes, and the catalogue (its synonyms are in it). */
+    private data class IndexKey(
+        val recipeIds: List<Long>,
+        val catalogVersion: String,
+    )
+
+    /** The search index, rebuilt when the library's recipes or the catalogue change. */
+    private var index: Pair<IndexKey, List<RecipeSearch.Recipe>>? = null
 
     /** From the shared list read; only while the tab is shown (and 5 s after, across a rotation). */
     val ui: StateFlow<RecipesUi> =
@@ -119,9 +125,9 @@ class RecipesViewModel(
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecipesUi())
 
     private suspend fun indexFor(lib: List<com.robert4lyf.hypershop.data.LibraryRecipe>): List<RecipeSearch.Recipe> {
-        val ids = lib.map { it.recipeId }
-        index?.takeIf { it.first == ids }?.let { return it.second }
-        val lines = c.repository.ingredientsOf(ids)
+        val key = IndexKey(lib.map { it.recipeId }, c.catalog.version)
+        index?.takeIf { it.first == key }?.let { return it.second }
+        val lines = c.repository.ingredientsOf(key.recipeIds)
         val built =
             lib.map { r ->
                 RecipeSearch.Recipe(
@@ -137,7 +143,7 @@ class RecipesViewModel(
                     },
                 )
             }
-        index = ids to built
+        index = key to built
         return built
     }
 
@@ -240,7 +246,15 @@ class RecipesViewModel(
     fun remove(use: UseSummary) =
         viewModelScope.launch {
             val removed = c.repository.removeUse(use.useId) ?: return@launch
-            messages.send(UiMessage("Removed ${use.title} from the list", undo = { c.repository.restoreUse(removed) }))
+            messages.send(
+                UiMessage(
+                    "Removed ${use.title} from the list",
+                    undo = {
+                        // The recipe copy can go meanwhile (the start-up purge); the use can't come back without it.
+                        if (!c.repository.restoreUse(removed)) messages.send(UiMessage("Can't undo: the recipe is gone"))
+                    },
+                ),
+            )
         }
 
     /** "Add the in-stock items now": the review screen again, full amounts, nothing pre-ticked. */
@@ -270,6 +284,8 @@ class RecipesViewModel(
                 lines = lines,
                 rawLines = lines.map { it.raw },
                 preTick = false,
+                // Editing this part later stores its copy under the recipe's entry, not a second one.
+                libraryKey = recipe.libraryKey,
                 book = recipe.book,
                 page = recipe.page,
             )

@@ -60,7 +60,7 @@ class ImportWorkerTest {
     fun withTheReviewScreenOpenItUsesClaude() =
         runBlocking {
             val c = TestContainer.create(pages, claude, key = "sk-ant-test")
-            c.reviewGate.set(true)
+            c.reviewGate.acquire()
             servePage()
             claude.enqueue(MockResponse().setBody(CLAUDE_OK))
             val id = c.importJobs.enqueue(ImportInput(pages.url("/r").toString()))
@@ -75,7 +75,7 @@ class ImportWorkerTest {
     fun withoutAKeyItNeverMarksClaudePending() =
         runBlocking {
             val c = TestContainer.create(pages, claude, key = null)
-            c.reviewGate.set(true)
+            c.reviewGate.acquire()
             servePage()
             val r = c.awaitJob(c.importJobs.enqueue(ImportInput(pages.url("/r").toString()))).result!!
             assertEquals(ParsedBy.RULES, r.parsedBy)

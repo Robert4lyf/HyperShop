@@ -24,84 +24,85 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.robert4lyf.hypershop.R
 
-// Basil green on a warm neutral ladder, tomato for things to check
-// (docs/design/ui-overhaul.md). Every text pair clears 4.5:1.
+// A fresh basil green on a bright, slightly minted neutral ladder, tomato for
+// things to check (docs/design/ui-overhaul.md, "Brighter pass"). Every text
+// pair clears 4.5:1 (tools/contrast.py lists them).
 private val Light =
     lightColorScheme(
-        primary = Color(0xFF1E6B3C),
+        primary = Color(0xFF178040),
         onPrimary = Color.White,
-        primaryContainer = Color(0xFFCDEFD4),
-        onPrimaryContainer = Color(0xFF00210F),
-        inversePrimary = Color(0xFF8FD8A3),
-        secondary = Color(0xFF4E6354),
+        primaryContainer = Color(0xFFC6F2D2),
+        onPrimaryContainer = Color(0xFF05331A),
+        inversePrimary = Color(0xFF8FE0A8),
+        secondary = Color(0xFF48685A),
         onSecondary = Color.White,
-        secondaryContainer = Color(0xFFD1E8D6),
+        secondaryContainer = Color(0xFFD6ECDC),
         onSecondaryContainer = Color(0xFF0C1F13),
-        tertiary = Color(0xFFA9452C),
+        tertiary = Color(0xFFB4432A),
         onTertiary = Color.White,
-        tertiaryContainer = Color(0xFFFFDBD1),
+        tertiaryContainer = Color(0xFFFFDCD0),
         onTertiaryContainer = Color(0xFF3B0900),
-        background = Color(0xFFF6F7F2),
-        onBackground = Color(0xFF191C19),
-        surface = Color(0xFFF6F7F2),
-        onSurface = Color(0xFF191C19),
-        surfaceVariant = Color(0xFFDDE5DA),
-        onSurfaceVariant = Color(0xFF414941),
-        surfaceTint = Color(0xFF1E6B3C),
-        inverseSurface = Color(0xFF2E312D),
-        inverseOnSurface = Color(0xFFEFF1EB),
+        background = Color(0xFFF6F9F4),
+        onBackground = Color(0xFF171C18),
+        surface = Color(0xFFF6F9F4),
+        onSurface = Color(0xFF171C18),
+        surfaceVariant = Color(0xFFDFE8DD),
+        onSurfaceVariant = Color(0xFF4A5449),
+        surfaceTint = Color(0xFF178040),
+        inverseSurface = Color(0xFF2C312D),
+        inverseOnSurface = Color(0xFFF0F3EC),
         error = Color(0xFFB3261E),
         onError = Color.White,
         errorContainer = Color(0xFFF9DEDC),
         onErrorContainer = Color(0xFF410E0B),
-        outline = Color(0xFF717970),
-        outlineVariant = Color(0xFFC1C9BF),
-        surfaceBright = Color(0xFFF6F7F2),
-        surfaceDim = Color(0xFFD7DAD3),
+        outline = Color(0xFF70796F),
+        outlineVariant = Color(0xFFC6CFC4),
+        surfaceBright = Color(0xFFFFFFFF),
+        surfaceDim = Color(0xFFD9DFD6),
         surfaceContainerLowest = Color.White,
-        surfaceContainerLow = Color(0xFFF0F2EC),
-        surfaceContainer = Color(0xFFEAEDE6),
-        surfaceContainerHigh = Color(0xFFE4E7E0),
-        surfaceContainerHighest = Color(0xFFDEE2DA),
+        surfaceContainerLow = Color(0xFFF0F4EE),
+        surfaceContainer = Color(0xFFEAF0E8),
+        surfaceContainerHigh = Color(0xFFE3EAE1),
+        surfaceContainerHighest = Color(0xFFDCE4DA),
     )
 
 private val Dark =
     darkColorScheme(
-        primary = Color(0xFF8FD8A3),
-        onPrimary = Color(0xFF00391C),
-        primaryContainer = Color(0xFF00522B),
-        onPrimaryContainer = Color(0xFFABF5BE),
-        inversePrimary = Color(0xFF1E6B3C),
-        secondary = Color(0xFFB5CCBA),
+        primary = Color(0xFF8FE0A8),
+        onPrimary = Color(0xFF003A1C),
+        primaryContainer = Color(0xFF0F5A30),
+        onPrimaryContainer = Color(0xFFB5F5C6),
+        inversePrimary = Color(0xFF178040),
+        secondary = Color(0xFFB8D0BE),
         onSecondary = Color(0xFF213527),
-        secondaryContainer = Color(0xFF374B3D),
-        onSecondaryContainer = Color(0xFFD1E8D6),
+        secondaryContainer = Color(0xFF384E40),
+        onSecondaryContainer = Color(0xFFD6ECDC),
         tertiary = Color(0xFFFFB4A1),
         onTertiary = Color(0xFF5F1604),
         tertiaryContainer = Color(0xFF872F18),
-        onTertiaryContainer = Color(0xFFFFDBD1),
-        background = Color(0xFF0F1411),
-        onBackground = Color(0xFFDEE4DD),
-        surface = Color(0xFF0F1411),
-        onSurface = Color(0xFFDEE4DD),
-        surfaceVariant = Color(0xFF414942),
-        onSurfaceVariant = Color(0xFFC1C9C0),
-        surfaceTint = Color(0xFF8FD8A3),
-        inverseSurface = Color(0xFFDEE4DD),
+        onTertiaryContainer = Color(0xFFFFDCD0),
+        background = Color(0xFF121A15),
+        onBackground = Color(0xFFE2E8E1),
+        surface = Color(0xFF121A15),
+        onSurface = Color(0xFFE2E8E1),
+        surfaceVariant = Color(0xFF3F4A42),
+        onSurfaceVariant = Color(0xFFC3CCC2),
+        surfaceTint = Color(0xFF8FE0A8),
+        inverseSurface = Color(0xFFE2E8E1),
         inverseOnSurface = Color(0xFF2C322E),
         error = Color(0xFFF2B8B5),
         onError = Color(0xFF601410),
         errorContainer = Color(0xFF8C1D18),
         onErrorContainer = Color(0xFFF9DEDC),
-        outline = Color(0xFF8B938A),
-        outlineVariant = Color(0xFF414942),
-        surfaceBright = Color(0xFF353A36),
-        surfaceDim = Color(0xFF0F1411),
-        surfaceContainerLowest = Color(0xFF0A0F0C),
-        surfaceContainerLow = Color(0xFF171D19),
-        surfaceContainer = Color(0xFF1B211D),
-        surfaceContainerHigh = Color(0xFF252B27),
-        surfaceContainerHighest = Color(0xFF303632),
+        outline = Color(0xFF8C968B),
+        outlineVariant = Color(0xFF3F4A42),
+        surfaceBright = Color(0xFF38433C),
+        surfaceDim = Color(0xFF121A15),
+        surfaceContainerLowest = Color(0xFF0C120E),
+        surfaceContainerLow = Color(0xFF182019),
+        surfaceContainer = Color(0xFF1C2620),
+        surfaceContainerHigh = Color(0xFF202A24),
+        surfaceContainerHighest = Color(0xFF2A352E),
     )
 
 /** Plus Jakarta Sans (SIL OFL, assets/licenses), bundled so the app looks the same on every phone. */
@@ -145,8 +146,8 @@ val HyperShopShapes =
         extraSmall = RoundedCornerShape(8.dp),
         small = RoundedCornerShape(12.dp),
         medium = RoundedCornerShape(16.dp),
-        large = RoundedCornerShape(24.dp),
-        extraLarge = RoundedCornerShape(32.dp),
+        large = RoundedCornerShape(22.dp),
+        extraLarge = RoundedCornerShape(28.dp),
     )
 
 /**
@@ -174,8 +175,14 @@ fun HyperShopTheme(
 /** Whether [HyperShopTheme] is dark, set once by the theme rather than guessed from colours. */
 val LocalDarkTheme = staticCompositionLocalOf { false }
 
-/** The card colour: white on the light background, a lifted grey on the dark one (never darker than the page). */
+/** The card colour: white on the light background, a lifted green-grey on the dark one (never darker than the page). */
 val androidx.compose.material3.ColorScheme.card: Color
     @Composable
     @ReadOnlyComposable
     get() = if (LocalDarkTheme.current) surfaceContainerHigh else surfaceContainerLowest
+
+/** A card's hairline edge: faint in the light theme (where the shadow does the work), a touch lighter than the card in the dark one. */
+val androidx.compose.material3.ColorScheme.cardEdge: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = if (LocalDarkTheme.current) surfaceContainerHighest else outlineVariant.copy(alpha = 0.45f)

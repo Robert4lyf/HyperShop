@@ -20,13 +20,13 @@ object Brand {
     val OnHero = Color.White
     val OnHeroSoft = Color.White.copy(alpha = 0.9f)
 
-    /** Warm, for "ready to review": a call to act, distinct from the basil header. */
-    val WarmCall = Brush.linearGradient(listOf(Color(0xFFB4471F), Color(0xFFB83A5E)))
+    /** Warm, for "ready to review": a call to act, distinct from the basil header. White text clears 4.5:1 on both ends. */
+    val WarmCall = Brush.linearGradient(listOf(Color(0xFFC4451F), Color(0xFFBD3A64)))
 
     /** A recipe's own two-tone gradient, picked from its title so it stays the same. */
     fun recipeBrush(seed: String): Brush {
         val hue = recipeHue(seed)
-        return Brush.linearGradient(listOf(Color.hsl(hue, 0.55f, 0.28f), Color.hsl((hue + 40f) % 360f, 0.55f, 0.26f)))
+        return Brush.linearGradient(listOf(Color.hsl(hue, 0.58f, 0.31f), Color.hsl((hue + 40f) % 360f, 0.58f, 0.28f)))
     }
 
     fun recipeHue(seed: String): Float = ((seed.hashCode() % 360 + 360) % 360).toFloat()
@@ -50,13 +50,14 @@ val heroBrush: Brush
     @ReadOnlyComposable
     get() = Brush.linearGradient(if (LocalDarkTheme.current) HERO_DARK else HERO_LIGHT)
 
-private val HERO_LIGHT = listOf(Color(0xFF0B6B3E), Color(0xFF0B6E73))
-private val HERO_DARK = listOf(Color(0xFF0A4A2C), Color(0xFF0A4A55))
+// Brighter than the first pass: fresh basil into lagoon; white text still clears 4.5:1 at both ends.
+private val HERO_LIGHT = listOf(Color(0xFF15854A), Color(0xFF0F7F86))
+private val HERO_DARK = listOf(Color(0xFF0E6A3B), Color(0xFF0B6B70))
 
 /** Two soft light circles in the top-right corner: depth on a hero without an image. */
 fun Modifier.heroGlow(): Modifier =
     drawBehind {
         val r = size.minDimension
-        drawCircle(Color.White.copy(alpha = 0.08f), radius = r * 0.9f, center = Offset(size.width + r * 0.15f, -r * 0.25f))
-        drawCircle(Color.White.copy(alpha = 0.06f), radius = r * 0.55f, center = Offset(size.width - r * 0.2f, size.height + r * 0.1f))
+        drawCircle(Color.White.copy(alpha = 0.12f), radius = r * 0.9f, center = Offset(size.width + r * 0.15f, -r * 0.25f))
+        drawCircle(Color.White.copy(alpha = 0.08f), radius = r * 0.55f, center = Offset(size.width - r * 0.2f, size.height + r * 0.1f))
     }

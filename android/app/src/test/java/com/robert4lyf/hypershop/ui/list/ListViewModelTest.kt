@@ -223,6 +223,18 @@ class ListViewModelTest {
     }
 
     @Test
+    fun theSheetShowsATickTheListHasNotDrawnYet() {
+        val c = TestContainer.create()
+        c.add("2 onions")
+        val vm = ListViewModel(c)
+        val ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
+        // Ticked straight in the repository: the list on screen still shows the row open.
+        runBlocking { c.repository.tick(ui.row("onion").id) }
+        vm.openItem(ui.row("onion").id)
+        assertTrue(await(vm.sheet) { it != null }!!.done)
+    }
+
+    @Test
     fun finishCountsATickNotYetOnScreen() {
         val c = TestContainer.create()
         c.add("2 onions", "1 carrot")

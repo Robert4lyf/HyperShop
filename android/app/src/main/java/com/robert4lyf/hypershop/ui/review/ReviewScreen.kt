@@ -99,6 +99,7 @@ import com.robert4lyf.hypershop.ui.common.sectionPosition
 import com.robert4lyf.hypershop.ui.common.siteName
 import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.card
+import com.robert4lyf.hypershop.ui.theme.heroBrush
 import com.robert4lyf.hypershop.ui.theme.heroGlow
 import com.robert4lyf.hypershop.ui.theme.style
 
@@ -216,7 +217,7 @@ private fun TopBar(
             textAlign = TextAlign.Center,
             modifier = Modifier.weight(1f),
         )
-        var menu by remember { mutableStateOf(false) }
+        var menu by rememberSaveable { mutableStateOf(false) }
         Box {
             IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
@@ -244,9 +245,9 @@ private fun Hero(
     onTitle: (String) -> Unit,
     onBook: (String, String) -> Unit,
 ) {
-    var renaming by remember { mutableStateOf(false) }
+    var renaming by rememberSaveable { mutableStateOf(false) }
     if (renaming) TitleDialog(ui.title, onDismiss = { renaming = false }) { onTitle(it) }
-    var explainOffline by remember { mutableStateOf(false) }
+    var explainOffline by rememberSaveable { mutableStateOf(false) }
     if (explainOffline) {
         AlertDialog(
             onDismissRequest = { explainOffline = false },
@@ -256,7 +257,7 @@ private fun Hero(
             confirmButton = { TextButton(onClick = { explainOffline = false }) { Text("OK") } },
         )
     }
-    var sourcing by remember { mutableStateOf(false) }
+    var sourcing by rememberSaveable { mutableStateOf(false) }
     if (sourcing) BookDialog(ui.book, ui.page, onDismiss = { sourcing = false }, onSave = onBook)
     val open = rememberOpenLink()
     val onHero = ButtonDefaults.textButtonColors(contentColor = Brand.OnHero)
@@ -264,9 +265,10 @@ private fun Hero(
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp)
-                .clip(RoundedCornerShape(28.dp))
-                .background(Brand.recipeBrush(ui.title))
+                .padding(start = 16.dp, end = 16.dp, top = 4.dp)
+                .clip(RoundedCornerShape(24.dp))
+                // The same basil-to-lagoon hero as every screen; a recipe's own hue stays on the Recipes tab.
+                .background(heroBrush)
                 .heroGlow()
                 .padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -359,7 +361,7 @@ private fun TitleDialog(
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
 ) {
-    var text by remember { mutableStateOf(current) }
+    var text by rememberSaveable { mutableStateOf(current) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
     val save = {
@@ -397,8 +399,8 @@ private fun BookDialog(
     onDismiss: () -> Unit,
     onSave: (String, String) -> Unit,
 ) {
-    var b by remember { mutableStateOf(book.orEmpty()) }
-    var p by remember { mutableStateOf(page.orEmpty()) }
+    var b by rememberSaveable { mutableStateOf(book.orEmpty()) }
+    var p by rememberSaveable { mutableStateOf(page.orEmpty()) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Book and page") },
@@ -504,7 +506,7 @@ private fun Servings(
     onServings: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var typing by remember { mutableStateOf(false) }
+    var typing by rememberSaveable { mutableStateOf(false) }
     if (typing) ServingsDialog(s, onDismiss = { typing = false }, onSet = onServings)
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Surface(shape = RoundedCornerShape(50), color = Color.White, contentColor = HERO_INK) {
@@ -539,7 +541,7 @@ private fun ServingsDialog(
     onDismiss: () -> Unit,
     onSet: (Int) -> Unit,
 ) {
-    var text by remember { mutableStateOf(current?.toString().orEmpty()) }
+    var text by rememberSaveable { mutableStateOf(current?.toString().orEmpty()) }
     val value = text.trim().toIntOrNull()?.takeIf { it in 1..99 }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
@@ -579,7 +581,7 @@ private fun AisleHeader(
     onAisleInStock: (AisleCode) -> Unit,
     modifier: Modifier,
 ) {
-    var menu by remember { mutableStateOf(false) }
+    var menu by rememberSaveable { mutableStateOf(false) }
     // The same rule as the Add button: a row already covered by the list adds nothing.
     val adding = rows.count { !it.inStock && it.adds }
     Row(
@@ -587,21 +589,28 @@ private fun AisleHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        AisleBadge(aisle)
+        AisleBadge(aisle, size = 36.dp)
         Text(
             aisle.displayName,
             style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f).semantics { heading() },
         )
-        Text(
-            when {
-                adding > 0 -> "$adding to add"
-                rows.all { it.inStock } -> "All in stock"
-                else -> "Nothing to add"
-            },
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = MaterialTheme.colorScheme.surfaceContainerLowest,
+            contentColor = aisle.style.content,
+        ) {
+            Text(
+                when {
+                    adding > 0 -> "$adding to add"
+                    rows.all { it.inStock } -> "All in stock"
+                    else -> "Nothing to add"
+                },
+                Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
         Box {
             IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "${aisle.displayName} options") }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
@@ -654,7 +663,7 @@ private fun ReviewRowItem(
                 }
                 Text(
                     name,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     color = if (row.check && !row.inStock) MaterialTheme.colorScheme.tertiary else faded,
                     textDecoration = struck,
                 )
@@ -686,7 +695,7 @@ private fun ReviewRowItem(
         Icon(
             Icons.Rounded.ChevronRight,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = MaterialTheme.colorScheme.outline,
             modifier = Modifier.size(22.dp),
         )
     }
@@ -702,8 +711,8 @@ private fun InStockPill(
     val shape = RoundedCornerShape(50)
     Surface(
         shape = shape,
-        color = if (on) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-        contentColor = if (on) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        color = if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+        contentColor = if (on) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
         border = if (on) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier =
             Modifier
