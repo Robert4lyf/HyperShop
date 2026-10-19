@@ -1,5 +1,8 @@
 package com.robert4lyf.hypershop.ui.recipes
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -111,6 +114,7 @@ class RecipesScreenTest {
                 RecipesScreen(USES, onRemove = {}, onAddInStock = {}, library = LibraryActions(onAdd = { added += it.key }))
             }
         }
+        compose.onNodeWithTag("view-library").performClick()
         val list = compose.onNodeWithTag("recipes")
         // Not on the list: straight in.
         list.performScrollToNode(hasTestTag("lib-add-r:9"))
@@ -129,6 +133,9 @@ class RecipesScreenTest {
         compose.setContent {
             HyperShopTheme(dynamicColor = false) { RecipesScreen(USES.copy(uses = emptyList()), onRemove = {}, onAddInStock = {}) }
         }
+        // An empty list opens on the library; the list says it is empty.
+        compose.onNodeWithTag("lib-r:9").assertExists()
+        compose.onNodeWithTag("view-list").performClick()
         compose.onNodeWithTag("nothing-yet").assertExists()
         compose.onNodeWithText("Nothing on the list").assertExists()
     }
@@ -172,6 +179,7 @@ class RecipesScreenTest {
                 RecipesScreen(USES, onRemove = {}, onAddInStock = {}, library = LibraryActions(onOpen = { opened += it.key }))
             }
         }
+        compose.onNodeWithTag("view-library").performClick()
         compose.onNodeWithTag("recipes").performScrollToNode(hasTestTag("lib-r:9"))
         compose.onNodeWithTag("lib-r:9").performClick()
         assertEquals(listOf("r:9"), opened)
@@ -199,6 +207,24 @@ class RecipesScreenTest {
             HyperShopTheme { AddRecipeContent(AddRecipeActions(), onDone = {}) }
         }
         compose.onRoot().captureRoboImage(Shots.path("add-recipe-light.png"))
+    }
+
+    @Test
+    fun theListAndTheLibraryAreSeparateAndANewRecipeShowsOnTheList() {
+        var ui by mutableStateOf(USES.copy(uses = USES.uses.take(1)))
+        compose.setContent { HyperShopTheme(dynamicColor = false) { RecipesScreen(ui, onRemove = {}, onAddInStock = {}) } }
+        // Opens on the list: its cards, not the library's.
+        compose.onNodeWithText("Remove from list").assertExists()
+        compose.onNodeWithTag("lib-r:9").assertDoesNotExist()
+        compose.onNodeWithTag("view-library").performClick()
+        compose.onNodeWithTag("lib-r:9").assertExists()
+        compose.onNodeWithText("Remove from list").assertDoesNotExist()
+        compose.onRoot().captureRoboImage(Shots.path("recipes-library-light.png"))
+        // A recipe added to the list brings the list back.
+        ui = USES
+        compose.waitForIdle()
+        compose.onAllNodesWithText("Remove from list").assertCountEquals(3)
+        compose.onNodeWithTag("lib-r:9").assertDoesNotExist()
     }
 
     @Test
