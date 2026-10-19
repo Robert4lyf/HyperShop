@@ -110,7 +110,14 @@ fun RecipesRoute(
                 onRemove = vm::removeChip,
                 onClear = vm::clearSearch,
             ),
-        add = AddRecipeActions(onLink = vm::addLink, onManual = { n, s, l -> vm.addManual(n, s, l) }, onPhoto = { vm.addPhoto(it) }),
+        add =
+            AddRecipeActions(onLink = vm::addLink, onManual = {
+                    n,
+                    s,
+                    l,
+                ->
+                vm.addManual(n, s, l)
+            }, onPhoto = { uri, book, page -> vm.addPhoto(uri, book, page) }),
     )
     val detail by vm.detail.collectAsStateWithLifecycle()
     detail?.let { d ->
@@ -206,7 +213,7 @@ fun RecipesScreen(
             ) { Icon(Icons.Rounded.Add, contentDescription = "Add a recipe", modifier = Modifier.size(28.dp)) }
         }
     }
-    if (adding) AddRecipeSheet(add, onDismiss = { adding = false })
+    if (adding) AddRecipeSheet(add, onDismiss = { adding = false }, lastBook = ui.lastBook)
     forget?.let { row ->
         AlertDialog(
             onDismissRequest = { forget = null },
@@ -337,7 +344,7 @@ private fun LibraryCard(
                 Text(row.title, style = MaterialTheme.typography.titleMedium)
                 val bits =
                     listOfNotNull(
-                        webLink(row.url)?.let { siteName(it) },
+                        webLink(row.url)?.let { siteName(it) } ?: row.bookRef,
                         if (row.lines == 1) "1 ingredient" else "${row.lines} ingredients",
                         "added " + DateUtils.getRelativeTimeSpanString(row.lastAddedAt, now, DAY).toString().lowercase(),
                     )
@@ -397,8 +404,10 @@ private fun UseCard(
                 Column(Modifier.padding(20.dp).padding(end = 56.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(use.title, style = MaterialTheme.typography.titleLarge, color = Brand.OnHero)
                     val site = url?.let { siteName(it) }
+                    val book = use.bookRef
                     when {
                         site != null -> Meta(Icons.Rounded.Link, site)
+                        book != null -> Meta(Icons.AutoMirrored.Rounded.MenuBook, book)
                         use.recipeId == null -> Meta(Icons.Rounded.EditNote, "Typed into the list")
                     }
                 }
@@ -510,7 +519,7 @@ fun RecipeDetailContent(
                 Text(detail.row.title, style = MaterialTheme.typography.headlineSmall)
                 val bits =
                     listOfNotNull(
-                        url?.let { siteName(it) },
+                        url?.let { siteName(it) } ?: detail.row.bookRef,
                         detail.servings?.let { "Serves $it" },
                         if (detail.row.lines == 1) "1 ingredient" else "${detail.row.lines} ingredients",
                     )

@@ -43,4 +43,7 @@ data class ImportResult(
     val photo: String? = null,
     /** The recipe-library entry this is a copy of (an edit, or "Add to list" from the library). */
     val libraryKey: String? = null,
+    /** A cookbook recipe's book and page, as typed (photo or typed in; editable on review). */
+    val book: String? = null,
+    val page: String? = null,
 )

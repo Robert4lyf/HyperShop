@@ -13,7 +13,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
-/** v1 → v2 (the recipe library), with the live-key index that isn't in Room's schema (KNOWN_ISSUES #9). */
+/** v1 → v2 (the recipe library), with the live-key index that isn't in Room's schema (KNOWN_ISSUES #9); v2 → v3 (book and page). */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34])
 class MigrationTest {
@@ -47,7 +47,7 @@ class MigrationTest {
         val room =
             Room.databaseBuilder(ApplicationProvider.getApplicationContext(), HyperShopDatabase::class.java, name)
                 .addCallback(HyperShopDatabase.CALLBACK)
-                .addMigrations(HyperShopDatabase.MIGRATION_1_2)
+                .addMigrations(HyperShopDatabase.MIGRATION_1_2, HyperShopDatabase.MIGRATION_2_3)
                 .allowMainThreadQueries()
                 .build()
         val idx =
@@ -56,5 +56,20 @@ class MigrationTest {
         assertTrue(idx.moveToFirst())
         idx.close()
         room.close()
+    }
+
+    @Test
+    fun aCookbookRecipeGetsABookAndPage() {
+        helper.createDatabase(name, 2).apply {
+            execSQL("INSERT INTO Recipe VALUES (1,NULL,'Soup',2,'METRIC',200,'WEB','CLAUDE',NULL,0,300,'r:1')")
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(name, 3, true, HyperShopDatabase.MIGRATION_2_3)
+        db.execSQL("UPDATE Recipe SET book = 'Simple', page = '142' WHERE id = 1")
+        val c = db.query("SELECT title, libraryKey, book, page FROM Recipe")
+        assertTrue(c.moveToFirst())
+        assertEquals(listOf("Soup", "r:1", "Simple", "142"), (0..3).map { c.getString(it) })
+        c.close()
+        db.close()
     }
 }

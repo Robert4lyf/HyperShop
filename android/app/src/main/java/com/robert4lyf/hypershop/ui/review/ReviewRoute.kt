@@ -67,7 +67,7 @@ fun ReviewRoute(
                 onRetryClaude = vm::retryWithClaude,
                 onAisleInStock = vm::aisleInStock,
                 onClearInStock = vm::clearInStock,
-                edits = ReviewEdits(onTitle = vm::setTitle, onAddLine = vm::addLine),
+                edits = ReviewEdits(onTitle = vm::setTitle, onAddLine = vm::addLine, onBook = vm::setBook),
             )
         is ReviewState.Failed ->
             ManualLinesView(

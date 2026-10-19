@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.ui.recipes
 
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -99,6 +100,19 @@ class RecipesScreenTest {
         compose.onNodeWithTag("manual-go").performClick()
         assertEquals(listOf("link https://example.com/soup", "manual Gran's soup 6 2"), got)
         assertEquals(2, done)
+    }
+
+    @Test
+    fun thePhotoFormStartsWithTheLastBookAndTakesAPage() {
+        compose.setContent {
+            HyperShopTheme(
+                dynamicColor = false,
+            ) { AddRecipeContent(AddRecipeActions(), onDone = {}, start = "PHOTO", lastBook = "Ottolenghi Simple") }
+        }
+        compose.onNodeWithTag("photo-book").assertTextContains("Ottolenghi Simple")
+        compose.onNodeWithTag("photo-page").performTextInput("142")
+        compose.onNodeWithTag("photo-page").assertTextContains("142")
+        compose.onRoot().captureRoboImage(Shots.path("add-photo-light.png"))
     }
 
     @Test
