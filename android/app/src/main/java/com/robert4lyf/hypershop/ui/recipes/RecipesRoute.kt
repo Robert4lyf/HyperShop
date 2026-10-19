@@ -86,7 +86,7 @@ import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.theme.card
-import com.robert4lyf.hypershop.ui.theme.heroGlow
+import com.robert4lyf.hypershop.ui.theme.lowPoly
 import com.robert4lyf.hypershop.ui.util.factoryFor
 
 @Composable
@@ -459,7 +459,7 @@ private fun UseCard(
         val hue = Brand.recipeHue(use.title)
         Column {
             // The recipe's own colour band: the same hue as its review screen.
-            Box(Modifier.fillMaxWidth().background(Brand.recipeBrush(use.title)).heroGlow()) {
+            Box(Modifier.fillMaxWidth().lowPoly(use.title)) {
                 Icon(
                     Icons.AutoMirrored.Rounded.MenuBook,
                     contentDescription = null,
