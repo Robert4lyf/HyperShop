@@ -86,7 +86,7 @@ import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.theme.card
-import com.robert4lyf.hypershop.ui.theme.heroGlow
+import com.robert4lyf.hypershop.ui.theme.lowPoly
 import com.robert4lyf.hypershop.ui.util.factoryFor
 
 @Composable
@@ -459,14 +459,8 @@ private fun UseCard(
         val hue = Brand.recipeHue(use.title)
         Column {
             // The recipe's own colour band: the same hue as its review screen.
-            Box(Modifier.fillMaxWidth().background(Brand.recipeBrush(use.title)).heroGlow()) {
-                Icon(
-                    Icons.AutoMirrored.Rounded.MenuBook,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.16f),
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp).size(72.dp),
-                )
-                Column(Modifier.padding(20.dp).padding(end = 56.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Box(Modifier.fillMaxWidth().lowPoly(use.title)) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(use.title, style = MaterialTheme.typography.titleLarge, color = Brand.OnHero)
                     val site = url?.let { siteName(it) }
                     val book = use.bookRef

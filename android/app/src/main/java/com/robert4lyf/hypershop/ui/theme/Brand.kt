@@ -11,7 +11,7 @@ import androidx.compose.ui.graphics.Color
 /**
  * The brand's colour beyond Material's roles (docs/design/ui-overhaul.md,
  * "Colour pass"): a basil-to-lagoon gradient for heroes, citrus for highlights
- * on it, and a hue per recipe. White text clears 4.5:1 on every gradient here.
+ * on it, and a low-poly header per recipe ([lowPoly]). White text clears 4.5:1 on every gradient here.
  */
 object Brand {
     val Citrus = Color(0xFFFFE08A)
@@ -23,13 +23,8 @@ object Brand {
     /** Warm, for "ready to review": a call to act, distinct from the basil header. White text clears 4.5:1 on both ends. */
     val WarmCall = Brush.linearGradient(listOf(Color(0xFFC4451F), Color(0xFFBD3A64)))
 
-    /** A recipe's own two-tone gradient, picked from its title so it stays the same. */
-    fun recipeBrush(seed: String): Brush {
-        val hue = recipeHue(seed)
-        return Brush.linearGradient(listOf(Color.hsl(hue, 0.58f, 0.31f), Color.hsl((hue + 40f) % 360f, 0.58f, 0.28f)))
-    }
-
-    fun recipeHue(seed: String): Float = ((seed.hashCode() % 360 + 360) % 360).toFloat()
+    /** A recipe's hue for its chips and icons, from its header's palette and picked by its title, so it stays the same. */
+    fun recipeHue(seed: String): Float = lowPolyPalette(seed).hue
 
     /** A soft tint of [hue] for chips on a card. */
     fun tint(
