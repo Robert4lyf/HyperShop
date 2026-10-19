@@ -32,7 +32,7 @@ new APK on the phone as usual.
 6. [x] Tick every item in an aisle: "<aisle> done" appears with **Next: <aisle>** selected, and Start goes to that aisle?
 7. [x] "Undo <item>" on that prompt unticks it on both the watch and the phone?
 8. [x] **Offline:** with the phone's Bluetooth off (or the phone out of range), tick 2 items; the status row says "2 unsynced". On the phone, add a recipe that also uses one of those items, then turn Bluetooth back on and reopen the watch app. Does that item come back unticked with "1 more" under it?
-9. [ ] **Memory** (debug build): watch › Settings › Load sample (60). Scrolling and ticking stay quick, and nothing crashes. Use "Back to phone list" afterwards.
+9. [x] **Memory** (debug build): watch › Settings › Load sample (60). Scrolling and ticking stay quick, and nothing crashes. Use "Back to phone list" afterwards.
 10. [~] The glance (scroll up or down from the watch face) shows "N left · <aisle> next" after using the app? — No glance, and the 245 offers no way to add one for a watch app. Removed from the app.
 
 If the probe numbers differ much from 384 bytes, tell me and I'll set the phone's page size from them (`PayloadCap`).
