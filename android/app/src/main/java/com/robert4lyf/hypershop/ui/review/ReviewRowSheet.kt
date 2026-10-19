@@ -189,14 +189,16 @@ private fun Rename(
             keyboardActions = KeyboardActions(onDone = { if (changed) onRename(text) }),
             modifier = Modifier.fillMaxWidth().testTag("rename"),
         )
-        Text(
-            // Where the new name would go, as soon as it is typed; else what a rename means.
-            (if (changed) preview(text) else null)
-                ?: "Just for this recipe. To change it everywhere, use Settings › Ingredient library.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 4.dp).testTag("rename-preview"),
-        )
+        if (changed) {
+            preview(text)?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp).testTag("rename-preview"),
+                )
+            }
+        }
         if (changed) Button(onClick = { onRename(text) }, modifier = Modifier.testTag("rename-go")) { Text("Rename") }
     }
 }
@@ -283,7 +285,6 @@ internal fun MoveAisle(
             onDismissRequest = { picked = null },
             icon = { Icon(a.icon, contentDescription = null) },
             title = { Text("Always put it in ${a.displayName}?") },
-            text = { Text("\"Always\" remembers this for next time. \"Just this time\" moves only this item.") },
             confirmButton = {
                 TextButton(onClick = {
                     picked = null

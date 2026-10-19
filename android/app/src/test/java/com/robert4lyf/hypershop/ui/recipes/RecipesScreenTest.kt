@@ -3,6 +3,7 @@ package com.robert4lyf.hypershop.ui.recipes
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -114,10 +115,9 @@ class RecipesScreenTest {
         // Not on the list: straight in.
         list.performScrollToNode(hasTestTag("lib-add-r:9"))
         compose.onNodeWithTag("lib-add-r:9").performClick()
-        // On the list: "Add again", after a word about the amounts.
+        // On the list: "Add again" asks first.
         list.performScrollToNode(hasTestTag("lib-add-r:1"))
         compose.onNodeWithTag("lib-add-r:1").performClick()
-        compose.onNodeWithText("The amounts will be added on top of what is already there.").assertExists()
         compose.onNodeWithText("Cancel").performClick()
         compose.onNodeWithTag("lib-add-r:1").performClick()
         compose.onNodeWithTag("add-again-confirm").performClick()
@@ -130,18 +130,18 @@ class RecipesScreenTest {
             HyperShopTheme(dynamicColor = false) { RecipesScreen(USES.copy(uses = emptyList()), onRemove = {}, onAddInStock = {}) }
         }
         compose.onNodeWithTag("nothing-yet").assertExists()
-        compose.onNodeWithText("Nothing on the list yet — add a recipe below or tap +").assertExists()
+        compose.onNodeWithText("Nothing on the list").assertExists()
     }
 
     @Test
     fun thePhotoOptionNeedsAKey() {
         compose.setContent { HyperShopTheme { AddRecipeContent(AddRecipeActions(), onDone = {}, hasKey = false) } }
-        compose.onNodeWithText("Needs your Claude key (Settings › Claude)").assertExists()
+        compose.onNodeWithText("Needs a Claude key").assertExists()
         compose.onNodeWithTag("add-photo").performClick()
         compose.onNodeWithTag("photo-camera").assertIsNotEnabled()
         compose.onNodeWithTag("photo-pick").assertIsNotEnabled()
         compose.onNodeWithContentDescription("Back").performClick()
-        compose.onNodeWithText("Needs your Claude key (Settings › Claude)").assertExists()
+        compose.onNodeWithText("Needs a Claude key").assertExists()
     }
 
     @Test
@@ -149,6 +149,19 @@ class RecipesScreenTest {
         compose.setContent { HyperShopTheme { AddRecipeContent(AddRecipeActions(), onDone = {}, start = "PHOTO") } }
         compose.onNodeWithTag("photo-camera").assertIsEnabled()
         compose.onNodeWithTag("photo-pick").assertIsEnabled()
+    }
+
+    @Test
+    fun thePhotoFormStartsWithTheLastBookAndTakesAPage() {
+        compose.setContent {
+            HyperShopTheme(
+                dynamicColor = false,
+            ) { AddRecipeContent(AddRecipeActions(), onDone = {}, start = "PHOTO", lastBook = "Ottolenghi Simple") }
+        }
+        compose.onNodeWithTag("photo-book").assertTextContains("Ottolenghi Simple")
+        compose.onNodeWithTag("photo-page").performTextInput("142")
+        compose.onNodeWithTag("photo-page").assertTextContains("142")
+        compose.onRoot().captureRoboImage(Shots.path("add-photo-light.png"))
     }
 
     @Test

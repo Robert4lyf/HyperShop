@@ -62,7 +62,7 @@ class LibraryScreenTest {
         }
         compose.onNodeWithText("Yours").assertExists()
         compose.onNodeWithText("Edited").assertExists()
-        compose.onNodeWithText("456 ingredients · names, aisles and units").assertExists()
+        compose.onNodeWithText("456 ingredients").assertExists()
         compose.onNodeWithTag("entry-milk").performClick()
         compose.onNodeWithTag("library-search").performTextInput("ba")
         compose.onNodeWithTag("aisle-${AisleCode.PRODUCE.name}").performClick()
@@ -79,8 +79,7 @@ class LibraryScreenTest {
                 LibraryScreen(LibraryUi(loaded = loaded), query, onBack = {}, onSearch = {}, onOpen = {}, onAdd = {})
             }
         }
-        val copy = "Nothing matches. Tap Add ingredient to create it."
-        compose.onNodeWithText("Names, aisles and units").assertExists()
+        val copy = "Nothing matches"
         compose.onNodeWithText(copy).assertDoesNotExist()
         loaded = true
         compose.onNodeWithText(copy).assertDoesNotExist()

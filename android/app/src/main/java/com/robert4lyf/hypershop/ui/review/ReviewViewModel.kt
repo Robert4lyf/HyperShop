@@ -16,6 +16,7 @@ import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.QtyBase
+import com.robert4lyf.hypershop.data.ListRepository
 import com.robert4lyf.hypershop.data.StoredRecipe
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.extract.Method
@@ -104,6 +105,10 @@ data class ReviewUi(
     val originalServings: Int? = null,
     /** "Retry with Claude" is running (a [busy] that can be stopped). */
     val retrying: Boolean = false,
+    /** No web page: a cookbook recipe, which can carry its book and page. */
+    val cookbook: Boolean = false,
+    val book: String? = null,
+    val page: String? = null,
 ) {
     private val rows: List<ReviewRow> get() = aisles.flatMap { it.second }
     val addCount: Int get() = rows.count { !it.inStock && it.adds }
@@ -311,6 +316,8 @@ class ReviewViewModel(
                 r.claudePending,
                 r.lines,
                 r.libraryKey,
+                r.book,
+                r.page,
             )
         preview = c.repository.preview(s, servings, emptyMap(), aisleMoves, r.editsUse)
         stored = s
@@ -411,6 +418,9 @@ class ReviewViewModel(
                     claudeNote = claudeNote(r),
                     originalServings = r.servings,
                     retrying = retrying,
+                    cookbook = webLink(r.url) == null,
+                    book = r.book,
+                    page = r.page,
                 ),
             )
     }
@@ -768,6 +778,21 @@ class ReviewViewModel(
             changed = true
             recompute()
         }
+
+    /** The cookbook it came from: book and page, either may be blank. */
+    fun setBook(
+        book: String,
+        page: String,
+    ) = act {
+        val r = result ?: return@act
+        val b = book.trim().take(ListRepository.MAX_BOOK).ifEmpty { null }
+        val p = page.trim().take(ListRepository.MAX_PAGE).ifEmpty { null }
+        if (b == r.book && p == r.page) return@act
+        val edited = r.copy(book = b, page = p)
+        store(edited)
+        result = edited
+        recompute()
+    }
 
     /** "Add an ingredient": a line typed in, rule-parsed, at the end of the recipe. */
     fun addLine(text: String) =

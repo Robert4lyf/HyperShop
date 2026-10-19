@@ -20,9 +20,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.ShoppingBasket
-import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -43,7 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
@@ -186,17 +183,13 @@ fun ReadyCard(
                     if (n == 1) "1 recipe ready to review" else "$n recipes ready to review",
                     style = MaterialTheme.typography.titleMedium,
                 )
-                Text(
-                    if (n == 1) "Check the ingredients before they go on the list" else "Tap to review the first; the rest follow",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
             }
             Icon(Icons.Rounded.ChevronRight, contentDescription = null)
         }
     }
 }
 
-/** First run: what the app does, in two steps, a sample list to try, and a paste of a copied link. */
+/** First run: an empty list, a sample to try, and a paste of a copied link. */
 @Composable
 fun EmptyState(
     onSample: () -> Unit,
@@ -207,47 +200,12 @@ fun EmptyState(
         title = "Your list is empty",
         modifier = Modifier.padding(top = 8.dp).testTag("empty"),
     ) {
-        Spacer(Modifier.size(4.dp))
-        Step(Icons.Rounded.IosShare, "Share a recipe", "From your browser, share any recipe page, or paste its link on the Recipes tab.")
-        Step(Icons.Rounded.Storefront, "Shop aisle by aisle", "Check the ingredients, then tick them off as you go.")
-        Text(
-            "Or type items into the field above.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onSample) { Text("Try a sample list") }
             OutlinedButton(onClick = onPasteLink, modifier = Modifier.testTag("paste-link")) {
                 Icon(Icons.Rounded.ContentPaste, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(6.dp))
                 Text("Paste a link")
-            }
-        }
-    }
-}
-
-@Composable
-private fun Step(
-    icon: ImageVector,
-    title: String,
-    body: String,
-) {
-    Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.card) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Box(
-                Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-            Column {
-                Text(title, style = MaterialTheme.typography.titleSmall)
-                Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

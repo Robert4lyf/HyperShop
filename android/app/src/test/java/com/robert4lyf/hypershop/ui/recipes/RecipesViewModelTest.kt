@@ -3,6 +3,10 @@ package com.robert4lyf.hypershop.ui.recipes
 import android.os.Looper
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.robert4lyf.hypershop.core.model.UnitLocale
+import com.robert4lyf.hypershop.core.parse.RuleParser
+import com.robert4lyf.hypershop.importing.ImportInput
+import com.robert4lyf.hypershop.importing.ImportResult
 import com.robert4lyf.hypershop.testutil.CHILLI
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.testutil.await
@@ -134,6 +138,50 @@ class RecipesViewModelTest {
         runBlocking { got[1].undo!!.invoke() }
         assertEquals("Weeknight chilli", await(vm.ui) { it.library.size == 1 }.library.single().title)
         watching.cancel()
+    }
+
+    @Test
+    fun aCookbookRecipeKeepsItsBookAndPage() {
+        val c = TestContainer.create()
+        // As "+ › Photo of a recipe" leaves it once Claude has read the photo.
+        val raw = listOf("4 eggs", "400g tin chopped tomatoes")
+        val result =
+            ImportResult(
+                url = null,
+                title = "Shakshuka",
+                servings = 2,
+                locale = UnitLocale.METRIC,
+                method = "PHOTO",
+                lines = RuleParser().parseLines(raw),
+                rawLines = raw,
+                book = "Simple",
+            )
+        val review = ReviewViewModel(c, runBlocking { c.importJobs.enqueueReady(ImportInput("", "Photo of a recipe"), result) })
+        val ui = (await(review.state) { it is ReviewState.Ready } as ReviewState.Ready).ui
+        assertTrue(ui.cookbook)
+        assertEquals("Simple", ui.book)
+        // The page, added on the review screen.
+        review.setBook("Ottolenghi Simple", " 142 ")
+        await(review.state) { it is ReviewState.Ready && it.ui.page == "142" && it.ui.book == "Ottolenghi Simple" }
+        review.confirm()
+        await(review.state) { it is ReviewState.Added }
+
+        val vm = RecipesViewModel(c).shown()
+        val loaded = await(vm.ui) { it.library.isNotEmpty() && it.uses.isNotEmpty() }
+        assertEquals("Ottolenghi Simple · p. 142", loaded.library.single().bookRef)
+        assertEquals("Ottolenghi Simple · p. 142", loaded.uses.single().bookRef)
+        // The photo form starts with the book used last.
+        assertEquals("Ottolenghi Simple", loaded.lastBook)
+        // Searching by the book finds it.
+        vm.onSearchText("ottolenghi")
+        Snapshot.sendApplyNotifications()
+        await(vm.ui) { it.terms.isNotEmpty() && it.library.singleOrNull()?.title == "Shakshuka" }
+
+        // Edit keeps the book and page.
+        vm.edit(loaded.uses.single())
+        val edit = ReviewViewModel(c, nextReview(vm))
+        val reopened = (await(edit.state) { it is ReviewState.Ready } as ReviewState.Ready).ui
+        assertEquals("Ottolenghi Simple" to "142", reopened.book to reopened.page)
     }
 
     @Test

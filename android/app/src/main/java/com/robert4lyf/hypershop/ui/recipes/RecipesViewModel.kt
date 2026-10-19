@@ -11,6 +11,7 @@ import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.search.RecipeSearch
 import com.robert4lyf.hypershop.data.UseSummary
+import com.robert4lyf.hypershop.data.bookRef
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.importing.ImportInput
 import com.robert4lyf.hypershop.importing.ImportResult
@@ -39,6 +40,8 @@ data class RecipesUi(
     val hasLibrary: Boolean = library.isNotEmpty(),
     /** What is being searched for (chips, then the text being typed); empty when not searching. */
     val terms: List<String> = emptyList(),
+    /** The book of the cookbook recipe added most recently: the photo form starts with it. */
+    val lastBook: String? = null,
 )
 
 /** A saved recipe opened from "Your recipes": its ingredients, under their headings. */
@@ -61,6 +64,8 @@ data class LibraryRow(
     val onList: Boolean,
     /** Searching: the ingredients that matched ("chestnut mushroom, spinach"). */
     val uses: String? = null,
+    /** "Ottolenghi Simple · p. 142" for a cookbook recipe. */
+    val bookRef: String? = null,
 )
 
 /** The Recipes tab (PLAN §3.5): the uses on the list. */
@@ -86,7 +91,19 @@ class RecipesViewModel(
     val ui: StateFlow<RecipesUi> =
         combine(c.repository.list.map { c.repository.usesOnList(it) }, c.repository.observeLibrary(), terms) { uses, lib, q ->
             val onList = uses.mapNotNull { it.libraryKey }.toSet()
-            val rows = lib.map { LibraryRow(it.recipeId, it.key, it.title, it.url, it.lines, it.lastAddedAt, it.key in onList) }
+            val rows =
+                lib.map {
+                    LibraryRow(
+                        it.recipeId,
+                        it.key,
+                        it.title,
+                        it.url,
+                        it.lines,
+                        it.lastAddedAt,
+                        it.key in onList,
+                        bookRef = bookRef(it.book, it.page),
+                    )
+                }
             val shown =
                 if (q.isEmpty()) {
                     rows
@@ -96,7 +113,8 @@ class RecipesViewModel(
                         byId[h.id]?.copy(uses = h.uses.takeIf { it.isNotEmpty() }?.joinToString(", "))
                     }
                 }
-            RecipesUi(uses, loaded = true, library = shown, hasLibrary = rows.isNotEmpty(), terms = q)
+            val lastBook = lib.filter { it.book != null }.maxByOrNull { it.lastAddedAt }?.book
+            RecipesUi(uses, loaded = true, library = shown, hasLibrary = rows.isNotEmpty(), terms = q, lastBook = lastBook)
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecipesUi())
 
@@ -108,7 +126,8 @@ class RecipesViewModel(
             lib.map { r ->
                 RecipeSearch.Recipe(
                     r.recipeId,
-                    r.title,
+                    // The book's name too: "Ottolenghi" finds everything from it.
+                    listOfNotNull(r.title, r.book).joinToString(" "),
                     lines[r.recipeId].orEmpty().map { p ->
                         val entry = c.repository.target(p.name).catalogId?.let { c.catalog.byId[it] }
                         RecipeSearch.Ingredient(
@@ -172,6 +191,8 @@ class RecipesViewModel(
                     model = r.model,
                     rawLines = lines.map { it.raw },
                     libraryKey = row.key,
+                    book = r.book,
+                    page = r.page,
                 )
             reviews.send(c.importJobs.enqueueReady(ImportInput(r.url ?: "", r.title), result))
         }
@@ -249,6 +270,8 @@ class RecipesViewModel(
                 lines = lines,
                 rawLines = lines.map { it.raw },
                 preTick = false,
+                book = recipe.book,
+                page = recipe.page,
             )
         reviews.send(c.importJobs.enqueueReady(ImportInput(recipe.url ?: "", recipe.title), result))
     }
@@ -277,6 +300,8 @@ class RecipesViewModel(
                     editsUse = use.useId,
                     inStockLines = src.inStockLines,
                     libraryKey = r.libraryKey,
+                    book = r.book,
+                    page = r.page,
                 )
             reviews.send(c.importJobs.enqueueReady(ImportInput(r.url ?: "", r.title), result))
         }
@@ -285,25 +310,30 @@ class RecipesViewModel(
      * "+ › Photo of a recipe": the photo is saved, scaled down, and reviewed like a
      * shared page; the review screen asks Claude to read it once it is open.
      */
-    fun addPhoto(uri: Uri) =
-        viewModelScope.launch {
-            val file = PhotoStore.save(c.context, uri)
-            if (file == null) {
-                messages.send(UiMessage("Couldn't open that photo"))
-                return@launch
-            }
-            val result =
-                ImportResult(
-                    url = null,
-                    title = null,
-                    servings = null,
-                    locale = UnitLocale.METRIC,
-                    method = "PHOTO",
-                    claudePending = true,
-                    photo = file.path,
-                )
-            reviews.send(c.importJobs.enqueueReady(ImportInput("", "Photo of a recipe"), result))
+    fun addPhoto(
+        uri: Uri,
+        book: String = "",
+        page: String = "",
+    ) = viewModelScope.launch {
+        val file = PhotoStore.save(c.context, uri)
+        if (file == null) {
+            messages.send(UiMessage("Couldn't open that photo"))
+            return@launch
         }
+        val result =
+            ImportResult(
+                url = null,
+                title = null,
+                servings = null,
+                locale = UnitLocale.METRIC,
+                method = "PHOTO",
+                claudePending = true,
+                photo = file.path,
+                book = book.trim().ifEmpty { null },
+                page = page.trim().ifEmpty { null },
+            )
+        reviews.send(c.importJobs.enqueueReady(ImportInput("", "Photo of a recipe"), result))
+    }
 
     /** "+ › Paste a link": the same path as sharing a page to the app (the review screen opens when it is ready). */
     fun addLink(text: String) {

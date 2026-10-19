@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -72,8 +73,8 @@ data class AddRecipeActions(
     val onLink: (String) -> Unit = {},
     /** Name, servings (null when blank) and the ingredient lines as typed. */
     val onManual: (String, Int?, String) -> Unit = { _, _, _ -> },
-    /** A photo of a recipe, from the camera or the photo picker. */
-    val onPhoto: (Uri) -> Unit = {},
+    /** A photo of a recipe, from the camera or the photo picker, with its book and page (either may be blank). */
+    val onPhoto: (Uri, String, String) -> Unit = { _, _, _ -> },
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,13 +83,14 @@ fun AddRecipeSheet(
     actions: AddRecipeActions,
     onDismiss: () -> Unit,
     hasKey: Boolean = true,
+    lastBook: String? = null,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        AddRecipeContent(actions, onDone = onDismiss, hasKey = hasKey)
+        AddRecipeContent(actions, onDone = onDismiss, hasKey = hasKey, lastBook = lastBook)
     }
 }
 
-private const val NEEDS_KEY = "Needs your Claude key (Settings › Claude)"
+private const val NEEDS_KEY = "Needs a Claude key"
 
 /** The sheet's content, stateless apart from what is being typed (so tests and screenshots can show it). */
 @Composable
@@ -98,6 +100,8 @@ fun AddRecipeContent(
     start: String = "CHOOSE",
     /** A Claude key is saved; without one a photo can't be read. */
     hasKey: Boolean = true,
+    /** The photo form's book to start with: the one used last. */
+    lastBook: String? = null,
 ) {
     var mode by rememberSaveable { mutableStateOf(start) }
     Column(
@@ -115,21 +119,18 @@ fun AddRecipeContent(
                     Icons.Rounded.Link,
                     hue = 160f,
                     title = "Paste a link",
-                    body = "A recipe page from the web. Sharing a page to HyperShop does the same.",
                     tag = "add-link",
                 ) { mode = AddMode.LINK.name }
                 Choice(
                     Icons.Rounded.EditNote,
                     hue = 25f,
                     title = "Type it in",
-                    body = "Your own recipe: a name, how many it serves and the ingredients.",
                     tag = "add-manual",
                 ) { mode = AddMode.MANUAL.name }
                 Choice(
                     Icons.Rounded.PhotoCamera,
                     hue = 280f,
                     title = "Photo of a recipe",
-                    body = "A cookbook page: Claude reads the ingredients from the photo.",
                     tag = "add-photo",
                     note = NEEDS_KEY.takeIf { !hasKey },
                 ) { mode = AddMode.PHOTO.name }
@@ -145,8 +146,8 @@ fun AddRecipeContent(
                     onDone()
                 }
             AddMode.PHOTO ->
-                PhotoForm(hasKey, onBack = { mode = AddMode.CHOOSE.name }) { uri ->
-                    actions.onPhoto(uri)
+                PhotoForm(hasKey, lastBook, onBack = { mode = AddMode.CHOOSE.name }) { uri, book, page ->
+                    actions.onPhoto(uri, book, page)
                     onDone()
                 }
         }
@@ -158,7 +159,6 @@ private fun Choice(
     icon: ImageVector,
     hue: Float,
     title: String,
-    body: String,
     tag: String,
     /** Why it won't work yet, shown in the warning colour. */
     note: String? = null,
@@ -181,7 +181,6 @@ private fun Choice(
             ) { Icon(icon, contentDescription = null, tint = Brand.strong(hue, dark)) }
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium)
-                Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 note?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary) }
             }
             Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -236,29 +235,47 @@ private fun LinkForm(
 /**
  * "Take a photo" hands the camera app a file of ours to save into (no CAMERA
  * permission needed); "Choose from photos" is the system photo picker (none either).
+ * The book and page are optional, typed before the photo is taken, and can be
+ * changed on the review screen; the book starts as the one used last.
  */
 @Composable
 private fun PhotoForm(
     hasKey: Boolean,
+    lastBook: String?,
     onBack: () -> Unit,
-    onPicked: (Uri) -> Unit,
+    onPicked: (Uri, String, String) -> Unit,
 ) {
     val context = LocalContext.current
+    var book by rememberSaveable { mutableStateOf(lastBook.orEmpty()) }
+    var page by rememberSaveable { mutableStateOf("") }
+    val picked = { uri: Uri -> onPicked(uri, book, page) }
     // Where the camera app saves the shot: kept across the trip to the camera and back.
     var shot by rememberSaveable { mutableStateOf<String?>(null) }
     val camera =
         rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
             val uri = shot?.let(Uri::parse)
-            if (ok && uri != null) onPicked(uri)
+            if (ok && uri != null) picked(uri)
         }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let(onPicked) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let(picked) }
     FormTitle("Photo of a recipe", onBack)
-    Text(
-        "Get the whole ingredient list in the photo, flat and in good light. Claude reads it (this needs your key), " +
-            "then you check the ingredients as for a shared recipe.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = book,
+            onValueChange = { book = it },
+            label = { Text("Book (optional)") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
+            modifier = Modifier.weight(1f).testTag("photo-book"),
+        )
+        OutlinedTextField(
+            value = page,
+            onValueChange = { page = it.take(20) },
+            label = { Text("Page") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+            modifier = Modifier.width(96.dp).testTag("photo-page"),
+        )
+    }
     if (!hasKey) Text(NEEDS_KEY, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.tertiary)
     Button(
         enabled = hasKey,
@@ -326,11 +343,6 @@ private fun ManualForm(
         shape = MaterialTheme.shapes.medium,
         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
         modifier = Modifier.fillMaxWidth().testTag("manual-lines"),
-    )
-    Text(
-        "Next you check the ingredients, as for a shared recipe, before anything goes on the list.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Button(
         onClick = { onSubmit(name.trim(), servings, lines) },

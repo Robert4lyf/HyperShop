@@ -89,15 +89,6 @@ fun ManualLinesView(
                         }
                         Column(Modifier.padding(horizontal = 4.dp)) {
                             Text("Select lines manually", style = MaterialTheme.typography.headlineSmall)
-                            Text(
-                                if (candidates.isNotEmpty()) {
-                                    "Paste the ingredients, or tick the lines from the page below."
-                                } else {
-                                    "Paste the recipe's ingredients below."
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
                         }
                         OutlinedTextField(
                             value = pasted,
@@ -114,7 +105,7 @@ fun ManualLinesView(
                         )
                         if (candidates.isNotEmpty()) {
                             Text(
-                                "Or tick the ingredient lines from the page:",
+                                "Or tick lines from the page",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 4.dp),

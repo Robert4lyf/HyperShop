@@ -162,15 +162,9 @@ fun VoiceTestScreen(
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") }
                     Text("Voice test", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
                 }
-                Text(
-                    "Checks for the voice mode plan, on your phone and headphones. Nothing is ticked and Claude isn't used. " +
-                        "Only the words the phone recognised go in the log; no audio is kept.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
             item {
-                Step("1. Speech pack", "Is English (UK) recognition on the phone itself, so it works without signal?") {
+                Step("1. Speech pack", "English (UK), on the phone") {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilledTonalButton(onClick = actions.onCheckPack, modifier = Modifier.testTag("check-pack")) { Text("Check") }
                         OutlinedButton(
@@ -183,7 +177,7 @@ fun VoiceTestScreen(
                 }
             }
             item {
-                Step("2. Quick check", "Tap, then say \"next three\". Shows what was heard and how fast. Try both recognizers.") {
+                Step("2. Quick check", "Say \"next three\"") {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilledTonalButton(onClick = { actions.onQuickCheck(true) }, modifier = Modifier.testTag("quick-on-device")) {
                             Text("On-device")
@@ -197,9 +191,7 @@ fun VoiceTestScreen(
             item {
                 Step(
                     "3. Background test",
-                    "Start it, lock the phone and put it in your pocket. Say things like \"next\", \"done\", \"got the milk\", " +
-                        "press your headphone button now and then, and leave it 10+ minutes (try a noisy room or a shop). Then come back " +
-                        "and share the log. Run it once with each headset.",
+                    "Lock the phone, talk for 10+ minutes, then share the log.",
                 ) {
                     ToggleRow("Use the headset microphone", headsetMic) { headsetMic = it }
                     ToggleRow("On-device recognizer", onDevice) { onDevice = it }

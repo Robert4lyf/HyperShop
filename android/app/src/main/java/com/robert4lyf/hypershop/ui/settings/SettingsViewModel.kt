@@ -316,9 +316,9 @@ fun watchStatus(
     problem: String?,
 ): String =
     when (state) {
-        WatchLinkState.APP_READY -> "Forerunner connected. Open HyperShop on the watch to see your list."
-        WatchLinkState.CONNECTED -> "Forerunner connected. Looking for HyperShop on it…"
+        WatchLinkState.APP_READY -> "Watch connected"
+        WatchLinkState.CONNECTED -> "Watch connected"
         WatchLinkState.NOT_INSTALLED -> problem ?: "Install HyperShop on the watch"
-        WatchLinkState.DISCONNECTED -> problem ?: "Watch not connected. Ticks made on it sync when it's back."
-        WatchLinkState.NO_SDK -> problem ?: "No watch: Garmin Connect isn't available"
+        WatchLinkState.DISCONNECTED -> problem ?: "Watch not connected"
+        WatchLinkState.NO_SDK -> problem ?: "Garmin Connect isn't available"
     }

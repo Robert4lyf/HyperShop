@@ -112,7 +112,12 @@ fun RecipesRoute(
                 onRemove = vm::removeChip,
                 onClear = vm::clearSearch,
             ),
-        add = AddRecipeActions(onLink = vm::addLink, onManual = { n, s, l -> vm.addManual(n, s, l) }, onPhoto = { vm.addPhoto(it) }),
+        add =
+            AddRecipeActions(
+                onLink = vm::addLink,
+                onManual = { n, s, l -> vm.addManual(n, s, l) },
+                onPhoto = { uri, book, page -> vm.addPhoto(uri, book, page) },
+            ),
         hasKey = hasKey,
     )
     val detail by vm.detail.collectAsStateWithLifecycle()
@@ -179,14 +184,13 @@ fun RecipesScreen(
                         EmptyHero(
                             Icons.AutoMirrored.Rounded.MenuBook,
                             "No recipes yet",
-                            body = "No recipes on the list. Tap + to paste a link or type one in, or share a page from your browser.",
                         )
                     }
                 }
                 if (ui.loaded && ui.uses.isEmpty() && ui.hasLibrary) {
                     item(key = "nothing-yet") {
                         InfoBanner(
-                            "Nothing on the list yet — add a recipe below or tap +",
+                            "Nothing on the list",
                             Icons.AutoMirrored.Rounded.MenuBook,
                             Modifier.padding(horizontal = 16.dp).testTag("nothing-yet"),
                         )
@@ -203,15 +207,13 @@ fun RecipesScreen(
                         ) {
                             Column {
                                 Text("Your recipes", style = MaterialTheme.typography.titleLarge)
-                                Text(
-                                    when {
-                                        ui.terms.isEmpty() -> "Every recipe you've added. The one you added longest ago is at the top."
-                                        ui.library.isEmpty() -> "Nothing uses ${ui.terms.joinToString(" or ")}."
-                                        else -> "Using the most of ${ui.terms.joinToString(", ")} first."
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                                if (ui.terms.isNotEmpty() && ui.library.isEmpty()) {
+                                    Text(
+                                        "No matches",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                             RecipeSearchBox(search)
                         }
@@ -235,14 +237,13 @@ fun RecipesScreen(
             ) { Icon(Icons.Rounded.Add, contentDescription = "Add a recipe", modifier = Modifier.size(28.dp)) }
         }
     }
-    if (adding) AddRecipeSheet(add, onDismiss = { adding = false }, hasKey = hasKey)
+    if (adding) AddRecipeSheet(add, onDismiss = { adding = false }, hasKey = hasKey, lastBook = ui.lastBook)
     forget?.let { row -> ForgetRecipeDialog(row, onConfirm = { library.onRemove(row) }, onDismiss = { forget = null }) }
     addAgain?.let { row -> AddAgainDialog(row, onConfirm = { library.onAdd(row) }, onDismiss = { addAgain = null }) }
     confirm?.let { use ->
         AlertDialog(
             onDismissRequest = { confirm = null },
             title = { Text("Remove ${use.title}?") },
-            text = { Text("Its items come off the list, unless another recipe needs them too.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirm = null
@@ -264,7 +265,6 @@ private fun ForgetRecipeDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Remove ${row.title} from your recipes?") },
-        text = { Text("It won't be offered here again. Anything from it on the list stays.") },
         confirmButton = {
             TextButton(onClick = {
                 onDismiss()
@@ -285,7 +285,6 @@ private fun AddAgainDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add ${row.title} again?") },
-        text = { Text("The amounts will be added on top of what is already there.") },
         confirmButton = {
             TextButton(onClick = {
                 onDismiss()
@@ -319,7 +318,7 @@ private fun RecipeSearchBox(s: SearchBox) {
         OutlinedTextField(
             value = s.text,
             onValueChange = s.onText,
-            placeholder = { Text(if (s.chips.isEmpty()) "Search: an ingredient you have, or a dish" else "And…") },
+            placeholder = { Text(if (s.chips.isEmpty()) "Search" else "And…") },
             leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
             trailingIcon = {
                 if (s.text.isNotEmpty() || s.chips.isNotEmpty()) {
@@ -396,7 +395,7 @@ private fun LibraryCard(
                 Text(row.title, style = MaterialTheme.typography.titleMedium)
                 val bits =
                     listOfNotNull(
-                        webLink(row.url)?.let { siteName(it) },
+                        webLink(row.url)?.let { siteName(it) } ?: row.bookRef,
                         if (row.lines == 1) "1 ingredient" else "${row.lines} ingredients",
                         "added " + DateUtils.getRelativeTimeSpanString(row.lastAddedAt, now, DAY).toString().lowercase(),
                     )
@@ -458,8 +457,10 @@ private fun UseCard(
                 Column(Modifier.padding(20.dp).padding(end = 56.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(use.title, style = MaterialTheme.typography.titleLarge, color = Brand.OnHero)
                     val site = url?.let { siteName(it) }
+                    val book = use.bookRef
                     when {
                         site != null -> Meta(Icons.Rounded.Link, site)
+                        book != null -> Meta(Icons.AutoMirrored.Rounded.MenuBook, book)
                         use.recipeId == null -> Meta(Icons.Rounded.EditNote, "Typed into the list")
                     }
                 }
@@ -574,7 +575,7 @@ fun RecipeDetailContent(
                 Text(detail.row.title, style = MaterialTheme.typography.headlineSmall)
                 val bits =
                     listOfNotNull(
-                        url?.let { siteName(it) },
+                        url?.let { siteName(it) } ?: detail.row.bookRef,
                         detail.servings?.let { "Serves $it" },
                         if (detail.row.lines == 1) "1 ingredient" else "${detail.row.lines} ingredients",
                     )

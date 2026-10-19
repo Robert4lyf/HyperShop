@@ -107,7 +107,6 @@ import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.util.factoryFor
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 data class SettingsActions(
@@ -191,7 +190,7 @@ fun SettingsScreen(
                 contentPadding = PaddingValues(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                item(key = "top") { ScreenHeader(title = "Settings", subtitle = "Your list, your shop, your watch") }
+                item(key = "top") { ScreenHeader(title = "Settings") }
                 // Nothing below the header until the saved settings are in, so no control jumps.
                 if (!ui.loaded) {
                     item(key = "loading") {
@@ -223,12 +222,7 @@ fun SettingsScreen(
             onDismissRequest = actions.onDismissKeyLost,
             icon = { Icon(Icons.Rounded.Lock, contentDescription = null) },
             title = { Text("Claude key removed") },
-            text = {
-                Text(
-                    "Android could no longer unlock your saved key, so it was deleted and Claude is off. " +
-                        "Recipes are read offline until you enter the key again.",
-                )
-            },
+            text = { Text("The saved key couldn't be unlocked. Enter it again.") },
             confirmButton = { TextButton(onClick = actions.onDismissKeyLost) { Text("OK") } },
         )
     }
@@ -293,10 +287,7 @@ private fun IngredientsGroup(actions: SettingsActions) {
             .testTag("open-library"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f)) {
-            Text("Ingredient library", style = MaterialTheme.typography.bodyLarge)
-            Hint("Names, aisles and units the app knows. Edit them or add your own.")
-        }
+        Text("Ingredient library", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
         Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -338,7 +329,7 @@ private fun ListGroup(
     Spacer(Modifier.height(4.dp))
     Text("Always in stock", style = MaterialTheme.typography.bodyLarge)
     if (ui.staples.isEmpty()) {
-        Hint("None yet. Mark something \"Always in stock\" on the review screen.")
+        Hint("None")
     } else {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             for (s in ui.staples) StapleChip(s) { actions.onRemoveStaple(s) }
@@ -371,7 +362,6 @@ private fun AislesGroup(
     actions: SettingsActions,
 ) {
     var confirmReset by remember { mutableStateOf(false) }
-    Hint("The order you walk the shop in. The list follows it.")
     Column {
         ui.aisles.forEachIndexed { i, a ->
             Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -405,7 +395,6 @@ private fun AislesGroup(
         AlertDialog(
             onDismissRequest = { confirmReset = false },
             title = { Text("Reset the aisle order?") },
-            text = { Text("The aisles go back to the order the app came with.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmReset = false
@@ -423,11 +412,6 @@ private fun WatchGroup(
     actions: SettingsActions,
 ) {
     InfoBanner(ui.watchStatus, Icons.Rounded.Watch, Modifier.testTag("watch-status"))
-    Text(
-        "Vibration and the rest of the watch's settings are on the watch: Settings at the bottom of its aisle list.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
 }
 
 @Composable
@@ -437,16 +421,9 @@ private fun KeySection(
 ) {
     var confirmRemove by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        InfoBanner(
-            "Recipe pages, photos and typed recipes you review are sent to Anthropic under your own key. " +
-                "Items you add on the list never leave the phone.",
-            Icons.Rounded.Lock,
-            Modifier.testTag("privacy"),
-            Tone.PRIMARY,
-        )
         if (ui.keyMissingAfterRestore) {
             InfoBanner(
-                "Your key isn't backed up, so it didn't come across with this restore. Enter it again.",
+                "Your key wasn't restored. Enter it again.",
                 Icons.Rounded.Error,
                 tone = Tone.ERROR,
             )
@@ -501,7 +478,6 @@ private fun KeySection(
                 },
                 enabled = key.isNotBlank(),
             ) { Text("Save and test") }
-            Hint("Without a key, recipes are read by the built-in parser, which gets simple lists right and struggles with unusual ones.")
         }
         ui.keyStatus?.let {
             Text(
@@ -509,9 +485,9 @@ private fun KeySection(
                     KeyStatus.TESTING -> "Testing…"
                     KeyStatus.OK -> "✓ The key works"
                     KeyStatus.BAD_KEY -> "✗ Anthropic didn't accept that key"
-                    KeyStatus.MALFORMED -> "✗ That doesn't look like a key — paste it again"
-                    KeyStatus.OFFLINE -> "Couldn't reach Anthropic. Check your connection."
-                    KeyStatus.ERROR -> "Anthropic returned an error. Try again later."
+                    KeyStatus.MALFORMED -> "✗ That isn't a key"
+                    KeyStatus.OFFLINE -> "Couldn't reach Anthropic"
+                    KeyStatus.ERROR -> "Anthropic returned an error"
                 },
                 Modifier.testTag("key-status"),
                 style = MaterialTheme.typography.titleSmall,
@@ -528,7 +504,6 @@ private fun KeySection(
         AlertDialog(
             onDismissRequest = { confirmRemove = false },
             title = { Text("Remove your Claude key?") },
-            text = { Text("Recipes will be read offline until you enter one again.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmRemove = false
@@ -542,9 +517,9 @@ private fun KeySection(
 
 private val MODEL_NOTES =
     mapOf(
-        ClaudeModel.HAIKU to "Fast and the most accurate on ingredient names. About $0.001 a recipe.",
-        ClaudeModel.SONNET to "About 20 times Haiku's cost.",
-        ClaudeModel.OPUS to "About 40 times Haiku's cost.",
+        ClaudeModel.HAIKU to "About $0.001 a recipe",
+        ClaudeModel.SONNET to "About 20× the cost",
+        ClaudeModel.OPUS to "About 40× the cost",
     )
 
 @Composable
@@ -572,8 +547,6 @@ private fun ModelSection(
     }
 }
 
-private val RESET_DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM", Locale.getDefault())
-
 @Composable
 private fun CapsSection(
     ui: SettingsUi,
@@ -593,8 +566,6 @@ private fun CapsSection(
             "This month: ${usd(ui.spentThisMonthUsd)} of ${usd(ui.monthlyCapUsd)}",
         )
         Meter("Today", ui.callsToday / ui.dailyCalls.coerceAtLeast(1).toFloat(), "Today: ${ui.callsToday} of ${ui.dailyCalls} calls")
-        val nextMonth = ui.today.withDayOfMonth(1).plusMonths(1).format(RESET_DAY)
-        Hint("At the cap, recipes are read offline until $nextMonth for the month, or until tomorrow for the day.")
         CapField(
             "Monthly cap (US$)",
             String.format(Locale.US, "%.2f", ui.monthlyCapUsd),
@@ -607,7 +578,7 @@ private fun CapsSection(
             "Calls a day",
             ui.dailyCalls.toString(),
             "cap-day",
-            help = "0 to 1000 a day (0 turns Claude off)",
+            help = "0 to 1000",
             keyboard = KeyboardType.Number,
             onSet = actions.onDailyCalls,
         )
@@ -691,7 +662,6 @@ private fun AdvancedGroup(
     SwitchRow("Show the debug log", ui.debugLog, actions.onDebugLog)
     if (ui.debugLog) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Hint("Kept in memory only, never sent anywhere. Keys and query strings are removed.")
             Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest) {
                 Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     if (ui.logLines.isEmpty()) Text("Nothing logged yet", style = MaterialTheme.typography.bodySmall)
@@ -701,9 +671,6 @@ private fun AdvancedGroup(
             TextButton(onClick = actions.onRefreshLog) { Text("Refresh") }
         }
     }
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        OutlinedButton(onClick = actions.onVoiceTest, modifier = Modifier.testTag("open-voice-test")) { Text("Voice test") }
-        Hint("An experiment: checks whether hands-free shopping would work on this phone")
-    }
+    OutlinedButton(onClick = actions.onVoiceTest, modifier = Modifier.testTag("open-voice-test")) { Text("Voice test") }
     actions.onDebug?.let { open -> OutlinedButton(onClick = open) { Text("Debug tools") } }
 }

@@ -56,6 +56,8 @@ data class LibraryRecipe(
     val url: String?,
     val lines: Int,
     val lastAddedAt: Long,
+    val book: String? = null,
+    val page: String? = null,
 )
 
 /** What "Edit" on the Recipes tab reopens: see [ListRepository.editSource]. */
@@ -72,7 +74,7 @@ data class StoredRecipe(
     val lines: List<Pair<RecipeLineEntity, ParsedIngredient>>,
 )
 
-/** The phone's answer to a watch message (PLAN §3.6): always sent. */
+/** A recipe on the list (or the items typed in), for the Recipes tab's "On your list". */
 data class UseSummary(
     val useId: Long,
     val recipeId: Long?,
@@ -84,6 +86,8 @@ data class UseSummary(
     val inStockCount: Int,
     /** Its recipe's library entry ([LibraryRecipe.key]), for "On your list" in the library. */
     val libraryKey: String? = null,
+    /** "Ottolenghi Simple · p. 142" ([bookRef]). */
+    val bookRef: String? = null,
 )
 
 /** A use's title and recipe page, for the item sheet's "From" rows. */
@@ -285,6 +289,8 @@ class ListRepository(
         lines: List<ParsedIngredient>,
         /** The library entry this is a new copy of (an edit or a re-add); null for a new recipe. */
         libraryKey: String? = null,
+        book: String? = null,
+        page: String? = null,
     ): StoredRecipe =
         db.withTransaction {
             val r =
@@ -300,6 +306,8 @@ class ListRepository(
                     model,
                     claudePending,
                     libraryKey = libraryKey,
+                    book = book?.trim()?.take(MAX_BOOK)?.ifEmpty { null },
+                    page = page?.trim()?.take(MAX_PAGE)?.ifEmpty { null },
                 )
             val id = dao.insertRecipe(r)
             val rows = lines.map { RecipeLineEntity(0, id, it.section, it.raw, json.encodeToString(ParsedIngredient.serializer(), it)) }
@@ -357,6 +365,7 @@ class ListRepository(
                 itemCount = cs.map { it.itemId }.distinct().size,
                 inStockCount = inStock[u.id] ?: 0,
                 libraryKey = r?.let { it.libraryKey ?: it.url ?: "r:${it.id}" },
+                bookRef = r?.let { bookRef(it.book, it.page) },
             )
         }
     }
@@ -437,7 +446,16 @@ class ListRepository(
         dao.observeLibrary().map { rows ->
             val counts = rows.map { it.id }.chunked(MAX_ARGS).flatMap { dao.lineCounts(it) }.associate { it.recipeId to it.n }
             rows.map { r ->
-                LibraryRecipe(r.id, r.libraryKey ?: "r:${r.id}", r.title ?: "Recipe", r.url, counts[r.id] ?: 0, r.lastAddedAt ?: 0)
+                LibraryRecipe(
+                    r.id,
+                    r.libraryKey ?: "r:${r.id}",
+                    r.title ?: "Recipe",
+                    r.url,
+                    counts[r.id] ?: 0,
+                    r.lastAddedAt ?: 0,
+                    r.book,
+                    r.page,
+                )
             }
         }
 
@@ -887,6 +905,8 @@ class ListRepository(
 
     companion object {
         const val RESULT_HISTORY = 64
+        const val MAX_BOOK = 120
+        const val MAX_PAGE = 20
 
         /** Below SQLite's 999 bound variables. */
         private const val MAX_ARGS = 500

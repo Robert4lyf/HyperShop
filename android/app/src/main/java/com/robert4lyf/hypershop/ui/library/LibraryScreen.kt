@@ -150,11 +150,13 @@ fun LibraryScreen(
                             style = MaterialTheme.typography.headlineSmall,
                             modifier = Modifier.semantics { heading() },
                         )
-                        Text(
-                            if (ui.loaded) "${ui.total} ingredients · names, aisles and units" else "Names, aisles and units",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        if (ui.loaded) {
+                            Text(
+                                "${ui.total} ingredients",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
                 OutlinedTextField(
@@ -178,7 +180,7 @@ fun LibraryScreen(
                 LazyColumn(Modifier.fillMaxSize().testTag("library"), contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp)) {
                     // Only once the catalogue is in: an empty list before that is just loading.
                     if (ui.loaded && ui.rows.isEmpty() && (query.isNotEmpty() || aisle != null)) {
-                        item { Text("Nothing matches. Tap Add ingredient to create it.", Modifier.padding(24.dp)) }
+                        item { Text("Nothing matches", Modifier.padding(24.dp)) }
                     }
                     itemsIndexed(ui.rows, key = { _, r -> r.id }) { i, r ->
                         Row(
@@ -359,7 +361,7 @@ fun EntryEditor(
         Text(if (f.isNew) "Add ingredient" else "Edit ingredient", style = MaterialTheme.typography.headlineSmall)
         Field("Name", f.name, "entry-name") { edit(f.copy(name = it)) }
         Field("Plural (optional)", f.plural, "entry-plural") { edit(f.copy(plural = it)) }
-        Field("Also called, separated by commas", f.synonyms, "entry-synonyms", lines = 2) { edit(f.copy(synonyms = it)) }
+        Field("Also called", f.synonyms, "entry-synonyms", lines = 2) { edit(f.copy(synonyms = it)) }
         Text("Aisle", style = MaterialTheme.typography.titleSmall)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             for (a in AisleCode.entries) {
@@ -401,24 +403,19 @@ fun EntryEditor(
                         ) { Text(label, maxLines = 1) }
                     }
                 }
-                if (f.policy == DisplayPolicy.PRESENCE) {
-                    Help("None: the list shows just the name, as for salt or herbs you buy in a pack.")
-                }
-                Field("Usually sold as, e.g. 1 kg bag", f.packNote, "entry-pack") { edit(f.copy(packNote = it)) }
-                Field("Grams per cup (turns cups into grams)", f.gramsPerCup, "entry-grams", number = true) {
+                Field("Usually sold as", f.packNote, "entry-pack") { edit(f.copy(packNote = it)) }
+                Field("Grams per cup", f.gramsPerCup, "entry-grams", number = true) {
                     edit(f.copy(gramsPerCup = it))
                 }
-                Field("Group in the aisle, e.g. Herbs (optional)", f.group, "entry-group") { edit(f.copy(group = it)) }
-                Field("Swaps, separated by commas", f.swaps, "entry-swaps", lines = 2) { edit(f.copy(swaps = it)) }
+                Field("Group (optional)", f.group, "entry-group") { edit(f.copy(group = it)) }
+                Field("Swaps", f.swaps, "entry-swaps", lines = 2) { edit(f.copy(swaps = it)) }
                 // Suggestions for the term after the last comma; picking one completes that term.
                 Suggestions(suggestFor(f.swaps.substringAfterLast(','), suggest)) { name ->
                     val kept = f.swaps.substringBeforeLast(',', missingDelimiterValue = "").trim()
                     edit(f.copy(swaps = if (kept.isEmpty()) name else "$kept, $name"))
                 }
-                Help("Offered on the list as \"Swap for\", e.g. maple syrup for agave syrup.")
                 Field("Always replace with (optional)", f.replaceWith, "entry-replace") { edit(f.copy(replaceWith = it)) }
                 Suggestions(suggestFor(f.replaceWith, suggest)) { edit(f.copy(replaceWith = it)) }
-                Help("Recipes asking for this get the other ingredient instead; one already on the list is swapped now.")
             }
         }
         error?.let {
@@ -455,15 +452,6 @@ fun EntryEditor(
         AlertDialog(
             onDismissRequest = { confirmReset = false },
             title = { Text(if (start.custom) "Delete $name?" else "Reset $name to default?") },
-            text = {
-                Text(
-                    if (start.custom) {
-                        "It leaves the library. Anything on the list keeps its name."
-                    } else {
-                        "Your changes go, and the ingredient is as the app came with it."
-                    },
-                )
-            },
             confirmButton = {
                 TextButton(onClick = {
                     confirmReset = false
@@ -480,11 +468,6 @@ private fun suggestFor(
     typed: String,
     suggest: (String) -> List<String>,
 ): List<String> = if (typed.isBlank()) emptyList() else suggest(typed)
-
-@Composable
-private fun Help(text: String) {
-    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-}
 
 /** Up to five ingredient names under a field, each a row that fills it in. */
 @Composable

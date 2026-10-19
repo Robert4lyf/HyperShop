@@ -50,4 +50,7 @@ data class ImportResult(
     val decisionsSaved: Boolean = false,
     /** "Just this time" aisle moves made on the review, by merge key. */
     val aisleMoves: Map<String, AisleCode> = emptyMap(),
+    /** A cookbook recipe's book and page, as typed (photo or typed in; editable on review). */
+    val book: String? = null,
+    val page: String? = null,
 )

@@ -62,7 +62,7 @@ class ManualLinesTest {
     @Test
     fun blockedPageOffersPasteAndTryAgain() {
         show(ImportError.HTTP, emptyList(), retry = true)
-        compose.onNodeWithText("The site refused the request (some sites block apps).").assertExists()
+        compose.onNodeWithText("The site refused the request.").assertExists()
         compose.onNodeWithText("Paste the ingredient lines").assertExists()
         compose.onNodeWithText("Try again").performClick()
         assertEquals(1, retried)

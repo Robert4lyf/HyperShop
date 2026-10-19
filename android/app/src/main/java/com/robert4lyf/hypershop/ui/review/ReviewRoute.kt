@@ -72,7 +72,6 @@ fun ReviewRoute(
         AlertDialog(
             onDismissRequest = { confirmDiscard = false },
             title = { Text("Discard this recipe?") },
-            text = { Text("The changes you made here will be lost.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDiscard = false
@@ -95,7 +94,7 @@ fun ReviewRoute(
                 onRetryClaude = vm::retryWithClaude,
                 onAisleInStock = vm::aisleInStock,
                 onClearInStock = vm::clearInStock,
-                edits = ReviewEdits(onTitle = vm::setTitle, onAddLine = vm::addLine),
+                edits = ReviewEdits(onTitle = vm::setTitle, onAddLine = vm::addLine, onBook = vm::setBook),
                 onStopRetry = vm::stopRetry,
             )
         is ReviewState.Failed ->
@@ -150,7 +149,7 @@ fun ReviewRoute(
                 // Outside or Back: nothing happens, the job stays ready to review.
                 onDismissRequest = onDone,
                 title = { Text("Already on your list") },
-                text = { Text("${s.title} is already on your list. The amounts will be added on top of what is already there.") },
+                text = { Text("${s.title} is already on your list.") },
                 confirmButton = { TextButton(onClick = vm::addAgain) { Text("Add again") } },
                 dismissButton = { TextButton(onClick = vm::cancel) { Text("Don't add") } },
             )
@@ -174,7 +173,7 @@ private fun LoadingView(
         Text(s.stage, Modifier.testTag("loading"), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         if (s.slow) {
             Text(
-                "Taking a while. You can paste the ingredients instead.",
+                "Taking a while",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -187,12 +186,12 @@ private fun LoadingView(
 
 fun errorText(e: ImportError): String =
     when (e) {
-        ImportError.BLOCKED -> "That address can't be fetched (it isn't a public https page)."
+        ImportError.BLOCKED -> "That address can't be fetched."
         ImportError.NOT_HTML -> "That link isn't a web page."
         ImportError.TOO_LARGE -> "That page is too large to read."
-        ImportError.HTTP -> "The site refused the request (some sites block apps)."
-        ImportError.OFFLINE -> "You're offline. Share the link again when you're connected, or paste the lines."
+        ImportError.HTTP -> "The site refused the request."
+        ImportError.OFFLINE -> "You're offline."
         ImportError.NO_RECIPE -> "No ingredient list found on that page."
         ImportError.NOT_A_RECIPE -> "That page doesn't look like a recipe."
-        ImportError.PHOTO_NEEDS_KEY -> "Reading a photo needs your Claude key (Settings › Claude). Or type the ingredients below."
+        ImportError.PHOTO_NEEDS_KEY -> "Reading a photo needs a Claude key."
     }

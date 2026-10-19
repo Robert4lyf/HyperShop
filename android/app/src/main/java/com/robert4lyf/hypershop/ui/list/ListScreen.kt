@@ -242,11 +242,6 @@ private fun LazyListScope.inStockSection(
                 }
                 Column(Modifier.weight(1f)) {
                     Text("In stock", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                    Text(
-                        "Marked in stock for these recipes. Check before you go.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
                 }
                 Text("${rows.size}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
                 Icon(
@@ -349,8 +344,8 @@ private fun ListTop(
         subtitle =
             when {
                 !ui.loaded -> null
-                !shopping -> "Recipes in, shopping list out"
-                ui.left == 0 -> "Everything's in the basket"
+                !shopping -> null
+                ui.left == 0 -> "All done"
                 else -> "${ui.doneCount} of $total ticked"
             },
         actions = {
@@ -404,7 +399,7 @@ private fun ListTop(
         AlertDialog(
             onDismissRequest = { confirmClear = false },
             title = { Text("Clear the whole list?") },
-            text = { Text(if (total == 1) "1 item. You can undo for 10 seconds." else "$total items. You can undo for 10 seconds.") },
+            text = { Text(if (total == 1) "1 item" else "$total items") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmClear = false

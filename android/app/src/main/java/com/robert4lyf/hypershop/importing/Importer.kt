@@ -158,20 +158,20 @@ class Importer(
     companion object {
         /**
          * [ImportResult.claudeNote] (a [ClaudeResult.Reason] name, or the refusal note) in
-         * plain words for the review screen, each saying what to do about it.
+         * plain words for the review screen.
          */
         fun claudeNoteText(note: String?): String? =
             when (note) {
                 null -> null
-                "NO_KEY" -> "No Claude key — add one in Settings › Claude"
-                "BAD_KEY" -> "Claude rejected the key — check it in Settings › Claude"
-                "CAP_REACHED" -> "Monthly cap reached — raise it in Settings › Claude"
-                "OFFLINE" -> "Offline — retry when connected"
-                "RATE_LIMITED", "OVERLOADED" -> "Claude is busy — try again in a minute"
-                "SERVER" -> "Claude had a problem — try again in a minute"
-                "MAX_TOKENS" -> "The recipe was too long for Claude to answer"
-                "INVALID_RESPONSE" -> "Claude's answer couldn't be read — try again"
-                "REQUEST" -> "Claude turned the request down — try again later"
+                "NO_KEY" -> "No Claude key"
+                "BAD_KEY" -> "Claude rejected the key"
+                "CAP_REACHED" -> "Monthly cap reached"
+                "OFFLINE" -> "Offline"
+                "RATE_LIMITED", "OVERLOADED" -> "Claude is busy"
+                "SERVER" -> "Claude had a problem"
+                "MAX_TOKENS" -> "Too long for Claude"
+                "INVALID_RESPONSE" -> "Claude's answer couldn't be read"
+                "REQUEST" -> "Claude turned the request down"
                 else -> if (note.startsWith("Claude declined")) "Claude declined this page" else note
             }
 

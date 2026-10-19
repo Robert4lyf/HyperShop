@@ -132,7 +132,7 @@ class ListScreenTest {
         show()
         compose.onNodeWithContentDescription("More").performClick()
         compose.onNodeWithText("Clear all").performClick()
-        compose.onNodeWithText("6 items. You can undo for 10 seconds.").assertExists()
+        compose.onNodeWithText("6 items").assertExists()
         compose.onNodeWithText("Cancel").performClick()
         assertEquals(emptyList<String>(), events)
         compose.onNodeWithContentDescription("More").performClick()
@@ -258,7 +258,6 @@ class ListScreenTest {
         showWithHeader(ListUi(loaded = true, readyJobs = listOf(7, 8)))
         val card = compose.onNodeWithTag("ready-card")
         assertEquals(Role.Button, card.fetchSemanticsNode().config.getOrNull(SemanticsProperties.Role))
-        compose.onNodeWithText("Tap to review the first; the rest follow").assertExists()
         // Several waiting: the card opens the oldest.
         compose.onNodeWithText("2 recipes ready to review").performClick()
         compose.onNodeWithText("Try a sample list").performClick()

@@ -175,7 +175,6 @@ private fun ItemAisle(
             onDismissRequest = { picked = null },
             icon = { Icon(a.icon, contentDescription = null) },
             title = { Text("Move ${name.replaceFirstChar { it.uppercase() }} to ${a.displayName}?") },
-            text = { Text("\"Always\" remembers this for next time. \"Just this time\" moves only this item.") },
             confirmButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     TextButton(onClick = {
@@ -249,15 +248,6 @@ private fun Swaps(
         AlertDialog(
             onDismissRequest = { asking = null },
             title = { Text("Swap ${sheet.name} for $to?") },
-            text = {
-                Text(
-                    if (sheet.canAlways) {
-                        "Its amounts move to $to. \"Always\" also uses $to whenever a recipe asks for ${sheet.name}."
-                    } else {
-                        "Its amounts move to $to."
-                    },
-                )
-            },
             confirmButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     TextButton(onClick = {
