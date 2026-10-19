@@ -95,3 +95,4 @@ Run 1 stops here. The yes/no checks are in `docs/HANDOFF.md`. No PR: there is no
 ## ⏸ Hand-off B — waiting on you
 Run 2 stops here. The yes/no checks (install, probe, sync, offline, memory, glance) are in `docs/HANDOFF.md`. The watch builds (`hypershop-fr245.prg`, `hypershop-fr245-debug.prg`) are attached to the rolling release once this run is merged.
 - [x] Hand-off B checklist written (docs/HANDOFF.md)
+- [x] Hand-off B checks on a real Forerunner 245: all pass; the glance is dropped (the 245 offers none for a watch app)
