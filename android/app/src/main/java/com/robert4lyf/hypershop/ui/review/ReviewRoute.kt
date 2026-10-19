@@ -107,12 +107,12 @@ fun ReviewRoute(
 
 fun errorText(e: ImportError): String =
     when (e) {
-        ImportError.BLOCKED -> "That address can't be fetched (it isn't a public https page)."
+        ImportError.BLOCKED -> "That address can't be fetched."
         ImportError.NOT_HTML -> "That link isn't a web page."
         ImportError.TOO_LARGE -> "That page is too large to read."
-        ImportError.HTTP -> "The site refused the request (some sites block apps)."
-        ImportError.OFFLINE -> "You're offline. Share the link again when you're connected, or paste the lines."
+        ImportError.HTTP -> "The site refused the request."
+        ImportError.OFFLINE -> "You're offline."
         ImportError.NO_RECIPE -> "No ingredient list found on that page."
         ImportError.NOT_A_RECIPE -> "That page doesn't look like a recipe."
-        ImportError.PHOTO_NEEDS_KEY -> "Reading a photo needs your Claude key (Settings › Claude). Or type the ingredients below."
+        ImportError.PHOTO_NEEDS_KEY -> "Reading a photo needs a Claude key."
     }

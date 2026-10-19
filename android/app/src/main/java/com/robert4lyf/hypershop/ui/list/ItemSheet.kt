@@ -167,15 +167,6 @@ private fun Swaps(
         AlertDialog(
             onDismissRequest = { asking = null },
             title = { Text("Swap ${sheet.name} for $to?") },
-            text = {
-                Text(
-                    if (sheet.canAlways) {
-                        "Its amounts move to $to. \"Always\" also uses $to whenever a recipe asks for ${sheet.name}."
-                    } else {
-                        "Its amounts move to $to."
-                    },
-                )
-            },
             confirmButton = {
                 TextButton(onClick = {
                     asking = null
