@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AutoAwesome
@@ -76,6 +77,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
+import com.robert4lyf.hypershop.data.bookRef
 import com.robert4lyf.hypershop.ui.common.AisleBadge
 import com.robert4lyf.hypershop.ui.common.BottomActionBar
 import com.robert4lyf.hypershop.ui.common.InfoBanner
@@ -90,9 +92,11 @@ import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.theme.heroGlow
 import com.robert4lyf.hypershop.ui.theme.style
 
-/** Changes to the recipe itself: its name, and an ingredient added by hand. */
+/** Changes to the recipe itself: its name, its book and page, and an ingredient added by hand. */
 data class ReviewEdits(
     val onTitle: (String) -> Unit = {},
+    /** A cookbook recipe's book and page. */
+    val onBook: (String, String) -> Unit = { _, _ -> },
     val onAddLine: (String) -> Unit = {},
 )
 
@@ -115,7 +119,7 @@ fun ReviewScreen(
             TopBar(onCancel, onClearInStock)
             val card = MaterialTheme.colorScheme.card
             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
-                item(key = "hero") { Hero(ui, onServings, onRetryClaude, edits.onTitle) }
+                item(key = "hero") { Hero(ui, onServings, onRetryClaude, edits.onTitle, edits.onBook) }
                 ui.notice?.let { n ->
                     item(key = "notice") {
                         InfoBanner(
@@ -208,9 +212,12 @@ private fun Hero(
     onServings: (Int) -> Unit,
     onRetryClaude: () -> Unit,
     onTitle: (String) -> Unit,
+    onBook: (String, String) -> Unit,
 ) {
     var renaming by remember { mutableStateOf(false) }
     if (renaming) TitleDialog(ui.title, onDismiss = { renaming = false }) { onTitle(it) }
+    var sourcing by remember { mutableStateOf(false) }
+    if (sourcing) BookDialog(ui.book, ui.page, onDismiss = { sourcing = false }, onSave = onBook)
     val open = rememberOpenLink()
     val onHero = ButtonDefaults.textButtonColors(contentColor = Brand.OnHero)
     CompositionLocalProvider(LocalContentColor provides Brand.OnHero) {
@@ -252,6 +259,19 @@ private fun Hero(
                 )
                 IconButton(onClick = { renaming = true }, modifier = Modifier.testTag("edit-title")) {
                     Icon(Icons.Rounded.Edit, contentDescription = "Rename recipe", tint = Brand.OnHero)
+                }
+            }
+            if (ui.cookbook) {
+                // Where it came from, for next time: the book and page, or a way to add them.
+                TextButton(
+                    onClick = { sourcing = true },
+                    colors = onHero,
+                    contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp),
+                    modifier = Modifier.testTag("edit-book"),
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.size(8.dp))
+                    Text(bookRef(ui.book, ui.page) ?: "Add book and page", maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)) {
@@ -302,6 +322,48 @@ private fun TitleDialog(
                 onSave(text)
                 onDismiss()
             }, modifier = Modifier.testTag("title-save")) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/** The cookbook a recipe came from: either field may be left empty. */
+@Composable
+private fun BookDialog(
+    book: String?,
+    page: String?,
+    onDismiss: () -> Unit,
+    onSave: (String, String) -> Unit,
+) {
+    var b by remember { mutableStateOf(book.orEmpty()) }
+    var p by remember { mutableStateOf(page.orEmpty()) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Book and page") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = b,
+                    onValueChange = { b = it },
+                    label = { Text("Book") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                    modifier = Modifier.fillMaxWidth().testTag("book-field"),
+                )
+                OutlinedTextField(
+                    value = p,
+                    onValueChange = { p = it },
+                    label = { Text("Page") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("page-field"),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onSave(b, p)
+                onDismiss()
+            }, modifier = Modifier.testTag("book-save")) { Text("Save") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )

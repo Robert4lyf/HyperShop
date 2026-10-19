@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -71,8 +72,8 @@ data class AddRecipeActions(
     val onLink: (String) -> Unit = {},
     /** Name, servings (null when blank) and the ingredient lines as typed. */
     val onManual: (String, Int?, String) -> Unit = { _, _, _ -> },
-    /** A photo of a recipe, from the camera or the photo picker. */
-    val onPhoto: (Uri) -> Unit = {},
+    /** A photo of a recipe, from the camera or the photo picker, with its book and page (either may be blank). */
+    val onPhoto: (Uri, String, String) -> Unit = { _, _, _ -> },
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -80,9 +81,10 @@ data class AddRecipeActions(
 fun AddRecipeSheet(
     actions: AddRecipeActions,
     onDismiss: () -> Unit,
+    lastBook: String? = null,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        AddRecipeContent(actions, onDone = onDismiss)
+        AddRecipeContent(actions, onDone = onDismiss, lastBook = lastBook)
     }
 }
 
@@ -92,6 +94,8 @@ fun AddRecipeContent(
     actions: AddRecipeActions,
     onDone: () -> Unit,
     start: String = "CHOOSE",
+    /** The photo form's book to start with: the one used last. */
+    lastBook: String? = null,
 ) {
     var mode by rememberSaveable { mutableStateOf(start) }
     Column(
@@ -138,8 +142,8 @@ fun AddRecipeContent(
                     onDone()
                 }
             AddMode.PHOTO ->
-                PhotoForm(onBack = { mode = AddMode.CHOOSE.name }) { uri ->
-                    actions.onPhoto(uri)
+                PhotoForm(lastBook, onBack = { mode = AddMode.CHOOSE.name }) { uri, book, page ->
+                    actions.onPhoto(uri, book, page)
                     onDone()
                 }
         }
@@ -225,21 +229,27 @@ private fun LinkForm(
 /**
  * "Take a photo" hands the camera app a file of ours to save into (no CAMERA
  * permission needed); "Choose from photos" is the system photo picker (none either).
+ * The book and page are optional, typed before the photo is taken, and can be
+ * changed on the review screen; the book starts as the one used last.
  */
 @Composable
 private fun PhotoForm(
+    lastBook: String?,
     onBack: () -> Unit,
-    onPicked: (Uri) -> Unit,
+    onPicked: (Uri, String, String) -> Unit,
 ) {
     val context = LocalContext.current
+    var book by rememberSaveable { mutableStateOf(lastBook.orEmpty()) }
+    var page by rememberSaveable { mutableStateOf("") }
+    val picked = { uri: Uri -> onPicked(uri, book, page) }
     // Where the camera app saves the shot: kept across the trip to the camera and back.
     var shot by rememberSaveable { mutableStateOf<String?>(null) }
     val camera =
         rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
             val uri = shot?.let(Uri::parse)
-            if (ok && uri != null) onPicked(uri)
+            if (ok && uri != null) picked(uri)
         }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let(onPicked) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let(picked) }
     FormTitle("Photo of a recipe", onBack)
     Text(
         "Get the whole ingredient list in the photo, flat and in good light. Claude reads it (this needs your key), " +
@@ -247,6 +257,24 @@ private fun PhotoForm(
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = book,
+            onValueChange = { book = it },
+            label = { Text("Book (optional)") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
+            modifier = Modifier.weight(1f).testTag("photo-book"),
+        )
+        OutlinedTextField(
+            value = page,
+            onValueChange = { page = it.take(20) },
+            label = { Text("Page") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+            modifier = Modifier.width(96.dp).testTag("photo-page"),
+        )
+    }
     Button(
         onClick = {
             val file = File(File(context.cacheDir, "camera").apply { mkdirs() }, "shot.jpg")

@@ -68,7 +68,20 @@ data class RecipeEntity(
      * copy with the same key; the library shows the latest.
      */
     val libraryKey: String? = null,
+    /** A cookbook recipe's book and page, as typed (photo or typed-in recipes). */
+    val book: String? = null,
+    val page: String? = null,
 )
+
+/** "Ottolenghi Simple · p. 142", "p. 142" or "Ottolenghi Simple"; null when neither was given. */
+fun bookRef(
+    book: String?,
+    page: String?,
+): String? {
+    val b = book?.trim()?.takeIf { it.isNotEmpty() }
+    val p = page?.trim()?.takeIf { it.isNotEmpty() }?.let { "p. $it" }
+    return listOfNotNull(b, p).joinToString(" · ").ifEmpty { null }
+}
 
 @Entity(
     tableName = "RecipeLine",

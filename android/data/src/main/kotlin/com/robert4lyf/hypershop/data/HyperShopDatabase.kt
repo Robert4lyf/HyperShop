@@ -10,7 +10,7 @@ import com.robert4lyf.hypershop.core.catalog.CatalogLoader
 import com.robert4lyf.hypershop.core.model.AisleCode
 
 @Database(
-    version = 2,
+    version = 3,
     exportSchema = true,
     entities = [
         MetaEntity::class, ItemEntity::class, ItemAliasEntity::class, RecipeEntity::class, RecipeLineEntity::class,
@@ -47,6 +47,15 @@ abstract class HyperShopDatabase : RoomDatabase() {
                     db.execSQL("CREATE INDEX IF NOT EXISTS index_Recipe_libraryKey ON Recipe(libraryKey)")
                     db.execSQL("UPDATE Recipe SET libraryKey = COALESCE(url, 'r:' || id)")
                     db.execSQL("UPDATE Recipe SET lastAddedAt = (SELECT MAX(addedAt) FROM RecipeUse WHERE RecipeUse.recipeId = Recipe.id)")
+                }
+            }
+
+        /** v3: a cookbook recipe's book and page. */
+        val MIGRATION_2_3 =
+            object : Migration(2, 3) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE Recipe ADD COLUMN book TEXT")
+                    db.execSQL("ALTER TABLE Recipe ADD COLUMN page TEXT")
                 }
             }
 
@@ -88,7 +97,11 @@ abstract class HyperShopDatabase : RoomDatabase() {
             }
 
         fun build(context: Context): HyperShopDatabase =
-            Room.databaseBuilder(context, HyperShopDatabase::class.java, NAME).addCallback(CALLBACK).addMigrations(MIGRATION_1_2).build()
+            Room.databaseBuilder(
+                context,
+                HyperShopDatabase::class.java,
+                NAME,
+            ).addCallback(CALLBACK).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
 
         /**
          * Tests: [queryExecutor] can run Room's background work (invalidation
