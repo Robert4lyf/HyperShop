@@ -150,6 +150,10 @@ class WatchSyncCoordinatorTest {
             assertEquals(1, reply.first().ackedThrough)
             assertTrue("a full snapshot", reply.first().pages > 0)
             assertTrue(reply.flatMap { it.items }.first { it.id == onion.id }.done)
+            // The list-change push that follows the tick has nothing to add: the reply was it.
+            c.fake().sent.clear()
+            c.watchSync.push(force = false)
+            assertTrue("the tick's listRev went once", c.fake().sent.isEmpty())
 
             // The same batch again (its reply was lost): acked, nothing applied twice, ack-only.
             c.fake().sent.clear()

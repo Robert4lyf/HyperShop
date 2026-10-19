@@ -13,6 +13,7 @@ import com.robert4lyf.hypershop.claude.UsageRecord
 import com.robert4lyf.hypershop.core.catalog.Catalog
 import com.robert4lyf.hypershop.core.catalog.CatalogLoader
 import com.robert4lyf.hypershop.core.parse.RuleParser
+import com.robert4lyf.hypershop.core.sync.PayloadCap
 import com.robert4lyf.hypershop.data.EpochMarker
 import com.robert4lyf.hypershop.data.HyperShopDatabase
 import com.robert4lyf.hypershop.data.ListRepository
@@ -130,6 +131,7 @@ class AppContainer(
             scope = applicationScope,
             log = log::log,
             clock = clock,
+            cap = PayloadCap(bytes = PayloadCap.FR245_BYTES),
         )
 
     /**
