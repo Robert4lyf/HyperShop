@@ -21,9 +21,9 @@ class Screens {
     private const VIBRATE_KEY = "vb";
     private const DEBOUNCE_MS = 700;
     private const SUB_CHARS = 18;
-    //! An aisle's rows: the focused one is taller, for the larger name and its sub-line.
+    //! An aisle's rows: the focused one is taller, for a name wrapped onto two lines and its sub-line.
     private const ROW_H = 48;
-    private const FOCUS_ROW_H = 72;
+    private const FOCUS_ROW_H = 92;
 
     private enum Screen { AISLES, AISLE, DONE, SETTINGS }
 
