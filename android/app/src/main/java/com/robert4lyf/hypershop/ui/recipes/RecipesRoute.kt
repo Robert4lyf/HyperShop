@@ -460,13 +460,7 @@ private fun UseCard(
         Column {
             // The recipe's own colour band: the same hue as its review screen.
             Box(Modifier.fillMaxWidth().lowPoly(use.title)) {
-                Icon(
-                    Icons.AutoMirrored.Rounded.MenuBook,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.16f),
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp).size(72.dp),
-                )
-                Column(Modifier.padding(20.dp).padding(end = 56.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(use.title, style = MaterialTheme.typography.titleLarge, color = Brand.OnHero)
                     val site = url?.let { siteName(it) }
                     val book = use.bookRef

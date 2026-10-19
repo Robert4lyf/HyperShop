@@ -24,7 +24,7 @@ object Brand {
     val WarmCall = Brush.linearGradient(listOf(Color(0xFFC4451F), Color(0xFFBD3A64)))
 
     /** A recipe's hue for its chips and icons, from its header's palette and picked by its title, so it stays the same. */
-    fun recipeHue(seed: String): Float = LOW_POLY_HUES[(seed.hashCode() % LOW_POLY_HUES.size + LOW_POLY_HUES.size) % LOW_POLY_HUES.size]
+    fun recipeHue(seed: String): Float = lowPolyPalette(seed).hue
 
     /** A soft tint of [hue] for chips on a card. */
     fun tint(
