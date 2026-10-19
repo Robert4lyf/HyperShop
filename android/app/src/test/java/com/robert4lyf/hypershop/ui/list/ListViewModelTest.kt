@@ -4,6 +4,7 @@ import android.os.Looper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.di.AppContainer
+import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.testutil.await
 import com.robert4lyf.hypershop.testutil.readyJob
@@ -56,10 +57,40 @@ class ListViewModelTest {
         val vm = ListViewModel(c)
         val standard = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
         assertEquals(listOf("lemon", "onion", "basil", "carrot"), standard.aisles.single().second.map { it.name })
-        vm.toggleCategorised()
+        vm.setView(ListView.TYPE)
         val grouped = await(vm.ui) { it.categorised }
         assertEquals(listOf("onion", "carrot", "basil", "lemon"), grouped.aisles.single().second.map { it.name })
         assertEquals(listOf("Vegetables", "Vegetables", "Herbs", "Fruit"), grouped.aisles.single().second.map { it.group })
+    }
+
+    @Test
+    fun byRecipeGivesEachRecipeACardThenSharedThenByHand() {
+        val c = TestContainer.create()
+        c.add("2 onions", "500g beef mince", "1 carrot")
+        val dal = ReviewViewModel(c, runBlocking { c.readyJob("1 onion", "200g red lentils", title = "Red lentil dal") })
+        await(dal.state) { it is ReviewState.Ready }
+        dal.confirm()
+        await(dal.state) { it is ReviewState.Added }
+        val vm = ListViewModel(c)
+        vm.addTyped("milk")
+        await(vm.ui) { u -> u.aisles.flatMap { it.second }.any { it.name == "milk" } }
+        vm.setView(ListView.RECIPE)
+        val ui = await(vm.ui) { it.view == ListView.RECIPE && it.recipes.size == 4 }
+        assertEquals(
+            listOf("Weeknight chilli", "Red lentil dal", "In more than one recipe", "Added by hand"),
+            ui.recipes.map { it.title },
+        )
+        // Within a card, walking order: produce before meat.
+        assertEquals(listOf("carrot", "beef mince"), ui.recipes[0].rows.map { it.name })
+        assertEquals(listOf("red lentils"), ui.recipes[1].rows.map { it.name })
+        // The card names the recipe, so its rows don't; a shared row names both.
+        assertNull(ui.recipes[0].rows.first().from)
+        assertEquals("onion", ui.recipes[2].rows.single().name)
+        assertEquals("Weeknight chilli, Red lentil dal", ui.recipes[2].rows.single().from)
+        assertEquals(listOf("milk"), ui.recipes[3].rows.map { it.name })
+        // The other views carry no recipe cards.
+        vm.setView(ListView.STORE)
+        assertTrue(await(vm.ui) { it.view == ListView.STORE }.recipes.isEmpty())
     }
 
     @Test

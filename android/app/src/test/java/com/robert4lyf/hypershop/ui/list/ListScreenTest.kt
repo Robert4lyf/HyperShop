@@ -6,7 +6,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
-import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -21,6 +20,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.robert4lyf.hypershop.core.model.AisleCode
+import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.testutil.Shots
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
 import org.junit.Assert.assertEquals
@@ -199,16 +199,46 @@ class ListScreenTest {
                 ListRow(1, "onion", "2 onions", null, TickState.OPEN, AisleCode.PRODUCE, "Vegetables"),
                 ListRow(2, "basil", "basil", null, TickState.OPEN, AisleCode.PRODUCE, "Herbs"),
             )
-        val ui = SAMPLE_LIST.copy(aisles = listOf(AisleCode.PRODUCE to rows), categorised = true)
-        compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions.copy(onToggleView = { events += "view" })) } }
+        val ui = SAMPLE_LIST.copy(aisles = listOf(AisleCode.PRODUCE to rows), view = ListView.TYPE)
+        compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions.copy(onView = { events += "view $it" })) } }
         compose.onNodeWithText("Vegetables").assertExists()
         compose.onNodeWithText("Herbs").assertExists()
-        // The switch lives in the menu, as a checkable "Group by type".
+        // The layouts live in the menu, as a radio group with "Group by type" chosen.
         compose.onNodeWithContentDescription("More").performClick()
-        val item = compose.onNodeWithTag("view-toggle")
-        assertEquals(ToggleableState.On, item.fetchSemanticsNode().config.getOrNull(SemanticsProperties.ToggleableState))
-        item.performClick()
-        assertEquals(listOf("view"), events)
+        assertEquals(true, compose.onNodeWithTag("view-TYPE").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Selected))
+        assertEquals(false, compose.onNodeWithTag("view-RECIPE").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Selected))
+        compose.onNodeWithTag("view-RECIPE").performClick()
+        assertEquals(listOf("view RECIPE"), events)
+    }
+
+    @Test
+    fun byRecipeShowsACardPerRecipe() {
+        val rows = SAMPLE_LIST.aisles.flatMap { it.second }
+        val ui =
+            SAMPLE_LIST.copy(
+                view = ListView.RECIPE,
+                recipes =
+                    listOf(
+                        RecipeSection("use-1", "Weeknight chilli", RecipeSection.Kind.RECIPE, rows.take(3)),
+                        RecipeSection("use-2", "Red lentil dal", RecipeSection.Kind.RECIPE, listOf(rows[5])),
+                        RecipeSection(
+                            "shared",
+                            "In more than one recipe",
+                            RecipeSection.Kind.SHARED,
+                            listOf(rows[3].copy(from = "Weeknight chilli, Red lentil dal")),
+                        ),
+                        RecipeSection("by-hand", "Added by hand", RecipeSection.Kind.BY_HAND, listOf(rows[4])),
+                    ),
+            )
+        compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions) } }
+        compose.onNodeWithTag("recipe-use-1").assertExists()
+        compose.onNodeWithTag("aisle-PRODUCE").assertDoesNotExist()
+        compose.onNodeWithTag("item-${rows.first().id}").assertExists()
+        // A card closes like an aisle.
+        compose.onNodeWithTag("recipe-use-1").performClick()
+        compose.onNodeWithTag("item-${rows.first().id}").assertDoesNotExist()
+        compose.onNodeWithTag("recipe-use-1").performClick()
+        compose.onRoot().captureRoboImage(Shots.path("list-recipes-light.png"))
     }
 
     @Test

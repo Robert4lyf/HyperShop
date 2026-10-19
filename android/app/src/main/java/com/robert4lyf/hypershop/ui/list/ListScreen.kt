@@ -22,18 +22,22 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DoneAll
+import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Inventory2
+import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -64,14 +68,15 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
-import androidx.compose.ui.semantics.toggleableState
-import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
+import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.ui.common.AisleBadge
 import com.robert4lyf.hypershop.ui.common.BottomActionBar
 import com.robert4lyf.hypershop.ui.common.CountPill
@@ -80,6 +85,7 @@ import com.robert4lyf.hypershop.ui.common.TickMark
 import com.robert4lyf.hypershop.ui.common.sectionItem
 import com.robert4lyf.hypershop.ui.common.sectionPosition
 import com.robert4lyf.hypershop.ui.theme.Brand
+import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.theme.style
 import kotlin.math.roundToInt
@@ -92,8 +98,8 @@ data class ListActions(
     val onShare: () -> Unit = {},
     /** "Need it" on an in-stock ingredient. */
     val onNeed: (InStockRow) -> Unit = {},
-    /** The menu's switch between the standard and categorised views. */
-    val onToggleView: () -> Unit = {},
+    /** The menu's choice of layout: store order, by type, or by recipe. */
+    val onView: (ListView) -> Unit = {},
 )
 
 /**
@@ -150,7 +156,15 @@ private fun ListBody(
     // An aisle that gains something to buy opens again, so new items are never hidden.
     // Compared after composition, against a plain (non-state) memo: a tick doesn't
     // cost a second composition, only an aisle that has to open again does.
-    val leftByAisle = remember(ui.aisles) { ui.aisles.associate { (a, rows) -> a.name to rows.count { it.state != TickState.DONE } } }
+    val byRecipe = ui.view == ListView.RECIPE
+    val leftByAisle =
+        remember(ui.aisles, ui.recipes, byRecipe) {
+            if (byRecipe) {
+                ui.recipes.associate { s -> s.key to s.rows.count { it.state != TickState.DONE } }
+            } else {
+                ui.aisles.associate { (a, rows) -> a.name to rows.count { it.state != TickState.DONE } }
+            }
+        }
     val lastLeft = remember { LeftMemo(leftByAisle) }
     LaunchedEffect(leftByAisle) {
         val before = lastLeft.counts
@@ -162,7 +176,7 @@ private fun ListBody(
     // an aisle opens or closes or the view switches: then everything below moves at once,
     // and the rows slid the height of the aisle while the aisle titles jumped. For the frames
     // of that change the rows go straight to their new place.
-    val layout = collapsed to ui.categorised
+    val layout = collapsed to ui.view
     var settled by remember { mutableStateOf(layout) }
     val still = settled != layout
     LaunchedEffect(layout) {
@@ -185,7 +199,33 @@ private fun ListBody(
     ) {
         header()
         if (ui.isEmpty) item { empty() }
-        for ((aisle, rows) in ui.aisles) {
+        if (byRecipe) {
+            for (section in ui.recipes) {
+                val open = section.key !in collapsed
+                val count = if (open) section.rows.size + 1 else 1
+                item(key = "recipe-${section.key}", contentType = "aisle") {
+                    RecipeTitle(
+                        section,
+                        open,
+                        onToggle = { collapsed = if (open) collapsed + section.key else collapsed - section.key },
+                        modifier = Modifier.padding(top = 12.dp),
+                        count = count,
+                    )
+                }
+                if (open) {
+                    itemsIndexed(section.rows, key = { _, r -> "${section.key}-${r.id}" }, contentType = { _, _ -> "Item" }) { i, r ->
+                        val tile =
+                            if (still) {
+                                Modifier.animateItem(fadeInSpec = null, placementSpec = null, fadeOutSpec = null)
+                            } else {
+                                Modifier.animateItem()
+                            }.sectionItem(sectionPosition(i + 1, count), card)
+                        ListRowItem(r, actions, tile)
+                    }
+                }
+            }
+        }
+        for ((aisle, rows) in if (byRecipe) emptyList() else ui.aisles) {
             val open = aisle.name !in collapsed
             // Categorised: a label above each group, when the aisle has more than one.
             val labelled = ui.categorised && rows.map { it.group }.distinct().size > 1
@@ -375,22 +415,26 @@ private fun ListTop(
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(
-                        text = { Text("Group by type") },
-                        trailingIcon = { if (ui.categorised) Icon(Icons.Rounded.Check, contentDescription = null) },
-                        onClick = {
-                            menu = false
-                            actions.onToggleView()
-                        },
-                        // Read as a checkbox, so TalkBack says whether it is on.
-                        modifier =
-                            Modifier
-                                .semantics {
-                                    role = Role.Checkbox
-                                    toggleableState = if (ui.categorised) ToggleableState.On else ToggleableState.Off
-                                }
-                                .testTag("view-toggle"),
-                    )
+                    for ((view, label) in VIEWS) {
+                        val on = ui.view == view
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            trailingIcon = { if (on) Icon(Icons.Rounded.Check, contentDescription = null) },
+                            onClick = {
+                                menu = false
+                                actions.onView(view)
+                            },
+                            // Read as a radio button, so TalkBack says which one is chosen.
+                            modifier =
+                                Modifier
+                                    .semantics {
+                                        role = Role.RadioButton
+                                        selected = on
+                                    }
+                                    .testTag("view-${view.name}"),
+                        )
+                    }
+                    HorizontalDivider()
                     DropdownMenuItem(text = { Text("Share list as text") }, enabled = !ui.isEmpty, onClick = {
                         menu = false
                         actions.onShare()
@@ -584,5 +628,63 @@ private fun ListRowItem(
                 modifier = Modifier.padding(horizontal = 12.dp),
             )
         }
+    }
+}
+
+private val VIEWS = listOf(ListView.STORE to "Store order", ListView.TYPE to "Group by type", ListView.RECIPE to "Group by recipe")
+
+/** A recipe card's header: in the recipe's own colour, or plain for shared and hand-added items. */
+@Composable
+private fun RecipeTitle(
+    section: RecipeSection,
+    open: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier,
+    count: Int,
+) {
+    val dark = LocalDarkTheme.current
+    val left = section.rows.count { it.state != TickState.DONE }
+    val (container, content, icon) =
+        when (section.kind) {
+            RecipeSection.Kind.RECIPE -> {
+                val hue = Brand.recipeHue(section.title)
+                Triple(Brand.tint(hue, dark), Brand.strong(hue, dark), Icons.AutoMirrored.Rounded.MenuBook)
+            }
+            RecipeSection.Kind.SHARED ->
+                Triple(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer, Icons.Rounded.Layers)
+            RecipeSection.Kind.BY_HAND ->
+                Triple(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant, Icons.Rounded.EditNote)
+        }
+    Row(
+        modifier
+            .sectionItem(sectionPosition(0, count), container)
+            .fillMaxWidth()
+            .clickable(onClickLabel = if (open) "Collapse" else "Expand", role = Role.Button, onClick = onToggle)
+            .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
+            .semantics(mergeDescendants = true) {
+                heading()
+                stateDescription = if (open) "Expanded" else "Collapsed"
+            }
+            .testTag("recipe-${section.key}"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(content), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = container, modifier = Modifier.size(20.dp))
+        }
+        Text(
+            section.title,
+            style = MaterialTheme.typography.titleMedium,
+            color = content,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        if (left == 0) {
+            Text("Done ✓", style = MaterialTheme.typography.labelLarge, color = content)
+        } else {
+            CountPill("$left left", content)
+        }
+        Icon(if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, contentDescription = null, tint = content)
     }
 }
