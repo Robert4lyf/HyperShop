@@ -30,7 +30,7 @@ new APK on the phone as usual.
 4. [x] Import a recipe on the phone, then open the watch app: the aisles appear, each showing "N left"?
 5. [~] In an aisle, tick 3 items with Start: each one buzzes, sinks to the bottom, and shows ticked on the phone within a few seconds? — took 20–30 s: the phone sent each snapshot twice in 384 B pages and queued the next tick behind them. Fixed (2048 B pages, one snapshot per tick); check again.
 6. [x] Tick every item in an aisle: "<aisle> done" appears with **Next: <aisle>** selected, and Start goes to that aisle?
-7. [ ] "Undo <item>" on that prompt unticks it on both the watch and the phone?
+7. [x] "Undo <item>" on that prompt unticks it on both the watch and the phone?
 8. [ ] **Offline:** with the phone's Bluetooth off (or the phone out of range), tick 2 items; the status row says "2 unsynced". On the phone, add a recipe that also uses one of those items, then turn Bluetooth back on and reopen the watch app. Does that item come back unticked with "1 more" under it?
 9. [ ] **Memory** (debug build): watch › Settings › Load sample (60). Scrolling and ticking stay quick, and nothing crashes. Use "Back to phone list" afterwards.
 10. [ ] The glance (scroll up or down from the watch face) shows "N left · <aisle> next" after using the app?
