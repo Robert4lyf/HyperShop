@@ -34,13 +34,14 @@ build size to the job summary, compiles the tests for the device, and uploads
   fr245m watch app 1.25 MB; both Connect IQ 3.3.1–3.3.6, 240×240 MIP.
 - **Release build size** (fr245, `--build-stats 0`, step 6.5 commit): code
   16.1 KB, data 2.5 KB, PRG 25 KB — about 14% of the 128 KB.
-- Glance: "14 left · Produce next", read from Storage `g`, which the app
-  writes when a snapshot is adopted or an item is ticked on the watch (not
-  per received page). Only `getGlanceView` and the glance view
-  are `(:glance)`; the foreground entry points carry
-  `(:typecheck(disableGlanceCheck))` because they build the link and screens.
-- Messages may be capped in the low hundreds of bytes (unverified; the
-  payload probe in the debug build measures it at Hand-off B).
+- **No glance.** The definitions list glances, but on a real 245 a watch app's
+  glance never shows and cannot be added to the loop (Hand-off B), so the app
+  has none. A widget would show, but gets 64 KB and times out to the watch
+  face mid-shop.
+- **Messages:** the payload probe got 4096 B through both ways (its largest
+  size) on a real 245; the phone pages at 2048 B.
+- **CheckboxMenu** draws its box only on the focused row and adds a "Done"
+  item that closes the menu, so the aisle is a `CustomMenu` (`ItemRows.mc`).
 - Storage: one value may take 32 KB, so the snapshot is stored as the aisles
   (`sa`) plus the items 48 to a key (`si0`, `si1`, …), each tagged with its
   listRev; see "Watch rules › Storage" in `docs/garmin-protocol.md`.

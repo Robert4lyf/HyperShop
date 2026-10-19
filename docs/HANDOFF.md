@@ -24,16 +24,16 @@ To install, plug the watch into a computer by USB and copy the `.prg` into
 Copy one build at a time; the newer copy replaces the older one. Install the
 new APK on the phone as usual.
 
-1. [ ] The watch app opens and shows "Waiting for phone", then your list within 10 s of opening it with the phone nearby?
-2. [ ] Settings › Watch on the phone says "Forerunner connected…"?
-3. [ ] **Payload probe** (debug build): watch › Settings (bottom of the aisle list) › Payload probe. Note the two numbers ("To watch", "To phone") here: ______ / ______
-4. [ ] Import a recipe on the phone, then open the watch app: the aisles appear, each showing "N left"?
-5. [ ] In an aisle, tick 3 items with Start: each one buzzes, sinks to the bottom, and shows ticked on the phone within a few seconds?
-6. [ ] Tick every item in an aisle: "<aisle> done" appears with **Next: <aisle>** selected, and Start goes to that aisle?
-7. [ ] "Undo <item>" on that prompt unticks it on both the watch and the phone?
+1. [x] The watch app opens and shows "Waiting for phone", then your list within 10 s of opening it with the phone nearby?
+2. [x] Settings › Watch on the phone says "Forerunner connected…"?
+3. [x] **Payload probe** (debug build): watch › Settings (bottom of the aisle list) › Payload probe. Note the two numbers ("To watch", "To phone") here: 4096 / 4133 — the probe's top size both ways; the phone now pages at 2048 B.
+4. [x] Import a recipe on the phone, then open the watch app: the aisles appear, each showing "N left"?
+5. [~] In an aisle, tick 3 items with Start: each one buzzes, sinks to the bottom, and shows ticked on the phone within a few seconds? — took 20–30 s: the phone sent each snapshot twice in 384 B pages and queued the next tick behind them. Fixed (2048 B pages, one snapshot per tick); check again.
+6. [x] Tick every item in an aisle: "<aisle> done" appears with **Next: <aisle>** selected, and Start goes to that aisle?
+7. [x] "Undo <item>" on that prompt unticks it on both the watch and the phone?
 8. [ ] **Offline:** with the phone's Bluetooth off (or the phone out of range), tick 2 items; the status row says "2 unsynced". On the phone, add a recipe that also uses one of those items, then turn Bluetooth back on and reopen the watch app. Does that item come back unticked with "1 more" under it?
 9. [ ] **Memory** (debug build): watch › Settings › Load sample (60). Scrolling and ticking stay quick, and nothing crashes. Use "Back to phone list" afterwards.
-10. [ ] The glance (scroll up or down from the watch face) shows "N left · <aisle> next" after using the app?
+10. [~] The glance (scroll up or down from the watch face) shows "N left · <aisle> next" after using the app? — No glance, and the 245 offers no way to add one for a watch app. Removed from the app.
 
 If the probe numbers differ much from 384 bytes, tell me and I'll set the phone's page size from them (`PayloadCap`).
 

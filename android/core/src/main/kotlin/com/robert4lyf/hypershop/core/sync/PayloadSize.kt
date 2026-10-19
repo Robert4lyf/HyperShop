@@ -36,6 +36,13 @@ data class PayloadCap(
     companion object {
         /** "Low hundreds of bytes" (BangGym's notes); replaced by the probe's measurement. */
         const val DEFAULT_BYTES = 384
+
+        /**
+         * The Forerunner 245, measured by the payload probe at Hand-off B: 4096 B
+         * arrived both ways, the probe's largest size, so the true limit is higher.
+         * Half of that, for headroom on the watch's heap while it parses a page.
+         */
+        const val FR245_BYTES = 2048
         const val DEFAULT_MAX_PAGES = 16
     }
 }

@@ -119,7 +119,10 @@ class WatchSyncCoordinator(
         val reply = repository.applyWatch(m)
         when {
             m is WatchMessage.Bye -> Unit
-            reply.fullSnapshot -> sendSnapshot(m.installId, reply)
+            // A hello always gets the list. Ticks change the list, so the change push may
+            // already have sent this listRev, built after the write and so carrying these
+            // acks: sending it twice put the next tick behind both.
+            reply.fullSnapshot -> sendSnapshot(m.installId, onlyIfNew = m !is WatchMessage.Hello) { reply }
             else -> sendAckOnly(reply)
         }
     }
@@ -133,7 +136,7 @@ class WatchSyncCoordinator(
         if (link.state.value != WatchLinkState.APP_READY) return
         val to = install ?: repository.lastInstall()?.also { install = it } ?: return
         if (!force && repository.epochAndRev().second.toInt() == sentRev) return
-        sendSnapshot(to, repository.watchAck(to))
+        sendSnapshot(to, onlyIfNew = !force) { repository.watchAck(to) }
     }
 
     private suspend fun sendAckOnly(reply: WatchReply) {
@@ -142,25 +145,29 @@ class WatchSyncCoordinator(
         send(listOf(page))
     }
 
+    /** Read and sent under the lock, so [onlyIfNew] sees a snapshot that went out while this one waited. */
     private suspend fun sendSnapshot(
         installId: Int,
-        reply: WatchReply,
-    ) {
+        onlyIfNew: Boolean,
+        reply: suspend () -> WatchReply,
+    ) = sending.withLock {
         val v = repository.watchView()
-        val pages = SnapshotPager.build(input(v, installId, reply), cap)
-        if (send(pages)) sentRev = v.list.listRev.toInt()
+        if (onlyIfNew && v.list.listRev.toInt() == sentRev) return@withLock
+        val pages = SnapshotPager.build(input(v, installId, reply()), cap)
+        if (sendPages(pages)) sentRev = v.list.listRev.toInt()
     }
 
-    private suspend fun send(pages: List<SnapshotPage>): Boolean =
-        sending.withLock {
-            for (p in pages) {
-                if (!link.send(WatchCodec.encodePage(p))) {
-                    log("watch: send failed at page ${p.page + 1} of ${maxOf(p.pages, 1)}")
-                    return@withLock false
-                }
+    private suspend fun send(pages: List<SnapshotPage>): Boolean = sending.withLock { sendPages(pages) }
+
+    private suspend fun sendPages(pages: List<SnapshotPage>): Boolean {
+        for (p in pages) {
+            if (!link.send(WatchCodec.encodePage(p))) {
+                log("watch: send failed at page ${p.page + 1} of ${maxOf(p.pages, 1)}")
+                return false
             }
-            true
         }
+        return true
+    }
 
     private suspend fun input(
         v: WatchListView,

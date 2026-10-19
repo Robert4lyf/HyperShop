@@ -19,9 +19,11 @@ using Toybox.WatchUi;
 class Screens {
 
     private const VIBRATE_KEY = "vb";
-    private const GLANCE_KEY = "g";
     private const DEBOUNCE_MS = 700;
     private const SUB_CHARS = 18;
+    //! An aisle's rows: the focused one is taller, for the larger name and its sub-line.
+    private const ROW_H = 48;
+    private const FOCUS_ROW_H = 72;
 
     private enum Screen { AISLES, AISLE, DONE, SETTINGS }
 
@@ -40,9 +42,6 @@ class Screens {
     private var _lastPress as Lang.Number = -DEBOUNCE_MS;
     //! The item ticked last in the open aisle, for "Undo" on the done prompt.
     private var _lastTicked as Lang.Number = -1;
-    //! The snapshot the glance summary was last written for.
-    private var _glanceRev as Lang.Number = -1;
-    private var _glanceEpoch as Lang.Number = -1;
 
     function initialize(phoneLink as PhoneLink) {
         link = phoneLink;
@@ -79,7 +78,6 @@ class Screens {
         menu.setFocus(focus);
         _menu = menu;
         _screen = AISLES;
-        writeGlance(view, false);
         return menu;
     }
 
@@ -244,12 +242,15 @@ class Screens {
 
     function openAisle(a as Lang.Number, focus as Lang.Number, transition as WatchUi.SlideType) as Void {
         var sync = link.sync;
-        var menu = new WatchUi.CheckboxMenu({:title => sync.aisles[a][1] as Lang.String});
+        var menu = new WatchUi.CustomMenu(ROW_H, Graphics.COLOR_BLACK, {
+            :title => new AisleTitle(sync.aisles[a][1] as Lang.String),
+            :focusItemHeight => FOCUS_ROW_H
+        });
         var view = sync.view();
         var list = aisleItems(a, view);
         for (var i = 0; i < list.size(); i++) {
             var id = list[i][0] as Lang.Number;
-            menu.addItem(new WatchUi.CheckboxMenuItem(list[i][1] as Lang.String, itemSub(list[i]), id, view.get(id) == true, {}));
+            menu.addItem(new ItemRow(id, list[i][1] as Lang.String, itemSub(list[i]), view.get(id) == true));
         }
         if (list.size() > 0) {
             menu.setFocus(focus < list.size() ? focus : list.size() - 1);
@@ -276,13 +277,11 @@ class Screens {
         return sub.length() > SUB_CHARS ? sub.substring(0, SUB_CHARS) : sub;
     }
 
-    //! Select on a row. CheckboxMenu has already flipped the box; it is put
-    //! back whenever the tick does not happen.
-    function onItemSelected(item as WatchUi.CheckboxMenuItem) as Void {
+    //! Select on a row. The row only changes once the tick has happened.
+    function onItemSelected(item as ItemRow) as Void {
         var id = item.getId() as Lang.Number;
         var now = System.getTimer();
         if (now - _lastPress < DEBOUNCE_MS) {
-            item.setChecked(link.sync.viewOf(id) == true);
             return;
         }
         _lastPress = now;
@@ -299,7 +298,6 @@ class Screens {
             }
         }
         if (!link.toggle(id)) {
-            item.setChecked(link.sync.viewOf(id) == true);
             WatchUi.pushView(
                 new MessageView(text(link.sync.outboxFull() ? Rez.Strings.SyncWithPhone : Rez.Strings.NoticeChanged)),
                 new MessageDelegate(),
@@ -312,7 +310,6 @@ class Screens {
             _lastTicked = id;
         }
         buzz();
-        writeGlance(view, true);
         if (counts(_aisle, view)[0] == 0) {
             showDone(_aisle);
         } else {
@@ -389,7 +386,6 @@ class Screens {
             var undone = _lastTicked;
             if (link.toggle(undone)) {
                 _lastTicked = -1;
-                writeGlance(link.sync.view(), true);
                 openAisle(_aisle, 0, WatchUi.SLIDE_RIGHT);
                 return;
             }
@@ -434,7 +430,6 @@ class Screens {
     //! and the outbox, and a refresh asks about every aisle.
     function onSyncChanged() as Void {
         var view = link.sync.view();
-        writeGlance(view, false);
         var menu = _menu;
         if (menu == null) {
             return;
@@ -503,39 +498,10 @@ class Screens {
                 continue;
             }
             var row = menu.getItem(index);
-            if (row instanceof WatchUi.CheckboxMenuItem) {
-                (row as WatchUi.CheckboxMenuItem).setChecked(view.get(id) == true);
-                row.setSubLabel(itemSub(items[i]));
+            if (row instanceof ItemRow) {
+                (row as ItemRow).setState(view.get(id) == true, itemSub(items[i]));
             }
         }
-    }
-
-    //! "14 left · Produce next", kept for a glance should the watch run one.
-    //! A Storage write, so only when the counts can have moved: a snapshot
-    //! was adopted (listRev or epoch changed) or, with [force], a tick here.
-    private function writeGlance(view as Lang.Dictionary<Lang.Number, Lang.Boolean>, force as Lang.Boolean) as Void {
-        var sync = link.sync;
-        if (!force && sync.listRev == _glanceRev && sync.epoch == _glanceEpoch) {
-            return;
-        }
-        var left = 0;
-        var next = null as Lang.String or Null;
-        for (var a = 0; a < sync.aisles.size(); a++) {
-            if (!showAisle(a, view)) {
-                continue;
-            }
-            var c = counts(a, view);
-            left += c[0] + c[2];
-            if (next == null && c[0] > 0) {
-                next = sync.aisles[a][1] as Lang.String;
-            }
-        }
-        try {
-            Application.Storage.setValue(GLANCE_KEY, [left, next != null ? next : ""]);
-        } catch (e) {
-        }
-        _glanceRev = sync.listRev;
-        _glanceEpoch = sync.epoch;
     }
 
     function text(id as Lang.ResourceId) as Lang.String {
@@ -570,8 +536,8 @@ class AisleDelegate extends WatchUi.Menu2InputDelegate {
     }
 
     function onSelect(item as WatchUi.MenuItem) as Void {
-        if (item instanceof WatchUi.CheckboxMenuItem) {
-            _screens.onItemSelected(item as WatchUi.CheckboxMenuItem);
+        if (item instanceof ItemRow) {
+            _screens.onItemSelected(item as ItemRow);
         }
     }
 

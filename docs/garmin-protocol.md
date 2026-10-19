@@ -128,8 +128,10 @@ first. Ack-only replies read `epochAndRev()` rather than the list.
 
 ## Payload size and paging
 
-`PayloadSize` over-estimates the Connect IQ encoding; `PayloadCap` defaults to
-384 bytes × 16 pages until the Hand-off B probe measures the Forerunner 245.
+`PayloadSize` over-estimates the Connect IQ encoding. `PayloadCap` defaults to
+384 bytes × 16 pages (the test vectors' size); the app uses 2048 bytes × 16
+pages (`PayloadCap.FR245_BYTES`), half of what the Hand-off B probe measured on
+the Forerunner 245 (4096 B both ways, the probe's ceiling).
 Each page carries the envelope and acks first. Then aisles, then items. When
 it all needs more than `maxPages`, drop in order: DONE items (except ticked in
 the last 30 minutes or in the current aisle), then shorten names to 16
