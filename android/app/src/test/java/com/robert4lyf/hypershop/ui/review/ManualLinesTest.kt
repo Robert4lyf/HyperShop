@@ -51,7 +51,7 @@ class ManualLinesTest {
     @Test
     fun blockedPageOffersPasteOnly() {
         show(ImportError.HTTP, emptyList())
-        compose.onNodeWithText("The site refused the request (some sites block apps).").assertExists()
+        compose.onNodeWithText("The site refused the request.").assertExists()
         compose.onNodeWithText("Paste the ingredient lines").assertExists()
     }
 

@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -19,9 +18,7 @@ import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.ShoppingBasket
-import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -41,7 +38,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -177,14 +173,13 @@ fun ReadyCard(
                     if (n == 1) "1 recipe ready to review" else "$n recipes ready to review",
                     style = MaterialTheme.typography.titleMedium,
                 )
-                Text("Check the ingredients before they go on the list", style = MaterialTheme.typography.bodySmall)
             }
             Icon(Icons.Rounded.ChevronRight, contentDescription = null)
         }
     }
 }
 
-/** First run: what the app does, in two steps, and a sample list to try. */
+/** First run: an empty list and a sample to try. */
 @Composable
 fun EmptyState(onSample: () -> Unit) {
     EmptyHero(
@@ -192,42 +187,7 @@ fun EmptyState(onSample: () -> Unit) {
         title = "Your list is empty",
         modifier = Modifier.padding(top = 8.dp).testTag("empty"),
     ) {
-        Spacer(Modifier.size(4.dp))
-        Step(Icons.Rounded.IosShare, "Share a recipe", "From your browser, share any recipe page, or paste its link on the Recipes tab.")
-        Step(Icons.Rounded.Storefront, "Shop aisle by aisle", "Check the ingredients, then tick them off as you go.")
-        Text(
-            "Or type items into the field above.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         Button(onClick = onSample) { Text("Try a sample list") }
-    }
-}
-
-@Composable
-private fun Step(
-    icon: ImageVector,
-    title: String,
-    body: String,
-) {
-    Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.card) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Box(
-                Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-            Column {
-                Text(title, style = MaterialTheme.typography.titleSmall)
-                Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
     }
 }
 

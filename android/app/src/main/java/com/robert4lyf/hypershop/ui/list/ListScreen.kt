@@ -191,11 +191,6 @@ private fun LazyListScope.inStockSection(
                 }
                 Column(Modifier.weight(1f)) {
                     Text("In stock", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                    Text(
-                        "Marked in stock for these recipes. Check before you go.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
                 }
                 Text("${rows.size}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
                 Icon(
@@ -290,8 +285,8 @@ private fun ListTop(
         overline = if (shopping) "Shopping list" else null,
         subtitle =
             when {
-                !shopping -> "Recipes in, shopping list out"
-                ui.left == 0 -> "Everything's in the basket"
+                !shopping -> null
+                ui.left == 0 -> "All done"
                 else -> "${ui.doneCount} of $total ticked"
             },
         actions = {

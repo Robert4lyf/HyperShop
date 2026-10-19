@@ -152,7 +152,7 @@ fun LibraryScreen(
                 val card = MaterialTheme.colorScheme.card
                 LazyColumn(Modifier.fillMaxSize().testTag("library"), contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp)) {
                     if (ui.rows.isEmpty()) {
-                        item { Text("Nothing matches. Add it with the button below.", Modifier.padding(24.dp)) }
+                        item { Text("Nothing matches", Modifier.padding(24.dp)) }
                     }
                     itemsIndexed(ui.rows, key = { _, r -> r.id }) { i, r ->
                         Row(
@@ -239,7 +239,7 @@ fun EntryEditor(
         Text(if (f.isNew) "Add ingredient" else "Edit ingredient", style = MaterialTheme.typography.headlineSmall)
         Field("Name", f.name, "entry-name") { f = f.copy(name = it) }
         Field("Plural (optional)", f.plural, "entry-plural") { f = f.copy(plural = it) }
-        Field("Also called, separated by commas", f.synonyms, "entry-synonyms", lines = 2) { f = f.copy(synonyms = it) }
+        Field("Also called", f.synonyms, "entry-synonyms", lines = 2) { f = f.copy(synonyms = it) }
         Text("Aisle", style = MaterialTheme.typography.titleSmall)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             for (a in AisleCode.entries) {
@@ -261,23 +261,11 @@ fun EntryEditor(
                 ) { Text(label, maxLines = 1) }
             }
         }
-        if (f.policy == DisplayPolicy.PRESENCE) {
-            Text(
-                "None: the list shows just the name, as for salt or herbs you buy in a pack.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Field("Group in the aisle, e.g. Herbs (optional)", f.group, "entry-group") { f = f.copy(group = it) }
-        Field("Swaps, separated by commas", f.swaps, "entry-swaps", lines = 2) { f = f.copy(swaps = it) }
-        Text(
-            "Offered on the list as \"Swap for\", e.g. maple syrup for agave syrup.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Field("Group (optional)", f.group, "entry-group") { f = f.copy(group = it) }
+        Field("Swaps", f.swaps, "entry-swaps", lines = 2) { f = f.copy(swaps = it) }
         Field("Always use instead (optional)", f.replaceWith, "entry-replace") { f = f.copy(replaceWith = it) }
-        Field("Usually sold as, e.g. 1 kg bag", f.packNote, "entry-pack") { f = f.copy(packNote = it) }
-        Field("Grams per cup (turns cups into grams)", f.gramsPerCup, "entry-grams", number = true) { f = f.copy(gramsPerCup = it) }
+        Field("Usually sold as", f.packNote, "entry-pack") { f = f.copy(packNote = it) }
+        Field("Grams per cup", f.gramsPerCup, "entry-grams", number = true) { f = f.copy(gramsPerCup = it) }
         Row(
             Modifier.fillMaxWidth().clickable(role = Role.Switch) { f = f.copy(alwaysInStock = !f.alwaysInStock) },
             verticalAlignment = Alignment.CenterVertically,

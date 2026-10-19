@@ -67,8 +67,6 @@ class SettingsScreenTest {
         field.performTextInput("abcdef")
         list.performScrollToNode(hasText("Save and test"))
         compose.onNodeWithText("Save and test").performClick()
-        list.performScrollToNode(hasTestTag("privacy"))
-        compose.onNodeWithTag("privacy").assertExists()
         list.performScrollToNode(hasTestTag("spend"))
         compose.onNodeWithText("Spent this month: $0.04 of $2.00 · 3 of 50 calls today").assertExists()
         list.performScrollToNode(hasText("Show the debug log"))

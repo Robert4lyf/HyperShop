@@ -113,21 +113,18 @@ fun AddRecipeContent(
                     Icons.Rounded.Link,
                     hue = 160f,
                     title = "Paste a link",
-                    body = "A recipe page from the web. Sharing a page to HyperShop does the same.",
                     tag = "add-link",
                 ) { mode = AddMode.LINK.name }
                 Choice(
                     Icons.Rounded.EditNote,
                     hue = 25f,
                     title = "Type it in",
-                    body = "Your own recipe: a name, how many it serves and the ingredients.",
                     tag = "add-manual",
                 ) { mode = AddMode.MANUAL.name }
                 Choice(
                     Icons.Rounded.PhotoCamera,
                     hue = 280f,
                     title = "Photo of a recipe",
-                    body = "A cookbook page: Claude reads the ingredients from the photo.",
                     tag = "add-photo",
                 ) { mode = AddMode.PHOTO.name }
             }
@@ -155,7 +152,6 @@ private fun Choice(
     icon: ImageVector,
     hue: Float,
     title: String,
-    body: String,
     tag: String,
     onClick: () -> Unit,
 ) {
@@ -174,10 +170,7 @@ private fun Choice(
                 Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)).background(Brand.tint(hue, dark)),
                 contentAlignment = Alignment.Center,
             ) { Icon(icon, contentDescription = null, tint = Brand.strong(hue, dark)) }
-            Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -251,12 +244,6 @@ private fun PhotoForm(
         }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let(picked) }
     FormTitle("Photo of a recipe", onBack)
-    Text(
-        "Get the whole ingredient list in the photo, flat and in good light. Claude reads it (this needs your key), " +
-            "then you check the ingredients as for a shared recipe.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(
             value = book,
@@ -339,11 +326,6 @@ private fun ManualForm(
         shape = MaterialTheme.shapes.medium,
         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
         modifier = Modifier.fillMaxWidth().testTag("manual-lines"),
-    )
-    Text(
-        "Next you check the ingredients, as for a shared recipe, before anything goes on the list.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Button(
         onClick = { onSubmit(name.trim(), servings, lines) },

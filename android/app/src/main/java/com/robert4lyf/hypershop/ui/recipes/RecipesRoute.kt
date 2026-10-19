@@ -171,7 +171,6 @@ fun RecipesScreen(
                         EmptyHero(
                             Icons.AutoMirrored.Rounded.MenuBook,
                             "No recipes yet",
-                            body = "No recipes on the list. Tap + to paste a link or type one in, or share a page from your browser.",
                         )
                     }
                 }
@@ -186,15 +185,13 @@ fun RecipesScreen(
                         ) {
                             Column {
                                 Text("Your recipes", style = MaterialTheme.typography.titleLarge)
-                                Text(
-                                    when {
-                                        ui.terms.isEmpty() -> "Every recipe you've added. The longest since you last made it is at the top."
-                                        ui.library.isEmpty() -> "Nothing uses ${ui.terms.joinToString(" or ")}."
-                                        else -> "Using the most of ${ui.terms.joinToString(", ")} first."
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                                if (ui.terms.isNotEmpty() && ui.library.isEmpty()) {
+                                    Text(
+                                        "No matches",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                             RecipeSearchBox(search)
                         }
@@ -218,7 +215,6 @@ fun RecipesScreen(
         AlertDialog(
             onDismissRequest = { forget = null },
             title = { Text("Remove ${row.title} from your recipes?") },
-            text = { Text("It won't be offered here again. Anything from it on the list stays.") },
             confirmButton = {
                 TextButton(onClick = {
                     forget = null
@@ -232,7 +228,6 @@ fun RecipesScreen(
         AlertDialog(
             onDismissRequest = { confirm = null },
             title = { Text("Remove ${use.title}?") },
-            text = { Text("Its items come off the list, unless another recipe needs them too.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirm = null
