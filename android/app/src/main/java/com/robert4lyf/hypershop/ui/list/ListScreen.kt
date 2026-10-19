@@ -49,6 +49,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -156,6 +157,18 @@ private fun ListBody(
         val grew = leftByAisle.filter { (a, n) -> n > (before[a] ?: 0) }.keys
         if (grew.any { it in collapsed }) collapsed = collapsed - grew
     }
+    // Rows slide when they move, so a ticked one glides to the bottom of its aisle. Not when
+    // an aisle opens or closes or the view switches: then everything below moves at once,
+    // and the rows slid the height of the aisle while the aisle titles jumped. For the frames
+    // of that change the rows go straight to their new place.
+    val layout = collapsed to ui.categorised
+    var settled by remember { mutableStateOf(layout) }
+    val still = settled != layout
+    LaunchedEffect(layout) {
+        withFrameNanos {}
+        withFrameNanos {}
+        settled = layout
+    }
     // Room for the keyboard, so the last aisles scroll above it while the Add field keeps focus.
     // Only the part of the keyboard that overlaps the list counts: the tab bar below it is
     // already clear of the keyboard, and a plain imePadding() would leave that much blank.
@@ -188,8 +201,12 @@ private fun ListBody(
             }
             if (open) {
                 itemsIndexed(cells, key = { _, c -> c.key(aisle) }, contentType = { _, c -> c.javaClass.simpleName }) { i, c ->
-                    // A ticked row slides to the bottom of its aisle rather than jumping there.
-                    val tile = Modifier.animateItem().sectionItem(sectionPosition(i + 1, count), card)
+                    val tile =
+                        if (still) {
+                            Modifier.animateItem(fadeInSpec = null, placementSpec = null, fadeOutSpec = null)
+                        } else {
+                            Modifier.animateItem()
+                        }.sectionItem(sectionPosition(i + 1, count), card)
                     when (c) {
                         is Cell.Item -> ListRowItem(c.row, actions, tile)
                         is Cell.Label -> GroupLabel(c.name, tile)

@@ -8,6 +8,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -23,6 +24,7 @@ import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.testutil.Shots
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -152,6 +154,42 @@ class ListScreenTest {
         assertEquals("Collapsed", header.fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
         header.performClick()
         compose.onNodeWithTag("item-1").assertExists()
+    }
+
+    @Test
+    fun collapsingOrOpeningAnAisleMovesTheRestStraightToTheirPlace() {
+        show()
+        val milk = compose.onNodeWithTag("item-4")
+        compose.mainClock.autoAdvance = false
+        for (step in listOf("collapse", "open")) {
+            compose.onNodeWithTag("aisle-PRODUCE").performClick()
+            compose.mainClock.advanceTimeByFrame()
+            compose.mainClock.advanceTimeByFrame()
+            val first = milk.getBoundsInRoot().top
+            compose.mainClock.advanceTimeBy(2_000)
+            // Where it ends up from the first frame: no slide the height of the aisle.
+            assertEquals(step, milk.getBoundsInRoot().top.value, first.value, 1f)
+        }
+    }
+
+    @Test
+    fun aTickedRowStillSlidesToTheBottomOfItsAisle() {
+        var ui by mutableStateOf(SAMPLE_LIST)
+        compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions) } }
+        val milk = compose.onNodeWithTag("item-4")
+        val before = milk.getBoundsInRoot().top
+        compose.mainClock.autoAdvance = false
+        // Milk is ticked: it sinks below butter.
+        val (aisle, rows) = SAMPLE_LIST.aisles[1]
+        val ticked = listOf(rows[1], rows[0].copy(state = TickState.DONE))
+        ui = SAMPLE_LIST.copy(aisles = SAMPLE_LIST.aisles.map { if (it.first == aisle) aisle to ticked else it })
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeByFrame()
+        val moving = milk.getBoundsInRoot().top
+        compose.mainClock.advanceTimeBy(2_000)
+        val after = milk.getBoundsInRoot().top
+        assertTrue("it moved down", after > before)
+        assertTrue("on its way, not there yet", moving < after)
     }
 
     @Test
