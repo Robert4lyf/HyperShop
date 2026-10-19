@@ -47,6 +47,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -76,6 +79,7 @@ import com.robert4lyf.hypershop.ui.common.EmptyHero
 import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.PillShape
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
+import com.robert4lyf.hypershop.ui.common.basilSegmentedColors
 import com.robert4lyf.hypershop.ui.common.cardLift
 import com.robert4lyf.hypershop.ui.common.fieldLift
 import com.robert4lyf.hypershop.ui.common.pillFieldColors
@@ -168,6 +172,17 @@ fun RecipesScreen(
     var forget by rememberSaveable { mutableStateOf<String?>(null) }
     var addAgain by rememberSaveable { mutableStateOf<String?>(null) }
     var adding by rememberSaveable { mutableStateOf(false) }
+    // Null until a toggle is tapped: the list when it has anything, else the library.
+    var picked by rememberSaveable { mutableStateOf<Boolean?>(null) }
+    val showLibrary = ui.hasLibrary && (picked ?: ui.uses.isEmpty())
+    // A recipe landing on the list (from the library, a link or a photo) is shown there.
+    var seen by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(ui.loaded, ui.uses.size) {
+        if (!ui.loaded) return@LaunchedEffect
+        val before = seen
+        if (before != null && ui.uses.size > before) picked = false
+        seen = ui.uses.size
+    }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxSize()) {
             LazyColumn(
@@ -196,7 +211,27 @@ fun RecipesScreen(
                         )
                     }
                 }
-                if (ui.loaded && ui.uses.isEmpty() && ui.hasLibrary) {
+                if (ui.hasLibrary) {
+                    item(key = "view") {
+                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                            SegmentedButton(
+                                selected = !showLibrary,
+                                onClick = { picked = false },
+                                shape = SegmentedButtonDefaults.itemShape(0, 2),
+                                colors = basilSegmentedColors(),
+                                modifier = Modifier.testTag("view-list"),
+                            ) { Text("On the list") }
+                            SegmentedButton(
+                                selected = showLibrary,
+                                onClick = { picked = true },
+                                shape = SegmentedButtonDefaults.itemShape(1, 2),
+                                colors = basilSegmentedColors(),
+                                modifier = Modifier.testTag("view-library"),
+                            ) { Text("Library") }
+                        }
+                    }
+                }
+                if (ui.loaded && ui.uses.isEmpty() && ui.hasLibrary && !showLibrary) {
                     item(key = "nothing-yet") {
                         InfoBanner(
                             "Nothing on the list",
@@ -205,26 +240,22 @@ fun RecipesScreen(
                         )
                     }
                 }
-                items(ui.uses, key = { it.useId }) { use ->
-                    UseCard(use, onRemove = { confirm = use.useId }, onAddInStock = { onAddInStock(use) }, onEdit = { onEdit(use) })
+                if (!showLibrary) {
+                    items(ui.uses, key = { it.useId }) { use ->
+                        UseCard(use, onRemove = { confirm = use.useId }, onAddInStock = { onAddInStock(use) }, onEdit = { onEdit(use) })
+                    }
                 }
-                if (ui.hasLibrary) {
-                    item(key = "library-title") {
-                        Column(
-                            Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Column {
-                                Text("Your recipes", style = MaterialTheme.typography.titleLarge)
-                                if (ui.terms.isNotEmpty() && ui.library.isEmpty()) {
-                                    Text(
-                                        "No matches",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
+                if (showLibrary) {
+                    item(key = "library-search") {
+                        Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             RecipeSearchBox(search)
+                            if (ui.terms.isNotEmpty() && ui.library.isEmpty()) {
+                                Text(
+                                    "No matches",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                     items(ui.library, key = { "lib-${it.key}" }) { row ->
