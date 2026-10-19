@@ -170,3 +170,38 @@ Shared components (`ui/common/`):
 4. Recipes and settings.
 5. Re-record the screenshots and contact sheet, check contrast and TalkBack,
    and update `docs/HANDOFF.md`.
+
+## Revisions after the usability review
+
+Behaviour and layout changes made after a review of every screen, in the
+same design system:
+
+- **Nothing is lost by accident.** Cancel on the review asks "Discard this
+  recipe?" once anything was edited, and a plain cancel shows "Import
+  discarded · Undo". Edits, servings and in-stock ticks are kept with the
+  import job, so Back and coming back shows them again. "Remove from list",
+  "Remove from your recipes", "Clear in stock", "Mark this aisle in stock",
+  a removed staple and a reset ingredient all have Undo; "Clear all",
+  "Remove key", "Reset to default" and "Reset order" ask first.
+- **The keyboard never covers the field.** The list, review, manual-lines
+  and item-sheet screens pad for the keyboard; the item sheet opens full height.
+- **One-handed shopping.** "Finish shopping" sits in a bottom bar once
+  anything is ticked. A tick slides the row down with a 10 s "Ticked X · Undo".
+  The item sheet leads with Tick/Untick; delete is a labelled button at the end.
+- **The review says what it will do.** A summary line ("4 to add · 1 in
+  stock · 1 to check"), "+amount" on rows that add, "needs amount" on in-stock
+  rows, "Already on your list" where nothing is added, "Check: <reason>" on
+  flagged lines, "Nothing to add" on the button, and the real reason when
+  Claude could not run ("Monthly cap reached — raise it in Settings › Claude").
+  The in-stock pill is outlined when off and filled with a check when on, and
+  every row has a chevron.
+- **Loading is staged.** "Fetching the page…" / "Reading with Claude…" with a
+  Cancel, and after 25 s an offer to paste the ingredients instead.
+- **Sharing is forgiving.** `http://` links are upgraded, shared text with
+  several lines is read as the ingredients, and two quick shares are reviewed
+  in turn.
+- **Settings and library.** Aisles can move to the top or bottom and reset;
+  caps explain their limits; a malformed key is told apart from a rejected one;
+  the spend meters say what happens at the cap; the ingredient editor shows the
+  common fields first with the rest under Advanced, suggests names for swaps,
+  and has Cancel; the library has aisle filter chips.

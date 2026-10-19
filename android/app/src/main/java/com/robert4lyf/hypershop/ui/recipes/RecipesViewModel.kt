@@ -218,11 +218,11 @@ class RecipesViewModel(
         _detail.value = null
     }
 
-    /** "Remove from your recipes" (what's on the list stays). */
+    /** "Remove from your recipes" (what's on the list stays); Undo brings it back. */
     fun removeFromLibrary(row: LibraryRow) =
         viewModelScope.launch {
-            c.repository.removeFromLibrary(row.key)
-            messages.send(UiMessage("Removed ${row.title} from your recipes"))
+            val copies = c.repository.removeFromLibrary(row.key)
+            messages.send(UiMessage("Removed ${row.title} from your recipes", undo = { c.repository.restoreToLibrary(copies) }))
         }
 
     /** Uses whose "Add the in-stock items now" is being set up: a second tap meanwhile does nothing. */
@@ -236,10 +236,11 @@ class RecipesViewModel(
     /** Job ids to open on the review screen. */
     val openReview: Flow<Long> = reviews.receiveAsFlow()
 
+    /** "Remove from list"; Undo puts the use and its items back as they were. */
     fun remove(use: UseSummary) =
         viewModelScope.launch {
-            c.repository.removeUse(use.useId)
-            messages.send(UiMessage("Removed ${use.title} from the list"))
+            val removed = c.repository.removeUse(use.useId) ?: return@launch
+            messages.send(UiMessage("Removed ${use.title} from the list", undo = { c.repository.restoreUse(removed) }))
         }
 
     /** "Add the in-stock items now": the review screen again, full amounts, nothing pre-ticked. */

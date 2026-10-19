@@ -3,8 +3,11 @@ package com.robert4lyf.hypershop.ui.review
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -37,10 +40,19 @@ internal val SAMPLE_REVIEW =
                 AisleCode.SPICES_CONDIMENTS to
                     listOf(
                         ReviewRow("cat:salt", "salt", null, true, false, AisleCode.SPICES_CONDIMENTS),
-                        ReviewRow("name:chipotle paste or sauce", "chipotle paste", "1 tbsp", false, true, AisleCode.SPICES_CONDIMENTS),
+                        ReviewRow(
+                            "name:chipotle paste or sauce",
+                            "chipotle paste",
+                            "1 tbsp",
+                            false,
+                            true,
+                            AisleCode.SPICES_CONDIMENTS,
+                            checkReason = "has 'or'",
+                        ),
                     ),
             ),
         badge = Badge.CLAUDE_PENDING,
+        originalServings = 4,
     )
 
 @RunWith(AndroidJUnit4::class)
@@ -76,8 +88,8 @@ class ReviewScreenTest {
         val node = compose.onNodeWithTag("row-cat:onion", useUnmergedTree = false).fetchSemanticsNode()
         val texts = node.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text }
         val toggle = node.children.count { it.config.getOrNull(SemanticsProperties.ToggleableState) != null }
-        // name, quantity and the in-stock box.
-        assertTrue("texts $texts", texts.containsAll(listOf("Onion", "2")))
+        // name, quantity (what goes on) and the in-stock box.
+        assertTrue("texts $texts", texts.containsAll(listOf("Onion", "+2")))
         assertTrue(texts.size + toggle <= 4) // "In stock" label + name + quantity + box, read as one node
         compose.onNodeWithTag("row-cat:onion").performClick()
         assertEquals("row cat:onion", events.last())
@@ -100,6 +112,32 @@ class ReviewScreenTest {
         compose.onAllNodesWithText("In stock")[0].performClick()
         compose.onAllNodesWithText("In stock")[3].performClick()
         assertEquals(listOf("stock cat:onion true", "stock cat:salt false"), events)
+    }
+
+    @Test
+    fun servingsUnknownStartsAtOneAndTheSummarySaysWhatHappens() {
+        show(SAMPLE_REVIEW.copy(servings = null))
+        compose.onNodeWithText("Serves ?").fetchSemanticsNode()
+        compose.onNodeWithContentDescription("More servings").performClick()
+        assertEquals(listOf("servings 1"), events)
+        compose.onNodeWithTag("summary").assertTextEquals("4 to add · 1 in stock · 1 to check")
+        compose.onNodeWithText("Check: has 'or'").fetchSemanticsNode()
+    }
+
+    @Test
+    fun nothingToAddKeepsTheButtonButDisabled() {
+        val all = SAMPLE_REVIEW.aisles.map { (a, rows) -> a to rows.map { it.copy(inStock = true) } }
+        show(SAMPLE_REVIEW.copy(aisles = all, servings = 6))
+        compose.onNodeWithText("Nothing to add — all in stock").assertIsNotEnabled()
+        compose.onNodeWithTag("servings-original").assertTextEquals("(recipe: 4)")
+        compose.onNodeWithText("Already on your list").assertDoesNotExist()
+    }
+
+    @Test
+    fun aRowTheListAlreadyCoversSaysSo() {
+        show(SAMPLE_REVIEW.copy(aisles = listOf(AisleCode.PRODUCE to listOf(SAMPLE_REVIEW.aisles[0].second[0].copy(adds = false)))))
+        compose.onNodeWithText("Already on your list").fetchSemanticsNode()
+        compose.onNodeWithTag("add").assertIsNotEnabled()
     }
 
     @Test

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -81,12 +82,15 @@ data class AddRecipeActions(
 fun AddRecipeSheet(
     actions: AddRecipeActions,
     onDismiss: () -> Unit,
+    hasKey: Boolean = true,
     lastBook: String? = null,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        AddRecipeContent(actions, onDone = onDismiss, lastBook = lastBook)
+        AddRecipeContent(actions, onDone = onDismiss, hasKey = hasKey, lastBook = lastBook)
     }
 }
+
+private const val NEEDS_KEY = "Needs a Claude key"
 
 /** The sheet's content, stateless apart from what is being typed (so tests and screenshots can show it). */
 @Composable
@@ -94,6 +98,8 @@ fun AddRecipeContent(
     actions: AddRecipeActions,
     onDone: () -> Unit,
     start: String = "CHOOSE",
+    /** A Claude key is saved; without one a photo can't be read. */
+    hasKey: Boolean = true,
     /** The photo form's book to start with: the one used last. */
     lastBook: String? = null,
 ) {
@@ -126,6 +132,7 @@ fun AddRecipeContent(
                     hue = 280f,
                     title = "Photo of a recipe",
                     tag = "add-photo",
+                    note = NEEDS_KEY.takeIf { !hasKey },
                 ) { mode = AddMode.PHOTO.name }
             }
             AddMode.LINK ->
@@ -139,7 +146,7 @@ fun AddRecipeContent(
                     onDone()
                 }
             AddMode.PHOTO ->
-                PhotoForm(lastBook, onBack = { mode = AddMode.CHOOSE.name }) { uri, book, page ->
+                PhotoForm(hasKey, lastBook, onBack = { mode = AddMode.CHOOSE.name }) { uri, book, page ->
                     actions.onPhoto(uri, book, page)
                     onDone()
                 }
@@ -153,6 +160,8 @@ private fun Choice(
     hue: Float,
     title: String,
     tag: String,
+    /** Why it won't work yet, shown in the warning colour. */
+    note: String? = null,
     onClick: () -> Unit,
 ) {
     val dark = LocalDarkTheme.current
@@ -170,7 +179,10 @@ private fun Choice(
                 Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)).background(Brand.tint(hue, dark)),
                 contentAlignment = Alignment.Center,
             ) { Icon(icon, contentDescription = null, tint = Brand.strong(hue, dark)) }
-            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                note?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary) }
+            }
             Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -203,6 +215,7 @@ private fun LinkForm(
         singleLine = true,
         shape = MaterialTheme.shapes.medium,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+        keyboardActions = KeyboardActions(onGo = { if (url.isNotBlank()) onSubmit(url) }),
         trailingIcon = {
             // Read only when tapped, so Android shows no "pasted from your clipboard" for nothing.
             IconButton(onClick = {
@@ -227,6 +240,7 @@ private fun LinkForm(
  */
 @Composable
 private fun PhotoForm(
+    hasKey: Boolean,
     lastBook: String?,
     onBack: () -> Unit,
     onPicked: (Uri, String, String) -> Unit,
@@ -262,7 +276,9 @@ private fun PhotoForm(
             modifier = Modifier.width(96.dp).testTag("photo-page"),
         )
     }
+    if (!hasKey) Text(NEEDS_KEY, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.tertiary)
     Button(
+        enabled = hasKey,
         onClick = {
             val file = File(File(context.cacheDir, "camera").apply { mkdirs() }, "shot.jpg")
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.photos", file)
@@ -277,6 +293,7 @@ private fun PhotoForm(
         Text("Take a photo")
     }
     OutlinedButton(
+        enabled = hasKey,
         onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
         modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("photo-pick"),
     ) {

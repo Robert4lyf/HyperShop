@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.importing
 
+import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.UnitLocale
@@ -43,6 +44,12 @@ data class ImportResult(
     val photo: String? = null,
     /** The recipe-library entry this is a copy of (an edit, or "Add to list" from the library). */
     val libraryKey: String? = null,
+    /** The rows marked in stock on the review (merge keys), so reopening it shows the same decisions. */
+    val inStockKeys: List<String> = emptyList(),
+    /** [inStockKeys] was saved: an empty list then means nothing in stock, not "not decided yet". */
+    val decisionsSaved: Boolean = false,
+    /** "Just this time" aisle moves made on the review, by merge key. */
+    val aisleMoves: Map<String, AisleCode> = emptyMap(),
     /** A cookbook recipe's book and page, as typed (photo or typed in; editable on review). */
     val book: String? = null,
     val page: String? = null,

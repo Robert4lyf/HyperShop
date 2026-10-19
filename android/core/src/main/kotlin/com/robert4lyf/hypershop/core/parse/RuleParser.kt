@@ -54,8 +54,15 @@ class RuleParser(
         val toks: List<Token> = Tokeniser.tokenise(text)
         var i = 0
         var check = false
+        var checkReason: String? = null
         var optional = false
         val notes = ArrayList<String>()
+
+        /** R7: the line needs a look; the first reason is the one shown. */
+        fun flag(reason: String) {
+            check = true
+            if (checkReason == null) checkReason = reason
+        }
 
         fun parse(): ParsedIngredient {
             // "about 2 cups stock": a leading qualifier goes to the note (R4.1).
@@ -107,7 +114,7 @@ class RuleParser(
                     } else {
                         // "2 x 3 eggs": a multiplier with no size. Keep the count, drop the "x", and flag it (R7).
                         i = save + 1
-                        check = true
+                        flag("a count times a count")
                     }
                 } else if (word(i) == "x") {
                     // "4 x chicken thighs": a bare multiplier, not part of the name.
@@ -186,7 +193,7 @@ class RuleParser(
             val (name, trailingUnit, impliedQty) = nameAndNote(unit == null && qty != null && !sizedCount)
             if (trailingUnit != null) unit = trailingUnit
             if (qty == null && impliedQty != null) qty = impliedQty
-            if (unit == QtyUnit.OTHER) check = true
+            if (unit == QtyUnit.OTHER) flag("an unknown unit")
 
             if ("optional" in lower || "if desired" in lower || "if you like" in lower) optional = true
             val quantityText = if (qtyEnd > qtyStart) span(qtyStart, qtyEnd).trim() else null
@@ -202,6 +209,7 @@ class RuleParser(
                 note = notes.map { it.trim() }.filter { it.isNotEmpty() }.distinct().joinToString(", ").ifEmpty { null },
                 optional = optional,
                 check = check || name.isEmpty(),
+                checkReason = checkReason ?: if (name.isEmpty()) "no ingredient name" else null,
             )
         }
 
@@ -272,7 +280,7 @@ class RuleParser(
             if (second != null && second > first) return second
             // "3-2 eggs": a separator and a number that make no range; the name would otherwise start "-2".
             i = save
-            check = true
+            flag("a range that goes down")
             return null
         }
 
@@ -388,7 +396,7 @@ class RuleParser(
             if (moved.isNotEmpty()) notes.add(0, moved.joinToString(" "))
             // A leftover amount ("1 lb. 4 oz. beef", "1/0 cup sugar") is not a name: R7.
             if (head.firstOrNull()?.kind in LEFTOVER && catalog.lookup(joinWords(kept)) == null) {
-                check = true
+                flag("an amount left in the name")
             }
 
             var name = joinWords(kept).lowercase().trim()
@@ -397,7 +405,7 @@ class RuleParser(
             // R7: juice/zest of N lemons.
             var implied: Rational? = null
             Regexless.juiceOf(name)?.let { (part, fruit, n) ->
-                check = true
+                flag("\"$part of\": the fruit is listed, not the $part")
                 name = fruit
                 implied = n
                 notes.add(0, part)
@@ -405,7 +413,7 @@ class RuleParser(
             // R4.4: "A or B" keeps A; "safflower or peanut oil" shares the head noun.
             val orAt = " $name ".indexOf(" or ")
             if (orAt >= 0) {
-                check = true
+                flag("\"A or B\": one of two")
                 val a = name.substring(0, maxOf(0, orAt - 1)).trim()
                 val b = name.substring(minOf(name.length, orAt + 3)).trim()
                 val bWords = b.split(' ')
@@ -414,7 +422,7 @@ class RuleParser(
                 name = if (sharesHead) "$a ${bWords.drop(1).joinToString(" ")}" else a
                 notes.add(0, "or $b")
             } else if (" and " in " $name " || " & " in " $name ") {
-                check = true // R7: "X and Y" is Claude's to split
+                flag("\"X and Y\": may be two items") // R7: Claude's to split
             }
 
             var trailing: QtyUnit? = null

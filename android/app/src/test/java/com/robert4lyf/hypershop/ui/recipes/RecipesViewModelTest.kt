@@ -11,6 +11,7 @@ import com.robert4lyf.hypershop.testutil.CHILLI
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.testutil.await
 import com.robert4lyf.hypershop.testutil.readyJob
+import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.list.add
 import com.robert4lyf.hypershop.ui.review.ReviewState
 import com.robert4lyf.hypershop.ui.review.ReviewViewModel
@@ -113,6 +114,30 @@ class RecipesViewModelTest {
         // Removed from the library; the list keeps its items.
         vm.removeFromLibrary(again)
         await(vm.ui) { it.library.isEmpty() && it.uses.size == 2 }
+    }
+
+    @Test
+    fun removingFromTheListOrTheLibraryCanBeUndone() {
+        val c = TestContainer.create()
+        c.add(*CHILLI)
+        val vm = RecipesViewModel(c).shown()
+        val got = mutableListOf<UiMessage>()
+        val watching = CoroutineScope(Dispatchers.Main).launch { vm.events.collect { got += it } }
+        val use = await(vm.ui) { it.uses.isNotEmpty() && it.library.isNotEmpty() }.uses.single()
+        vm.remove(use)
+        await(vm.ui) { it.uses.isEmpty() && got.size == 1 }
+        assertEquals("Removed Weeknight chilli from the list", got[0].text)
+        runBlocking { got[0].undo!!.invoke() }
+        // Back as it was: the use, its items and the library's "on your list".
+        val back = await(vm.ui) { it.uses.size == 1 && it.library.single().onList }
+        assertEquals(use.itemCount, back.uses.single().itemCount)
+        assertTrue(runBlocking { c.repository.snapshot() }.itemByKey("cat:onion") != null)
+        vm.removeFromLibrary(back.library.single())
+        await(vm.ui) { it.library.isEmpty() && got.size == 2 }
+        assertEquals("Removed Weeknight chilli from your recipes", got[1].text)
+        runBlocking { got[1].undo!!.invoke() }
+        assertEquals("Weeknight chilli", await(vm.ui) { it.library.size == 1 }.library.single().title)
+        watching.cancel()
     }
 
     @Test

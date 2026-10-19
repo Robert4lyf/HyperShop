@@ -325,4 +325,12 @@ class RuleParserTest {
         // Twenty digits: not a metric alternative either, so the line is still shopped by the cup.
         assertEquals(QtyUnit.CUP, p.parse("1 cup flour (" + "9".repeat(20) + "g)").shopUnit)
     }
+
+    @Test
+    fun aFlaggedLineSaysWhy() {
+        assertEquals("\"A or B\": one of two", p.parse("2 tbsp olive oil or butter").checkReason)
+        assertEquals("\"X and Y\": may be two items", p.parse("salt and pepper").checkReason)
+        assertEquals("a range that goes down", p.parse("3-2 eggs").checkReason)
+        assertNull(p.parse("2 onions").checkReason)
+    }
 }

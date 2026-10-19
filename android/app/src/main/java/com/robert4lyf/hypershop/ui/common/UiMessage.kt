@@ -1,8 +1,11 @@
 package com.robert4lyf.hypershop.ui.common
 
-/** A snackbar request; [undo] runs when "Undo" is tapped. */
+/**
+ * A snackbar request; [undo] runs when "Undo" is tapped. A message with Undo
+ * stays 10 s so there is time to act; a plain notice goes after 4 s.
+ */
 data class UiMessage(
     val text: String,
     val undo: (suspend () -> Unit)? = null,
-    val seconds: Int = 10,
+    val seconds: Int = if (undo != null) 10 else 4,
 )

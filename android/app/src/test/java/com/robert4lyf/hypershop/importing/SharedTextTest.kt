@@ -52,11 +52,20 @@ class SharedTextTest {
     }
 
     @Test
-    fun onlyHttpsLinksAndASubjectThatIsJustTheUrlIsNoTitle() {
-        assertNull(url("http://example.com/recipe"))
+    fun httpIsTriedAsHttpsOtherSchemesIgnoredAndASubjectThatIsJustTheUrlIsNoTitle() {
+        assertEquals("https://example.com/recipe", url("http://example.com/recipe"))
         assertNull(url("content://media/1 or file:///sdcard/x.html"))
         assertNull(url("no link here"))
         assertNull(url(null))
         assertNull(SharedText.parse("https://example.com/r", "https://example.com/r")!!.subject)
+        assertEquals("Https for beginners", SharedText.parse("https://example.com/r", "Https for beginners")!!.subject)
+    }
+
+    @Test
+    fun textWithNoLinkButSeveralLinesIsTheIngredientsThemselves() {
+        assertEquals(listOf("2 eggs", "100 g flour"), SharedText.lines(" 2 eggs \n\n100 g flour\n"))
+        assertNull("one line is a search, not a recipe", SharedText.lines("just some words"))
+        assertNull("a link wins", SharedText.lines("Pancakes\nhttps://example.com/pancakes"))
+        assertNull(SharedText.lines(null))
     }
 }

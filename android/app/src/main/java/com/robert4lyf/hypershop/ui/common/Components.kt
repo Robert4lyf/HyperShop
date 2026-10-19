@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Remove
@@ -42,6 +44,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
@@ -280,18 +284,20 @@ fun EmptyHero(
 /**
  * A raised bar pinned to the bottom of a screen, for its main action. It draws
  * down to the screen edge and pads its content for the navigation bar, so the
- * screen using it must not be padded for that inset as well.
+ * screen using it must not be padded for that inset as well. A screen that
+ * sits above the tab bar (already clear of that inset) passes [navigationBarInset] false.
  */
 @Composable
 fun BottomActionBar(
     modifier: Modifier = Modifier,
+    navigationBarInset: Boolean = true,
     content: @Composable RowScope.() -> Unit,
 ) {
     Surface(modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 0.dp, shadowElevation = 8.dp) {
         Column {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             Row(
-                Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp),
+                (if (navigationBarInset) Modifier.navigationBarsPadding() else Modifier).padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 content = content,
@@ -317,7 +323,8 @@ fun SheetHeader(
 
 /**
  * An amount field and its button ("Set" on the item sheet). The label stays visible (and spoken) once something is typed;
- * [onSubmit] returns false when the text has no amount.
+ * [onSubmit] returns false when the text has no amount. Done on the keyboard submits too. The keyboard is the text one,
+ * not the number pad, because an amount carries its unit ("500 g").
  */
 @Composable
 fun AmountField(
@@ -329,6 +336,7 @@ fun AmountField(
 ) {
     var amount by remember { mutableStateOf("") }
     var bad by remember { mutableStateOf(false) }
+    val submit = { if (amount.isNotBlank()) bad = !onSubmit(amount) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionLabel(heading)
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -343,10 +351,12 @@ fun AmountField(
                 supportingText = if (bad) ({ Text("Enter an amount, like 2 or 200 ml") }) else null,
                 singleLine = true,
                 shape = MaterialTheme.shapes.medium,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { submit() }),
                 modifier = Modifier.weight(1f).testTag(tag),
             )
             FilledTonalButton(
-                onClick = { bad = !onSubmit(amount) },
+                onClick = submit,
                 enabled = amount.isNotBlank(),
                 modifier = Modifier.padding(top = 8.dp),
             ) { Text(button) }

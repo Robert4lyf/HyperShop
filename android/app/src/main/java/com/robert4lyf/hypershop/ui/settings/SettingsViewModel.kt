@@ -9,20 +9,24 @@ import com.robert4lyf.hypershop.core.merge.UnitsSetting
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.settings.ThemeMode
+import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.watch.WatchLinkState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.time.LocalDate
 
-/** "Test key": null until tried. */
-enum class KeyStatus { TESTING, OK, BAD_KEY, OFFLINE, ERROR }
+/** "Test key": null until tried. [MALFORMED] never reached Anthropic: it can't be a key. */
+enum class KeyStatus { TESTING, OK, BAD_KEY, MALFORMED, OFFLINE, ERROR }
 
 data class SettingsUi(
     val units: UnitsSetting = UnitsSetting.METRIC,
@@ -43,6 +47,8 @@ data class SettingsUi(
     val dailyCalls: Int = SpendGuard.DEFAULT_DAILY_CALLS,
     val spentThisMonthUsd: Double = 0.0,
     val callsToday: Int = 0,
+    /** The app's today, so the screen can say when the caps reset. */
+    val today: LocalDate = LocalDate.now(),
     val debugLog: Boolean = false,
     /** The in-memory log's last lines (redacted), shown while [debugLog] is on. */
     val logLines: List<String> = emptyList(),
@@ -56,6 +62,11 @@ class SettingsViewModel(
 ) : ViewModel() {
     private val _ui = MutableStateFlow(SettingsUi())
     val ui: StateFlow<SettingsUi> = _ui
+
+    private val messages = Channel<UiMessage>(Channel.BUFFERED)
+
+    /** Snackbars (a removed staple, with Undo). */
+    val events: Flow<UiMessage> = messages.receiveAsFlow()
 
     // Main thread only (viewModelScope), so plain fields.
     private var keyWasSet = false
@@ -138,7 +149,10 @@ class SettingsViewModel(
     suspend fun refreshSpend() {
         val history = c.usageHistory()
         val g = SpendGuard()
-        _ui.update { it.copy(spentThisMonthUsd = g.spentThisMonth(history, c.today()), callsToday = g.callsToday(history, c.today())) }
+        val today = c.today()
+        _ui.update {
+            it.copy(spentThisMonthUsd = g.spentThisMonth(history, today), callsToday = g.callsToday(history, today), today = today)
+        }
     }
 
     // ---- List ------------------------------------------------------------------------------
@@ -151,10 +165,12 @@ class SettingsViewModel(
             c.repository.unitsChanged()
         }
 
+    /** The × on a staple chip; Undo marks it "always in stock" again. */
     fun removeStaple(name: String) =
         viewModelScope.launch {
             val key = c.repository.staples().firstOrNull { stapleName(it) == name } ?: return@launch
             c.repository.setStaple(key, false)
+            messages.send(UiMessage("$name is no longer always in stock", undo = { c.repository.setStaple(key, true) }))
         }
 
     // ---- Aisles ----------------------------------------------------------------------------
@@ -170,6 +186,25 @@ class SettingsViewModel(
         val j = i + delta
         if (i < 0 || j !in order.indices) return
         order[i] = order[j].also { order[j] = order[i] }
+        write(order)
+    }
+
+    /** "Move to top" / "Move to bottom": [aisle] goes to [index] in the walking order. */
+    fun moveAisleTo(
+        aisle: AisleCode,
+        index: Int,
+    ) {
+        val order = _ui.value.aisles.toMutableList()
+        if (!order.remove(aisle)) return
+        order.add(index.coerceIn(0, order.size), aisle)
+        write(order)
+    }
+
+    /** "Reset order": the aisles as the app ships them. */
+    fun resetAisleOrder() = write(AisleCode.entries.toList())
+
+    private fun write(order: List<AisleCode>) {
+        if (order == _ui.value.aisles) return
         aislesMoved = true
         _ui.update { it.copy(aisles = order) }
         viewModelScope.launch { aisleWrites.withLock { c.repository.setAisleOrder(order) } }
@@ -189,7 +224,7 @@ class SettingsViewModel(
         val gen = ++keyGen
         viewModelScope.launch {
             if (!KEY_CHARS.matches(key)) {
-                keyStatus(gen, KeyStatus.BAD_KEY)
+                keyStatus(gen, KeyStatus.MALFORMED)
                 return@launch
             }
             if (!c.apiKeyStore.set(key)) {

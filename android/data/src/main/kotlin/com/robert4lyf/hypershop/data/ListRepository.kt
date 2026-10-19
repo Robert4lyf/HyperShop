@@ -9,6 +9,7 @@ import com.robert4lyf.hypershop.core.merge.Merger
 import com.robert4lyf.hypershop.core.merge.NewItem
 import com.robert4lyf.hypershop.core.merge.Preview
 import com.robert4lyf.hypershop.core.merge.Rekey
+import com.robert4lyf.hypershop.core.merge.RemovedUse
 import com.robert4lyf.hypershop.core.merge.RowDecision
 import com.robert4lyf.hypershop.core.merge.ShoppingList
 import com.robert4lyf.hypershop.core.merge.TickSource
@@ -93,6 +94,12 @@ data class UseSummary(
 data class UseLink(
     val title: String,
     val url: String?,
+)
+
+/** What "Remove from list" took off, for Undo: the list rows and the use's review decisions. */
+data class UseRemoval(
+    val removed: RemovedUse,
+    val decisions: List<LineDecisionEntity>,
 )
 
 /** "Finish shopping": the stamp for Undo and how many ticked items went. */
@@ -467,12 +474,22 @@ class ListRepository(
         for (r in older.drop(1)) if (dao.usesOfRecipe(r.id) == 0) dao.deleteRecipe(r.id)
     }
 
-    /** "Remove from your recipes": leaves the library; copies nothing on the list uses go. */
-    suspend fun removeFromLibrary(key: String) =
+    /**
+     * "Remove from your recipes": leaves the library. The copies stay until the
+     * start-up purge, so [restoreToLibrary] (Undo) can bring the entry back.
+     * Returns what to restore: each copy and when it was added.
+     */
+    suspend fun removeFromLibrary(key: String): List<Pair<Long, Long>> =
         db.withTransaction {
-            val copies = dao.recipesByKey(key).filter { it.lastAddedAt != null }
+            val copies = dao.recipesByKey(key).filter { it.lastAddedAt != null }.map { it.id to it.lastAddedAt!! }
             dao.forgetKey(key)
-            for (r in copies) if (dao.usesOfRecipe(r.id) == 0) dao.deleteRecipe(r.id)
+            copies
+        }
+
+    /** Undo of [removeFromLibrary]. */
+    suspend fun restoreToLibrary(copies: List<Pair<Long, Long>>) =
+        db.withTransaction {
+            for ((id, at) in copies) dao.setLastAdded(id, at)
         }
 
     /** The parsed lines of each recipe in [ids] (the recipe search's index): one query per 900. */
@@ -589,7 +606,27 @@ class ListRepository(
         }
     }
 
-    suspend fun removeUse(useId: Long) = write { it.removeUse(useId) to Unit }
+    /** "Remove from list": what went, for [restoreUse] (Undo); null when there was no such use. */
+    suspend fun removeUse(useId: Long): UseRemoval? =
+        db.withTransaction {
+            val old = load()
+            val (next, removed) = old.removeUseKeeping(useId)
+            if (removed == null) return@withTransaction null
+            // The use's review decisions cascade with it; Undo wants them back too.
+            val decisions = dao.decisions(useId)
+            persist(old, next)
+            UseRemoval(removed, decisions)
+        }
+
+    /** Undo of [removeUse]. False when the use was back already. */
+    suspend fun restoreUse(r: UseRemoval): Boolean =
+        db.withTransaction {
+            val old = load()
+            val next = old.restoreUse(r.removed) ?: return@withTransaction false
+            persist(old, next)
+            dao.putDecisions(r.decisions)
+            true
+        }
 
     suspend fun rescaleUse(
         useId: Long,
@@ -682,7 +719,7 @@ class ListRepository(
             l.swapItem(item.id, target)?.let { it to target.displayName }
         }
 
-    /** Purges soft deletes older than 7 days. */
+    /** Purges soft deletes older than 7 days, and recipes forgotten from the library that nothing uses. */
     suspend fun purgeDeleted() =
         db.withTransaction {
             val ids = dao.deletedBefore(clock() - ShoppingList.SEVEN_DAYS)
@@ -691,6 +728,7 @@ class ListRepository(
                 persist(old, old.copy(items = old.items - ids.toSet(), contributions = old.contributions.filter { it.itemId !in ids }))
                 dao.undelete(ids)
             }
+            dao.deleteForgottenRecipes()
         }
 
     /** Move to another aisle; "Always put X in Y?" yes → a user override. */

@@ -10,12 +10,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -31,6 +34,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -42,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -55,6 +60,8 @@ import com.robert4lyf.hypershop.voice.VoiceTestTools
 /** What the screen shows and does: stateless, for tests. */
 data class VoiceTestUi(
     val running: Boolean = false,
+    /** The speech pack download is under way, so "Download" is off meanwhile. */
+    val downloading: Boolean = false,
     val packStatus: String? = null,
     val quickStatus: String? = null,
     val log: List<String> = emptyList(),
@@ -79,6 +86,7 @@ fun VoiceTestRoute(onBack: () -> Unit) {
     val running by VoiceTestService.running.collectAsStateWithLifecycle()
     val log by VoiceTestLog.lines.collectAsStateWithLifecycle()
     var pack by remember { mutableStateOf<String?>(null) }
+    var downloading by remember { mutableStateOf(false) }
     var quick by remember { mutableStateOf<String?>(null) }
     var active by remember { mutableStateOf<SpeechRecognizer?>(null) }
     DisposableEffect(Unit) { onDispose { active?.destroy() } }
@@ -89,6 +97,7 @@ fun VoiceTestRoute(onBack: () -> Unit) {
                 pending?.invoke()
             } else {
                 VoiceTestLog.log("microphone permission refused")
+                quick = "Microphone permission refused — allow it in Android settings"
             }
             pending = null
         }
@@ -102,10 +111,17 @@ fun VoiceTestRoute(onBack: () -> Unit) {
         permissions.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS))
     }
     VoiceTestScreen(
-        VoiceTestUi(running, pack, quick, log),
+        VoiceTestUi(running, downloading, pack, quick, log),
         VoiceTestActions(
             onCheckPack = { VoiceTestTools.checkPack(context) { pack = it } },
-            onDownloadPack = { VoiceTestTools.downloadPack(context) { pack = it } },
+            onDownloadPack = {
+                downloading = true
+                // Progress reports keep it running; any other report is the end, one way or another.
+                VoiceTestTools.downloadPack(context) {
+                    pack = it
+                    downloading = it.startsWith("Downloading")
+                }
+            },
             onQuickCheck = { onDevice ->
                 withMic {
                     active?.destroy()
@@ -138,7 +154,7 @@ fun VoiceTestScreen(
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         LazyColumn(
             Modifier.fillMaxSize().testTag("voice-test"),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
@@ -151,7 +167,11 @@ fun VoiceTestScreen(
                 Step("1. Speech pack", "English (UK), on the phone") {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilledTonalButton(onClick = actions.onCheckPack, modifier = Modifier.testTag("check-pack")) { Text("Check") }
-                        OutlinedButton(onClick = actions.onDownloadPack) { Text("Download") }
+                        OutlinedButton(
+                            onClick = actions.onDownloadPack,
+                            enabled = !ui.downloading,
+                            modifier = Modifier.testTag("download-pack"),
+                        ) { Text("Download") }
                     }
                     ui.packStatus?.let { Text(it) }
                 }
@@ -206,7 +226,7 @@ fun VoiceTestScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Log", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                     OutlinedButton(onClick = actions.onShare, modifier = Modifier.testTag("share-log")) { Text("Share log") }
-                    androidx.compose.material3.TextButton(onClick = actions.onClear) { Text("Clear") }
+                    TextButton(onClick = actions.onClear) { Text("Clear") }
                 }
             }
             if (ui.log.isEmpty()) item { Text("Nothing yet", style = MaterialTheme.typography.bodySmall) }
@@ -238,8 +258,12 @@ private fun ToggleRow(
     checked: Boolean,
     onChange: (Boolean) -> Unit,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    // The whole row is the switch, so TalkBack reads one control with its label.
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(value = checked, role = Role.Switch, onValueChange = onChange),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(label, Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onChange)
+        Switch(checked = checked, onCheckedChange = null)
     }
 }

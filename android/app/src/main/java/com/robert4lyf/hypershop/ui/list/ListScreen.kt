@@ -8,10 +8,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,8 +21,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ViewList
-import androidx.compose.material.icons.rounded.Category
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DoneAll
@@ -28,6 +29,9 @@ import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -40,6 +44,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -49,18 +54,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.ui.common.AisleBadge
-import com.robert4lyf.hypershop.ui.common.HeroButton
+import com.robert4lyf.hypershop.ui.common.BottomActionBar
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
 import com.robert4lyf.hypershop.ui.common.TickMark
 import com.robert4lyf.hypershop.ui.common.sectionItem
@@ -68,6 +80,7 @@ import com.robert4lyf.hypershop.ui.common.sectionPosition
 import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.theme.style
+import kotlin.math.roundToInt
 
 data class ListActions(
     val onToggle: (ListRow) -> Unit,
@@ -77,13 +90,14 @@ data class ListActions(
     val onShare: () -> Unit = {},
     /** "Need it" on an in-stock ingredient. */
     val onNeed: (InStockRow) -> Unit = {},
-    /** The header's switch between the standard and categorised views. */
+    /** The menu's switch between the standard and categorised views. */
     val onToggleView: () -> Unit = {},
 )
 
 /**
  * The list (PLAN §3.5), stateless: the count and progress, then [header] (the
- * "Add item" field and cards, Step 5.6b), then one card per aisle.
+ * "Add item" field and cards, Step 5.6b), then one card per aisle, and once
+ * something is ticked a "Finish shopping" bar within thumb's reach.
  */
 @Composable
 fun ListScreen(
@@ -94,10 +108,30 @@ fun ListScreen(
 ) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
-            // Pinned: the count, "Finish shopping" and the menu stay in reach on a long list.
+            // Pinned: the count and the menu stay in reach on a long list.
             ListTop(ui, actions)
-            ListBody(ui, actions, header, empty)
+            Box(Modifier.weight(1f)) {
+                if (ui.loaded) ListBody(ui, actions, header, empty) else Loading()
+            }
+            if (ui.doneCount > 0) {
+                // The screen sits above the tab bar, so the bar needs no navigation-bar inset of its own.
+                BottomActionBar(navigationBarInset = false) {
+                    Button(onClick = actions.onFinish, modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("finish")) {
+                        Icon(Icons.Rounded.DoneAll, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text("Finish shopping")
+                    }
+                }
+            }
         }
+    }
+}
+
+/** Before the first read: a spinner, so the hero doesn't flip from one title to another. */
+@Composable
+private fun Loading() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(Modifier.semantics { contentDescription = "Loading" }.testTag("loading"))
     }
 }
 
@@ -122,7 +156,19 @@ private fun ListBody(
         val grew = leftByAisle.filter { (a, n) -> n > (before[a] ?: 0) }.keys
         if (grew.any { it in collapsed }) collapsed = collapsed - grew
     }
-    LazyColumn(Modifier.fillMaxSize().testTag("list"), contentPadding = PaddingValues(bottom = 24.dp)) {
+    // Room for the keyboard, so the last aisles scroll above it while the Add field keeps focus.
+    // Only the part of the keyboard that overlaps the list counts: the tab bar below it is
+    // already clear of the keyboard, and a plain imePadding() would leave that much blank.
+    var below by remember { mutableIntStateOf(0) }
+    val ime = WindowInsets.ime.getBottom(LocalDensity.current)
+    val keyboard = with(LocalDensity.current) { (ime - below).coerceAtLeast(0).toDp() }
+    LazyColumn(
+        Modifier
+            .fillMaxSize()
+            .onGloballyPositioned { below = (it.findRootCoordinates().size.height - it.boundsInRoot().bottom).roundToInt() }
+            .testTag("list"),
+        contentPadding = PaddingValues(bottom = 24.dp + keyboard),
+    ) {
         header()
         if (ui.isEmpty) item { empty() }
         for ((aisle, rows) in ui.aisles) {
@@ -142,7 +188,8 @@ private fun ListBody(
             }
             if (open) {
                 itemsIndexed(cells, key = { _, c -> c.key(aisle) }, contentType = { _, c -> c.javaClass.simpleName }) { i, c ->
-                    val tile = Modifier.sectionItem(sectionPosition(i + 1, count), card)
+                    // A ticked row slides to the bottom of its aisle rather than jumping there.
+                    val tile = Modifier.animateItem().sectionItem(sectionPosition(i + 1, count), card)
                     when (c) {
                         is Cell.Item -> ListRowItem(c.row, actions, tile)
                         is Cell.Label -> GroupLabel(c.name, tile)
@@ -156,7 +203,7 @@ private fun ListBody(
 
 /**
  * "In stock": what you marked in stock on review for the recipes on the list,
- * to check before you go. Closed until opened; "Need it" puts one on the list.
+ * to check before you go. Open until closed; "Need it" puts one on the list.
  */
 private fun LazyListScope.inStockSection(
     rows: List<InStockRow>,
@@ -164,7 +211,7 @@ private fun LazyListScope.inStockSection(
     onNeed: (InStockRow) -> Unit,
 ) {
     item(key = "in-stock", contentType = "aisle") {
-        var open by rememberSaveable { mutableStateOf(false) }
+        var open by rememberSaveable { mutableStateOf(true) }
         Column {
             val count = if (open) rows.size + 1 else 1
             Row(
@@ -172,8 +219,12 @@ private fun LazyListScope.inStockSection(
                     .padding(top = 24.dp)
                     .sectionItem(sectionPosition(0, count), MaterialTheme.colorScheme.secondaryContainer)
                     .fillMaxWidth()
-                    .clickable(role = Role.Button) { open = !open }
+                    .clickable(onClickLabel = if (open) "Collapse" else "Expand", role = Role.Button) { open = !open }
                     .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
+                    .semantics(mergeDescendants = true) {
+                        heading()
+                        stateDescription = if (open) "Expanded" else "Collapsed"
+                    }
                     .testTag("in-stock"),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -211,7 +262,7 @@ private fun LazyListScope.inStockSection(
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(r.main.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodyLarge)
-                            Text(r.from, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(r.from, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         TextButton(onClick = { onNeed(r) }, modifier = Modifier.testTag("need-${r.key}")) { Text("Need it") }
                     }
@@ -280,40 +331,51 @@ private fun ListTop(
 ) {
     val shopping = ui.loaded && !ui.isEmpty
     val total = ui.left + ui.doneCount
+    // A confirmation, since Clear all takes everything in one go.
+    var confirmClear by remember { mutableStateOf(false) }
     ScreenHeader(
-        title = if (shopping) "${ui.left} left" else "HyperShop",
-        overline = if (shopping) "Shopping list" else null,
+        title =
+            when {
+                !ui.loaded -> ""
+                shopping -> "${ui.left} left"
+                else -> "HyperShop"
+            },
+        overline = if (ui.loaded && !shopping) null else "Shopping list",
         subtitle =
             when {
+                !ui.loaded -> null
                 !shopping -> null
                 ui.left == 0 -> "All done"
                 else -> "${ui.doneCount} of $total ticked"
             },
         actions = {
-            if (ui.doneCount > 0) {
-                HeroButton(onClick = actions.onFinish) {
-                    Icon(Icons.Rounded.DoneAll, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(6.dp))
-                    Text("Finish shopping")
-                }
-            }
-            IconButton(onClick = actions.onToggleView, modifier = Modifier.testTag("view-toggle")) {
-                Icon(
-                    if (ui.categorised) Icons.Rounded.Category else Icons.AutoMirrored.Rounded.ViewList,
-                    contentDescription = if (ui.categorised) "Categorised view: show standard" else "Standard view: show categorised",
-                )
-            }
             var menu by remember { mutableStateOf(false) }
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Group by type") },
+                        trailingIcon = { if (ui.categorised) Icon(Icons.Rounded.Check, contentDescription = null) },
+                        onClick = {
+                            menu = false
+                            actions.onToggleView()
+                        },
+                        // Read as a checkbox, so TalkBack says whether it is on.
+                        modifier =
+                            Modifier
+                                .semantics {
+                                    role = Role.Checkbox
+                                    toggleableState = if (ui.categorised) ToggleableState.On else ToggleableState.Off
+                                }
+                                .testTag("view-toggle"),
+                    )
                     DropdownMenuItem(text = { Text("Share list as text") }, enabled = !ui.isEmpty, onClick = {
                         menu = false
                         actions.onShare()
                     })
                     DropdownMenuItem(text = { Text("Clear all") }, enabled = !ui.isEmpty, onClick = {
                         menu = false
-                        actions.onClearAll()
+                        confirmClear = true
                     })
                 }
             }
@@ -333,6 +395,20 @@ private fun ListTop(
             }
         },
     )
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text("Clear the whole list?") },
+            text = { Text(if (total == 1) "1 item" else "$total items") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmClear = false
+                    actions.onClearAll()
+                }, modifier = Modifier.testTag("clear-confirm")) { Text("Clear") }
+            },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
+        )
+    }
 }
 
 @Composable
@@ -375,6 +451,39 @@ private fun AisleTitle(
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+/**
+ * The main line as shown: the item's name gets a capital wherever it starts
+ * ("2 Onions", "700 ml Milk", "Coriander"), so rows with and without an
+ * amount read alike. A plural the name isn't a prefix of ("leaves") gets the
+ * first letter capitalised instead.
+ */
+internal fun displayMain(
+    main: String,
+    name: String,
+): String {
+    val at =
+        main.indexOf(name, ignoreCase = true).takeIf { it >= 0 && name.isNotEmpty() }
+            ?: main.indexOfFirst { it.isLetter() }.takeIf { it >= 0 }
+            ?: return main
+    return main.substring(0, at) + main[at].uppercaseChar() + main.substring(at + 1)
+}
+
+/**
+ * The row's sub-lines: "2 already ticked" or the pack note, and the recipe the
+ * item came from. The recipe joins the ticked count on one line ("2 already
+ * ticked · Weeknight chilli"), but a pack note gets a line of its own.
+ */
+internal fun subLines(row: ListRow): List<String> {
+    val sub = row.sub
+    val from = row.from
+    return when {
+        sub == null -> listOfNotNull(from)
+        from == null -> listOf(sub)
+        row.state == TickState.PARTIAL -> listOf("$sub · $from")
+        else -> listOf(sub, from)
     }
 }
 
@@ -441,12 +550,14 @@ private fun ListRowItem(
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    row.main.replaceFirstChar { it.uppercase() },
+                    displayMain(row.main, row.name),
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                     textDecoration = if (done) TextDecoration.LineThrough else null,
                 )
-                row.sub?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                for (line in subLines(row)) {
+                    Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
             Icon(
                 Icons.Rounded.ChevronRight,

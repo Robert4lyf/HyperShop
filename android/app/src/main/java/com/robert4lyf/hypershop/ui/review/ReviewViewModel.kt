@@ -5,26 +5,38 @@ import androidx.lifecycle.viewModelScope
 import com.robert4lyf.hypershop.core.catalog.DisplayPolicy
 import com.robert4lyf.hypershop.core.merge.ApplyResult
 import com.robert4lyf.hypershop.core.merge.Display
+import com.robert4lyf.hypershop.core.merge.Incoming
+import com.robert4lyf.hypershop.core.merge.IncomingLine
+import com.robert4lyf.hypershop.core.merge.NewItem
 import com.robert4lyf.hypershop.core.merge.Preview
 import com.robert4lyf.hypershop.core.merge.PreviewRow
 import com.robert4lyf.hypershop.core.merge.RowDecision
 import com.robert4lyf.hypershop.core.merge.UnitsSetting
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.ParsedBy
+import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.data.ListRepository
 import com.robert4lyf.hypershop.data.StoredRecipe
 import com.robert4lyf.hypershop.di.AppContainer
+import com.robert4lyf.hypershop.extract.Method
 import com.robert4lyf.hypershop.importing.ImportError
 import com.robert4lyf.hypershop.importing.ImportResult
+import com.robert4lyf.hypershop.importing.Importer
+import com.robert4lyf.hypershop.importing.JobState
 import com.robert4lyf.hypershop.importing.PhotoStore
+import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.common.webLink
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -41,6 +53,8 @@ data class ReviewRow(
     val aisle: AisleCode,
     /** False when everything this row needs is already covered, so nothing is added. */
     val adds: Boolean = true,
+    /** Why [check] is set ("\"A or B\": one of two"). */
+    val checkReason: String? = null,
 )
 
 enum class Badge { CLAUDE, CLAUDE_PENDING, RULES }
@@ -52,6 +66,8 @@ data class SheetLine(
     val parsed: String,
     /** B in "A or B", when the line has one. */
     val alternative: String?,
+    /** Why the line is flagged to check, when it is. */
+    val checkReason: String? = null,
 )
 
 /** The review row's detail sheet (PLAN §3.1). */
@@ -65,6 +81,8 @@ data class RowSheet(
     val aisle: AisleCode,
     val inStock: Boolean,
     val isStaple: Boolean,
+    /** False when the recipe has one line: it can't be removed. */
+    val canRemove: Boolean = true,
 )
 
 data class ReviewUi(
@@ -79,16 +97,41 @@ data class ReviewUi(
     val url: String? = null,
     /** Editing a recipe already on the list ("Save changes" rather than "Add"). */
     val editing: Boolean = false,
+    /** Something was changed here (a row, the servings, the name): Cancel asks first. */
+    val changed: Boolean = false,
+    /** Why Claude didn't read this recipe, in plain words, when it didn't. */
+    val claudeNote: String? = null,
+    /** The servings the recipe gives, shown when the stepper has moved away from it. */
+    val originalServings: Int? = null,
+    /** "Retry with Claude" is running (a [busy] that can be stopped). */
+    val retrying: Boolean = false,
     /** No web page: a cookbook recipe, which can carry its book and page. */
     val cookbook: Boolean = false,
     val book: String? = null,
     val page: String? = null,
 ) {
-    val addCount: Int get() = aisles.sumOf { (_, rows) -> rows.count { !it.inStock && it.adds } }
+    private val rows: List<ReviewRow> get() = aisles.flatMap { it.second }
+    val addCount: Int get() = rows.count { !it.inStock && it.adds }
+    val inStockCount: Int get() = rows.count { it.inStock }
+    val checkCount: Int get() = rows.count { it.check && !it.inStock }
+
+    /** "4 to add · 2 in stock · 1 to check", without the zero parts. */
+    val summary: String
+        get() =
+            listOfNotNull(
+                addCount.takeIf { it > 0 }?.let { "$it to add" },
+                inStockCount.takeIf { it > 0 }?.let { "$it in stock" },
+                checkCount.takeIf { it > 0 }?.let { "$it to check" },
+            ).joinToString(" · ")
 }
 
 sealed interface ReviewState {
-    data object Loading : ReviewState
+    data class Loading(
+        /** "Fetching the page…", "Reading with Claude…" */
+        val stage: String,
+        /** The page has taken over [ReviewViewModel.SLOW_MS]: offer pasting the ingredients instead. */
+        val slow: Boolean = false,
+    ) : ReviewState
 
     data class Ready(
         val ui: ReviewUi,
@@ -103,7 +146,7 @@ sealed interface ReviewState {
     data class Added(
         val count: Int,
         val useId: Long,
-        /** An edit was saved: no Undo, "Updated <title>". */
+        /** An edit was saved: no Undo, "Saved changes to <title>". */
         val edited: String? = null,
     ) : ReviewState
 
@@ -123,8 +166,13 @@ class ReviewViewModel(
     private val c: AppContainer,
     private val jobId: Long,
 ) : ViewModel() {
-    private val _state = MutableStateFlow<ReviewState>(ReviewState.Loading)
+    private val _state = MutableStateFlow<ReviewState>(ReviewState.Loading(STAGE_OPENING))
     val state: StateFlow<ReviewState> = _state
+
+    private val _events = Channel<UiMessage>(Channel.BUFFERED)
+
+    /** Snackbars: "Cleared in stock · Undo", "Added honey to Baking". */
+    val events: Flow<UiMessage> = _events.receiveAsFlow()
 
     private var result: ImportResult? = null
     private var stored: StoredRecipe? = null
@@ -134,14 +182,31 @@ class ReviewViewModel(
     private var units = UnitsSetting.METRIC
     private val aisleMoves = mutableMapOf<String, AisleCode>()
 
+    /** Set by every change made here; Cancel asks before discarding it. */
+    private var changed = false
+
+    /**
+     * Applying or retrying with Claude. [recompute] carries it into the UI, so a
+     * row change meanwhile can't re-enable "Add", and neither can start twice.
+     */
+    private var busy = false
+    private var retrying = false
+    private var retryJob: Job? = null
+
+    /** The import as it failed, for the lines picked or pasted in its place. */
+    private var failedFrom: ImportResult? = null
+
     /** The use an edit replaces ([ImportResult.editsUse]). */
     private val replacing: Long? get() = result?.editsUse
 
     /** See [act]. Declared before init, which uses it. */
     private val ops = Mutex()
 
+    /** The load, so Cancel and "paste instead" need not wait for a slow page behind [ops]. */
+    private val loadJob: Job
+
     init {
-        act { load() }
+        loadJob = act { load() }
     }
 
     /**
@@ -175,13 +240,27 @@ class ReviewViewModel(
     private suspend fun load() {
         units = c.settings.units.first()
         c.importJobs.ensureScheduled(jobId)
-        // Woken by the row changing, not by polling it ten times a second while the page is fetched.
-        val job = c.importJobs.awaitFinished(jobId)
+        val waiting = c.importJobs.get(jobId)?.state.let { it == JobState.QUEUED || it == JobState.RUNNING }
+        if (waiting) _state.value = ReviewState.Loading(STAGE_FETCHING)
+        // Woken by the row changing, not by polling it ten times a second while the page is
+        // fetched. A parallel timer offers pasting the lines once the fetch has taken a while;
+        // the wait itself goes on.
+        val slowTimer =
+            viewModelScope.launch {
+                delay(SLOW_MS)
+                (_state.value as? ReviewState.Loading)?.let { _state.value = it.copy(slow = true) }
+            }
+        val job =
+            try {
+                c.importJobs.awaitFinished(jobId)
+            } finally {
+                slowTimer.cancel()
+            }
         var r = job?.result ?: return fail(ImportError.NO_RECIPE, emptyList())
         failedFrom = r
         // Once per import: a failure or refusal in the worker isn't retried on open ("Retry with Claude" is).
         if (r.claudePending && !r.claudeTried && c.reviewGate.visible.value) {
-            _state.value = ReviewState.Loading
+            _state.value = ReviewState.Loading(STAGE_CLAUDE)
             // Kept on the job, so reopening this review neither pays for Claude again nor
             // retries a failure (claudeTried is set on those).
             r = parseWithClaude(r)
@@ -201,6 +280,7 @@ class ReviewViewModel(
 
     private suspend fun begin(r: ImportResult) {
         servings = r.targetServings ?: r.servings
+        if (r.decisionsSaved) aisleMoves.putAll(r.aisleMoves)
         store(r)
         decisions = c.repository.merger.defaultDecisions(preview!!.incoming, c.repository.staples()).toMutableMap()
         if (!r.preTick) decisions.replaceAll { _, d -> d.copy(inStock = false) }
@@ -210,6 +290,14 @@ class ReviewViewModel(
             val (inStock, added) = lines.indices.partition { it in r.inStockLines }
             val keys = inStock.map { lines[it].target.mergeKey }.toSet() - added.map { lines[it].target.mergeKey }.toSet()
             for (k in keys) decisions[k] = (decisions[k] ?: RowDecision()).copy(inStock = true)
+        }
+        if (r.decisionsSaved) {
+            // Back here after leaving (or Undo after Cancel): the decisions as they were left.
+            val saved = r.inStockKeys.toSet()
+            for (row in preview!!.rows) {
+                val k = row.target.mergeKey
+                decisions[k] = (decisions[k] ?: RowDecision()).copy(inStock = k in saved)
+            }
         }
         recompute()
     }
@@ -236,24 +324,52 @@ class ReviewViewModel(
         old?.let { c.repository.discardRecipe(it.recipe.id) }
     }
 
-    private var failedFrom: ImportResult? = null
+    /**
+     * The review's edits (lines, name, servings, in-stock rows, aisle moves) go
+     * with the job, so Back and coming back, or Undo after Cancel, shows them again.
+     */
+    private suspend fun persist() {
+        val r = result ?: return
+        val edited =
+            r.copy(
+                targetServings = servings,
+                inStockKeys = decisions.filterValues { it.inStock }.keys.sorted(),
+                decisionsSaved = true,
+                aisleMoves = aisleMoves.toMap(),
+            )
+        result = edited
+        c.importJobs.update(jobId, edited)
+    }
 
     private fun candidates(r: ImportResult): List<String> =
         r.rawLines.ifEmpty {
             r.pageText.orEmpty().lines().map { it.trim() }.filter { it.length in 2..500 }.distinct().take(300)
         }
 
+    /** "Taking a while": stop waiting for the page and paste the ingredients instead. */
+    fun pasteInstead() {
+        loadJob.cancel()
+        act {
+            if (_state.value !is ReviewState.Loading) return@act
+            val input = c.importJobs.get(jobId)?.input
+            // The page's title and address are kept for the lines pasted in its place.
+            failedFrom = ImportResult(input?.url, input?.subject, null, Importer.localeFor(input?.url, emptyList()), Method.MANUAL.name)
+            fail(ImportError.NO_RECIPE, emptyList())
+        }
+    }
+
     /** "Select lines manually": the picked or pasted lines, parsed as a recipe and reviewed as usual. */
     fun useLines(lines: List<String>) =
         act {
             val picked = lines.flatMap { it.lines() }.map { it.trim() }.filter { it.isNotEmpty() }
             if (picked.isEmpty()) return@act
-            _state.value = ReviewState.Loading
+            val claude = c.reviewGate.visible.value && c.apiKeyStore.get() != null
+            _state.value = ReviewState.Loading(if (claude) STAGE_CLAUDE else STAGE_LINES)
             val from = failedFrom
             val r =
                 c.importer
                     .fromLines(picked, from?.title, allowClaude = c.reviewGate.visible.value, model = c.settings.model.first())
-                    .copy(url = from?.url)
+                    .copy(url = from?.url?.takeIf { it.isNotEmpty() })
             if (r.lines.isEmpty()) return@act fail(ImportError.NO_RECIPE, picked)
             result = r
             begin(r)
@@ -280,6 +396,7 @@ class ReviewViewModel(
                     order.indexOf(a).let { i -> if (i < 0) Int.MAX_VALUE else i }
                 }
             }
+        persist()
         val r = result!!
         _state.value =
             ReviewState.Ready(
@@ -297,12 +414,26 @@ class ReviewViewModel(
                     url = webLink(r.url),
                     busy = busy,
                     editing = r.editsUse != null,
+                    changed = changed,
+                    claudeNote = claudeNote(r),
+                    originalServings = r.servings,
+                    retrying = retrying,
                     cookbook = webLink(r.url) == null,
                     book = r.book,
                     page = r.page,
                 ),
             )
     }
+
+    /** Why the badge isn't "Parsed by Claude", when it isn't. */
+    private fun claudeNote(r: ImportResult): String? =
+        when {
+            r.parsedBy == ParsedBy.CLAUDE -> null
+            r.claudeNote != null -> Importer.claudeNoteText(r.claudeNote)
+            // Claude answered that there was nothing to read; the rule parser's lines stand.
+            r.claudeTried && !r.claudePending -> "Claude found no ingredient list here; the lines were read offline"
+            else -> null
+        }
 
     private fun row(r: PreviewRow): ReviewRow {
         val d = r.decision
@@ -313,6 +444,7 @@ class ReviewViewModel(
         val produce = r.target.aisle == AisleCode.PRODUCE
         val hint = Display.hintOf(lines.map { it.parsed.shopUnit })
         val entry = c.catalog.byId[r.target.catalogId ?: ""]
+        val check = lines.firstOrNull { it.parsed.check }
         return ReviewRow(
             key = r.target.mergeKey,
             name = entry?.name ?: r.target.displayName,
@@ -323,15 +455,16 @@ class ReviewViewModel(
                     Display.amount(needed, units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy)
                 },
             inStock = d.inStock,
-            check = lines.any { it.parsed.check },
+            check = check != null,
             aisle = r.target.aisle,
             adds = preview!!.contributions.any { it.mergeKey == r.target.mergeKey },
+            checkReason = check?.parsed?.checkReason,
         )
     }
 
     private fun lineQty(
-        l: com.robert4lyf.hypershop.core.merge.IncomingLine,
-        inc: com.robert4lyf.hypershop.core.merge.Incoming,
+        l: IncomingLine,
+        inc: Incoming,
     ): QtyBase = l.parsed.shopBase(inc.locale).times(inc.scale)
 
     fun setInStock(
@@ -339,20 +472,38 @@ class ReviewViewModel(
         inStock: Boolean,
     ) = act {
         decisions[key] = (decisions[key] ?: RowDecision()).copy(inStock = inStock)
+        changed = true
         recompute()
     }
 
-    /** Overflow menu: mark this aisle in stock. */
+    /** Overflow menu: mark this aisle in stock (with Undo). */
     fun aisleInStock(aisle: AisleCode) =
         act {
-            preview?.rows?.filter { it.target.aisle == aisle }?.forEach { decisions[it.target.mergeKey] = it.decision.copy(inStock = true) }
+            val before = decisions.toMap()
+            val rows = preview?.rows?.filter { it.target.aisle == aisle && !it.decision.inStock }.orEmpty()
+            if (rows.isEmpty()) return@act
+            for (r in rows) decisions[r.target.mergeKey] = r.decision.copy(inStock = true)
+            changed = true
             recompute()
+            _events.send(UiMessage("${aisle.displayName} marked in stock", undo = { restoreDecisions(before) }))
         }
 
-    /** Overflow menu: clear in stock. */
+    /** Overflow menu: clear in stock (with Undo). */
     fun clearInStock() =
         act {
+            val before = decisions.toMap()
+            if (before.values.none { it.inStock }) return@act
             decisions.replaceAll { _, d -> d.copy(inStock = false) }
+            changed = true
+            recompute()
+            _events.send(UiMessage("Cleared in stock", undo = { restoreDecisions(before) }))
+        }
+
+    /** Undo of [clearInStock] and [aisleInStock]: the decisions as they were. */
+    fun restoreDecisions(decisions: Map<String, RowDecision>) =
+        act {
+            this.decisions = decisions.toMutableMap()
+            changed = true
             recompute()
         }
 
@@ -360,6 +511,7 @@ class ReviewViewModel(
         act {
             if (n in 1..99) {
                 servings = n
+                changed = true
                 recompute()
             }
         }
@@ -369,24 +521,29 @@ class ReviewViewModel(
         val r = result ?: return
         if (busy) return
         busy = true
-        (state.value as? ReviewState.Ready)?.let { _state.value = it.copy(ui = it.ui.copy(busy = true)) }
-        act {
-            try {
-                val again = parseWithClaude((result ?: r).copy(claudePending = true)) { it.parsedBy == ParsedBy.CLAUDE }
-                store(again)
-                result = again
-            } finally {
-                busy = false
+        retrying = true
+        (state.value as? ReviewState.Ready)?.let { _state.value = it.copy(ui = it.ui.copy(busy = true, retrying = true)) }
+        retryJob =
+            act {
+                try {
+                    val again = parseWithClaude((result ?: r).copy(claudePending = true)) { it.parsedBy == ParsedBy.CLAUDE }
+                    store(again)
+                    result = again
+                } finally {
+                    busy = false
+                    retrying = false
+                }
+                // Why it didn't work shows under the badge (ReviewUi.claudeNote).
+                recompute()
             }
-            recompute(notice = if (result?.parsedBy == ParsedBy.CLAUDE) null else "Claude is unavailable; kept the offline parse")
-        }
     }
 
-    /**
-     * Applying or retrying with Claude. [recompute] carries it into the UI, so a
-     * row change meanwhile can't re-enable "Add", and neither can start twice.
-     */
-    private var busy = false
+    /** "Stop" while asking Claude. An answer that still arrives is kept on the job for next time. */
+    fun stopRetry() {
+        val j = retryJob?.takeIf { it.isActive } ?: return
+        j.cancel()
+        act { recompute() }
+    }
 
     /** "Add N items": one transaction re-checking every rev shown. Runs once at a time. */
     fun confirm() {
@@ -422,13 +579,25 @@ class ReviewViewModel(
         c.applicationScope.launch { c.repository.discardRecipe(s.recipe.id) }
     }
 
-    fun cancel() =
+    /**
+     * Cancel: the screen closes at once; the job is only done for good once the
+     * "Import discarded" snackbar has gone without Undo ([discardForGood]). Not
+     * queued behind a slow page or Claude.
+     */
+    fun cancel() {
+        loadJob.cancel()
+        retryJob?.cancel()
         act {
             stored?.let { c.repository.discardRecipe(it.recipe.id) }
-            PhotoStore.delete((result ?: failedFrom)?.photo)
-            c.importJobs.done(jobId)
             _state.value = ReviewState.Cancelled
         }
+    }
+
+    /** Undo wasn't tapped: the job is done and its photo, if any, goes. */
+    suspend fun discardForGood() {
+        PhotoStore.delete(c.importJobs.get(jobId)?.result?.photo)
+        c.importJobs.done(jobId)
+    }
 
     // ---- the row sheet (Step 5.5) ----------------------------------------------------
 
@@ -466,6 +635,7 @@ class ReviewViewModel(
                     l.parsed.raw,
                     summary(l.parsed),
                     l.parsed.note?.takeIf { it.startsWith("or ") }?.removePrefix("or ")?.trim(),
+                    l.parsed.checkReason?.takeIf { l.parsed.check },
                 )
             }
         return RowSheet(
@@ -477,13 +647,23 @@ class ReviewViewModel(
             row.target.aisle,
             row.decision.inStock,
             entry != null && row.decision.inStock,
+            canRemove = p.incoming.lines.size > 1,
         )
     }
 
     /** Live re-parse of an edited line. */
     fun reparse(text: String): String = summary(c.ruleParser.parse(text))
 
-    private fun summary(p: com.robert4lyf.hypershop.core.model.ParsedIngredient): String =
+    /** Under the rename field: "Joins maple syrup in Baking" or "A new item in Other". */
+    fun renamePreview(name: String): String? {
+        val n = name.trim().lowercase()
+        if (n.isEmpty()) return null
+        val t = c.repository.target(n)
+        val entry = c.catalog.byId[t.catalogId ?: ""]
+        return if (entry != null) "Joins ${entry.name} in ${t.aisle.displayName}" else "A new item in ${t.aisle.displayName}"
+    }
+
+    private fun summary(p: ParsedIngredient): String =
         listOfNotNull(
             p.quantity?.let { q -> Display.fraction(q) + (p.quantityMax?.let { "–" + Display.fraction(it) } ?: "") },
             p.unit?.serial,
@@ -496,6 +676,7 @@ class ReviewViewModel(
         act {
             c.repository.setStaple(key, true)
             decisions[key] = (decisions[key] ?: RowDecision()).copy(inStock = true)
+            changed = true
             recompute()
         }
 
@@ -511,36 +692,42 @@ class ReviewViewModel(
         } else {
             aisleMoves[key] = aisle
         }
+        changed = true
         recompute()
     }
 
-    /** "A or B" swap: the line becomes B, with "or A" in its note. */
-    fun swap(lineId: Long) =
-        act {
-            replaceLine(lineId) { p ->
-                val alt = p.note?.takeIf { it.startsWith("or ") }?.removePrefix("or ")?.trim() ?: return@replaceLine p
-                p.copy(name = alt.lowercase(), note = "or ${p.name}", unit = p.unit)
-            }
-        }
+    /** "A or B" swap: the line becomes B, with "or A" in its note. [onKey] gets the row's new key. */
+    fun swap(
+        lineId: Long,
+        onKey: (String) -> Unit = {},
+    ) = act {
+        replaceLine(lineId) { p ->
+            val alt = p.note?.takeIf { it.startsWith("or ") }?.removePrefix("or ")?.trim() ?: return@replaceLine p
+            p.copy(name = alt.lowercase(), note = "or ${p.name}", unit = p.unit)
+        }?.let(onKey)
+    }
 
-    /** Edit the source line; it is parsed again with the rule parser. */
+    /** Edit the source line; it is parsed again with the rule parser. [onKey] gets the row's new key. */
     fun editLine(
         lineId: Long,
         text: String,
+        onKey: (String) -> Unit = {},
     ) = act {
         if (text.isBlank()) return@act
-        replaceLine(lineId) { old -> c.ruleParser.parse(text).copy(section = old.section) }
+        replaceLine(lineId) { old -> c.ruleParser.parse(text).copy(section = old.section) }?.let(onKey)
     }
 
     /**
      * "Rename": the row's lines are read as [name] for this recipe only; the
      * ingredient library is unchanged. A name the library knows joins that
      * ingredient ("maple syrup"); any other becomes an item of its own. What was
-     * decided for the row (in stock, an aisle move) goes with it.
+     * decided for the row (in stock, an aisle move) goes with it. [onKey] gets the
+     * row's new key.
      */
     fun rename(
         key: String,
         name: String,
+        onKey: (String) -> Unit = {},
     ) = act {
         val n = name.trim().lowercase()
         val ids = preview?.incoming?.lines?.filter { it.target.mergeKey == key }?.map { it.recipeLineId }?.toSet()
@@ -551,28 +738,32 @@ class ReviewViewModel(
             aisleMoves.remove(key)?.let { aisleMoves.putIfAbsent(to, it) }
         }
         // Claude's aisle was for the old name.
-        replaceLines(ids) { it.copy(name = n, aisleSuggestion = null) }
+        replaceLines(ids) { it.copy(name = n, aisleSuggestion = null) }?.let(onKey)
     }
 
     private suspend fun replaceLine(
         lineId: Long,
-        f: (com.robert4lyf.hypershop.core.model.ParsedIngredient) -> com.robert4lyf.hypershop.core.model.ParsedIngredient,
+        f: (ParsedIngredient) -> ParsedIngredient,
     ) = replaceLines(setOf(lineId), f)
 
+    /** Returns the key of the row the first changed line now belongs to (it can change with the name). */
     private suspend fun replaceLines(
         lineIds: Set<Long>,
-        f: (com.robert4lyf.hypershop.core.model.ParsedIngredient) -> com.robert4lyf.hypershop.core.model.ParsedIngredient,
-    ) {
-        val s = stored ?: return
-        val r = result ?: return
+        f: (ParsedIngredient) -> ParsedIngredient,
+    ): String? {
+        val s = stored ?: return null
+        val r = result ?: return null
         val lines = r.lines.toMutableList()
         val indices = s.lines.indices.filter { s.lines[it].first.id in lineIds && it in lines.indices }
-        if (indices.isEmpty()) return
+        if (indices.isEmpty()) return null
         for (i in indices) lines[i] = f(lines[i])
         val edited = r.copy(lines = lines)
         store(edited)
         result = edited
+        changed = true
         recompute()
+        // The recipe is stored again (new line ids) in the same order, so the line is found by index.
+        return preview?.incoming?.lines?.getOrNull(indices.first())?.target?.mergeKey
     }
 
     /** The recipe's name, as shown on the Recipes tab. */
@@ -584,6 +775,7 @@ class ReviewViewModel(
             val edited = r.copy(title = t)
             store(edited)
             result = edited
+            changed = true
             recompute()
         }
 
@@ -611,8 +803,14 @@ class ReviewViewModel(
             val edited = r.copy(lines = r.lines + c.ruleParser.parse(t), rawLines = r.rawLines + t)
             store(edited)
             result = edited
+            changed = true
             recompute()
+            preview?.incoming?.lines?.lastOrNull()?.target?.let { added ->
+                _events.send(UiMessage("Added ${displayName(added).replaceFirstChar { it.uppercase() }} to ${added.aisle.displayName}"))
+            }
         }
+
+    private fun displayName(t: NewItem): String = c.catalog.byId[t.catalogId ?: ""]?.name ?: t.displayName
 
     /** "Remove from recipe": the line goes from this recipe (the last one stays). */
     fun removeLine(lineId: Long) =
@@ -624,6 +822,7 @@ class ReviewViewModel(
             val edited = r.copy(lines = r.lines.filterIndexed { i, _ -> i != index })
             store(edited)
             result = edited
+            changed = true
             recompute()
         }
 
@@ -631,4 +830,14 @@ class ReviewViewModel(
     fun previewRow(key: String): PreviewRow? = preview?.rows?.firstOrNull { it.target.mergeKey == key }
 
     internal fun currentPreview(): Preview? = preview
+
+    companion object {
+        const val STAGE_OPENING = "Opening…"
+        const val STAGE_FETCHING = "Fetching the page…"
+        const val STAGE_CLAUDE = "Reading with Claude…"
+        const val STAGE_LINES = "Reading the lines…"
+
+        /** How long a fetch may take before the screen offers pasting the lines instead. */
+        const val SLOW_MS = 25_000L
+    }
 }

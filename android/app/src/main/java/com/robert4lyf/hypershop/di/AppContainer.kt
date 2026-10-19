@@ -19,6 +19,7 @@ import com.robert4lyf.hypershop.data.ListRepository
 import com.robert4lyf.hypershop.extract.FetchPolicy
 import com.robert4lyf.hypershop.extract.SafeFetcher
 import com.robert4lyf.hypershop.importing.HyperShopWorkerFactory
+import com.robert4lyf.hypershop.importing.ImportInput
 import com.robert4lyf.hypershop.importing.ImportJobs
 import com.robert4lyf.hypershop.importing.Importer
 import com.robert4lyf.hypershop.importing.ReviewGate
@@ -34,6 +35,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -123,21 +125,49 @@ class AppContainer(
             clock = clock,
         )
 
-    /** Shares and pastes waiting for the UI: a job to review, or "no link". */
-    val shares = kotlinx.coroutines.flow.MutableStateFlow<ShareOutcome?>(null)
+    /**
+     * The share or paste waiting for the UI: a job to review, or "no link". One at
+     * a time: the UI calls [shareHandled] once it has acted on it, and the next
+     * share that arrived meanwhile (two quick shares) takes its place.
+     */
+    val shares = MutableStateFlow<ShareOutcome?>(null)
+    private val waitingShares = ArrayDeque<ShareOutcome>()
 
-    /** A share or a paste: queue the import, or say there was no link. Returns the job, if any. */
+    private fun offer(outcome: ShareOutcome) {
+        synchronized(waitingShares) { if (!shares.compareAndSet(null, outcome)) waitingShares.addLast(outcome) }
+    }
+
+    /** The UI has acted on [outcome]: the next waiting share, if any, is offered. */
+    fun shareHandled(outcome: ShareOutcome) {
+        synchronized(waitingShares) {
+            if (shares.compareAndSet(outcome, null)) waitingShares.removeFirstOrNull()?.let { shares.value = it }
+        }
+    }
+
+    /**
+     * A share or a paste: queue the import, or say there was no link. Text with no
+     * link but several lines is read as the ingredients themselves, offline here
+     * (Claude runs on the review screen, as for a page). Returns the job, if any.
+     */
     suspend fun importShared(
         text: String?,
         subject: String?,
     ): Long? {
         val input = SharedText.parse(text, subject)
-        if (input == null) {
-            shares.value = ShareOutcome.NoLink
-            return null
-        }
-        val id = importJobs.enqueue(input)
-        shares.value = ShareOutcome.Review(id)
+        val id =
+            if (input != null) {
+                importJobs.enqueue(input)
+            } else {
+                val lines = SharedText.lines(text)
+                if (lines == null) {
+                    offer(ShareOutcome.NoLink)
+                    return null
+                }
+                val title = subject?.trim()?.takeIf { it.isNotEmpty() }
+                val parsed = importer.fromLines(lines, title, allowClaude = false, model = settings.model.first())
+                importJobs.enqueueReady(ImportInput("", title), parsed)
+            }
+        offer(ShareOutcome.Review(id))
         return id
     }
 

@@ -338,7 +338,7 @@ class VoiceTestService : Service() {
         return Notification.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle("Voice test listening")
-            .setContentText("Speak commands; the log is in Settings › Voice test.")
+            .setContentText("Listening")
             .setContentIntent(open)
             .addAction(Notification.Action.Builder(null, "Stop", stop).build())
             .setOngoing(true)

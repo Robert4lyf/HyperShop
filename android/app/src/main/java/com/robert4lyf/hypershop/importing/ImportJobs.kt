@@ -103,6 +103,12 @@ class ImportJobs(
 
     suspend fun done(id: Long) = setState(id, JobState.DONE)
 
+    /** Keeps the review screen's edits with the job, so Back and coming back shows them again. */
+    suspend fun update(
+        id: Long,
+        result: ImportResult,
+    ) = dao.updateJobResult(id, json.encodeToString(ImportResult.serializer(), result))
+
     /**
      * Jobs ready to review, for the list's card: their results are not decoded (a
      * page's text can be tens of KB and this re-emits with every job change).

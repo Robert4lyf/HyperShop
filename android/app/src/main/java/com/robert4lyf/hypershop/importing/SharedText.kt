@@ -2,12 +2,17 @@ package com.robert4lyf.hypershop.importing
 
 /**
  * What a share (ACTION_SEND text) or a paste carries (PLAN §3.1): the first
- * https URL, without `utm_*` and `igsh` tracking parameters; EXTRA_SUBJECT is
- * the fallback title. Other schemes (http, file, content, intent) are ignored.
+ * web URL, without `utm_*` and `igsh` tracking parameters; EXTRA_SUBJECT is
+ * the fallback title. A plain `http://` link is tried as `https://` (the
+ * fetcher only speaks https; nearly every recipe site answers on it). Other
+ * schemes (file, content, intent) are ignored. Text with no link but several
+ * lines is taken as the ingredients themselves ([lines]).
  */
 object SharedText {
-    private val URL = Regex("""https://[^\s<>"'`]+""", RegexOption.IGNORE_CASE)
+    private val URL = Regex("""https?://[^\s<>"'`]+""", RegexOption.IGNORE_CASE)
     private const val TRAILING = ".,;:!?)]}'\"”’»"
+    private const val MAX_LINES = 300
+    private const val MAX_LINE = 500
 
     fun parse(
         text: String?,
@@ -20,8 +25,19 @@ object SharedText {
             if (url.last() == ')' && url.count { it == '(' } >= url.count { it == ')' }) break
             url = url.dropLast(1)
         }
-        val title = subject?.trim()?.takeIf { it.isNotEmpty() && !it.startsWith("https://", ignoreCase = true) }
+        if (url.startsWith("http://", ignoreCase = true)) url = "https://" + url.substring("http://".length)
+        val title = subject?.trim()?.takeIf { it.isNotEmpty() && !URL.matches(it) }
         return ImportInput(stripTracking(url), title)
+    }
+
+    /**
+     * Shared text with no link and at least two non-empty lines ("2 eggs\n100 g
+     * flour"): the lines, trimmed and capped as the extractor caps a page's.
+     */
+    fun lines(text: String?): List<String>? {
+        if (text == null || URL.containsMatchIn(text)) return null
+        val lines = text.lines().map { it.trim().take(MAX_LINE) }.filter { it.isNotEmpty() }.take(MAX_LINES)
+        return lines.takeIf { it.size >= 2 }
     }
 
     fun stripTracking(url: String): String {

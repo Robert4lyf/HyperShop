@@ -7,11 +7,16 @@ import com.robert4lyf.hypershop.data.ImportJobEntity
 import com.robert4lyf.hypershop.importing.ImportError
 import com.robert4lyf.hypershop.importing.ImportInput
 import com.robert4lyf.hypershop.importing.ImportResult
+import com.robert4lyf.hypershop.importing.JobState
 import com.robert4lyf.hypershop.importing.PhotoStore
 import com.robert4lyf.hypershop.testutil.CHILLI
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.testutil.await
 import com.robert4lyf.hypershop.testutil.readyJob
+import com.robert4lyf.hypershop.ui.common.UiMessage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -164,13 +169,67 @@ class ReviewViewModelTest {
     }
 
     @Test
-    fun cancelDiscardsTheRecipe() {
+    fun cancelDiscardsTheRecipeAndTheJobOnlyOnceUndoHasPassed() {
         val c = TestContainer.create()
-        val vm = ReviewViewModel(c, runBlocking { c.readyJob("2 onions", url = "https://example.com/chilli") })
+        val job = runBlocking { c.readyJob("2 onions", url = "https://example.com/chilli") }
+        val vm = ReviewViewModel(c, job)
         ready(vm)
         vm.cancel()
         await(vm.state) { it == ReviewState.Cancelled }
         assertTrue(runBlocking { c.db.dao().recipesByUrl("https://example.com/chilli") }.isEmpty())
+        // Still ready: Undo on the snackbar can open it again.
+        assertEquals(JobState.READY, runBlocking { c.importJobs.get(job) }!!.state)
+        runBlocking { vm.discardForGood() }
+        assertEquals(JobState.DONE, runBlocking { c.importJobs.get(job) }!!.state)
+    }
+
+    @Test
+    fun editsAreKeptWithTheJobAndRestoredOnReopening() {
+        val c = TestContainer.create()
+        val job = runBlocking { c.readyJob("2 onions", "1 carrot", servings = 4) }
+        val vm = ReviewViewModel(c, job)
+        ready(vm)
+        vm.setServings(8)
+        vm.setInStock("cat:carrot", true)
+        vm.moveAisle("cat:onion", AisleCode.FROZEN, always = false)
+        await(vm.state) { it is ReviewState.Ready && it.ui.changed && it.ui.row("cat:onion").aisle == AisleCode.FROZEN }
+        // Left with Back and opened again from the card: as it was left.
+        val again = ready(ReviewViewModel(c, job))
+        assertEquals(8, again.servings)
+        assertEquals(4, again.originalServings)
+        assertTrue(again.row("cat:carrot").inStock)
+        assertFalse(again.row("cat:onion").inStock)
+        assertEquals(AisleCode.FROZEN, again.row("cat:onion").aisle)
+        assertFalse("nothing changed yet on the reopened review", again.changed)
+    }
+
+    @Test
+    fun clearInStockCanBeUndone() {
+        val c = TestContainer.create()
+        val vm = ReviewViewModel(c, runBlocking { c.readyJob(*CHILLI) })
+        ready(vm)
+        val events = mutableListOf<UiMessage>()
+        val collecting = CoroutineScope(Dispatchers.Unconfined).launch { vm.events.collect { events += it } }
+        vm.clearInStock()
+        val cleared = await(vm.state) { it is ReviewState.Ready && it.ui.inStockCount == 0 } as ReviewState.Ready
+        assertEquals(cleared.ui.aisles.sumOf { it.second.size }, cleared.ui.addCount)
+        await(vm.state) { events.any { it.text == "Cleared in stock" && it.undo != null } }
+        runBlocking { events.single().undo!!.invoke() }
+        val restored = await(vm.state) { it is ReviewState.Ready && it.ui.row("cat:salt").inStock } as ReviewState.Ready
+        assertTrue(restored.ui.row("cat:olive_oil").inStock)
+        collecting.cancel()
+    }
+
+    @Test
+    fun rowsCarryTheFlagReasonAndTheHeroSumsThemUp() {
+        val c = TestContainer.create()
+        val vm = ReviewViewModel(c, runBlocking { c.readyJob("1 onion", "1 carrot", "salt", "1 lemon or lime") })
+        val ui = ready(vm)
+        val flagged = ui.aisles.flatMap { it.second }.single { it.check }
+        assertEquals("\"A or B\": one of two", flagged.checkReason)
+        assertTrue(ui.row("cat:onion").adds)
+        assertTrue("a staple, pre-ticked", ui.row("cat:salt").inStock)
+        assertEquals("3 to add · 1 in stock · 1 to check", ui.summary)
     }
 
     @Test
@@ -182,7 +241,7 @@ class ReviewViewModelTest {
             }
         val vm = ReviewViewModel(c, job)
         Thread.sleep(200)
-        assertTrue("still loading while the worker runs", vm.state.value == ReviewState.Loading)
+        assertTrue("still loading while the worker runs", vm.state.value is ReviewState.Loading)
         runBlocking {
             c.importJobs.finish(
                 job,

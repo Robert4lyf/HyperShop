@@ -7,7 +7,11 @@ import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.data.ClaudeUsageEntity
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.testutil.await
+import com.robert4lyf.hypershop.ui.common.UiMessage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -101,6 +105,52 @@ class SettingsViewModelTest {
             Thread.sleep(10)
         }
         assertEquals(listOf(third, start[0], start[1]) + start.drop(3), runBlocking { c.repository.aisleOrder() })
+    }
+
+    @Test
+    fun aKeyThatCannotBeOneNeverReachesAnthropic() {
+        val c = TestContainer.create()
+        val vm = SettingsViewModel(c)
+        await(vm.ui) { it.loaded }
+        vm.saveKey("caf\u00e9-key")
+        await(vm.ui) { it.keyStatus == KeyStatus.MALFORMED }
+        assertFalse(vm.ui.value.hasKey)
+    }
+
+    @Test
+    fun aislesGoToTheEndsAndBackToTheDefault() {
+        val c = TestContainer.create()
+        val vm = SettingsViewModel(c)
+        val start = await(vm.ui) { it.loaded && it.aisles.size > 3 }.aisles
+        val third = start[2]
+        vm.moveAisleTo(third, 0)
+        assertEquals(third, vm.ui.value.aisles.first())
+        vm.moveAisleTo(third, start.lastIndex)
+        assertEquals(third, vm.ui.value.aisles.last())
+        val end = System.currentTimeMillis() + 5000
+        while (runBlocking { c.repository.aisleOrder() }.last() != third && System.currentTimeMillis() < end) {
+            shadowOf(Looper.getMainLooper()).idle()
+            Thread.sleep(10)
+        }
+        assertEquals(third, runBlocking { c.repository.aisleOrder() }.last())
+        vm.resetAisleOrder()
+        assertEquals(AisleCode.entries.toList(), vm.ui.value.aisles)
+        await(vm.ui) { runBlocking { c.repository.aisleOrder() } == AisleCode.entries.toList() }
+    }
+
+    @Test
+    fun aRemovedStapleCanBeUndone() {
+        val c = TestContainer.create()
+        val vm = SettingsViewModel(c)
+        val got = mutableListOf<UiMessage>()
+        val watching = CoroutineScope(Dispatchers.Main).launch { vm.events.collect { got += it } }
+        await(vm.ui) { "salt" in it.staples }
+        vm.removeStaple("salt")
+        await(vm.ui) { "salt" !in it.staples && got.size == 1 }
+        assertEquals("salt is no longer always in stock", got.single().text)
+        runBlocking { got.single().undo!!.invoke() }
+        await(vm.ui) { "salt" in it.staples }
+        watching.cancel()
     }
 
     @Test

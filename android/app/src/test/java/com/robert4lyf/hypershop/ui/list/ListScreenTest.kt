@@ -1,10 +1,15 @@
 package com.robert4lyf.hypershop.ui.list
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -78,9 +83,62 @@ class ListScreenTest {
         compose.onNodeWithTag("item-1").performClick()
         compose.onNodeWithTag("tick-1").performClick()
         assertEquals("Ticked", compose.onNodeWithTag("tick-3").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
+        // "Finish shopping" sits in the bar at the bottom, in reach, once something is ticked.
         compose.onNodeWithText("Finish shopping").performClick()
+        compose.onNodeWithTag("finish").assertExists()
         compose.onNodeWithText("5 left").fetchSemanticsNode()
         assertEquals(listOf("open 1", "toggle 1", "finish"), events)
+    }
+
+    @Test
+    fun noFinishBarUntilSomethingIsTicked() {
+        val ui = SAMPLE_LIST.copy(aisles = listOf(SAMPLE_LIST.aisles[1]))
+        compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions) } }
+        compose.onNodeWithTag("finish").assertDoesNotExist()
+        compose.onNodeWithText("Finish shopping").assertDoesNotExist()
+    }
+
+    @Test
+    fun rowsReadAlikeAndShowTheirRecipe() {
+        val rows =
+            listOf(
+                ListRow(1, "milk", "700 ml milk", null, TickState.OPEN, AisleCode.DAIRY_EGGS, from = "Weeknight chilli"),
+                ListRow(2, "onion", "1 more onion", "2 already ticked", TickState.PARTIAL, AisleCode.DAIRY_EGGS, from = "Weeknight chilli"),
+                ListRow(3, "butter", "250 g butter", "1 × 250 g block", TickState.OPEN, AisleCode.DAIRY_EGGS, from = "Weeknight chilli"),
+            )
+        val ui = SAMPLE_LIST.copy(aisles = listOf(AisleCode.DAIRY_EGGS to rows))
+        compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions) } }
+        compose.onNodeWithText("700 ml Milk").assertExists()
+        compose.onNodeWithText("1 more Onion").assertExists()
+        compose.onNodeWithText("2 already ticked · Weeknight chilli").assertExists()
+        compose.onNodeWithText("1 × 250 g block").assertExists()
+        // The pack note keeps its line; the recipe goes under it.
+        assertEquals(listOf("1 × 250 g block", "Weeknight chilli"), subLines(rows[2]))
+        assertEquals("Coriander", displayMain("coriander", "coriander"))
+        assertEquals("2 Leaves", displayMain("2 leaves", "leaf"))
+        assertEquals("2 tins Chopped tomatoes", displayMain("2 tins chopped tomatoes", "chopped tomatoes"))
+    }
+
+    @Test
+    fun loadingShowsASpinnerAndNoCount() {
+        compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ListUi(), actions) } }
+        compose.onNodeWithTag("loading").assertExists()
+        compose.onNodeWithText("HyperShop").assertDoesNotExist()
+        compose.onNodeWithText("SHOPPING LIST").assertExists()
+    }
+
+    @Test
+    fun clearAllAsksFirst() {
+        show()
+        compose.onNodeWithContentDescription("More").performClick()
+        compose.onNodeWithText("Clear all").performClick()
+        compose.onNodeWithText("6 items").assertExists()
+        compose.onNodeWithText("Cancel").performClick()
+        assertEquals(emptyList<String>(), events)
+        compose.onNodeWithContentDescription("More").performClick()
+        compose.onNodeWithText("Clear all").performClick()
+        compose.onNodeWithTag("clear-confirm").performClick()
+        assertEquals(listOf("clear"), events)
     }
 
     @Test
@@ -107,7 +165,11 @@ class ListScreenTest {
         compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions.copy(onToggleView = { events += "view" })) } }
         compose.onNodeWithText("Vegetables").assertExists()
         compose.onNodeWithText("Herbs").assertExists()
-        compose.onNodeWithTag("view-toggle").performClick()
+        // The switch lives in the menu, as a checkable "Group by type".
+        compose.onNodeWithContentDescription("More").performClick()
+        val item = compose.onNodeWithTag("view-toggle")
+        assertEquals(ToggleableState.On, item.fetchSemanticsNode().config.getOrNull(SemanticsProperties.ToggleableState))
+        item.performClick()
         assertEquals(listOf("view"), events)
     }
 
@@ -119,9 +181,11 @@ class ListScreenTest {
                 inStock = listOf(InStockRow("cat:olive_oil", "olive oil", "2tbsp olive oil", "Weeknight chilli", AisleCode.OILS_VINEGARS)),
             )
         compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions) } }
+        // Open to start with, so what to check isn't hidden; the header closes and reopens it.
+        compose.onNodeWithText("2tbsp olive oil").assertExists()
+        compose.onNodeWithTag("in-stock").performScrollTo().performClick()
         compose.onNodeWithTag("need-cat:olive_oil").assertDoesNotExist()
         compose.onNodeWithTag("in-stock").performScrollTo().performClick()
-        compose.onNodeWithText("2tbsp olive oil").assertExists()
         compose.onNodeWithTag("need-cat:olive_oil").performScrollTo().performClick()
         assertEquals(listOf("need cat:olive_oil"), events)
     }
@@ -136,12 +200,43 @@ class ListScreenTest {
                 suggestions = { q -> if (q.startsWith("on")) listOf("onion", "spring onion") else emptyList() },
                 onReview = { events += "review $it" },
                 onSample = { events += "sample" },
+                onPasteLink = { events += "paste" },
             )
         compose.setContent {
             HyperShopTheme(dark = dark, dynamicColor = false) {
-                ListScreen(ui, actions, header = { listHeader(ui, header) }, empty = { EmptyState(header.onSample) })
+                ListScreen(ui, actions, header = { listHeader(ui, header) }, empty = { EmptyState(header.onSample, header.onPasteLink) })
             }
         }
+    }
+
+    @Test
+    fun aSuggestionKeepsTheAmountTyped() {
+        val header =
+            HeaderActions(
+                onAdd = { events += "add $it" },
+                suggestions = { q -> if (q.contains("on")) listOf("onion") else emptyList() },
+                onReview = {},
+                onSample = {},
+                onPick = { typed, s -> events += "pick $typed $s" },
+            )
+        compose.setContent {
+            HyperShopTheme(dynamicColor = false) { ListScreen(SAMPLE_LIST, actions, header = { listHeader(SAMPLE_LIST, header) }) }
+        }
+        compose.onNodeWithTag("add-item").performTextInput("2 on")
+        compose.onNodeWithTag("suggestion-onion").performClick()
+        assertEquals(listOf("pick 2 on onion"), events)
+    }
+
+    @Test
+    fun plusOneSaysWhatItAdds() {
+        var p by mutableStateOf(PlusOne(1, "onion", "onion"))
+        compose.setContent { HyperShopTheme(dynamicColor = false) { PlusOneDialog(p, onYes = { events += "yes" }, onNo = {}) } }
+        compose.onNodeWithText("Add one more onion to it?").assertExists()
+        compose.onNodeWithText("Add").performClick()
+        p = PlusOne(1, "onion", "200 g onion", amount = "200 g")
+        compose.onNodeWithText("Add 200 g more onion to it?").assertExists()
+        compose.onNodeWithText("Add 200 g").performClick()
+        assertEquals(listOf("yes", "yes"), events)
     }
 
     @Test
@@ -161,11 +256,14 @@ class ListScreenTest {
     @Test
     fun readyCardAndEmptyState() {
         showWithHeader(ListUi(loaded = true, readyJobs = listOf(7, 8)))
+        val card = compose.onNodeWithTag("ready-card")
+        assertEquals(Role.Button, card.fetchSemanticsNode().config.getOrNull(SemanticsProperties.Role))
+        // Several waiting: the card opens the oldest.
         compose.onNodeWithText("2 recipes ready to review").performClick()
         compose.onNodeWithText("Try a sample list").performClick()
-        // Paste link lives on the Recipes tab only.
-        compose.onNodeWithText("Paste link").assertDoesNotExist()
-        assertEquals(listOf("review 7", "sample"), events)
+        // "Paste a link" imports what is on the clipboard, like a share.
+        compose.onNodeWithText("Paste a link").performClick()
+        assertEquals(listOf("review 7", "sample", "paste"), events)
     }
 
     @Test

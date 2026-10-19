@@ -45,8 +45,11 @@ class SettingsScreenTest {
         SettingsActions(
             onRemoveStaple = { events += "staple $it" },
             onMoveAisle = { a, d -> events += "aisle $a $d" },
+            onMoveAisleTo = { a, i -> events += "aisle $a to $i" },
+            onResetAisles = { events += "reset aisles" },
             onWatchVibrate = { events += "vibrate $it" },
             onSaveKey = { events += "key ${it.length}" },
+            onRemoveKey = { events += "remove key" },
             onDebugLog = { events += "log $it" },
         )
 
@@ -79,7 +82,52 @@ class SettingsScreenTest {
         show(UI.copy(hasKey = true, keyStatus = KeyStatus.BAD_KEY))
         compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("key-status"))
         compose.onNodeWithText("✗ Anthropic didn't accept that key").assertExists()
-        compose.onNodeWithText("Remove key").assertExists()
+        // Removing asks first.
+        compose.onNodeWithText("Remove key").performClick()
+        compose.onNodeWithText("Keep").performClick()
+        compose.onNodeWithText("Remove key").performClick()
+        compose.onNodeWithText("Remove").performClick()
+        assertEquals(listOf("remove key"), events)
+    }
+
+    @Test
+    fun aMalformedKeyIsToldApartFromARejectedOne() {
+        show(UI.copy(keyStatus = KeyStatus.MALFORMED))
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("key-status"))
+        compose.onNodeWithText("✗ That isn't a key").assertExists()
+        compose.onNodeWithContentDescription("Paste").assertExists()
+    }
+
+    @Test
+    fun aislesMoveToTheEndsAndResetAfterAsking() {
+        show()
+        val second = AisleCode.entries[1]
+        compose.onNodeWithContentDescription("More for ${second.displayName}").performClick()
+        compose.onNodeWithText("Move to bottom").performClick()
+        compose.onNodeWithContentDescription("More for ${second.displayName}").performClick()
+        compose.onNodeWithText("Move to top").performClick()
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("reset-aisles"))
+        compose.onNodeWithTag("reset-aisles").performClick()
+        compose.onNodeWithText("Keep").performClick()
+        compose.onNodeWithTag("reset-aisles").performClick()
+        compose.onNodeWithText("Reset").performClick()
+        assertEquals(listOf("aisle $second to 3", "aisle $second to 0", "reset aisles"), events)
+    }
+
+    @Test
+    fun metersReadAsOneSentence() {
+        show()
+        val list = compose.onNodeWithTag("settings")
+        list.performScrollToNode(hasTestTag("spend"))
+        compose.onNodeWithContentDescription("This month: $0.04 of $2.00").assertExists()
+        compose.onNodeWithContentDescription("Today: 3 of 50 calls").assertExists()
+        compose.onNodeWithText("Between $0 and $100").assertExists()
+    }
+
+    @Test
+    fun aSpinnerUntilTheSettingsAreRead() {
+        show(SettingsUi())
+        compose.onNodeWithTag("settings-loading").assertExists()
     }
 
     @Test
