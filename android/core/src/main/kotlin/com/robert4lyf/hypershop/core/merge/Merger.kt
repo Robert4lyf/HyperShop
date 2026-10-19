@@ -174,23 +174,29 @@ class Merger(
         return Preview(incoming, rows, contributions, status, shown)
     }
 
-    /** One transaction: re-check every rev shown, then insert. */
+    /**
+     * One transaction: re-check every rev shown, then insert. [kind] MANUAL puts the
+     * lines in a hand-added use, with no recipe behind it (an edit of "Added by hand").
+     */
     fun apply(
         list: ShoppingList,
         preview: Preview,
         now: Long,
+        kind: UseKind = UseKind.RECIPE,
     ): ApplyResult {
         for ((key, shown) in preview.shownRevs) {
             if (list.itemByKey(key)?.let { it.id to it.rev } != shown) return ApplyResult.Stale
         }
-        val use = RecipeUse(list.nextId, preview.incoming.recipeId, UseKind.RECIPE, preview.incoming.servings ?: 1, now)
+        val manual = kind == UseKind.MANUAL
+        val use = RecipeUse(list.nextId, preview.incoming.recipeId.takeIf { !manual }, kind, preview.incoming.servings ?: 1, now)
         var l = list.copy(uses = list.uses + (use.id to use), nextId = list.nextId + 1)
         val createdRev = list.listRev + 1
         val touched = HashSet<Long>()
         val targets = preview.rows.associate { it.target.mergeKey to it.target }
         for (pc in preview.contributions) {
             val (l2, itemId) = l.ensureItem(targets.getValue(pc.mergeKey))
-            val c = Contribution(l2.nextId, use.id, pc.recipeLineId, itemId, pc.qty, pc.noScale, createdRev, unitHint = pc.unitHint)
+            val line = pc.recipeLineId.takeIf { !manual }
+            val c = Contribution(l2.nextId, use.id, line, itemId, pc.qty, pc.noScale, createdRev, unitHint = pc.unitHint)
             l = l2.copy(contributions = l2.contributions + c, nextId = l2.nextId + 1)
             touched += itemId
         }

@@ -254,6 +254,45 @@ class RecipesViewModelTest {
     }
 
     @Test
+    fun addedByHandCanBeEditedLikeARecipe() {
+        val c = TestContainer.create()
+        runBlocking {
+            for (line in listOf("2 onions", "500g beef mince")) {
+                val p = c.ruleParser.parse(line)
+                c.repository.manualAdd(p.name, p.shopBase(UnitLocale.METRIC), p.shopUnit)
+            }
+        }
+        val vm = RecipesViewModel(c).shown()
+        val byHand = await(vm.ui) { it.uses.isNotEmpty() }.uses.single()
+        assertEquals(null, byHand.recipeId)
+        vm.edit(byHand)
+        val edit = ReviewViewModel(c, nextReview(vm))
+        val keys = { s: ReviewState -> (s as? ReviewState.Ready)?.ui?.aisles?.flatMap { it.second }?.map { it.key }.orEmpty() }
+        val ready = (await(edit.state) { it is ReviewState.Ready } as ReviewState.Ready).ui
+        assertTrue(ready.editing && ready.byHand && !ready.cookbook)
+        assertEquals(setOf("cat:onion", "cat:beef_mince"), keys(edit.state.value).toSet())
+        edit.removeLine(edit.sheet("cat:onion")!!.lines.single().id)
+        await(edit.state) { "cat:onion" !in keys(it) }
+        edit.addLine("1 leek")
+        await(edit.state) { "cat:leek" in keys(it) }
+        edit.confirm()
+        await(edit.state) { it is ReviewState.Added }
+        // Still hand-added: one use with no recipe, and nothing in the library.
+        val after = await(vm.ui) { u -> u.uses.singleOrNull()?.itemCount == 2 }
+        assertEquals(null, after.uses.single().recipeId)
+        assertEquals("Added by hand", after.uses.single().title)
+        assertTrue(after.library.isEmpty())
+        val list = runBlocking { c.repository.snapshot() }
+        assertEquals(setOf("cat:beef_mince", "cat:leek"), list.liveItems.map { it.mergeKey }.toSet())
+        // A new typed item joins the same card.
+        runBlocking {
+            val p = c.ruleParser.parse("milk")
+            c.repository.manualAdd(p.name, p.shopBase(UnitLocale.METRIC), p.shopUnit)
+        }
+        assertEquals(3, await(vm.ui) { u -> u.uses.singleOrNull()?.itemCount == 3 }.uses.single().itemCount)
+    }
+
+    @Test
     fun aSavedRecipeOpensWithItsIngredients() {
         val c = TestContainer.create()
         c.add(*CHILLI)

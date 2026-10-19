@@ -106,6 +106,8 @@ data class ReviewUi(
     val originalServings: Int? = null,
     /** "Retry with Claude" is running (a [busy] that can be stopped). */
     val retrying: Boolean = false,
+    /** "Added by hand" being edited: no name or book to change. */
+    val byHand: Boolean = false,
     /** No web page: a cookbook recipe, which can carry its book and page. */
     val cookbook: Boolean = false,
     val book: String? = null,
@@ -431,7 +433,8 @@ class ReviewViewModel(
                     claudeNote = claudeNote(r),
                     originalServings = r.servings,
                     retrying = retrying,
-                    cookbook = webLink(r.url) == null,
+                    cookbook = webLink(r.url) == null && !r.byHand,
+                    byHand = r.byHand,
                     book = r.book,
                     page = r.page,
                 ),
@@ -575,7 +578,16 @@ class ReviewViewModel(
             try {
                 val p = preview ?: return@act
                 // "Add the in-stock items now" is part of a recipe: the library keeps the whole one.
-                when (val r = c.repository.apply(p, jobId, replacing, toLibrary = result?.method != "IN_STOCK")) {
+                when (
+                    val r =
+                        c.repository.apply(
+                            p,
+                            jobId,
+                            replacing,
+                            toLibrary = result?.method != "IN_STOCK",
+                            manual = result?.byHand == true,
+                        )
+                ) {
                     is ApplyResult.Applied -> {
                         _state.value = ReviewState.Added(r.added, r.useId, replacing?.let { result?.title ?: "Recipe" })
                     }
