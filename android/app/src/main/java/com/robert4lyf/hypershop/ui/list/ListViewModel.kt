@@ -16,6 +16,7 @@ import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.data.InStockLine
 import com.robert4lyf.hypershop.di.AppContainer
+import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.common.webLink
 import kotlinx.coroutines.Dispatchers
@@ -105,12 +106,26 @@ data class ListUi(
     /** Imports waiting for review: the "1 recipe ready to review" card. */
     val readyJobs: List<Long> = emptyList(),
     val plusOne: PlusOne? = null,
-    /** Rows grouped within each aisle, with a label per group. */
-    val categorised: Boolean = false,
+    val view: ListView = ListView.STORE,
+    /** The recipe view's cards, in the order the recipes were added; empty in the other views. */
+    val recipes: List<RecipeSection> = emptyList(),
 ) {
+    /** Rows grouped within each aisle, with a label per group. */
+    val categorised: Boolean get() = view == ListView.TYPE
+
     val isEmpty: Boolean get() = loaded && aisles.isEmpty()
     val left: Int get() = aisles.sumOf { (_, r) -> r.count { it.state != TickState.DONE } }
     val doneCount: Int get() = aisles.sumOf { (_, r) -> r.count { it.state == TickState.DONE } }
+}
+
+/** One card of the recipe view: a recipe's items, or those several recipes share, or those added by hand. */
+data class RecipeSection(
+    val key: String,
+    val title: String,
+    val kind: Kind,
+    val rows: List<ListRow>,
+) {
+    enum class Kind { RECIPE, SHARED, BY_HAND }
 }
 
 /** The shopping list (PLAN §3.5): grouped by aisle in store order, DONE rows sink within their aisle. */
@@ -134,8 +149,8 @@ class ListViewModel(
     /** The item sheet being loaded: a newer open, or a close, cancels it. */
     private var openJob: Job? = null
 
-    /** The walking order and the categorised switch. */
-    private val view = combine(order, c.settings.listCategorised) { o, cat -> o to cat }
+    /** The walking order and the layout. */
+    private val view = combine(order, c.settings.listView) { o, v -> o to v }
 
     /**
      * The list with its in-stock lines and recipe titles, read together on every
@@ -143,26 +158,82 @@ class ListViewModel(
      * change, so the aisles and the "In stock" section never show two different
      * lists for a frame.
      */
-    private val listWithInStock = c.repository.list.map { Triple(it, c.repository.inStockOnList(it), fromTitles(it)) }
+    private val listWithInStock = c.repository.list.map { Triple(it, c.repository.inStockOnList(it), sources(it)) }
 
     val ui: StateFlow<ListUi> =
-        combine(listWithInStock, c.settings.units, view, c.importJobs.ready, plusOne) { (list, lines, from), units, (ord, cat), ready, p ->
+        combine(listWithInStock, c.settings.units, view, c.importJobs.ready, plusOne) { (list, lines, src), units, (ord, v), ready, p ->
             lastList = list
             lastUnits = units
-            build(list, units, ord, cat, from).copy(readyJobs = ready.map { it.id }, plusOne = p, inStock = inStockRows(lines, units))
+            build(list, units, ord, v, src).copy(readyJobs = ready.map { it.id }, plusOne = p, inStock = inStockRows(lines, units))
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.Eagerly, ListUi())
 
-    /** The recipe title for each live item that exactly one use put on the list, when that use is a recipe: one query. */
-    private suspend fun fromTitles(list: ShoppingList): Map<Long, String> {
-        val single =
-            list.liveItems.mapNotNull { item ->
-                val use = list.contributionsOf(item.id).map { it.useId }.distinct().singleOrNull() ?: return@mapNotNull null
-                if (list.uses[use]?.kind == UseKind.RECIPE) item.id to use else null
+    /** Which uses put each live item on the list, and every use's title: one query. */
+    private suspend fun sources(list: ShoppingList): Sources {
+        val byItem = list.liveItems.associate { item -> item.id to list.contributionsOf(item.id).map { it.useId }.distinct().sorted() }
+        val ids = byItem.values.flatten().toSet()
+        if (ids.isEmpty()) return Sources(byItem, emptyMap())
+        return Sources(byItem, c.repository.useLinks(list, ids).mapValues { it.value.title })
+    }
+
+    /** The recipe title for each live item that exactly one use put on the list, when that use is a recipe. */
+    private fun fromTitles(
+        list: ShoppingList,
+        src: Sources,
+    ): Map<Long, String> =
+        src.uses.mapNotNull { (item, uses) ->
+            val use = uses.singleOrNull() ?: return@mapNotNull null
+            if (list.uses[use]?.kind != UseKind.RECIPE) return@mapNotNull null
+            src.titles[use]?.let { item to it }
+        }.toMap()
+
+    /**
+     * The recipe view: a card per recipe in the order they were added, then the
+     * items more than one recipe needs (each naming them), then those added by
+     * hand. Within a card, aisles in walking order, ticked rows last.
+     */
+    private fun recipeSections(
+        list: ShoppingList,
+        rows: List<Pair<ListRow, Int>>,
+        ord: List<AisleCode>,
+        src: Sources,
+    ): List<RecipeSection> {
+        fun aisleRank(a: AisleCode) = ord.indexOf(a).let { if (it < 0) Int.MAX_VALUE else it }
+        val order = compareBy<Pair<ListRow, Int>>({ it.first.state == TickState.DONE }, { aisleRank(it.first.aisle) }, { it.second })
+        val recipe = { use: Long -> list.uses[use]?.kind == UseKind.RECIPE }
+        val byKey =
+            rows.groupBy { (row, _) ->
+                val uses = src.uses[row.id].orEmpty()
+                when {
+                    uses.size > 1 -> SHARED
+                    uses.size == 1 && recipe(uses.single()) -> "use-${uses.single()}"
+                    else -> BY_HAND
+                }
             }
-        if (single.isEmpty()) return emptyMap()
-        val links = c.repository.useLinks(list, single.map { it.second }.toSet())
-        return single.mapNotNull { (item, use) -> links[use]?.let { item to it.title } }.toMap()
+        val recipeKeys = list.uses.keys.filter(recipe).sorted().map { "use-$it" }.filter { it in byKey }
+        return (recipeKeys + listOf(SHARED, BY_HAND).filter { it in byKey }).map { key ->
+            val sorted = byKey.getValue(key).sortedWith(order).map { it.first }
+            when (key) {
+                SHARED ->
+                    RecipeSection(
+                        key,
+                        "In more than one recipe",
+                        RecipeSection.Kind.SHARED,
+                        sorted.map { r -> r.copy(from = src.uses[r.id].orEmpty().mapNotNull { src.titles[it] }.joinToString(", ")) },
+                    )
+                BY_HAND -> RecipeSection(key, "Added by hand", RecipeSection.Kind.BY_HAND, sorted)
+                // The card already names the recipe.
+                else ->
+                    RecipeSection(
+                        key,
+                        src.titles[key.removePrefix("use-").toLong()] ?: "Recipe",
+                        RecipeSection.Kind.RECIPE,
+                        sorted.map {
+                            it.copy(from = null)
+                        },
+                    )
+            }
+        }
     }
 
     private fun inStockRows(
@@ -204,9 +275,11 @@ class ListViewModel(
         list: ShoppingList,
         units: UnitsSetting,
         ord: List<AisleCode>,
-        categorised: Boolean = false,
-        from: Map<Long, String> = emptyMap(),
+        view: ListView = ListView.STORE,
+        src: Sources = Sources(emptyMap(), emptyMap()),
     ): ListUi {
+        val categorised = view == ListView.TYPE
+        val from = fromTitles(list, src)
         val rows =
             list.liveItems.map { item ->
                 val entry = item.catalogId?.let { c.catalog.byId[it] }
@@ -235,14 +308,12 @@ class ListViewModel(
                 .toList()
                 .sortedBy { (a, _) -> ord.indexOf(a).let { if (it < 0) Int.MAX_VALUE else it } }
                 .map { (a, rs) -> a to rs.sortedWith(order).map { it.first } }
-        return ListUi(grouped, loaded = true, categorised = categorised)
+        val recipes = if (view == ListView.RECIPE) recipeSections(list, rows, ord, src) else emptyList()
+        return ListUi(grouped, loaded = true, view = view, recipes = recipes)
     }
 
-    /** The header's switch between the order added and grouped within each aisle. */
-    fun toggleCategorised() =
-        viewModelScope.launch {
-            c.settings.setListCategorised(!c.settings.listCategorised.first())
-        }
+    /** The menu's choice of layout. */
+    fun setView(v: ListView) = viewModelScope.launch { c.settings.setListView(v) }
 
     /** The round tick: tick, or untick a DONE row. */
     fun toggle(row: ListRow) = toggle(row.id, row.name)
@@ -491,3 +562,12 @@ class ListViewModel(
             )
     }
 }
+
+/** Each live item's uses (by id), and every use's title. */
+private class Sources(
+    val uses: Map<Long, List<Long>>,
+    val titles: Map<Long, String>,
+)
+
+private const val SHARED = "shared"
+private const val BY_HAND = "by-hand"

@@ -41,8 +41,15 @@ class Settings(
     val watchVibrate: Flow<Boolean> = store.data.map { it[WATCH_VIBRATE] ?: true }
     val debugLog: Flow<Boolean> = store.data.map { it[DEBUG_LOG] ?: false }
 
-    /** The list grouped within each aisle ("Herbs", "Fruit") rather than in the order added. */
-    val listCategorised: Flow<Boolean> = store.data.map { it[LIST_CATEGORISED] ?: false }
+    /**
+     * How the list is laid out. Read from the older on/off switch when it has
+     * never been set, so "Group by type" survives the update.
+     */
+    val listView: Flow<ListView> =
+        store.data.map { p ->
+            p[LIST_VIEW]?.let { runCatching { ListView.valueOf(it) }.getOrNull() }
+                ?: if (p[LIST_CATEGORISED] == true) ListView.TYPE else ListView.STORE
+        }
 
     /** The one-time "your key could not be read" notice is pending. */
     val keyLostNotice: Flow<Boolean> = store.data.map { it[KEY_LOST] ?: false }
@@ -69,7 +76,7 @@ class Settings(
 
     suspend fun setDebugLog(on: Boolean) = store.edit { it[DEBUG_LOG] = on }
 
-    suspend fun setListCategorised(on: Boolean) = store.edit { it[LIST_CATEGORISED] = on }
+    suspend fun setListView(v: ListView) = store.edit { it[LIST_VIEW] = v.name }
 
     suspend fun setKeyLostNotice(on: Boolean) = store.edit { it[KEY_LOST] = on }
 
@@ -84,7 +91,11 @@ class Settings(
         val WATCH_VIBRATE = booleanPreferencesKey("watch_vibrate")
         val DEBUG_LOG = booleanPreferencesKey("debug_log")
         val LIST_CATEGORISED = booleanPreferencesKey("list_categorised")
+        val LIST_VIEW = stringPreferencesKey("list_view")
         val KEY_LOST = booleanPreferencesKey("claude_key_lost_notice")
         val KEY_SET = booleanPreferencesKey("claude_key_was_set")
     }
 }
+
+/** The list's layouts: aisles in walking order, aisles split by type, or one card per recipe. */
+enum class ListView { STORE, TYPE, RECIPE }
