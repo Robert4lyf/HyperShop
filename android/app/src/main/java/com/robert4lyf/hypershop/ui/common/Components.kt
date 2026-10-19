@@ -63,6 +63,7 @@ import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.theme.cardEdge
 import com.robert4lyf.hypershop.ui.theme.heroBrush
 import com.robert4lyf.hypershop.ui.theme.heroGlow
+import com.robert4lyf.hypershop.ui.theme.lowPoly
 import com.robert4lyf.hypershop.ui.theme.style
 
 /** The aisle's icon on its colour: the same mark on every screen. */
@@ -159,7 +160,7 @@ fun SectionLabel(
 }
 
 /**
- * A screen's hero: the large title on the basil gradient, with an overline and
+ * A screen's hero: the large title on a low-poly mosaic picked by the title, with an overline and
  * subtitle and room for actions and more below. Content inside is white
  * ([LocalContentColor]), so icon buttons in [actions] need no colours.
  */
@@ -177,8 +178,7 @@ fun ScreenHeader(
             .fillMaxWidth()
             .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
             .clip(RoundedCornerShape(24.dp))
-            .background(heroBrush)
-            .heroGlow(),
+            .lowPoly(title, end = HEADER_END),
     ) {
         CompositionLocalProvider(LocalContentColor provides Brand.OnHero) {
             Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 18.dp, bottom = 18.dp)) {
@@ -450,3 +450,6 @@ fun CountPill(
 fun EdgeDivider(modifier: Modifier = Modifier) {
     HorizontalDivider(modifier, color = MaterialTheme.colorScheme.cardEdge)
 }
+
+/** How far a header's mosaic runs: short of the palette's brightest end, where white buttons sit. */
+internal const val HEADER_END = 0.86f

@@ -90,6 +90,7 @@ import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.data.bookRef
 import com.robert4lyf.hypershop.ui.common.AisleBadge
 import com.robert4lyf.hypershop.ui.common.BottomActionBar
+import com.robert4lyf.hypershop.ui.common.HEADER_END
 import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.SectionPosition
 import com.robert4lyf.hypershop.ui.common.Tone
@@ -99,8 +100,7 @@ import com.robert4lyf.hypershop.ui.common.sectionPosition
 import com.robert4lyf.hypershop.ui.common.siteName
 import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.card
-import com.robert4lyf.hypershop.ui.theme.heroBrush
-import com.robert4lyf.hypershop.ui.theme.heroGlow
+import com.robert4lyf.hypershop.ui.theme.lowPoly
 import com.robert4lyf.hypershop.ui.theme.style
 
 /** Changes to the recipe itself: its name, its book and page, and an ingredient added by hand. */
@@ -267,9 +267,8 @@ private fun Hero(
                 .fillMaxWidth()
                 .padding(start = 16.dp, end = 16.dp, top = 4.dp)
                 .clip(RoundedCornerShape(24.dp))
-                // The same basil-to-lagoon hero as every screen; a recipe's own hue stays on the Recipes tab.
-                .background(heroBrush)
-                .heroGlow()
+                // The recipe's own mosaic, the same as its card on the Recipes tab.
+                .lowPoly(ui.title, end = HEADER_END)
                 .padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {

@@ -21,8 +21,15 @@ import kotlin.random.Random
  * colour run, how far the warm end reaches, and a little light and shade per
  * facet. The left side, under the title, always stays in the dark end so the
  * white text keeps its contrast; the bright end only reaches the far right.
+ *
+ * [end] is how far along the palette the right edge gets: below 1 for a header
+ * with white buttons on the right, which stay legible on the mid tones but not
+ * on the gold and mint at the very end.
  */
-fun Modifier.lowPoly(seed: String): Modifier =
+fun Modifier.lowPoly(
+    seed: String,
+    end: Float = 1f,
+): Modifier =
     drawWithCache {
         val rnd = Random(seed.hashCode())
         val stops = lowPolyPalette(seed).stops
@@ -60,7 +67,7 @@ fun Modifier.lowPoly(seed: String): Modifier =
                     val cy = (t[0].y + t[1].y + t[2].y) / 3f / size.height
                     val along = (cx * dirX + (cy - 0.5f) * dirY * 0.6f - reach + (rnd.nextFloat() - 0.5f) * 0.06f).coerceIn(0f, 1f)
                     val shade = (rnd.nextFloat() - 0.5f) * 0.10f
-                    val base = sample(stops, along)
+                    val base = sample(stops, along * end)
                     val colour = if (shade >= 0) lerp(base, Color.White, shade) else lerp(base, Color.Black, -shade)
                     val path =
                         Path().apply {
