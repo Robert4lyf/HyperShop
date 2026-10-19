@@ -17,8 +17,6 @@ import com.robert4lyf.hypershop.data.WatchListView
 import com.robert4lyf.hypershop.data.WatchReply
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -36,8 +34,12 @@ import timber.log.Timber
  *   page otherwise. Ops are applied by [ListRepository.applyWatch] in one
  *   transaction, which also keeps the clock offset from `hello`'s `wn`.
  * - The last snapshot is re-sent when the link reaches APP_READY, and a new
- *   one when the list changes (`distinctUntilChanged`, and not again for a
- *   listRev the watch already has).
+ *   one when the list changes (listRev observed without loading the list; the
+ *   list is loaded only once a watch is ready and the push is due, and not
+ *   again for a listRev the watch already has).
+ * - Pushes go to the install that spoke last, or, after the phone process
+ *   restarted, to the last one the repository recorded: neither side has to
+ *   speak first.
  * - The payload probe is answered at the size asked for.
  */
 class WatchSyncCoordinator(
@@ -55,7 +57,7 @@ class WatchSyncCoordinator(
     private val sending = Mutex()
     private val arrivals = ArrayDeque<Long>()
 
-    /** The install that spoke last: unsolicited snapshots go to it. */
+    /** The install that spoke last (or was last recorded): unsolicited snapshots go to it. */
     @Volatile var install: Int? = null
         private set
 
@@ -84,7 +86,9 @@ class WatchSyncCoordinator(
             link.state.collect { if (it == WatchLinkState.APP_READY) push(force = true) }
         }
         scope.launch {
-            repository.list.map { it.listRev }.distinctUntilChanged().collect { push(force = false) }
+            // Not repository.list: that would keep the shared list flow hot and
+            // load the whole list on every write, watch or no watch.
+            repository.observeListRev().collect { push(force = false) }
         }
     }
 
@@ -120,27 +124,29 @@ class WatchSyncCoordinator(
         }
     }
 
-    /** The whole list to the last install heard from; [force] even when it already has this listRev. */
+    /**
+     * The whole list to the last install heard from (or recorded); [force]
+     * even when it already has this listRev. Nothing is loaded until a watch
+     * is ready and the push is due.
+     */
     suspend fun push(force: Boolean) {
-        val to = install ?: return
         if (link.state.value != WatchLinkState.APP_READY) return
-        val view = repository.watchView()
-        if (!force && view.list.listRev.toInt() == sentRev) return
-        sendSnapshot(to, repository.watchAck(to), view)
+        val to = install ?: repository.lastInstall()?.also { install = it } ?: return
+        if (!force && repository.epochAndRev().second.toInt() == sentRev) return
+        sendSnapshot(to, repository.watchAck(to))
     }
 
     private suspend fun sendAckOnly(reply: WatchReply) {
-        val view = repository.watchView()
-        val page = SnapshotPager.ackOnly(view.epoch, view.list.listRev.toInt(), reply.ackedThrough, reply.ackExceptions, cap)
+        val (epoch, listRev) = repository.epochAndRev()
+        val page = SnapshotPager.ackOnly(epoch.toInt(), listRev.toInt(), reply.ackedThrough, reply.ackExceptions, cap)
         send(listOf(page))
     }
 
     private suspend fun sendSnapshot(
         installId: Int,
         reply: WatchReply,
-        view: WatchListView? = null,
     ) {
-        val v = view ?: repository.watchView()
+        val v = repository.watchView()
         val pages = SnapshotPager.build(input(v, installId, reply), cap)
         if (send(pages)) sentRev = v.list.listRev.toInt()
     }

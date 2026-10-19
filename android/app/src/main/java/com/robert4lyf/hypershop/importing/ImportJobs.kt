@@ -96,12 +96,44 @@ class ImportJobs(
         id: Long,
         result: ImportResult,
     ) {
-        val state = if (result.error != null && result.lines.isEmpty() && result.pageText == null) JobState.FAILED else JobState.READY
         // One UPDATE, not a read then a write that could undo a concurrent change.
-        dao.finishJob(id, state.name, json.encodeToString(ImportResult.serializer(), result), result.error?.name)
+        dao.finishJob(id, stateFor(result).name, json.encodeToString(ImportResult.serializer(), result), result.error?.name)
+    }
+
+    private fun stateFor(result: ImportResult) =
+        if (result.error != null && result.lines.isEmpty() && result.pageText == null) JobState.FAILED else JobState.READY
+
+    /**
+     * The worker's result: kept only while the job is still its to finish. A fetch
+     * the review gave up on ([cancel]) has already moved on to pasted lines, and a
+     * late result must not replace them.
+     */
+    suspend fun finishRun(
+        id: Long,
+        result: ImportResult,
+    ) {
+        // One guarded UPDATE: a job the review has already moved on from (READY, DISCARDING, DONE) keeps its state.
+        dao.finishRunningJob(id, stateFor(result).name, json.encodeToString(ImportResult.serializer(), result), result.error?.name)
+    }
+
+    /** "Paste the ingredients" on a slow page: the fetch is stopped and the job waits, ready, for the lines. */
+    suspend fun cancel(id: Long) {
+        workManager().cancelUniqueWork("import-$id")
+        setState(id, JobState.READY)
     }
 
     suspend fun done(id: Long) = setState(id, JobState.DONE)
+
+    /** Cancelled on review, Undo still showing: off the ready card until Undo has passed or been tapped. */
+    suspend fun discarding(id: Long) = setState(id, JobState.DISCARDING)
+
+    /** Undo: back on the ready card. */
+    suspend fun restore(id: Long) = setState(id, JobState.READY)
+
+    /** At start-up: a discard whose Undo window the process did not live to see out is done with. */
+    suspend fun finishDiscards() {
+        for (j in dao.observeJobs(JobState.DISCARDING.name).first()) done(j.id)
+    }
 
     /** Keeps the review screen's edits with the job, so Back and coming back shows them again. */
     suspend fun update(

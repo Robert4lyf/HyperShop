@@ -9,8 +9,12 @@ import com.robert4lyf.hypershop.core.sync.WatchMessage
 import com.robert4lyf.hypershop.core.sync.WatchOp
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.testutil.TestContainer
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -38,6 +42,79 @@ class WatchSyncCoordinatorTest {
         val epoch = repository.listEpoch().toInt()
         watchSync.handle(WatchCodec.encode(WatchMessage.Hello(epoch, install, 0, 1_760_000_000, 0)))
     }
+
+    /** What the coordinator sends from its own scope arrives a little later. */
+    private suspend fun AppContainer.awaitSent(
+        what: String,
+        ok: (List<Map<String, Any>>) -> Boolean,
+    ) {
+        try {
+            withTimeout(10_000) { while (!ok(fake().sent)) delay(20) }
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            throw AssertionError("$what: not sent in time; sent ${fake().sent.size} payloads")
+        }
+    }
+
+    private fun List<Map<String, Any>>.names() = mapNotNull { WatchCodec.decodePage(it) }.flatMap { it.items }.map { it.name }
+
+    @Test
+    fun startPushesOnAppReadyAndOnEveryListChange() =
+        runBlocking {
+            val c = TestContainer.create()
+            c.addTyped(listOf("milk"))
+            c.hello()
+            c.fake().sent.clear()
+
+            // The fake is APP_READY from the start: the last snapshot goes again at once.
+            c.watchSync.start()
+            c.awaitSent("APP_READY push") { it.isNotEmpty() }
+            assertTrue("a full snapshot", c.pages().first().pages > 0)
+
+            // A list change is pushed without the watch asking.
+            c.fake().sent.clear()
+            c.addTyped(listOf("bread"))
+            c.awaitSent("listRev push") { sent -> sent.names().any { it.contains("bread", ignoreCase = true) } }
+
+            // No watch, no push; the watch back, the change it missed.
+            c.fake().sent.clear()
+            c.fake().setState(WatchLinkState.DISCONNECTED)
+            c.addTyped(listOf("eggs"))
+            delay(300)
+            assertTrue("nothing while disconnected", c.fake().sent.isEmpty())
+            c.fake().setState(WatchLinkState.APP_READY)
+            c.awaitSent("push on reconnect") { sent -> sent.names().any { it.contains("egg", ignoreCase = true) } }
+        }
+
+    @Test
+    fun aPushAfterTheProcessRestartedGoesToTheInstallOnRecord() =
+        runBlocking {
+            val c = TestContainer.create()
+            c.addTyped(listOf("milk"))
+            c.hello()
+
+            // A new process: the coordinator remembers nothing, the database does.
+            val link = FakeWatchLink()
+            val restarted =
+                WatchSyncCoordinator(
+                    link = link,
+                    repository = c.repository,
+                    catalog = c.catalog,
+                    units = { c.settings.units.first() },
+                    scope = c.applicationScope,
+                )
+            assertNull(restarted.install)
+            restarted.push(force = true)
+            assertEquals(install, restarted.install)
+            val pages = link.sent.map { requireNotNull(WatchCodec.decodePage(it)) }
+            assertTrue("the list went without a hello", pages.first().pages > 0)
+            assertTrue(pages.flatMap { it.items }.any { it.name.contains("milk", ignoreCase = true) })
+
+            // No install on record (a new epoch forgets them all): nothing to push to.
+            c.repository.checkEpoch(com.robert4lyf.hypershop.data.EpochMarker(java.nio.file.Files.createTempDirectory("epoch").toFile()))
+            val fresh = FakeWatchLink()
+            WatchSyncCoordinator(fresh, c.repository, c.catalog, { c.settings.units.first() }, c.applicationScope).push(force = true)
+            assertTrue(fresh.sent.isEmpty())
+        }
 
     @Test
     fun helloGetsTheWholeListInPagesUnderTheCap() =

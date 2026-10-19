@@ -10,9 +10,10 @@ using Toybox.Lang;
 // No Communications here and no clock: PhoneLink sends what this returns and
 // passes the time in, so the tests drive it directly.
 //
-// Persistence order matters. nextSeq is written before a batch is handed out,
-// and the outbox before a tick is shown. Every Storage access is wrapped: a
-// full store must cost the cache, never the app.
+// Persistence order matters. nextSeq is written before a batch is handed out
+// (a batch whose seqs could not be written is not handed out), and the outbox
+// before a tick is shown. Every Storage access is wrapped: a full store must
+// cost the cache, never the app.
 //
 // Shapes, all plain arrays so they store as they are:
 //   item    [id, name, sub, aisleIdx, done, rev]
@@ -22,11 +23,23 @@ using Toybox.Lang;
 //
 class WatchSync {
 
-    // Storage keys, each well under the 32 KB a value may take: a snapshot is
-    // at most 16 pages of a few hundred bytes.
+    // Storage keys. A value may take 32 KB, and the snapshot is the one thing
+    // that can grow past that once the probe raises the payload cap (16 pages
+    // of 4 KB is 64 KB), so the aisles get a key of their own and the items
+    // are stored ITEMS_PER_KEY at a time under "si0", "si1", … Each snapshot
+    // value starts with its listRev, so a reload never mixes two snapshots.
+    //   m    [installId, epoch, listRev, ackedThrough, more, hasSnapshot, itemKeys]
+    //   o    [nextSeq, outbox, settled]
+    //   sa   [listRev, aisles]
+    //   siN  [listRev, items]
     private const META_KEY = "m";
     private const OUTBOX_KEY = "o";
-    private const SNAPSHOT_KEY = "s";
+    private const AISLES_KEY = "sa";
+    private const ITEMS_KEY = "si";
+    //! The one-key snapshot of earlier builds, read once and then removed.
+    private const LEGACY_SNAPSHOT_KEY = "s";
+    //! About 5 KB of items at most under one key.
+    private const ITEMS_PER_KEY = 48;
 
     // How many listRevs may be half-assembled at once. Older ones are
     // superseded anyway; this bounds the memory a lost page can hold.
@@ -76,6 +89,11 @@ class WatchSync {
     private var _settled as Lang.Array<Lang.Array> = [] as Lang.Array<Lang.Array>;
     private var _assembling as Lang.Dictionary<Lang.Number, Lang.Dictionary> = {} as Lang.Dictionary<Lang.Number, Lang.Dictionary>;
     private var _persist as Lang.Boolean;
+    //! How many item keys the stored snapshot takes, so a smaller one
+    //! removes the rest.
+    private var _itemKeys as Lang.Number = 0;
+    //! The snapshot came from the one-key layout; the next save removes it.
+    private var _legacy as Lang.Boolean = false;
 
     //! [persist] false keeps everything in memory (the debug sample).
     function initialize(persist as Lang.Boolean) {
@@ -105,9 +123,9 @@ class WatchSync {
         partial = {} as Lang.Dictionary<Lang.Number, Lang.Boolean>;
         _settled = [] as Lang.Array<Lang.Array>;
         _assembling = {} as Lang.Dictionary<Lang.Number, Lang.Dictionary>;
-        saveMeta();
         saveOutbox();
         saveSnapshot();
+        saveMeta();
     }
 
     //! A list that came from nowhere: the debug sample. Never persisted.
@@ -178,13 +196,16 @@ class WatchSync {
         return true;
     }
 
-    //! The next batch to send, or null (nothing pending, or one in flight).
-    //! Seqs are assigned and written down before the batch is returned.
+    //! The next batch to send, or null (nothing pending, one in flight, or
+    //! Storage would not take the seqs). Seqs are assigned and written down
+    //! before the batch is returned: a restart after a send must not hand
+    //! out a seq again, since the phone drops a repeat as a duplicate.
     function nextBatch() as Lang.Dictionary or Null {
         if (inFlight || outbox.size() == 0) {
             return null;
         }
         var n = outbox.size() < batchSize ? outbox.size() : batchSize;
+        var first = nextSeq;
         var ops = [] as Lang.Array<Lang.Array>;
         for (var i = 0; i < n; i++) {
             var op = outbox[i];
@@ -196,7 +217,22 @@ class WatchSync {
             }
             ops.add([op[4], op[0], op[1], op[2], op[3]]);
         }
-        saveOutbox();
+        if (!saveOutbox()) {
+            // A full store: the cached list is worth less than the ticks, and
+            // the next hello brings it back.
+            freeSnapshot();
+            if (!saveOutbox()) {
+                // Nothing was sent, so the seqs just given out are taken back.
+                for (var i = 0; i < n; i++) {
+                    if ((outbox[i][4] as Lang.Number) >= first) {
+                        outbox[i][4] = 0;
+                    }
+                }
+                nextSeq = first;
+                say("storage", 0);
+                return null;
+            }
+        }
         inFlight = true;
         return {
             Protocol.KEY_VERSION => Protocol.VERSION,
@@ -561,13 +597,20 @@ class WatchSync {
 
     private function load() as Void {
         var meta = read(META_KEY);
-        if (meta instanceof Lang.Array && (meta as Lang.Array).size() == 5) {
+        // Snapshot keys the meta says are there: -1 is the one-key layout.
+        var stored = false;
+        var keys = -1;
+        if (meta instanceof Lang.Array && (meta as Lang.Array).size() >= 5) {
             var m = meta as Lang.Array;
-            installId = m[0] instanceof Lang.Number ? m[0] as Lang.Number : 0;
-            epoch = m[1] instanceof Lang.Number ? m[1] as Lang.Number : 0;
-            listRev = m[2] instanceof Lang.Number ? m[2] as Lang.Number : 0;
-            ackedThrough = m[3] instanceof Lang.Number ? m[3] as Lang.Number : 0;
-            more = m[4] instanceof Lang.Number ? m[4] as Lang.Number : 0;
+            installId = num(m[0] as Lang.Object or Null);
+            epoch = num(m[1] as Lang.Object or Null);
+            listRev = num(m[2] as Lang.Object or Null);
+            ackedThrough = num(m[3] as Lang.Object or Null);
+            more = num(m[4] as Lang.Object or Null);
+            if (m.size() >= 7) {
+                stored = m[5] instanceof Lang.Boolean ? m[5] as Lang.Boolean : false;
+                keys = num(m[6] as Lang.Object or Null);
+            }
         }
         var box = read(OUTBOX_KEY);
         if (box instanceof Lang.Array && (box as Lang.Array).size() == 3) {
@@ -578,24 +621,77 @@ class WatchSync {
             outbox = arrays(b[1] as Lang.Object or Null, 5);
             _settled = arrays(b[2] as Lang.Object or Null, 3);
         }
-        var snap = read(SNAPSHOT_KEY);
-        if (snap instanceof Lang.Array && (snap as Lang.Array).size() == 2) {
+        // A cache that does not hold together is worth less than none: the
+        // next hello brings the whole list back. An empty list that was
+        // adopted whole is a snapshot all the same (the meta says so).
+        if (loadSnapshot(stored, keys) && consistent()) {
+            hasSnapshot = true;
+        } else {
+            items = [] as Lang.Array<Lang.Array>;
+            aisles = [] as Lang.Array<Lang.Array>;
+            listRev = 0;
+            more = 0;
+            hasSnapshot = false;
+        }
+    }
+
+    private function num(raw as Lang.Object or Null) as Lang.Number {
+        return raw instanceof Lang.Number ? raw as Lang.Number : 0;
+    }
+
+    //! Reads the snapshot into aisles and items. False when there is none,
+    //! or what is there is not all from the listRev the meta names.
+    private function loadSnapshot(stored as Lang.Boolean, keys as Lang.Number) as Lang.Boolean {
+        if (keys < 0) {
+            var snap = read(LEGACY_SNAPSHOT_KEY);
+            if (!(snap instanceof Lang.Array) || (snap as Lang.Array).size() != 2) {
+                return false;
+            }
             var s = snap as Lang.Array;
             aisles = arrays(s[0] as Lang.Object or Null, 4);
             items = arrays(s[1] as Lang.Object or Null, 6);
-            hasSnapshot = items.size() > 0 || aisles.size() > 0;
+            _legacy = true;
+            return items.size() > 0 || aisles.size() > 0;
         }
-        // A cache that does not hold together is worth less than none: the
-        // next hello brings the whole list back.
+        if (!stored) {
+            return false;
+        }
+        var sa = part(read(AISLES_KEY));
+        if (sa == null) {
+            return false;
+        }
+        aisles = arrays(sa, 4);
+        items = [] as Lang.Array<Lang.Array>;
+        for (var k = 0; k < keys; k++) {
+            var si = part(read(ITEMS_KEY + k));
+            if (si == null) {
+                return false;
+            }
+            items.addAll(arrays(si, 6));
+        }
+        _itemKeys = keys;
+        return true;
+    }
+
+    //! The payload of a stored [listRev, payload] pair from this listRev.
+    private function part(raw as Lang.Object or Null) as Lang.Object or Null {
+        if (!(raw instanceof Lang.Array) || (raw as Lang.Array).size() != 2) {
+            return null;
+        }
+        var pair = raw as Lang.Array;
+        if (!(pair[0] instanceof Lang.Number) || (pair[0] as Lang.Number) != listRev) {
+            return null;
+        }
+        return pair[1] as Lang.Object or Null;
+    }
+
+    private function consistent() as Lang.Boolean {
         for (var i = 0; i < items.size(); i++) {
             if (!(items[i][3] instanceof Lang.Number) || (items[i][3] as Lang.Number) >= aisles.size()) {
-                items = [] as Lang.Array<Lang.Array>;
-                aisles = [] as Lang.Array<Lang.Array>;
-                listRev = 0;
-                hasSnapshot = false;
-                break;
+                return false;
             }
         }
+        return true;
     }
 
     private function arrays(raw as Lang.Object or Null, size as Lang.Number) as Lang.Array<Lang.Array> {
@@ -612,16 +708,54 @@ class WatchSync {
         return out;
     }
 
-    private function saveMeta() as Void {
-        write(META_KEY, [installId, epoch, listRev, ackedThrough, more]);
+    private function saveMeta() as Lang.Boolean {
+        return write(META_KEY, [installId, epoch, listRev, ackedThrough, more, hasSnapshot, _itemKeys]);
     }
 
-    private function saveOutbox() as Void {
-        write(OUTBOX_KEY, [nextSeq, outbox, _settled]);
+    private function saveOutbox() as Lang.Boolean {
+        return write(OUTBOX_KEY, [nextSeq, outbox, _settled]);
     }
 
-    private function saveSnapshot() as Void {
-        write(SNAPSHOT_KEY, [aisles, items]);
+    //! The aisles and the items, ITEMS_PER_KEY to a key, each tagged with
+    //! listRev. Keys a bigger snapshot took and this one does not are
+    //! removed. A write that fails leaves a snapshot that will not reload
+    //! (its parts disagree on listRev), which is the right outcome.
+    private function saveSnapshot() as Lang.Boolean {
+        var ok = write(AISLES_KEY, [listRev, aisles]);
+        var keys = (items.size() + ITEMS_PER_KEY - 1) / ITEMS_PER_KEY;
+        for (var k = 0; k < keys; k++) {
+            var from = k * ITEMS_PER_KEY;
+            var to = from + ITEMS_PER_KEY;
+            if (to > items.size()) {
+                to = items.size();
+            }
+            if (!write(ITEMS_KEY + k, [listRev, items.slice(from, to)])) {
+                ok = false;
+            }
+        }
+        for (var k = keys; k < _itemKeys; k++) {
+            remove(ITEMS_KEY + k);
+        }
+        _itemKeys = keys;
+        if (_legacy) {
+            remove(LEGACY_SNAPSHOT_KEY);
+            _legacy = false;
+        }
+        return ok;
+    }
+
+    //! Takes the snapshot out of Storage (not out of memory) to make room.
+    //! A restart then finds no cache and says hello for the whole list.
+    private function freeSnapshot() as Void {
+        remove(AISLES_KEY);
+        for (var k = 0; k < _itemKeys; k++) {
+            remove(ITEMS_KEY + k);
+        }
+        _itemKeys = 0;
+        if (_legacy) {
+            remove(LEGACY_SNAPSHOT_KEY);
+            _legacy = false;
+        }
     }
 
     private function read(key as Lang.String) as Lang.Object or Null {
@@ -635,14 +769,28 @@ class WatchSync {
         }
     }
 
-    private function write(key as Lang.String, value as Lang.Array) as Void {
+    //! Whether the value is in Storage. Always true without persistence:
+    //! there is nothing to fail.
+    private function write(key as Lang.String, value as Lang.Array) as Lang.Boolean {
+        if (!_persist) {
+            return true;
+        }
+        try {
+            Application.Storage.setValue(key, value as Lang.Array<Application.Storage.ValueType>);
+            return true;
+        } catch (e) {
+            // Full or failing storage: the session goes on from memory.
+            return false;
+        }
+    }
+
+    private function remove(key as Lang.String) as Void {
         if (!_persist) {
             return;
         }
         try {
-            Application.Storage.setValue(key, value as Lang.Array<Application.Storage.ValueType>);
+            Application.Storage.deleteValue(key);
         } catch (e) {
-            // Full or failing storage: the session goes on from memory.
         }
     }
 }

@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -23,18 +22,17 @@ import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.ShoppingBasket
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -45,7 +43,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.robert4lyf.hypershop.ui.common.EdgeDivider
 import com.robert4lyf.hypershop.ui.common.EmptyHero
+import com.robert4lyf.hypershop.ui.common.PillShape
+import com.robert4lyf.hypershop.ui.common.cardLift
+import com.robert4lyf.hypershop.ui.common.fieldLift
+import com.robert4lyf.hypershop.ui.common.pillFieldColors
 import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.theme.heroGlow
@@ -79,7 +82,8 @@ fun AddItemField(
         if (text.isNotBlank()) onAdd(text)
         text = ""
     }
-    val shown = suggestions(text)
+    // Filtered once per keystroke, not on every recomposition.
+    val shown = remember(text) { suggestions(text) }
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         OutlinedTextField(
             value = text,
@@ -102,26 +106,22 @@ fun AddItemField(
                     null
                 },
             singleLine = true,
-            shape = RoundedCornerShape(50),
-            colors =
-                OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = MaterialTheme.colorScheme.card,
-                    focusedContainerColor = MaterialTheme.colorScheme.card,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                ),
+            // A white pill with a hairline edge, lifted off the page like a card.
+            shape = PillShape,
+            colors = pillFieldColors(),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { submit() }),
-            modifier = Modifier.fillMaxWidth().testTag("add-item"),
+            modifier = Modifier.fillMaxWidth().fieldLift().testTag("add-item"),
         )
         if (shown.isNotEmpty()) {
             Surface(
-                Modifier.fillMaxWidth().padding(top = 8.dp),
+                Modifier.fillMaxWidth().padding(top = 8.dp).cardLift(),
                 shape = MaterialTheme.shapes.large,
                 color = MaterialTheme.colorScheme.card,
             ) {
                 Column {
                     shown.forEachIndexed { i, s ->
-                        if (i > 0) HorizontalDivider(Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        if (i > 0) EdgeDivider(Modifier.padding(start = 52.dp))
                         Row(
                             Modifier
                                 .fillMaxWidth()
@@ -159,7 +159,8 @@ fun ReadyCard(
     Surface(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp)
+            .cardLift(MaterialTheme.shapes.large)
             .clip(MaterialTheme.shapes.large)
             .clickable(onClickLabel = if (n == 1) "Review" else "Review the first", role = Role.Button) { onReview(jobs.first()) }
             .testTag("ready-card"),

@@ -20,9 +20,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.ExpandLess
@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.ui.common.AisleBadge
 import com.robert4lyf.hypershop.ui.common.BottomActionBar
+import com.robert4lyf.hypershop.ui.common.CountPill
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
 import com.robert4lyf.hypershop.ui.common.TickMark
 import com.robert4lyf.hypershop.ui.common.sectionItem
@@ -183,7 +184,7 @@ private fun ListBody(
                     rows,
                     open,
                     onToggle = { collapsed = if (open) collapsed + aisle.name else collapsed - aisle.name },
-                    modifier = Modifier.padding(top = 16.dp).sectionItem(sectionPosition(0, count), aisle.style.container),
+                    modifier = Modifier.padding(top = 12.dp).sectionItem(sectionPosition(0, count), aisle.style.container),
                 )
             }
             if (open) {
@@ -214,6 +215,7 @@ private fun LazyListScope.inStockSection(
         var open by rememberSaveable { mutableStateOf(true) }
         Column {
             val count = if (open) rows.size + 1 else 1
+            // The same card as an aisle: a tinted header with a badge and a count pill, then white rows.
             Row(
                 Modifier
                     .padding(top = 24.dp)
@@ -230,7 +232,7 @@ private fun LazyListScope.inStockSection(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Box(
-                    Modifier.size(36.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondary),
+                    Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.secondary),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -240,10 +242,13 @@ private fun LazyListScope.inStockSection(
                         modifier = Modifier.size(20.dp),
                     )
                 }
-                Column(Modifier.weight(1f)) {
-                    Text("In stock", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                }
-                Text("${rows.size}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                Text(
+                    "In stock",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.weight(1f),
+                )
+                CountPill("${rows.size}", MaterialTheme.colorScheme.onSecondaryContainer)
                 Icon(
                     if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
                     contentDescription = null,
@@ -256,12 +261,12 @@ private fun LazyListScope.inStockSection(
                         Modifier
                             .sectionItem(sectionPosition(i + 1, count), card)
                             .fillMaxWidth()
-                            .heightIn(min = 60.dp)
+                            .heightIn(min = 64.dp)
                             .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text(r.main.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodyLarge)
+                            Text(r.main.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleMedium)
                             Text(r.from, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         TextButton(onClick = { onNeed(r) }, modifier = Modifier.testTag("need-${r.key}")) { Text("Need it") }
@@ -331,8 +336,8 @@ private fun ListTop(
 ) {
     val shopping = ui.loaded && !ui.isEmpty
     val total = ui.left + ui.doneCount
-    // A confirmation, since Clear all takes everything in one go.
-    var confirmClear by remember { mutableStateOf(false) }
+    // A confirmation, since Clear all takes everything in one go; it survives a rotation.
+    var confirmClear by rememberSaveable { mutableStateOf(false) }
     ScreenHeader(
         title =
             when {
@@ -420,6 +425,7 @@ private fun AisleTitle(
     modifier: Modifier,
 ) {
     val left = rows.count { it.state != TickState.DONE }
+    val tint = aisle.style
     Row(
         modifier
             .fillMaxWidth()
@@ -433,23 +439,18 @@ private fun AisleTitle(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        AisleBadge(aisle)
+        AisleBadge(aisle, size = 36.dp)
         Text(aisle.displayName, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
         if (left == 0) {
-            Icon(
-                Icons.Rounded.CheckCircle,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
-            )
-            Text("Done", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Text("Done ✓", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         } else {
-            Text("$left left", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // A white pill on the tint, in the aisle's own colour: the count reads at a glance.
+            CountPill("$left left", tint.content)
         }
         Icon(
             if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = tint.content,
         )
     }
 }
@@ -551,7 +552,7 @@ private fun ListRowItem(
             Column(Modifier.weight(1f)) {
                 Text(
                     displayMain(row.main, row.name),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                     textDecoration = if (done) TextDecoration.LineThrough else null,
                 )
@@ -562,7 +563,7 @@ private fun ListRowItem(
             Icon(
                 Icons.Rounded.ChevronRight,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(horizontal = 12.dp),
             )
         }

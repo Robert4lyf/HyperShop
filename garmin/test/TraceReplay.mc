@@ -45,6 +45,22 @@ module TraceReplay {
                     reloaded.batchSize = sync.batchSize;
                     reloaded.outboxCap = sync.outboxCap;
                     problem = compare(reloaded, step, false);
+                    if (problem == null) {
+                        // Not in the generated state (the Kotlin model has
+                        // neither), so held to the live instance instead: a
+                        // restart keeps an empty snapshot as a snapshot, and
+                        // "+N on phone".
+                        problem = differ("hasSnapshot", reloaded.hasSnapshot, sync.hasSnapshot);
+                    }
+                    if (problem == null) {
+                        problem = differ("more", reloaded.more, sync.more);
+                    }
+                    if (problem == null) {
+                        problem = differ("items", reloaded.items, sync.items);
+                    }
+                    if (problem == null) {
+                        problem = differ("aisles", reloaded.aisles, sync.aisles);
+                    }
                     if (problem != null) {
                         problem = "after reload: " + problem;
                     }

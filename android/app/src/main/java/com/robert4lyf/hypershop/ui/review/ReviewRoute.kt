@@ -1,15 +1,19 @@
 package com.robert4lyf.hypershop.ui.review
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -17,7 +21,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,8 +36,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.importing.ImportError
 import com.robert4lyf.hypershop.ui.common.UiMessage
+import com.robert4lyf.hypershop.ui.common.cardLift
 import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.list.showTimed
+import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.util.factoryFor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -45,29 +51,38 @@ fun ReviewRoute(
     jobId: Long,
     snackbar: SnackbarHostState,
     onDone: () -> Unit,
-    /** Opens the review of another job in this one's place (Undo after Cancel, "Try again"). */
+    /** Opens the review of another job in this one's place ("Try again"). */
     onReopen: (Long) -> Unit = {},
+    /** Undo after Cancel: opens the review again, unless another is showing by then. */
+    onUndo: (Long) -> Unit = onReopen,
 ) {
-    // Claude may only run while this screen is in the foreground.
+    // Claude may only run while this screen is in the foreground. One hold on the gate per
+    // screen: adding the observer replays ON_START when already started, hence the flag.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
+        var held = false
+        val hold = { on: Boolean ->
+            if (on != held) {
+                held = on
+                if (on) container.reviewGate.acquire() else container.reviewGate.release()
+            }
+        }
         val obs =
             LifecycleEventObserver { _, e ->
-                if (e == Lifecycle.Event.ON_START) container.reviewGate.set(true)
-                if (e == Lifecycle.Event.ON_STOP) container.reviewGate.set(false)
+                if (e == Lifecycle.Event.ON_START) hold(true)
+                if (e == Lifecycle.Event.ON_STOP) hold(false)
             }
         lifecycle.addObserver(obs)
-        if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) container.reviewGate.set(true)
         onDispose {
             lifecycle.removeObserver(obs)
-            container.reviewGate.set(false)
+            hold(false)
         }
     }
     val vm: ReviewViewModel = viewModel(key = "review-$jobId", factory = factoryFor { ReviewViewModel(container, jobId) })
     val state by vm.state.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
-    var sheetKey by remember { mutableStateOf<String?>(null) }
-    var confirmDiscard by remember { mutableStateOf(false) }
+    var sheetKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var confirmDiscard by rememberSaveable { mutableStateOf(false) }
     if (confirmDiscard) {
         AlertDialog(
             onDismissRequest = { confirmDiscard = false },
@@ -103,8 +118,14 @@ fun ReviewRoute(
                 s.candidates,
                 onUse = vm::useLines,
                 onBack = {
-                    // A fetch that may work next time leaves the job as it is; a page with no recipe is discarded (with Undo).
-                    if (!s.error.transient) vm.cancel() else onDone()
+                    if (s.error.transient) {
+                        // A fetch that may work next time is done with ("Try again" makes a new job); it would sit unlisted otherwise.
+                        container.applicationScope.launch { container.importJobs.done(jobId) }
+                        onDone()
+                    } else {
+                        // A page with no recipe is discarded (with Undo).
+                        vm.cancel()
+                    }
                 },
                 onRetry =
                     if (!s.error.transient) {
@@ -138,10 +159,15 @@ fun ReviewRoute(
         ReviewState.Cancelled ->
             LaunchedEffect(Unit) {
                 onDone()
-                // The job is only done for good once Undo has had its chance; Undo opens this review again.
+                // The job is only done for good once Undo has had its chance; Undo puts it back and opens it again.
                 container.applicationScope.launch(Dispatchers.Main) {
                     val r = snackbar.showTimed("Import discarded", "Undo", 10)
-                    if (r == SnackbarResult.ActionPerformed) onReopen(jobId) else vm.discardForGood()
+                    if (r == SnackbarResult.ActionPerformed) {
+                        container.importJobs.restore(jobId)
+                        onUndo(jobId)
+                    } else {
+                        vm.discardForGood()
+                    }
                 }
             }
         is ReviewState.AlreadyOnList ->
@@ -157,30 +183,38 @@ fun ReviewRoute(
     sheetKey?.let { key -> ReviewRowSheetHost(vm, key, onKey = { sheetKey = it }, onDismiss = { sheetKey = null }) }
 }
 
-/** The wait for the page, then for Claude, with a way out of a slow page. */
+/** The wait for the page, then for Claude: a card with the stage, and a way out of a slow page. */
 @Composable
 private fun LoadingView(
     s: ReviewState.Loading,
     onCancel: () -> Unit,
     onPaste: () -> Unit,
 ) {
-    Column(
-        Modifier.fillMaxSize().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-    ) {
-        CircularProgressIndicator()
-        Text(s.stage, Modifier.testTag("loading"), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-        if (s.slow) {
-            Text(
-                "Taking a while",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            FilledTonalButton(onClick = onPaste, modifier = Modifier.testTag("paste-instead")) { Text("Paste the ingredients") }
+    Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+        Surface(
+            Modifier.fillMaxWidth().cardLift(),
+            shape = RoundedCornerShape(22.dp),
+            color = MaterialTheme.colorScheme.card,
+        ) {
+            Column(
+                Modifier.padding(horizontal = 24.dp, vertical = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                CircularProgressIndicator()
+                Text(s.stage, Modifier.testTag("loading"), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+                if (s.slow) {
+                    Text(
+                        "Taking a while",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                    FilledTonalButton(onClick = onPaste, modifier = Modifier.testTag("paste-instead")) { Text("Paste the ingredients") }
+                }
+                TextButton(onClick = onCancel) { Text("Cancel") }
+            }
         }
-        TextButton(onClick = onCancel) { Text("Cancel") }
     }
 }
 

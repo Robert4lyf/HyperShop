@@ -9,6 +9,7 @@ import androidx.compose.material3.SnackbarVisuals
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalContext
@@ -32,21 +33,24 @@ fun ListRoute(
     val ui by vm.ui.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
     val context = LocalContext.current
+    // Built once per view model: a new object on every recomposition would recompose the whole header.
     val header =
-        HeaderActions(
-            onAdd = vm::addTyped,
-            suggestions = vm::suggestions,
-            onReview = onReview,
-            onSample = vm::addSample,
-            onPick = vm::addSuggested,
-            onPasteLink = {
-                // Read only when tapped, so Android shows no "pasted from your clipboard" for nothing.
-                // Nothing, or no https link, ends in the usual "no link" snackbar.
-                val clip = context.getSystemService(ClipboardManager::class.java)?.primaryClip
-                val text = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
-                container.applicationScope.launch { container.importShared(text, null) }
-            },
-        )
+        remember(vm, context, onReview) {
+            HeaderActions(
+                onAdd = vm::addTyped,
+                suggestions = vm::suggestions,
+                onReview = onReview,
+                onSample = vm::addSample,
+                onPick = vm::addSuggested,
+                onPasteLink = {
+                    // Read only when tapped, so Android shows no "pasted from your clipboard" for nothing.
+                    // Nothing, or no https link, ends in the usual "no link" snackbar.
+                    val clip = context.getSystemService(ClipboardManager::class.java)?.primaryClip
+                    val text = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
+                    container.applicationScope.launch { container.importShared(text, null) }
+                },
+            )
+        }
     ListScreen(
         ui,
         ListActions(

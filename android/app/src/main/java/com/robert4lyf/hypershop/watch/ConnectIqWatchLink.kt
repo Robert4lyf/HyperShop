@@ -1,13 +1,18 @@
 package com.robert4lyf.hypershop.watch
 
+import android.app.Activity
+import android.app.Application
 import android.content.Context
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import com.garmin.android.connectiq.ConnectIQ
 import com.garmin.android.connectiq.IQApp
 import com.garmin.android.connectiq.IQDevice
 import com.robert4lyf.hypershop.core.sync.WatchProtocol
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -27,6 +32,10 @@ import kotlin.coroutines.resume
  * is missing, old or killed, so every entry point is wrapped and failures
  * become [state], never a crash. SDK callbacks arrive on the main thread, and
  * sends go out on it too.
+ *
+ * A failed or shut-down SDK is tried again whenever an activity comes to the
+ * foreground (the user may have installed or restarted Garmin Connect in
+ * between), and on [retry], which Settings › Watch can call.
  *
  * `WIRELESS` in every build: the APK you install is the debug build, and
  * `TETHERED` (the simulator over adb) would cut it off from a real watch.
@@ -50,7 +59,11 @@ class ConnectIqWatchLink(
 
     @Volatile private var app: IQApp? = null
 
+    /** `initialize` has been called and neither failed nor shut down since. */
     @Volatile private var started = false
+
+    /** `onSdkReady` has arrived for the current [started]. */
+    @Volatile private var sdkReady = false
 
     @Volatile private var handler: ((Map<*, *>) -> Unit)? = null
 
@@ -60,6 +73,43 @@ class ConnectIqWatchLink(
      */
     private val sendLock = Mutex()
 
+    /**
+     * When a send last timed out (elapsed realtime), or 0. The SDK's single
+     * listener means a status that arrives after the timeout would be read
+     * as the *next* send's, so the next send waits [LATE_GRACE_MS] first,
+     * while the abandoned send's listener is still the registered one and
+     * swallows it.
+     */
+    @Volatile private var timedOutAt = 0L
+
+    init {
+        (appContext as? Application)?.registerActivityLifecycleCallbacks(
+            object : Application.ActivityLifecycleCallbacks {
+                override fun onActivityResumed(activity: Activity) {
+                    if (!started) retry()
+                }
+
+                override fun onActivityCreated(
+                    activity: Activity,
+                    savedInstanceState: Bundle?,
+                ) = Unit
+
+                override fun onActivityStarted(activity: Activity) = Unit
+
+                override fun onActivityPaused(activity: Activity) = Unit
+
+                override fun onActivityStopped(activity: Activity) = Unit
+
+                override fun onActivitySaveInstanceState(
+                    activity: Activity,
+                    outState: Bundle,
+                ) = Unit
+
+                override fun onActivityDestroyed(activity: Activity) = Unit
+            },
+        )
+    }
+
     override fun onReceive(handler: (Map<*, *>) -> Unit) {
         this.handler = handler
     }
@@ -67,8 +117,34 @@ class ConnectIqWatchLink(
     override fun start() {
         if (started) return
         started = true
-        // The SDK builds a Handler on the calling thread's looper.
-        if (Looper.myLooper() == Looper.getMainLooper()) init() else Handler(Looper.getMainLooper()).post { init() }
+        sdkReady = false
+        onMain { init() }
+    }
+
+    /**
+     * Tries again from wherever the link stopped: the SDK when it failed or
+     * shut down, the watch when none was found, the app when the watch was
+     * found without it. Settings › Watch calls this; so does every return to
+     * the foreground while the SDK is down.
+     */
+    override fun retry() {
+        if (!started) {
+            start()
+            return
+        }
+        if (!sdkReady) return
+        onMain {
+            val d = device
+            when {
+                d == null -> attach()
+                app == null -> requestApp(d)
+            }
+        }
+    }
+
+    /** The SDK builds a Handler on the calling thread's looper. */
+    private fun onMain(block: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) block() else Handler(Looper.getMainLooper()).post(block)
     }
 
     private fun init() {
@@ -85,8 +161,13 @@ class ConnectIqWatchLink(
         val target = device ?: return false
         val watchApp = app ?: return false
         return sendLock.withLock {
+            val wait = timedOutAt + LATE_GRACE_MS - SystemClock.elapsedRealtime()
+            if (timedOutAt != 0L && wait > 0) delay(wait)
+            timedOutAt = 0L
             // Bounded: a Garmin Connect killed mid-send never calls back.
-            withTimeoutOrNull(SEND_TIMEOUT_MS) { sendOnMain(target, watchApp, payload) } ?: false
+            val ok = withTimeoutOrNull(SEND_TIMEOUT_MS) { sendOnMain(target, watchApp, payload) }
+            if (ok == null) timedOutAt = SystemClock.elapsedRealtime()
+            ok ?: false
         }
     }
 
@@ -112,6 +193,7 @@ class ConnectIqWatchLink(
         }
 
     private fun unavailable(why: String) {
+        sdkReady = false
         device = null
         app = null
         _problem.value = why
@@ -121,6 +203,7 @@ class ConnectIqWatchLink(
     private val sdkListener =
         object : ConnectIQ.ConnectIQListener {
             override fun onSdkReady() {
+                sdkReady = true
                 _problem.value = null
                 attach()
             }
@@ -172,6 +255,13 @@ class ConnectIqWatchLink(
             }
         }
 
+    /**
+     * Subscribes to every paired watch. The SDK delivers a device's current
+     * status to a newly registered listener synchronously, so a connected
+     * watch is already [device], with its app asked for, by the time the loop
+     * ends; only a re-registration (listener swapped, no status) needs the
+     * lookup below.
+     */
     private fun attach() {
         val known = devices { connectIq.knownDevices }
         if (known.isEmpty()) {
@@ -186,6 +276,7 @@ class ConnectIqWatchLink(
                 Timber.w(e, "Could not watch device status")
             }
         }
+        if (device != null) return
         val target = devices { connectIq.connectedDevices }.firstOrNull()
         if (target == null) {
             s.value = WatchLinkState.DISCONNECTED
@@ -256,5 +347,8 @@ class ConnectIqWatchLink(
     private companion object {
         /** A round trip through Garmin Connect takes seconds, never minutes. */
         const val SEND_TIMEOUT_MS = 15_000L
+
+        /** How long after a timed-out send the next one waits for its late status to land harmlessly. */
+        const val LATE_GRACE_MS = 2_000L
     }
 }

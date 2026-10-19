@@ -1,15 +1,24 @@
 package com.robert4lyf.hypershop.data
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.robert4lyf.hypershop.core.catalog.CatalogLoader
+import com.robert4lyf.hypershop.core.merge.ApplyResult
 import com.robert4lyf.hypershop.core.model.BaseKey
+import com.robert4lyf.hypershop.core.model.ParsedBy
+import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
+import com.robert4lyf.hypershop.core.model.UnitLocale
+import com.robert4lyf.hypershop.core.parse.RuleParser
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+
+private val parser = RuleParser()
 
 /** Step 5.2c: removing a use, Undo of an import, rescaling, finish shopping, soft delete with undo. */
 @RunWith(AndroidJUnit4::class)
@@ -80,7 +89,7 @@ class UsesTest {
         runBlocking {
             val a = r.import("2 onions", "Salt, to taste")
             r.import("1 carrot", url = "https://example.com/b")
-            r.repo.manualAdd("milk", com.robert4lyf.hypershop.core.model.QtyBase.PRESENCE, null)
+            r.repo.manualAdd("milk", QtyBase.PRESENCE, null)
             val l = r.repo.snapshot()
             val uses = r.repo.usesOnList(l)
             assertEquals(r.repo.usesOnList(), uses)
@@ -154,7 +163,61 @@ class UsesTest {
             r.repo.restoreToLibrary(copies)
             assertTrue(r.db.dao().recipesByKey(key).all { it.lastAddedAt != null })
             r.repo.removeFromLibrary(key)
+            r.now += 8L * 24 * 3600 * 1000
             r.repo.purgeDeleted()
             assertTrue(r.db.dao().recipesByKey(key).isEmpty())
+        }
+
+    @Test
+    fun aReviewCopyNotYetConfirmedSurvivesTheStartUpPurge() =
+        runBlocking {
+            // An edit or a re-add from the library: stored with its entry's key, not added yet.
+            val stored =
+                r.repo.storeRecipe(
+                    null, "Soup", 2, UnitLocale.METRIC, "WEB", ParsedBy.RULES, null, false, listOf(parser.parse("1 onion")),
+                    libraryKey = "r:1",
+                )
+            r.repo.purgeDeleted()
+            assertTrue(r.db.dao().recipe(stored.recipe.id) != null)
+            assertTrue(r.repo.apply(r.repo.preview(stored, 2)) is ApplyResult.Applied)
+            // Only once Undo of "remove from your recipes" is long past.
+            r.now += 8L * 24 * 3600 * 1000
+            r.repo.purgeDeleted()
+            assertTrue(r.db.dao().recipe(stored.recipe.id) != null)
+            r.repo.removeUse(r.repo.snapshot().uses.keys.single())
+            r.repo.removeFromLibrary("r:1")
+            r.repo.purgeDeleted()
+            assertTrue(r.db.dao().recipe(stored.recipe.id) == null)
+        }
+
+    @Test
+    fun restoreFailsOnceTheRecipeCopyIsGone() =
+        runBlocking {
+            val a = r.import("2 onions")
+            val recipeId = r.repo.snapshot().uses[a.useId]!!.recipeId!!
+            val removed = r.repo.removeUse(a.useId)!!
+            r.db.dao().deleteRecipe(recipeId)
+            assertFalse(r.repo.restoreUse(removed))
+            assertTrue(r.repo.snapshot().uses.isEmpty())
+            assertTrue(r.repo.snapshot().liveItems.isEmpty())
+        }
+
+    @Test
+    fun restoreAfterACatalogueEditJoinsTheItemAtItsNewKey() =
+        runBlocking {
+            val a = r.import("1 courgette")
+            val removed = r.repo.removeUse(a.useId)!!
+            // "Always use aubergine instead", saved in the ingredient library meanwhile.
+            val edited = CatalogLoader.default.copy()
+            edited.replace("edited", edited.entries.map { if (it.id == "courgette") it.copy(replaceWith = "aubergine") else it })
+            val repo = ListRepository(r.db, edited, clock = { r.now })
+            repo.manualAdd("aubergine", QtyBase.of(Rational.of(2), null, UnitLocale.METRIC), null)
+            assertTrue(repo.restoreUse(removed))
+            val l = repo.snapshot()
+            assertEquals(listOf("cat:aubergine"), l.liveItems.map { it.mergeKey })
+            assertEquals(Rational.of(3), l.total(l.liveItems.single().id)[BaseKey.ITEMS])
+            assertEquals(2, l.uses.size)
+            // The restored item's old id still finds it (a watch op in flight).
+            assertEquals(l.liveItems.single().id, l.resolve(removed.removed.items.single().id)?.id)
         }
 }

@@ -34,9 +34,13 @@ class PhoneLink {
     private var _timer as Timer.Timer or Null = null;
     private var _sentAt as Lang.Number = 0;
     private var _awaiting as Lang.Boolean = false;
+    //! The message awaited is a hello (else an op batch).
+    private var _awaitingHello as Lang.Boolean = false;
     private var _backoff as Lang.Number = 0;
     private var _notBefore as Lang.Number = 0;
     private var _offline as Lang.Boolean = false;
+    //! Garmin Connect's view of the Bluetooth link at the last timer tick.
+    private var _phoneConnected as Lang.Boolean = false;
 
     function initialize(watchSync as WatchSync) {
         sync = watchSync;
@@ -56,9 +60,14 @@ class PhoneLink {
 
     function start() as Void {
         Communications.registerForPhoneAppMessages(method(:onPhoneMessage));
+        _phoneConnected = phoneConnected();
         _timer = new Timer.Timer();
         (_timer as Timer.Timer).start(method(:onTimer), 1000, true);
         sendHello();
+    }
+
+    private function phoneConnected() as Lang.Boolean {
+        return System.getDeviceSettings().phoneConnected;
     }
 
     //! Flushes what it can and says goodbye. Best effort: onStop has very
@@ -168,6 +177,15 @@ class PhoneLink {
             return;
         }
         var now = Time.now().value();
+        var connected = phoneConnected();
+        if (connected && !_phoneConnected) {
+            // The phone is back in range (or Garmin Connect is): ask for the
+            // list now rather than when the back-off from its absence ends.
+            sync.helloDue = true;
+            _backoff = 0;
+            _notBefore = 0;
+        }
+        _phoneConnected = connected;
         if (_awaiting && now - _sentAt >= REPLY_SECONDS) {
             noReply(now);
         }
@@ -184,16 +202,22 @@ class PhoneLink {
     private function noReply(now as Lang.Number) as Void {
         _awaiting = false;
         sync.timeout();
-        // The next try may be a batch the phone already applied (its reply
-        // was lost); the phone re-acks a duplicate rather than applying it.
-        if (!sync.hasSnapshot) {
+        // An unanswered hello is asked again after the back-off, cached list
+        // or not: a watch opened before the phone app would otherwise show
+        // the cache all session. An unanswered batch is simply resent; the
+        // phone re-acks a duplicate rather than applying it.
+        if (_awaitingHello || !sync.hasSnapshot) {
             sync.helloDue = true;
         }
+        backOff(now);
+        changed();
+    }
+
+    private function backOff(now as Lang.Number) as Void {
         _notBefore = now + BACKOFF[_backoff];
         if (_backoff < BACKOFF.size() - 1) {
             _backoff += 1;
         }
-        changed();
     }
 
     function onTransmitFailed() as Void {
@@ -208,21 +232,30 @@ class PhoneLink {
         }
         transmit(sync.hello(Time.now().value()));
         _awaiting = true;
+        _awaitingHello = true;
         _sentAt = Time.now().value();
     }
 
     //! Sends the next batch unless something is in flight or backing off.
     private function flush() as Void {
-        if (_offline || _awaiting || Time.now().value() < _notBefore) {
+        var now = Time.now().value();
+        if (_offline || _awaiting || now < _notBefore) {
             return;
         }
         var batch = sync.nextBatch();
         if (batch == null) {
+            if (sync.unsynced() > 0 && !sync.inFlight) {
+                // Ticks waiting but none handed out: Storage would not take
+                // the seqs. Not every second, then; and the notice shows.
+                backOff(now);
+                changed();
+            }
             return;
         }
         transmit(batch);
         _awaiting = true;
-        _sentAt = Time.now().value();
+        _awaitingHello = false;
+        _sentAt = now;
     }
 
     private function transmit(payload as Lang.Dictionary) as Void {

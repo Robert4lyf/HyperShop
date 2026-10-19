@@ -6,7 +6,8 @@ import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import kotlinx.serialization.Serializable
 
-enum class JobState { QUEUED, RUNNING, READY, FAILED, DONE }
+/** DISCARDING: cancelled on review, with "Undo" still showing; not on the ready card, and DONE once Undo has passed. */
+enum class JobState { QUEUED, RUNNING, READY, FAILED, DONE, DISCARDING }
 
 /** Why an import could not produce lines; each has its own message and a way out. */
 enum class ImportError { BLOCKED, NOT_HTML, TOO_LARGE, HTTP, OFFLINE, NO_RECIPE, NOT_A_RECIPE, PHOTO_NEEDS_KEY }

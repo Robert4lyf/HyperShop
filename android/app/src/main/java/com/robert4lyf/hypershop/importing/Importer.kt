@@ -18,14 +18,27 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Claude is only called while the review screen is in the foreground (PLAN §3.7):
- * a share intent on its own never spends money.
+ * a share intent on its own never spends money. Counted, not a flag: when one
+ * review replaces another ("Try again", a queued share), the old screen's stop
+ * must not close the gate on the new one.
  */
 class ReviewGate {
+    private var count = 0
     private val v = MutableStateFlow(false)
     val visible: StateFlow<Boolean> = v
 
-    fun set(visible: Boolean) {
-        v.value = visible
+    /** A review screen has come to the foreground. */
+    @Synchronized
+    fun acquire() {
+        count++
+        v.value = true
+    }
+
+    /** That screen has left it (or gone); one release per acquire. */
+    @Synchronized
+    fun release() {
+        if (count > 0) count--
+        v.value = count > 0
     }
 }
 

@@ -42,7 +42,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -100,20 +99,22 @@ fun HyperShopApp(
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route
     val share by container.shares.collectAsState()
-    // Shares to review, in order. Taking one tells the container, which offers the next it holds.
-    val queued = remember { mutableStateListOf<Long>() }
     LaunchedEffect(share) {
         val s = share ?: return@LaunchedEffect
-        container.shareHandled(s)
         when (s) {
-            is ShareOutcome.Review -> queued += s.jobId
-            ShareOutcome.NoLink -> show(container, snackbar, UiMessage("There was no link or ingredient list in what you shared"))
+            is ShareOutcome.Review -> container.queueReview(s.jobId)
+            is ShareOutcome.NoLink -> show(container, snackbar, UiMessage("There was no link or ingredient list in what you shared"))
         }
+        container.shareHandled(s)
     }
     // One review at a time: the next share opens once this review closes (its job waits on the ready card meanwhile).
-    LaunchedEffect(route, queued.size) {
-        if (queued.isEmpty() || nav.currentBackStackEntry?.destination?.route == Routes.REVIEW) return@LaunchedEffect
-        nav.navigate(Routes.review(queued.removeAt(0))) { launchSingleTop = true }
+    // The queue lives in the container, so a rotation loses nothing; an id leaves it only once its review is opened.
+    val pending by container.pendingReviews.collectAsState()
+    LaunchedEffect(route, pending) {
+        val next = pending.firstOrNull() ?: return@LaunchedEffect
+        if (nav.currentBackStackEntry?.destination?.route == Routes.REVIEW) return@LaunchedEffect
+        nav.navigate(Routes.review(next)) { launchSingleTop = true }
+        container.reviewOpened(next)
     }
     // The review screens pin their main action to the bottom edge (BottomActionBar pads for
     // the navigation bar itself), so the snackbar sits above that bar instead of over it.
@@ -186,6 +187,12 @@ fun HyperShopApp(
                         nav.navigate(Routes.review(id)) {
                             popUpTo(Routes.REVIEW) { inclusive = true }
                             launchSingleTop = true
+                        }
+                    },
+                    // Undo after Cancel, up to 10 s later: a review opened meanwhile is left alone (the job is back on the card).
+                    onUndo = { id ->
+                        if (nav.currentBackStackEntry?.destination?.route != Routes.REVIEW) {
+                            nav.navigate(Routes.review(id)) { launchSingleTop = true }
                         }
                     },
                 )

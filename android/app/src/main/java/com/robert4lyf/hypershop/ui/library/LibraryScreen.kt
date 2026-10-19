@@ -1,6 +1,7 @@
 package com.robert4lyf.hypershop.ui.library
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,10 +19,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -35,6 +34,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,10 +63,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -77,8 +79,13 @@ import com.robert4lyf.hypershop.core.catalog.DisplayPolicy
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.AisleBadge
-import com.robert4lyf.hypershop.ui.common.sectionItem
-import com.robert4lyf.hypershop.ui.common.sectionPosition
+import com.robert4lyf.hypershop.ui.common.PillShape
+import com.robert4lyf.hypershop.ui.common.SectionLabel
+import com.robert4lyf.hypershop.ui.common.basilChipColors
+import com.robert4lyf.hypershop.ui.common.basilSegmentedColors
+import com.robert4lyf.hypershop.ui.common.cardLift
+import com.robert4lyf.hypershop.ui.common.fieldLift
+import com.robert4lyf.hypershop.ui.common.pillFieldColors
 import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.theme.icon
@@ -112,7 +119,8 @@ fun LibraryRoute(
     if (editing != null && f != null) {
         EntrySheet(
             f,
-            onSave = { next -> vm.save(next).also { if (it == null) editing = null } },
+            // Saved in the view model's scope: closing the sheet mid-save can't leave the list un-rekeyed.
+            onSave = { next -> vm.saveFromSheet(next).await().also { if (it == null) editing = null } },
             onReset = {
                 vm.reset(f.id)
                 editing = null
@@ -172,31 +180,37 @@ fun LibraryScreen(
                         }
                     },
                     singleLine = true,
-                    shape = RoundedCornerShape(50),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).testTag("library-search"),
+                    shape = PillShape,
+                    colors = pillFieldColors(),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).fieldLift().testTag("library-search"),
                 )
                 AisleChips(aisle, onAisle)
                 val card = MaterialTheme.colorScheme.card
-                LazyColumn(Modifier.fillMaxSize().testTag("library"), contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp)) {
+                val shape = MaterialTheme.shapes.large
+                LazyColumn(Modifier.fillMaxSize().testTag("library"), contentPadding = PaddingValues(top = 4.dp, bottom = 96.dp)) {
                     // Only once the catalogue is in: an empty list before that is just loading.
                     if (ui.loaded && ui.rows.isEmpty() && (query.isNotEmpty() || aisle != null)) {
                         item { Text("Nothing matches", Modifier.padding(24.dp)) }
                     }
-                    itemsIndexed(ui.rows, key = { _, r -> r.id }) { i, r ->
+                    items(ui.rows, key = { it.id }) { r ->
+                        // Each ingredient is its own lifted card, 8 dp from the next.
                         Row(
                             Modifier
-                                .sectionItem(sectionPosition(i, ui.rows.size), card)
+                                .padding(horizontal = 16.dp, vertical = 4.dp)
+                                .cardLift(shape)
+                                .clip(shape)
+                                .background(card)
                                 .fillMaxWidth()
-                                .heightIn(min = 60.dp)
+                                .heightIn(min = 64.dp)
                                 .clickable(onClickLabel = "Edit", role = Role.Button) { onOpen(r.id) }
                                 .padding(horizontal = 16.dp, vertical = 10.dp)
                                 .testTag("entry-${r.id}"),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                         ) {
-                            AisleBadge(r.aisle, size = 32.dp)
+                            AisleBadge(r.aisle, size = 36.dp)
                             Column(Modifier.weight(1f)) {
-                                Text(r.name, style = MaterialTheme.typography.bodyLarge)
+                                Text(r.name, style = MaterialTheme.typography.titleMedium)
                                 r.detail?.let {
                                     Text(
                                         it,
@@ -244,6 +258,7 @@ private fun AisleChips(
                 selected = aisle == null,
                 onClick = { onAisle(null) },
                 label = { Text("All") },
+                colors = basilChipColors(),
                 modifier = Modifier.testTag("aisle-all"),
             )
         }
@@ -253,6 +268,7 @@ private fun AisleChips(
                 onClick = { onAisle(if (aisle == a) null else a) },
                 label = { Text(a.displayName) },
                 leadingIcon = { Icon(a.icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                colors = basilChipColors(),
                 modifier = Modifier.testTag("aisle-${a.name}"),
             )
         }
@@ -347,7 +363,8 @@ fun EntryEditor(
     var error by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
     var advanced by rememberSaveable(start) { mutableStateOf(start.hasAdvanced) }
-    var confirmReset by remember { mutableStateOf(false) }
+    var confirmReset by rememberSaveable { mutableStateOf(false) }
+    // Only awaits [onSave]'s answer and closes the sheet; the save itself runs in the view model.
     val scope = rememberCoroutineScope()
     // Any edit clears the last save's complaint: it was about the form as it was.
     val edit = { next: EntryForm ->
@@ -362,14 +379,15 @@ fun EntryEditor(
         Field("Name", f.name, "entry-name") { edit(f.copy(name = it)) }
         Field("Plural (optional)", f.plural, "entry-plural") { edit(f.copy(plural = it)) }
         Field("Also called", f.synonyms, "entry-synonyms", lines = 2) { edit(f.copy(synonyms = it)) }
-        Text("Aisle", style = MaterialTheme.typography.titleSmall)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        SectionLabel("Aisle")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             for (a in AisleCode.entries) {
                 FilterChip(
                     selected = f.aisle == a,
                     onClick = { edit(f.copy(aisle = a)) },
                     label = { Text(a.displayName) },
                     leadingIcon = { Icon(a.icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    colors = basilChipColors(),
                 )
             }
         }
@@ -380,26 +398,29 @@ fun EntryEditor(
             Text("Always in stock", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Switch(checked = f.alwaysInStock, onCheckedChange = null)
         }
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 48.dp)
-                .toggleable(value = advanced, role = Role.Button) { advanced = it }
-                .testTag("entry-advanced"),
-            verticalAlignment = Alignment.CenterVertically,
+        // A tonal button that reads as a switch: TalkBack says whether Advanced is open.
+        FilledTonalButton(
+            onClick = { advanced = !advanced },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .semantics { stateDescription = if (advanced) "Expanded" else "Collapsed" }
+                    .testTag("entry-advanced"),
         ) {
-            Text("Advanced", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+            Text("Advanced", Modifier.weight(1f))
             Icon(if (advanced) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, contentDescription = null)
         }
         AnimatedVisibility(advanced) {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text("Amounts shown as", style = MaterialTheme.typography.titleSmall)
+                SectionLabel("Amounts shown as")
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                     POLICIES.forEachIndexed { i, (p, label) ->
                         SegmentedButton(
                             selected = f.policy == p,
                             onClick = { edit(f.copy(policy = p)) },
                             shape = SegmentedButtonDefaults.itemShape(i, POLICIES.size),
+                            colors = basilSegmentedColors(),
                         ) { Text(label, maxLines = 1) }
                     }
                 }
@@ -476,7 +497,7 @@ private fun Suggestions(
     onPick: (String) -> Unit,
 ) {
     if (names.isEmpty()) return
-    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerHighest) {
+    Surface(Modifier.cardLift(MaterialTheme.shapes.medium), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.card) {
         Column(Modifier.fillMaxWidth()) {
             for (n in names) {
                 Text(

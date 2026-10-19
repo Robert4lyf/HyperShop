@@ -17,6 +17,12 @@ interface WatchLink {
 
     fun start()
 
+    /**
+     * Tries again from wherever the link stopped (the SDK, the watch, the
+     * app): Settings › Watch's "Try again", safe to call at any time.
+     */
+    fun retry() = start()
+
     /** Sends one payload (a snapshot page). Only Connect IQ types inside. */
     suspend fun send(payload: Map<String, Any>): Boolean
 
@@ -41,7 +47,9 @@ object NoWatchLink : WatchLink {
 class FakeWatchLink : WatchLink {
     private val s = MutableStateFlow(WatchLinkState.APP_READY)
     override val state: StateFlow<WatchLinkState> = s
-    val sent = mutableListOf<Map<String, Any>>()
+
+    /** Safe to read while the coordinator's scope is still sending. */
+    val sent: MutableList<Map<String, Any>> = java.util.concurrent.CopyOnWriteArrayList()
     private var handler: ((Map<*, *>) -> Unit)? = null
 
     override fun start() = Unit

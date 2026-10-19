@@ -205,3 +205,33 @@ same design system:
   the spend meters say what happens at the cap; the ingredient editor shows the
   common fields first with the rest under Advanced, suggests names for swaps,
   and has Cancel; the library has aisle filter chips.
+
+## Brighter pass
+
+A second pass on the same system, after the app read as flat and grey on a
+phone in daylight. Checked with `tools/contrast.py` (every text/background
+pair in both schemes is at least 4.5:1).
+
+- **Colour.** The light scheme's primary is a deeper basil (`#178040`) on an
+  off-white, slightly green page (`#F6F9F4`); cards are pure white. The dark
+  scheme keeps a green-black page (`#121A15`) with a mint primary
+  (`#8FE0A8`). Hero and recipe gradients are more saturated, the warm
+  call-to-action is a clearer orange-to-rose, and the hero's overline is soft
+  white rather than citrus (which only reached 3.6:1 on the brighter hero).
+- **Aisles.** Each aisle's hue is more saturated; light tints sit at 93 %
+  lightness with a 30 % strong colour, dark containers at 24 %.
+- **Depth.** Cards get `cardLift`: a 2 dp soft shadow in the light theme and a
+  hairline `cardEdge` border in both, with 22 dp corners and 16 dp gutters.
+  Text fields are white pills with the same edge (`fieldLift`). Dividers use
+  `cardEdge`.
+- **Hierarchy.** Aisle headers carry a 36 dp badge and a white count pill in
+  the aisle colour ("Done ✓" in primary once every item is ticked). Rows are
+  at least 64 dp with `titleMedium` names and `bodyMedium` sub-lines; chevrons
+  use `outline`. Selected chips and segmented buttons are primary-container,
+  staple chips secondary-container, spend meters primary (tertiary near the
+  cap).
+- **Review.** The hero uses `heroBrush`; the loading state is a lifted card;
+  the in-stock pill is outlined when off and primary-container with a check
+  when on; manual lines are a lifted paste card over the page's candidates.
+- **Settings › Watch.** A "Try again" button appears when the watch link is
+  down, re-attaching the Connect IQ SDK.

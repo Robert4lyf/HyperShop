@@ -21,6 +21,7 @@ import com.robert4lyf.hypershop.data.StoredRecipe
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.extract.Method
 import com.robert4lyf.hypershop.importing.ImportError
+import com.robert4lyf.hypershop.importing.ImportInput
 import com.robert4lyf.hypershop.importing.ImportResult
 import com.robert4lyf.hypershop.importing.Importer
 import com.robert4lyf.hypershop.importing.JobState
@@ -29,7 +30,7 @@ import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.common.webLink
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -222,14 +223,15 @@ class ReviewViewModel(
     /**
      * Claude, and saving its answer on the job, run in the app's scope: leaving the
      * screen mid-call (the request is billed whether or not anyone waits) still
-     * records the usage and keeps the answer, so reopening doesn't pay again.
+     * records the usage and keeps the answer, so reopening doesn't pay again; a
+     * review reopened mid-call joins the call ([AppContainer.claudeParse]).
      */
     private suspend fun parseWithClaude(
         r: ImportResult,
         keep: (ImportResult) -> Boolean = { true },
     ): ImportResult =
-        c.applicationScope
-            .async {
+        c
+            .claudeParse(jobId) {
                 c.importer.parse(
                     r,
                     allowClaude = true,
@@ -256,7 +258,12 @@ class ReviewViewModel(
             } finally {
                 slowTimer.cancel()
             }
-        var r = job?.result ?: return fail(ImportError.NO_RECIPE, emptyList())
+        var r = job?.result
+        if (r == null) {
+            // No result: a fetch given up on for pasted lines ([pasteInstead]), opened again before any were.
+            failedFrom = manualFrom(job?.input)
+            return fail(ImportError.NO_RECIPE, emptyList())
+        }
         failedFrom = r
         // Once per import: a failure or refusal in the worker isn't retried on open ("Retry with Claude" is).
         if (r.claudePending && !r.claudeTried && c.reviewGate.visible.value) {
@@ -302,27 +309,29 @@ class ReviewViewModel(
         recompute()
     }
 
-    private suspend fun store(r: ImportResult) {
-        val old = stored
-        val s =
-            c.repository.storeRecipe(
-                r.url,
-                r.title,
-                r.servings,
-                r.locale,
-                "WEB",
-                r.parsedBy,
-                r.model,
-                r.claudePending,
-                r.lines,
-                r.libraryKey,
-                r.book,
-                r.page,
-            )
-        preview = c.repository.preview(s, servings, emptyMap(), aisleMoves, r.editsUse)
-        stored = s
-        old?.let { c.repository.discardRecipe(it.recipe.id) }
-    }
+    // Not cancellable part-way: a cancel between storing the recipe and taking it as [stored] would leak the row.
+    private suspend fun store(r: ImportResult) =
+        withContext(NonCancellable) {
+            val old = stored
+            val s =
+                c.repository.storeRecipe(
+                    r.url,
+                    r.title,
+                    r.servings,
+                    r.locale,
+                    "WEB",
+                    r.parsedBy,
+                    r.model,
+                    r.claudePending,
+                    r.lines,
+                    r.libraryKey,
+                    r.book,
+                    r.page,
+                )
+            preview = c.repository.preview(s, servings, emptyMap(), aisleMoves, r.editsUse)
+            stored = s
+            old?.let { c.repository.discardRecipe(it.recipe.id) }
+        }
 
     /**
      * The review's edits (lines, name, servings, in-stock rows, aisle moves) go
@@ -346,17 +355,21 @@ class ReviewViewModel(
             r.pageText.orEmpty().lines().map { it.trim() }.filter { it.length in 2..500 }.distinct().take(300)
         }
 
-    /** "Taking a while": stop waiting for the page and paste the ingredients instead. */
+    /** "Taking a while": stop waiting for the page (and the fetch itself) and paste the ingredients instead. */
     fun pasteInstead() {
         loadJob.cancel()
         act {
             if (_state.value !is ReviewState.Loading) return@act
-            val input = c.importJobs.get(jobId)?.input
-            // The page's title and address are kept for the lines pasted in its place.
-            failedFrom = ImportResult(input?.url, input?.subject, null, Importer.localeFor(input?.url, emptyList()), Method.MANUAL.name)
+            // The job is ready for the pasted lines; a fetch that still finishes finds it so and keeps out.
+            c.importJobs.cancel(jobId)
+            failedFrom = manualFrom(c.importJobs.get(jobId)?.input)
             fail(ImportError.NO_RECIPE, emptyList())
         }
     }
+
+    /** The page's title and address, kept for the lines pasted in its place. */
+    private fun manualFrom(input: ImportInput?) =
+        ImportResult(input?.url, input?.subject, null, Importer.localeFor(input?.url, emptyList()), Method.MANUAL.name)
 
     /** "Select lines manually": the picked or pasted lines, parsed as a recipe and reviewed as usual. */
     fun useLines(lines: List<String>) =
@@ -518,15 +531,18 @@ class ReviewViewModel(
 
     /** "Retry with Claude". */
     fun retryWithClaude() {
-        val r = result ?: return
-        if (busy) return
-        busy = true
-        retrying = true
-        (state.value as? ReviewState.Ready)?.let { _state.value = it.copy(ui = it.ui.copy(busy = true, retrying = true)) }
+        // A second tap while the first is still queued behind the lock would ask twice.
+        if (retryJob?.isActive == true) return
         retryJob =
             act {
+                val r = result ?: return@act
+                if (busy) return@act
+                // Set under the lock: a Stop while this waited for it then has nothing to undo.
+                busy = true
+                retrying = true
+                (state.value as? ReviewState.Ready)?.let { _state.value = it.copy(ui = it.ui.copy(busy = true, retrying = true)) }
                 try {
-                    val again = parseWithClaude((result ?: r).copy(claudePending = true)) { it.parsedBy == ParsedBy.CLAUDE }
+                    val again = parseWithClaude(r.copy(claudePending = true)) { it.parsedBy == ParsedBy.CLAUDE }
                     store(again)
                     result = again
                 } finally {
@@ -542,7 +558,11 @@ class ReviewViewModel(
     fun stopRetry() {
         val j = retryJob?.takeIf { it.isActive } ?: return
         j.cancel()
-        act { recompute() }
+        act {
+            busy = false
+            retrying = false
+            recompute()
+        }
     }
 
     /** "Add N items": one transaction re-checking every rev shown. Runs once at a time. */
@@ -589,13 +609,17 @@ class ReviewViewModel(
         retryJob?.cancel()
         act {
             stored?.let { c.repository.discardRecipe(it.recipe.id) }
+            // Off the ready card while Undo shows: opening it from there meanwhile would be undone by the timer.
+            c.importJobs.discarding(jobId)
             _state.value = ReviewState.Cancelled
         }
     }
 
-    /** Undo wasn't tapped: the job is done and its photo, if any, goes. */
+    /** Undo wasn't tapped: the job is done and its photo, if any, goes. Nothing happens to a job Undo already put back. */
     suspend fun discardForGood() {
-        PhotoStore.delete(c.importJobs.get(jobId)?.result?.photo)
+        val job = c.importJobs.get(jobId) ?: return
+        if (job.state != JobState.DISCARDING) return
+        PhotoStore.delete(job.result?.photo)
         c.importJobs.done(jobId)
     }
 
@@ -791,6 +815,7 @@ class ReviewViewModel(
         val edited = r.copy(book = b, page = p)
         store(edited)
         result = edited
+        changed = true
         recompute()
     }
 
