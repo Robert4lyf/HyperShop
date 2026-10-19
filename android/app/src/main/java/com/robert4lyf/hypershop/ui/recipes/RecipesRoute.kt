@@ -498,8 +498,6 @@ private fun UseCard(
                 }
                 // One filled button for the main thing, the rest as text; wraps on narrow
                 // phones and large text instead of squeezing the last button.
-                // Only recipes can be edited ("Added by hand" items are edited on the list).
-                val canEdit = use.recipeId != null
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -511,8 +509,8 @@ private fun UseCard(
                             Spacer(Modifier.size(8.dp))
                             Text("Open recipe")
                         }
-                        if (canEdit) TextButton(onClick = onEdit, modifier = Modifier.testTag("edit-${use.useId}")) { Text("Edit") }
-                    } else if (canEdit) {
+                        TextButton(onClick = onEdit, modifier = Modifier.testTag("edit-${use.useId}")) { Text("Edit") }
+                    } else {
                         FilledTonalButton(onClick = onEdit, modifier = Modifier.testTag("edit-${use.useId}")) {
                             Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.size(8.dp))

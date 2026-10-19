@@ -54,4 +54,11 @@ data class ImportResult(
     /** A cookbook recipe's book and page, as typed (photo or typed in; editable on review). */
     val book: String? = null,
     val page: String? = null,
-)
+) {
+    /** "Added by hand" opened for editing: no recipe, no book, saved back as hand-added items. */
+    val byHand: Boolean get() = method == BY_HAND
+
+    companion object {
+        const val BY_HAND = "BY_HAND"
+    }
+}

@@ -298,6 +298,10 @@ class RecipesViewModel(
      */
     fun edit(use: UseSummary) =
         viewModelScope.launch {
+            if (use.recipeId == null) {
+                editByHand(use)
+                return@launch
+            }
             val src = c.repository.editSource(use.useId) ?: return@launch
             val r = src.recipe
             val result =
@@ -321,6 +325,24 @@ class RecipesViewModel(
                 )
             reviews.send(c.importJobs.enqueueReady(ImportInput(r.url ?: "", r.title), result))
         }
+
+    /** "Edit" on "Added by hand": its items as lines on the review screen; saving puts them back by hand. */
+    private suspend fun editByHand(use: UseSummary) {
+        val raw = c.repository.manualLines(use.useId)?.takeIf { it.isNotEmpty() } ?: return
+        val result =
+            ImportResult(
+                url = null,
+                title = use.title,
+                servings = null,
+                locale = UnitLocale.METRIC,
+                method = ImportResult.BY_HAND,
+                lines = c.ruleParser.parseLines(raw),
+                rawLines = raw,
+                preTick = false,
+                editsUse = use.useId,
+            )
+        reviews.send(c.importJobs.enqueueReady(ImportInput("", use.title), result))
+    }
 
     /**
      * "+ › Photo of a recipe": the photo is saved, scaled down, and reviewed like a

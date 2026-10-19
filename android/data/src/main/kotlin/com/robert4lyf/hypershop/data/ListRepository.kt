@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import com.robert4lyf.hypershop.core.catalog.Catalog
 import com.robert4lyf.hypershop.core.catalog.CatalogLoader
 import com.robert4lyf.hypershop.core.merge.ApplyResult
+import com.robert4lyf.hypershop.core.merge.Display
 import com.robert4lyf.hypershop.core.merge.LineStatus
 import com.robert4lyf.hypershop.core.merge.Merger
 import com.robert4lyf.hypershop.core.merge.NewItem
@@ -544,6 +545,26 @@ class ListRepository(
             )
         }
 
+    /**
+     * "Edit" on "Added by hand": its items as lines to review ("500 g mince"), in
+     * list order, or null when [useId] isn't the hand-added use.
+     */
+    suspend fun manualLines(useId: Long): List<String>? =
+        db.withTransaction {
+            val l = load()
+            val use = l.uses[useId]?.takeIf { it.kind == UseKind.MANUAL } ?: return@withTransaction null
+            l.contributions
+                .filter { it.useId == use.id }
+                .groupBy { it.itemId }
+                .mapNotNull { (itemId, cs) -> l.items[itemId]?.takeIf { it.deletedAt == null }?.let { it to cs } }
+                .sortedBy { (item, _) -> item.position }
+                .map { (item, cs) ->
+                    val total = cs.map { it.qty }.reduce { a, b -> a + b }
+                    val produce = item.aisle == AisleCode.PRODUCE
+                    listOfNotNull(Display.amount(total, produce = produce, hint = cs.last().unitHint), item.displayName).joinToString(" ")
+                }
+        }
+
     /** The list a review shows against: without [replacing], the use an edit replaces. */
     private fun without(
         l: ShoppingList,
@@ -583,15 +604,25 @@ class ListRepository(
         replacing: Long? = null,
         /** False for part of a recipe ("Add the in-stock items now"): the library keeps the whole one. */
         toLibrary: Boolean = true,
+        /** An edit of "Added by hand": the lines go back as hand-added items, with no recipe kept. */
+        manual: Boolean = false,
     ): ApplyResult =
         db.withTransaction {
             val old = load()
             val oldRecipe = replacing?.let { old.uses[it]?.recipeId }
-            when (val r = merger.apply(without(old, replacing), preview, clock())) {
+            val kind = if (manual) UseKind.MANUAL else UseKind.RECIPE
+            when (val r = merger.apply(without(old, replacing), preview, clock(), kind)) {
                 is ApplyResult.Applied -> {
                     persist(old, r.list)
-                    dao.putDecisions(preview.lineStatus.map { (line, s) -> LineDecisionEntity(r.useId, line, s.name) })
                     jobId?.let { dao.setJobState(it, "DONE") }
+                    if (manual) {
+                        // The review's stored copy was only there to be reviewed.
+                        preview.incoming.recipeId?.let { id ->
+                            db.openHelper.writableDatabase.execSQL("DELETE FROM Recipe WHERE id = ?", arrayOf(id))
+                        }
+                        return@withTransaction r
+                    }
+                    dao.putDecisions(preview.lineStatus.map { (line, s) -> LineDecisionEntity(r.useId, line, s.name) })
                     if (toLibrary) preview.incoming.recipeId?.let { addedToLibrary(it) }
                     // The edited recipe was stored afresh; the old one goes once nothing uses it.
                     if (oldRecipe != null && oldRecipe != preview.incoming.recipeId && dao.uses().none { it.recipeId == oldRecipe }) {

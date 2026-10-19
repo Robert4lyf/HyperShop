@@ -291,7 +291,16 @@ private fun Hero(
                             }
                         }
                     }
-                    Badge.RULES -> Badge("Parsed offline", Icons.Rounded.CloudOff, centred, onClick = { explainOffline = true })
+                    // Typed by hand: there is nothing for Claude to have read.
+                    Badge.RULES ->
+                        if (!ui.byHand) {
+                            Badge(
+                                "Parsed offline",
+                                Icons.Rounded.CloudOff,
+                                centred,
+                                onClick = { explainOffline = true },
+                            )
+                        }
                 }
                 if (ui.retrying) {
                     CircularProgressIndicator(centred.size(20.dp), color = Brand.OnHero, strokeWidth = 2.dp)
@@ -313,8 +322,10 @@ private fun Hero(
                         Text(ui.summary, Modifier.testTag("summary"), style = MaterialTheme.typography.bodyMedium, color = Brand.OnHero)
                     }
                 }
-                IconButton(onClick = { renaming = true }, modifier = Modifier.testTag("edit-title")) {
-                    Icon(Icons.Rounded.Edit, contentDescription = "Rename recipe", tint = Brand.OnHero)
+                if (!ui.byHand) {
+                    IconButton(onClick = { renaming = true }, modifier = Modifier.testTag("edit-title")) {
+                        Icon(Icons.Rounded.Edit, contentDescription = "Rename recipe", tint = Brand.OnHero)
+                    }
                 }
             }
             if (ui.cookbook) {
@@ -333,7 +344,7 @@ private fun Hero(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Servings(ui.servings, ui.originalServings, onServings, Modifier.align(Alignment.CenterVertically))
+                if (!ui.byHand) Servings(ui.servings, ui.originalServings, onServings, Modifier.align(Alignment.CenterVertically))
                 ui.url?.let { url ->
                     TextButton(
                         onClick = { open(url) },
