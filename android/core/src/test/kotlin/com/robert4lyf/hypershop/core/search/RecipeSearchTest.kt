@@ -56,4 +56,16 @@ class RecipeSearchTest {
         assertTrue(hits.single().inTitle)
         assertEquals(emptyList<RecipeSearch.Hit>(), RecipeSearch.search(all, listOf(" ")))
     }
+
+    @Test
+    fun theWordBeingTypedMatchesWordStarts() {
+        // Half a word finds the dish while typing, in the title or an ingredient.
+        assertEquals(listOf(1L, 2L), RecipeSearch.search(all, listOf("mush"), typing = true).map { it.id })
+        assertEquals(listOf(4L), RecipeSearch.search(all, listOf("noo"), typing = true).map { it.id })
+        assertEquals(listOf(2L), RecipeSearch.search(all, listOf("soured cr"), typing = true).map { it.id })
+        // A finished term (a chip) is still whole words: "pea" is not "peanut".
+        assertEquals(emptyList<Long>(), RecipeSearch.search(all, listOf("mush")).map { it.id })
+        assertEquals(listOf(3L), RecipeSearch.search(all, listOf("chickpea", "spin"), typing = true).map { it.id })
+        assertEquals(emptyList<Long>(), RecipeSearch.search(all, listOf("pea", "zzz"), typing = true).map { it.id })
+    }
 }
