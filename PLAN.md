@@ -230,7 +230,7 @@ Nothing is added until you confirm it here.
 - **Recipes tab:**
   - Shows the uses currently on the list.
   - **"Remove from list"** for each use.
-  - **"Add the in-stock items now":** reopens the review screen with full amounts and nothing pre-ticked.
+  - ~~"Add the in-stock items now"~~ — removed after real use: confusing, and "Edit" on the recipe does the same.
 - **Backup:**
   - **Android Auto Backup** covers the database. It excludes the key file and `TickEvent`, and a restore creates a new list epoch (§3.6).
   - There is no JSON export or import.

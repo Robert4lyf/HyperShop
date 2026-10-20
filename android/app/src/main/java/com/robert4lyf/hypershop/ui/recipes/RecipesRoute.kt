@@ -108,7 +108,6 @@ fun RecipesRoute(
     RecipesScreen(
         ui,
         onRemove = vm::remove,
-        onAddInStock = vm::addInStockNow,
         onEdit = vm::edit,
         library = LibraryActions(onAdd = vm::addFromLibrary, onRemove = vm::removeFromLibrary, onOpen = vm::openDetail),
         search =
@@ -159,7 +158,6 @@ private fun RecipesUi.libraryRow(key: String?): LibraryRow? = key?.let { k -> li
 fun RecipesScreen(
     ui: RecipesUi,
     onRemove: (UseSummary) -> Unit,
-    onAddInStock: (UseSummary) -> Unit,
     onEdit: (UseSummary) -> Unit = {},
     add: AddRecipeActions = AddRecipeActions(),
     library: LibraryActions = LibraryActions(),
@@ -242,7 +240,7 @@ fun RecipesScreen(
                 }
                 if (!showLibrary) {
                     items(ui.uses, key = { it.useId }) { use ->
-                        UseCard(use, onRemove = { confirm = use.useId }, onAddInStock = { onAddInStock(use) }, onEdit = { onEdit(use) })
+                        UseCard(use, onRemove = { confirm = use.useId }, onEdit = { onEdit(use) })
                     }
                 }
                 if (showLibrary) {
@@ -476,7 +474,6 @@ private fun LibraryCard(
 private fun UseCard(
     use: UseSummary,
     onRemove: () -> Unit,
-    onAddInStock: () -> Unit,
     onEdit: () -> Unit,
 ) {
     val url = webLink(use.url)
@@ -542,7 +539,6 @@ private fun UseCard(
                             Text("Edit")
                         }
                     }
-                    if (use.inStockCount > 0) TextButton(onClick = onAddInStock) { Text("Add the in-stock items now") }
                     TextButton(onClick = onRemove) { Text("Remove from list") }
                 }
             }

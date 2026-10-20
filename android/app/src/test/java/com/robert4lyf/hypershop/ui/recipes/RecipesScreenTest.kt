@@ -66,24 +66,22 @@ class RecipesScreenTest {
     private fun show(dark: Boolean = false) =
         compose.setContent {
             HyperShopTheme(dark = dark, dynamicColor = false) {
-                RecipesScreen(USES, onRemove = { events += "remove ${it.useId}" }, onAddInStock = { events += "in stock ${it.useId}" })
+                RecipesScreen(USES, onRemove = { events += "remove ${it.useId}" })
             }
         }
 
     @Test
-    fun removeAsksFirstAndInStockOnlyWhenSomeWere() {
+    fun removeAsksFirst() {
         show()
         compose.onNodeWithContentDescription("Serves 4 · 6 items on the list · 3 in stock").assertExists()
-        compose.onNodeWithText("Add the in-stock items now").performClick()
-        // Only the chilli has in-stock lines, so there is one such button (onNodeWithText above
-        // would fail on two); every use can be removed, after a confirmation.
+        // Every use can be removed, after a confirmation.
         compose.onAllNodesWithText("Remove from list").assertCountEquals(3)
         compose.onNodeWithContentDescription("Serves 8 · 5 items on the list").assertExists()
         compose.onAllNodesWithText("Remove from list")[1].performClick()
         compose.onNodeWithText("Keep").performClick()
         compose.onAllNodesWithText("Remove from list")[1].performClick()
         compose.onNodeWithText("Remove").performClick()
-        assertEquals(listOf("in stock 1", "remove 2"), events)
+        assertEquals(listOf("remove 2"), events)
     }
 
     @Test
@@ -111,7 +109,7 @@ class RecipesScreenTest {
         val added = mutableListOf<String>()
         compose.setContent {
             HyperShopTheme(dynamicColor = false) {
-                RecipesScreen(USES, onRemove = {}, onAddInStock = {}, library = LibraryActions(onAdd = { added += it.key }))
+                RecipesScreen(USES, onRemove = {}, library = LibraryActions(onAdd = { added += it.key }))
             }
         }
         compose.onNodeWithTag("view-library").performClick()
@@ -131,7 +129,7 @@ class RecipesScreenTest {
     @Test
     fun anEmptyListWithSavedRecipesSaysSo() {
         compose.setContent {
-            HyperShopTheme(dynamicColor = false) { RecipesScreen(USES.copy(uses = emptyList()), onRemove = {}, onAddInStock = {}) }
+            HyperShopTheme(dynamicColor = false) { RecipesScreen(USES.copy(uses = emptyList()), onRemove = {}) }
         }
         // An empty list opens on the library; the list says it is empty.
         compose.onNodeWithTag("lib-r:9").assertExists()
@@ -176,7 +174,7 @@ class RecipesScreenTest {
         val opened = mutableListOf<String>()
         compose.setContent {
             HyperShopTheme(dynamicColor = false) {
-                RecipesScreen(USES, onRemove = {}, onAddInStock = {}, library = LibraryActions(onOpen = { opened += it.key }))
+                RecipesScreen(USES, onRemove = {}, library = LibraryActions(onOpen = { opened += it.key }))
             }
         }
         compose.onNodeWithTag("view-library").performClick()
@@ -212,7 +210,7 @@ class RecipesScreenTest {
     @Test
     fun theListAndTheLibraryAreSeparateAndANewRecipeShowsOnTheList() {
         var ui by mutableStateOf(USES.copy(uses = USES.uses.take(1)))
-        compose.setContent { HyperShopTheme(dynamicColor = false) { RecipesScreen(ui, onRemove = {}, onAddInStock = {}) } }
+        compose.setContent { HyperShopTheme(dynamicColor = false) { RecipesScreen(ui, onRemove = {}) } }
         // Opens on the list: its cards, not the library's.
         compose.onNodeWithText("Remove from list").assertExists()
         compose.onNodeWithTag("lib-r:9").assertDoesNotExist()
