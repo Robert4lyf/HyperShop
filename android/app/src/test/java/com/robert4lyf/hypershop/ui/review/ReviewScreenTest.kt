@@ -2,10 +2,12 @@ package com.robert4lyf.hypershop.ui.review
 
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -93,6 +95,14 @@ class ReviewScreenTest {
         assertTrue(texts.size + toggle <= 4) // "In stock" label + name + quantity + box, read as one node
         compose.onNodeWithTag("row-cat:onion").performClick()
         assertEquals("row cat:onion", events.last())
+    }
+
+    @Test
+    fun aSavedRecipeBeingEditedHasNoInStockOrServings() {
+        show(SAMPLE_REVIEW.copy(editing = true, savedOnly = true))
+        compose.onAllNodesWithContentDescription("In stock", substring = true).assertCountEquals(0)
+        compose.onAllNodesWithText("Serves", substring = true).assertCountEquals(0)
+        compose.onNodeWithText("Save changes").assertExists()
     }
 
     @Test

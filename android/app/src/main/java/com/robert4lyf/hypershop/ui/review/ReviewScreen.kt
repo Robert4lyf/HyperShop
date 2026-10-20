@@ -138,7 +138,7 @@ fun ReviewScreen(
     }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().imePadding()) {
-            TopBar(onCancel, onClearInStock, onAddIngredient = { focusAdd++ })
+            TopBar(onCancel, onClearInStock.takeUnless { ui.savedOnly }, onAddIngredient = { focusAdd++ })
             val card = MaterialTheme.colorScheme.card
             LazyColumn(Modifier.weight(1f), state = list, contentPadding = PaddingValues(bottom = 16.dp)) {
                 item(key = "hero") { Hero(ui, onServings, onRetryClaude, onStopRetry, edits.onTitle, edits.onBook) }
@@ -158,12 +158,12 @@ fun ReviewScreen(
                         AisleHeader(
                             aisle,
                             rows,
-                            onAisleInStock,
+                            onAisleInStock.takeUnless { ui.savedOnly },
                             Modifier.padding(top = 12.dp).sectionItem(sectionPosition(0, count), aisle.style.container),
                         )
                     }
                     itemsIndexed(rows, key = { _, r -> r.key }) { i, r ->
-                        ReviewRowItem(r, onInStock, onRow, sectionPosition(i + 1, count), card)
+                        ReviewRowItem(r, onInStock.takeUnless { ui.savedOnly }, onRow, sectionPosition(i + 1, count), card)
                     }
                 }
                 item(key = "add-line") { AddLine(edits.onAddLine, enabled = !ui.busy, focus = addFocus) }
@@ -201,7 +201,8 @@ fun ReviewScreen(
 @Composable
 private fun TopBar(
     onCancel: () -> Unit,
-    onClearInStock: () -> Unit,
+    /** Null when there's no in stock to clear (a saved recipe being edited). */
+    onClearInStock: (() -> Unit)?,
     onAddIngredient: () -> Unit,
 ) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -220,10 +221,12 @@ private fun TopBar(
                     menu = false
                     onAddIngredient()
                 })
-                DropdownMenuItem(text = { Text("Clear in stock") }, onClick = {
-                    menu = false
-                    onClearInStock()
-                })
+                onClearInStock?.let { clear ->
+                    DropdownMenuItem(text = { Text("Clear in stock") }, onClick = {
+                        menu = false
+                        clear()
+                    })
+                }
             }
         }
     }
@@ -338,7 +341,14 @@ private fun Hero(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                if (!ui.byHand) Servings(ui.servings, ui.originalServings, onServings, Modifier.align(Alignment.CenterVertically))
+                if (!ui.byHand && !ui.savedOnly) {
+                    Servings(
+                        ui.servings,
+                        ui.originalServings,
+                        onServings,
+                        Modifier.align(Alignment.CenterVertically),
+                    )
+                }
                 ui.url?.let { url ->
                     TextButton(
                         onClick = { open(url) },
@@ -585,7 +595,8 @@ private fun ServingsDialog(
 private fun AisleHeader(
     aisle: AisleCode,
     rows: List<ReviewRow>,
-    onAisleInStock: (AisleCode) -> Unit,
+    /** Null for a saved recipe being edited: a count, and no in-stock menu. */
+    onAisleInStock: ((AisleCode) -> Unit)?,
     modifier: Modifier,
 ) {
     var menu by rememberSaveable { mutableStateOf(false) }
@@ -610,6 +621,7 @@ private fun AisleHeader(
         ) {
             Text(
                 when {
+                    onAisleInStock == null -> "${rows.size}"
                     adding > 0 -> "$adding to add"
                     rows.all { it.inStock } -> "All in stock"
                     else -> "Nothing to add"
@@ -618,13 +630,15 @@ private fun AisleHeader(
                 style = MaterialTheme.typography.labelMedium,
             )
         }
-        Box {
-            IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "${aisle.displayName} options") }
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(text = { Text("Mark this aisle in stock") }, onClick = {
-                    menu = false
-                    onAisleInStock(aisle)
-                })
+        if (onAisleInStock != null) {
+            Box {
+                IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "${aisle.displayName} options") }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text("Mark this aisle in stock") }, onClick = {
+                        menu = false
+                        onAisleInStock(aisle)
+                    })
+                }
             }
         }
     }
@@ -638,7 +652,8 @@ private fun AisleHeader(
 @Composable
 private fun ReviewRowItem(
     row: ReviewRow,
-    onInStock: (String, Boolean) -> Unit,
+    /** Null for a saved recipe being edited: no "In stock" pill. */
+    onInStock: ((String, Boolean) -> Unit)?,
     onRow: (String) -> Unit,
     position: SectionPosition,
     card: Color,
@@ -698,7 +713,7 @@ private fun ReviewRowItem(
                 )
             }
         }
-        InStockPill(row.inStock, name) { onInStock(row.key, it) }
+        onInStock?.let { toggle -> InStockPill(row.inStock, name) { toggle(row.key, it) } }
         Icon(
             Icons.Rounded.ChevronRight,
             contentDescription = null,

@@ -293,6 +293,9 @@ class RecipesViewModelTest {
         // On the list already, but an edit adds nothing: no "add again?".
         val ready = await(edit.state) { it is ReviewState.Ready } as ReviewState.Ready
         assertTrue(ready.ui.editing)
+        // Nothing goes on the list from here, so no in-stock or servings: just the ingredients.
+        assertTrue(ready.ui.savedOnly)
+        assertTrue(ready.ui.summary, ready.ui.summary.endsWith(" ingredients"))
         edit.addLine("1 lime")
         await(edit.state) { s -> s is ReviewState.Ready && s.ui.changed }
         edit.confirm()
