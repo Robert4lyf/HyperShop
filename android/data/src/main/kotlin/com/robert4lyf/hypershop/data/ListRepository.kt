@@ -407,7 +407,7 @@ class ListRepository(
         val withInStock = uses.filter { it.id in inStock }
         val recipes = recipesById(withInStock.mapNotNull { it.recipeId })
         val ov = overrides()
-        // A line already on the list ("Add the in-stock items now", "Need it") isn't in stock any more.
+        // A line already on the list ("Need it") isn't in stock any more.
         val onList = l.contributions.filter { it.itemId in live }.mapNotNull { it.recipeLineId }.toSet()
         val wanted = inStock.values.flatten().toSet() - onList
         val rows = recipes.keys.toList().chunked(MAX_ARGS).flatMap { dao.linesFor(it) }.filter { it.id in wanted }.groupBy { it.recipeId }
@@ -515,17 +515,6 @@ class ListRepository(
             recipe to dao.lines(recipeId).map { json.decodeFromString(ParsedIngredient.serializer(), it.parsedJson) }
         }
 
-    /** "Add the in-stock items now": the lines of [useId] that were left out as in stock. */
-    suspend fun inStockLines(useId: Long): Pair<RecipeEntity, List<ParsedIngredient>>? =
-        db.withTransaction {
-            val recipeId = load().uses[useId]?.recipeId ?: return@withTransaction null
-            val recipe = dao.recipe(recipeId) ?: return@withTransaction null
-            val inStock = dao.decisions(useId).filter { it.status == LineStatus.IN_STOCK.name }.map { it.recipeLineId }.toSet()
-            val lines =
-                dao.lines(recipeId).filter { it.id in inStock }.map { json.decodeFromString(ParsedIngredient.serializer(), it.parsedJson) }
-            recipe to lines
-        }
-
     /**
      * "Edit" on the Recipes tab: the recipe as it went on the list for [useId] —
      * the recipe, its lines in order, the indices of those marked in stock — and
@@ -602,8 +591,6 @@ class ListRepository(
         jobId: Long? = null,
         /** An edit: this use (and its items, ticks and decisions) is replaced by the new one. */
         replacing: Long? = null,
-        /** False for part of a recipe ("Add the in-stock items now"): the library keeps the whole one. */
-        toLibrary: Boolean = true,
         /** An edit of "Added by hand": the lines go back as hand-added items, with no recipe kept. */
         manual: Boolean = false,
     ): ApplyResult =
@@ -623,7 +610,7 @@ class ListRepository(
                         return@withTransaction r
                     }
                     dao.putDecisions(preview.lineStatus.map { (line, s) -> LineDecisionEntity(r.useId, line, s.name) })
-                    if (toLibrary) preview.incoming.recipeId?.let { addedToLibrary(it) }
+                    preview.incoming.recipeId?.let { addedToLibrary(it) }
                     // The edited recipe was stored afresh; the old one goes once nothing uses it.
                     if (oldRecipe != null && oldRecipe != preview.incoming.recipeId && dao.uses().none { it.recipeId == oldRecipe }) {
                         db.openHelper.writableDatabase.execSQL("DELETE FROM Recipe WHERE id = ?", arrayOf(oldRecipe))

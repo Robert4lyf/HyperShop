@@ -63,7 +63,7 @@ class ImportJobs(
     /** The worker's claim; false when the job is already finished (a WorkManager re-run). */
     suspend fun claim(id: Long): Boolean = dao.claimJob(id) > 0
 
-    /** A job that needs no fetch, straight to review ("Add the in-stock items now"). */
+    /** A job that needs no fetch, straight to review (an edit, a typed or photographed recipe, the library). */
     suspend fun enqueueReady(
         input: ImportInput,
         result: ImportResult,

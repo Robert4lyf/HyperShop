@@ -31,7 +31,7 @@ data class ImportResult(
     val sourceUrls: List<String> = emptyList(),
     val error: ImportError? = null,
     val claudeNote: String? = null,
-    /** False for "Add the in-stock items now": full amounts, nothing pre-ticked, no "add again?". */
+    /** False for an edit and the library: nothing pre-ticked, no "add again?". */
     val preTick: Boolean = true,
     /** The servings the review opens at, when not [servings] (the recipe's own). */
     val targetServings: Int? = null,

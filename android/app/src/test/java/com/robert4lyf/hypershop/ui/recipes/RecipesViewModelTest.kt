@@ -106,16 +106,9 @@ class RecipesViewModelTest {
         val again = await(vm.ui) { it.uses.size == 1 && it.library.singleOrNull()?.onList == true }.library.single()
         assertEquals(off.key, again.key)
         assertTrue(again.lastAddedAt >= off.lastAddedAt)
-        // "Add the in-stock items now" doesn't replace the whole recipe in the library.
-        vm.addInStockNow(vm.ui.value.uses.single())
-        val part = ReviewViewModel(c, nextReview(vm))
-        await(part.state) { it is ReviewState.Ready }
-        part.confirm()
-        await(part.state) { it is ReviewState.Added }
-        assertEquals(again.recipeId, await(vm.ui) { it.uses.size == 2 }.library.single().recipeId)
         // Removed from the library; the list keeps its items.
         vm.removeFromLibrary(again)
-        await(vm.ui) { it.library.isEmpty() && it.uses.size == 2 }
+        await(vm.ui) { it.library.isEmpty() && it.uses.size == 1 }
     }
 
     @Test
@@ -159,33 +152,6 @@ class RecipesViewModelTest {
         assertTrue(vm.ui.value.uses.isEmpty())
         assertTrue(runBlocking { c.repository.snapshot() }.liveItems.isEmpty())
         watching.cancel()
-    }
-
-    @Test
-    fun editingThePartAddedFromInStockKeepsOneLibraryEntry() {
-        val c = TestContainer.create()
-        // A typed-in recipe has no URL: its library key is "r:<id>" of the first copy.
-        val vm = RecipesViewModel(c).shown()
-        vm.addManual("Soup", 2, "2 onions\nSalt, to taste")
-        val first = ReviewViewModel(c, nextReview(vm))
-        await(first.state) { it is ReviewState.Ready }
-        first.confirm()
-        await(first.state) { it is ReviewState.Added }
-        val use = await(vm.ui) { it.uses.isNotEmpty() && it.library.isNotEmpty() }.uses.single()
-        vm.addInStockNow(use)
-        val part = ReviewViewModel(c, nextReview(vm))
-        await(part.state) { it is ReviewState.Ready }
-        part.confirm()
-        await(part.state) { it is ReviewState.Added }
-        vm.edit(await(vm.ui) { it.uses.size == 2 }.uses.first { it.useId != use.useId })
-        val edit = ReviewViewModel(c, nextReview(vm))
-        await(edit.state) { it is ReviewState.Ready }
-        edit.confirm()
-        await(edit.state) { it is ReviewState.Added }
-        // Still one entry, under the recipe's key (its latest copy is now the edited part, as for a URL recipe).
-        val lib = await(vm.ui) { it.uses.size == 2 && it.library.size == 1 }.library
-        assertEquals(use.libraryKey, lib.single().key)
-        assertEquals("Soup", lib.single().title)
     }
 
     @Test
@@ -336,7 +302,7 @@ class RecipesViewModelTest {
     }
 
     @Test
-    fun usesInStockNowAndRemove() {
+    fun usesCountInStockAndRemove() {
         val c = TestContainer.create()
         c.add(*CHILLI)
         val vm = RecipesViewModel(c).shown()
@@ -345,18 +311,9 @@ class RecipesViewModelTest {
         assertEquals(4, use.servings)
         // Salt, olive oil and the soured-cream garnish were left out as in stock.
         assertEquals(3, use.inStockCount)
-        vm.addInStockNow(use)
-        val review = ReviewViewModel(c, nextReview(vm))
-        val ready = await(review.state) { it is ReviewState.Ready } as ReviewState.Ready
-        val rows = ready.ui.aisles.flatMap { it.second }
-        assertEquals(setOf("cat:salt", "cat:olive_oil", "cat:sour_cream"), rows.map { it.key }.toSet())
-        assertTrue("nothing pre-ticked", rows.none { it.inStock })
-        review.confirm()
-        await(review.state) { it is ReviewState.Added }
-        assertTrue(runBlocking { c.repository.snapshot() }.itemByKey("cat:salt") != null)
-        val uses = await(vm.ui) { it.uses.size == 2 }.uses
-        vm.remove(uses.last())
-        await(vm.ui) { it.uses.size == 1 }
+        assertTrue(runBlocking { c.repository.snapshot() }.itemByKey("cat:salt") == null)
+        vm.remove(use)
+        await(vm.ui) { it.uses.isEmpty() }
         assertTrue(runBlocking { c.repository.snapshot() }.itemByKey("cat:onion") == null)
     }
 

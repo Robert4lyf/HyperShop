@@ -577,14 +577,12 @@ class ReviewViewModel(
         act {
             try {
                 val p = preview ?: return@act
-                // "Add the in-stock items now" is part of a recipe: the library keeps the whole one.
                 when (
                     val r =
                         c.repository.apply(
                             p,
                             jobId,
                             replacing,
-                            toLibrary = result?.method != "IN_STOCK",
                             manual = result?.byHand == true,
                         )
                 ) {

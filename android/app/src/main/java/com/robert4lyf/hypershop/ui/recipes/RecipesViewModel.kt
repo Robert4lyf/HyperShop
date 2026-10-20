@@ -231,9 +231,6 @@ class RecipesViewModel(
             messages.send(UiMessage("Removed ${row.title} from your recipes", undo = { c.repository.restoreToLibrary(copies) }))
         }
 
-    /** Uses whose "Add the in-stock items now" is being set up: a second tap meanwhile does nothing. */
-    private val addingInStock = mutableSetOf<Long>()
-
     private val messages = Channel<UiMessage>(Channel.BUFFERED)
     val events: Flow<UiMessage> = messages.receiveAsFlow()
 
@@ -256,41 +253,6 @@ class RecipesViewModel(
                 ),
             )
         }
-
-    /** "Add the in-stock items now": the review screen again, full amounts, nothing pre-ticked. */
-    fun addInStockNow(use: UseSummary) {
-        // Main thread only: checked and set before the first suspension.
-        if (!addingInStock.add(use.useId)) return
-        viewModelScope.launch {
-            try {
-                addInStock(use)
-            } finally {
-                addingInStock.remove(use.useId)
-            }
-        }
-    }
-
-    private suspend fun addInStock(use: UseSummary) {
-        val (recipe, lines) = c.repository.inStockLines(use.useId) ?: return
-        if (lines.isEmpty()) return
-        val result =
-            ImportResult(
-                url = recipe.url,
-                title = recipe.title,
-                servings = recipe.servingsOriginal,
-                targetServings = use.servings,
-                locale = UnitLocale.valueOf(recipe.unitLocale),
-                method = "IN_STOCK",
-                lines = lines,
-                rawLines = lines.map { it.raw },
-                preTick = false,
-                // Editing this part later stores its copy under the recipe's entry, not a second one.
-                libraryKey = recipe.libraryKey,
-                book = recipe.book,
-                page = recipe.page,
-            )
-        reviews.send(c.importJobs.enqueueReady(ImportInput(recipe.url ?: "", recipe.title), result))
-    }
 
     /**
      * "Edit": the recipe back on the review screen as it went on the list (its lines,
