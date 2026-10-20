@@ -159,6 +159,11 @@ fun ReviewRoute(
         ReviewState.Cancelled ->
             LaunchedEffect(Unit) {
                 onDone()
+                if (vm.isEdit) {
+                    // Nothing was changed on the list, so "Import discarded" and its Undo would be noise.
+                    container.applicationScope.launch(Dispatchers.Main) { vm.discardForGood() }
+                    return@LaunchedEffect
+                }
                 // The job is only done for good once Undo has had its chance; Undo puts it back and opens it again.
                 container.applicationScope.launch(Dispatchers.Main) {
                     val r = snackbar.showTimed("Import discarded", "Undo", 10)

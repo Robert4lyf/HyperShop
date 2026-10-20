@@ -226,6 +226,39 @@ class RecipesScreenTest {
     }
 
     @Test
+    fun tapARecipeOnTheListToSeeItsIngredients() {
+        val opened = mutableListOf<Long>()
+        compose.setContent {
+            HyperShopTheme(dynamicColor = false) { RecipesScreen(USES, onRemove = {}, onOpenUse = { opened += it.useId }) }
+        }
+        compose.onNodeWithTag("use-2").performClick()
+        assertEquals(listOf(2L), opened)
+        // "Typed into the list" said nothing the card doesn't.
+        compose.onNodeWithText("Typed into the list").assertDoesNotExist()
+    }
+
+    @Test
+    fun aRecipeOnTheListShowsItsInStockLines() {
+        var edited = 0
+        val detail =
+            UseDetail(
+                USES.uses.first(),
+                writtenFor = 6,
+                sections =
+                    listOf(
+                        null to listOf("500g beef mince" to false, "2 onions" to false, "1 tsp salt" to true),
+                        "To serve" to listOf("Soured cream" to true),
+                    ),
+            )
+        compose.setContent { HyperShopTheme(dynamicColor = false) { UseDetailContent(detail, onEdit = { edited++ }, onRemove = {}) } }
+        compose.onNodeWithText("Serves 4 (written for 6)", substring = true).assertExists()
+        compose.onAllNodesWithText("In stock").assertCountEquals(2)
+        compose.onNodeWithTag("use-detail-edit").performClick()
+        assertEquals(1, edited)
+        compose.onRoot().captureRoboImage(Shots.path("use-detail-light.png"))
+    }
+
+    @Test
     fun recordLight() {
         show()
         compose.onRoot().captureRoboImage(Shots.path("recipes-light.png"))

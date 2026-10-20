@@ -52,6 +52,15 @@ data class RecipeDetail(
     val sections: List<Pair<String?, List<String>>>,
 )
 
+/** A recipe on the list, opened from its card: its lines as written, the in-stock ones marked. */
+data class UseDetail(
+    val use: UseSummary,
+    /** What the recipe is written for, when the list holds it at a different size. */
+    val writtenFor: Int?,
+    /** Heading (null for none) and its lines, each with whether it was left out as in stock. */
+    val sections: List<Pair<String?, List<Pair<String, Boolean>>>>,
+)
+
 /** One recipe in "Your recipes". */
 data class LibraryRow(
     val recipeId: Long,
@@ -222,6 +231,34 @@ class RecipesViewModel(
 
     fun closeDetail() {
         _detail.value = null
+    }
+
+    private val _useDetail = MutableStateFlow<UseDetail?>(null)
+
+    /** The recipe on the list whose ingredients are open, or null. */
+    val useDetail: StateFlow<UseDetail?> = _useDetail
+
+    /** A card tapped: the recipe's lines, or the hand-added items, in a sheet. */
+    fun openUse(use: UseSummary) =
+        viewModelScope.launch {
+            if (use.recipeId == null) {
+                val lines = c.repository.manualLines(use.useId) ?: return@launch
+                _useDetail.value = UseDetail(use, null, listOf(null to lines.map { it to false }))
+                return@launch
+            }
+            val src = c.repository.editSource(use.useId) ?: return@launch
+            val inStock = src.inStockLines.toSet()
+            val sections = ArrayList<Pair<String?, MutableList<Pair<String, Boolean>>>>()
+            src.lines.forEachIndexed { i, l ->
+                if (sections.isEmpty() || sections.last().first != l.section) sections += l.section to mutableListOf()
+                sections.last().second += l.raw to (i in inStock)
+            }
+            val written = src.recipe.servingsOriginal?.takeIf { it != src.servings }
+            _useDetail.value = UseDetail(use, written, sections)
+        }
+
+    fun closeUse() {
+        _useDetail.value = null
     }
 
     /** "Remove from your recipes" (what's on the list stays); Undo brings it back. */

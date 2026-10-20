@@ -211,12 +211,7 @@ private fun TopBar(
             Spacer(Modifier.size(6.dp))
             Text("Cancel")
         }
-        Text(
-            "Review ingredients",
-            style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1f),
-        )
+        Spacer(Modifier.weight(1f))
         var menu by rememberSaveable { mutableStateOf(false) }
         Box {
             IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
