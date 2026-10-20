@@ -346,7 +346,10 @@ class ListRepository(
         val shown =
             l.uses.values
                 .map { u -> u to l.contributionsOfUse(u.id).filter { it.itemId in live } }
-                .filter { (u, cs) -> u.archivedAt == null && cs.isNotEmpty() }
+                // A recipe stays once everything is bought, as the week's reminder of what to
+                // cook, until "Remove from list" or the 7-day archive at "Finish shopping".
+                // Hand-added items are only shopping, so that card goes with its last item.
+                .filter { (u, cs) -> u.archivedAt == null && (cs.isNotEmpty() || u.kind == UseKind.RECIPE) }
                 .sortedByDescending { (u, _) -> u.addedAt }
         if (shown.isEmpty()) return emptyList()
         val manual = manualTitle()

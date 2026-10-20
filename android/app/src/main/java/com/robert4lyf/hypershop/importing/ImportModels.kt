@@ -58,7 +58,14 @@ data class ImportResult(
     /** "Added by hand" opened for editing: no recipe, no book, saved back as hand-added items. */
     val byHand: Boolean get() = method == BY_HAND
 
+    /**
+     * An edit, or "Add" from the library: a review of something already kept, not an
+     * import. Leaving it drops it; it is never "ready to review" afterwards.
+     */
+    val throwaway: Boolean get() = editsUse != null || method == LIBRARY
+
     companion object {
         const val BY_HAND = "BY_HAND"
+        const val LIBRARY = "LIBRARY"
     }
 }

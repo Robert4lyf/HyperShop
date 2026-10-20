@@ -259,6 +259,59 @@ class RecipesViewModelTest {
     }
 
     @Test
+    fun aRecipeStaysOnceEverythingIsBoughtAndHandAddedGoes() {
+        val c = TestContainer.create()
+        c.add(*CHILLI)
+        runBlocking {
+            val p = c.ruleParser.parse("bin bags")
+            c.repository.manualAdd(p.name, p.shopBase(UnitLocale.METRIC), p.shopUnit)
+        }
+        val vm = RecipesViewModel(c).shown()
+        await(vm.ui) { it.uses.size == 2 }
+        // Everything bought: tick it all, then Finish shopping.
+        runBlocking {
+            for (item in c.repository.snapshot().liveItems) c.repository.toggle(item.id)
+            c.repository.finishShopping()
+        }
+        val after = await(vm.ui) { u -> u.uses.size == 1 && u.uses.single().itemCount == 0 }
+        // The recipe is still there to cook; the hand-added card went with its items.
+        assertEquals("Weeknight chilli", after.uses.single().title)
+        // And "Remove from list" still clears it.
+        vm.remove(after.uses.single())
+        await(vm.ui) { it.uses.isEmpty() }
+    }
+
+    @Test
+    fun leavingAnEditOrALibraryReAddLeavesNothingReadyToReview() {
+        val c = TestContainer.create()
+        c.add(*CHILLI)
+        val vm = RecipesViewModel(c).shown()
+        val start = await(vm.ui) { it.uses.isNotEmpty() && it.library.isNotEmpty() }
+        // Edit, then Back (which is Cancel on these).
+        vm.edit(start.uses.single())
+        val edit = ReviewViewModel(c, nextReview(vm))
+        await(edit.state) { it is ReviewState.Ready }
+        assertTrue(edit.isThrowaway)
+        edit.cancel()
+        await(edit.state) { it is ReviewState.Cancelled }
+        runBlocking { edit.discardForGood() }
+        // "Add" from the library, then Back.
+        vm.addFromLibrary(start.library.single())
+        val again = ReviewViewModel(c, nextReview(vm))
+        // Already on the list: the review asks first, as it does in the app.
+        await(again.state) { it is ReviewState.AlreadyOnList }
+        again.addAgain()
+        await(again.state) { it is ReviewState.Ready }
+        assertTrue(again.isThrowaway)
+        again.cancel()
+        await(again.state) { it is ReviewState.Cancelled }
+        runBlocking { again.discardForGood() }
+        assertTrue(runBlocking { c.importJobs.ready.first() }.isEmpty())
+        // The recipe on the list is untouched.
+        assertEquals(1, await(vm.ui) { it.uses.size == 1 }.uses.size)
+    }
+
+    @Test
     fun renamingShowsOnTheListAndInTheLibrary() {
         val c = TestContainer.create()
         c.add(*CHILLI)

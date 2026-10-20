@@ -19,7 +19,6 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.ShoppingBasket
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -197,7 +196,6 @@ fun EmptyState(
     onPasteLink: () -> Unit = {},
 ) {
     EmptyHero(
-        icon = Icons.Rounded.ShoppingBasket,
         title = "Your list is empty",
         modifier = Modifier.padding(top = 8.dp).testTag("empty"),
     ) {

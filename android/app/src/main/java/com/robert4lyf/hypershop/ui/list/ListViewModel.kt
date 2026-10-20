@@ -321,21 +321,10 @@ class ListViewModel(
     fun setView(v: ListView) = viewModelScope.launch { c.settings.setListView(v) }
 
     /** The round tick: tick, or untick a DONE row. */
-    fun toggle(row: ListRow) = toggle(row.id, row.name)
+    fun toggle(row: ListRow) = toggle(row.id)
 
-    /**
-     * Tick, or untick a DONE item (the item sheet's button too). A tick gets a
-     * snackbar with Undo, since the row slides away; an untick doesn't, as
-     * tapping again is its undo.
-     */
-    fun toggle(
-        id: Long,
-        name: String,
-    ) = viewModelScope.launch {
-        if (!c.repository.toggle(id)) return@launch
-        // Read back rather than trusting the row on screen: a quick second tap unticks before the list redraws.
-        if (c.repository.snapshot().isDone(id)) messages.send(UiMessage("Ticked $name", undo = { c.repository.untick(id) }))
-    }
+    /** Tick, or untick a DONE item (the item sheet's button too). No snackbar: tapping again is the undo. */
+    fun toggle(id: Long) = viewModelScope.launch { c.repository.toggle(id) }
 
     /** "Delete" on the item card: closes it, with Undo on the list. */
     fun delete(

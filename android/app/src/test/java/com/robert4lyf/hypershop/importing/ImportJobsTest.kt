@@ -53,4 +53,17 @@ class ImportJobsTest {
             c.importJobs.finishDiscards()
             assertEquals(JobState.DONE, c.importJobs.get(id)!!.state)
         }
+
+    @Test
+    fun anEditOrLibraryReAddLeftBehindIsClearedAtStartUpAndAnImportIsNot() =
+        runBlocking {
+            val c = TestContainer.create()
+            val edit = c.importJobs.enqueueReady(ImportInput("", "Soup"), soup.copy(method = "EDIT", editsUse = 7))
+            val again = c.importJobs.enqueueReady(ImportInput("", "Soup"), soup.copy(method = ImportResult.LIBRARY))
+            val shared = c.importJobs.enqueueReady(ImportInput("", "Soup"), soup)
+            assertEquals(setOf(edit, again, shared), c.importJobs.ready.first().map { it.id }.toSet())
+            c.importJobs.finishThrowaways()
+            assertEquals(listOf(shared), c.importJobs.ready.first().map { it.id })
+            assertEquals(JobState.DONE, c.importJobs.get(edit)!!.state)
+        }
 }

@@ -82,7 +82,7 @@ fun ListRoute(
                 onSwap = { to, always -> vm.swapItem(s.id, to, always) },
                 onToggle = {
                     // The sheet shows the state it opened with, so it closes; the list (and the snackbar) show the result.
-                    vm.toggle(s.id, s.name)
+                    vm.toggle(s.id)
                     vm.closeItem()
                 },
             ),

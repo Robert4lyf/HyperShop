@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Inventory
 import androidx.compose.material.icons.rounded.Link
@@ -233,10 +234,7 @@ fun RecipesScreen(
                 }
                 if (ui.loaded && ui.uses.isEmpty() && !ui.hasLibrary) {
                     item(key = "empty") {
-                        EmptyHero(
-                            Icons.AutoMirrored.Rounded.MenuBook,
-                            "No recipes yet",
-                        )
+                        EmptyHero("No recipes yet")
                     }
                 }
                 if (ui.hasLibrary) {
@@ -596,7 +594,7 @@ private fun UseCard(
                 val bits =
                     listOfNotNull(
                         use.servings?.let { "Serves $it" },
-                        if (use.itemCount == 1) "1 item on the list" else "${use.itemCount} items on the list",
+                        itemsLine(use.itemCount),
                         use.inStockCount.takeIf { it > 0 }?.let { "$it in stock" },
                     )
                 FlowRow(
@@ -607,7 +605,11 @@ private fun UseCard(
                     val bg = Brand.tint(hue, dark)
                     val fg = Brand.strong(hue, dark)
                     use.servings?.let { Fact(Icons.Rounded.People, "Serves $it", bg, fg) }
-                    Fact(Icons.Rounded.ShoppingCart, if (use.itemCount == 1) "1 item" else "${use.itemCount} items", bg, fg)
+                    when (use.itemCount) {
+                        0 -> Fact(Icons.Rounded.DoneAll, "All bought", bg, fg)
+                        1 -> Fact(Icons.Rounded.ShoppingCart, "1 item", bg, fg)
+                        else -> Fact(Icons.Rounded.ShoppingCart, "${use.itemCount} items", bg, fg)
+                    }
                     if (use.inStockCount > 0) Fact(Icons.Rounded.Inventory, "${use.inStockCount} in stock", bg, fg)
                 }
                 if (url != null) {
@@ -765,7 +767,7 @@ fun UseDetailContent(
                     listOfNotNull(
                         url?.let { siteName(it) } ?: use.bookRef,
                         use.servings?.let { s -> "Serves $s" + (detail.writtenFor?.let { " (written for $it)" } ?: "") },
-                        if (use.itemCount == 1) "1 item on the list" else "${use.itemCount} items on the list",
+                        itemsLine(use.itemCount),
                     )
                 Text(
                     bits.joinToString(" · "),
@@ -817,3 +819,11 @@ fun UseDetailContent(
         }
     }
 }
+
+/** "6 items on the list", or "All bought" once a recipe's shopping is done and it stays as a reminder. */
+private fun itemsLine(n: Int): String =
+    when (n) {
+        0 -> "All bought"
+        1 -> "1 item on the list"
+        else -> "$n items on the list"
+    }
