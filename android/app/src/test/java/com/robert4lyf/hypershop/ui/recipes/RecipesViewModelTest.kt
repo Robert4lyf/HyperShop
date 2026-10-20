@@ -422,6 +422,10 @@ class RecipesViewModelTest {
         }
         val vm = vm0.shown()
         await(vm.ui) { it.library.size == 2 }
+        // Half a word already finds it, while typing.
+        vm.onSearchText("mush")
+        Snapshot.sendApplyNotifications()
+        assertEquals(listOf("Mushroom risotto"), await(vm.ui) { it.terms == listOf("mush") }.library.map { it.title })
         vm.onSearchText("mushroom")
         Snapshot.sendApplyNotifications()
         val hits = await(vm.ui) { it.terms == listOf("mushroom") }

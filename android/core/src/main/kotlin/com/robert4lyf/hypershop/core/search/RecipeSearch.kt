@@ -6,8 +6,10 @@ import com.robert4lyf.hypershop.core.catalog.CatalogKey
  * "Search your recipes": what you have in ("mushrooms", "spinach") or fancy
  * ("mushroom"). A term matches a recipe's title or any of its ingredients,
  * as whole words with plurals folded, so "mushroom" finds chestnut, oyster and
- * wild mushrooms but "pea" doesn't find "peanut". Recipes using every term come
- * first, then those using more of them; otherwise the library's own order stays.
+ * wild mushrooms but "pea" doesn't find "peanut". The term still being typed
+ * ([typing]) is the exception: its last word matches the start of a word, so
+ * "saus" finds sausages before the word is finished. Recipes using every term
+ * come first, then those using more of them; otherwise the library's own order stays.
  */
 object RecipeSearch {
     /** One ingredient: how to show it, and every name it answers to (its line's and the catalogue's). */
@@ -35,7 +37,10 @@ object RecipeSearch {
     fun search(
         recipes: List<Recipe>,
         terms: List<String>,
+        /** The last of [terms] is still being typed. */
+        typing: Boolean = false,
     ): List<Hit> {
+        val partial = if (typing) terms.lastOrNull()?.let(::words)?.takeIf { it.isNotEmpty() } else null
         val queries = terms.map(::words).filter { it.isNotEmpty() }.distinct()
         if (queries.isEmpty()) return emptyList()
         return recipes
@@ -46,8 +51,9 @@ object RecipeSearch {
                 var inTitle = false
                 val uses = LinkedHashSet<String>()
                 for (q in queries) {
-                    val byIngredient = names.filter { (_, ns) -> ns.any { contains(it, q) } }.map { it.first.display }
-                    val byTitle = contains(title, q)
+                    val prefix = q == partial
+                    val byIngredient = names.filter { (_, ns) -> ns.any { contains(it, q, prefix) } }.map { it.first.display }
+                    val byTitle = contains(title, q, prefix)
                     if (byIngredient.isNotEmpty() || byTitle) matched++
                     uses += byIngredient
                     inTitle = inTitle || byTitle
@@ -59,13 +65,22 @@ object RecipeSearch {
     /** Lower case, accents folded, plurals folded, split into words. */
     fun words(s: String): List<String> = CatalogKey.of(s).split(' ', '-', '\'').filter { it.isNotEmpty() }.map(::stem)
 
-    /** [q] as consecutive words of [text]. */
+    /** [q] as consecutive words of [text]; with [prefix], its last word may be the start of one. */
     private fun contains(
         text: List<String>,
         q: List<String>,
+        prefix: Boolean = false,
     ): Boolean {
         if (q.size > text.size) return false
-        for (i in 0..text.size - q.size) if (q.indices.all { text[i + it] == q[it] }) return true
+        val last = q.lastIndex
+        for (i in 0..text.size - q.size) {
+            val hit =
+                q.indices.all { j ->
+                    val w = text[i + j]
+                    if (prefix && j == last) w.startsWith(q[j]) || w == q[j] else w == q[j]
+                }
+            if (hit) return true
+        }
         return false
     }
 

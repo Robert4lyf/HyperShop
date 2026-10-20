@@ -90,8 +90,12 @@ class RecipesViewModel(
 
     val searchChips: StateFlow<List<String>> = chips
 
+    /** The chips and the term being typed, and whether there is one being typed (it matches word starts). */
     private val terms =
-        combine(chips, snapshotFlow { searchText }) { cs, t -> cs + listOfNotNull(t.trim().takeIf { it.isNotEmpty() }) }
+        combine(chips, snapshotFlow { searchText }) { cs, t ->
+            val typed = t.trim().takeIf { it.isNotEmpty() }
+            (cs + listOfNotNull(typed)) to (typed != null)
+        }
 
     /** What the search index was built from: the library's recipes, and the catalogue (its synonyms are in it). */
     private data class IndexKey(
@@ -104,7 +108,7 @@ class RecipesViewModel(
 
     /** From the shared list read; only while the tab is shown (and 5 s after, across a rotation). */
     val ui: StateFlow<RecipesUi> =
-        combine(c.repository.list.map { c.repository.usesOnList(it) }, c.repository.observeLibrary(), terms) { uses, lib, q ->
+        combine(c.repository.list.map { c.repository.usesOnList(it) }, c.repository.observeLibrary(), terms) { uses, lib, (q, typing) ->
             val onList = uses.mapNotNull { it.libraryKey }.toSet()
             val rows =
                 lib.map {
@@ -124,7 +128,7 @@ class RecipesViewModel(
                     rows
                 } else {
                     val byId = rows.associateBy { it.recipeId }
-                    RecipeSearch.search(indexFor(lib), q).mapNotNull { h ->
+                    RecipeSearch.search(indexFor(lib), q, typing).mapNotNull { h ->
                         byId[h.id]?.copy(uses = h.uses.takeIf { it.isNotEmpty() }?.joinToString(", "))
                     }
                 }
