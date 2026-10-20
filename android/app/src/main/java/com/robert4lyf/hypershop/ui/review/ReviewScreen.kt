@@ -366,9 +366,11 @@ private fun Hero(
 }
 
 @Composable
-private fun TitleDialog(
+internal fun TitleDialog(
     current: String,
     onDismiss: () -> Unit,
+    heading: String = "Rename recipe",
+    label: String = "Recipe name",
     onSave: (String) -> Unit,
 ) {
     var text by rememberSaveable { mutableStateOf(current) }
@@ -382,12 +384,12 @@ private fun TitleDialog(
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Rename recipe") },
+        title = { Text(heading) },
         text = {
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
-                label = { Text("Recipe name") },
+                label = { Text(label) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { save() }),

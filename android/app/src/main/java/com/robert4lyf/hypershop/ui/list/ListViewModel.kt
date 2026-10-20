@@ -15,6 +15,7 @@ import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.data.InStockLine
+import com.robert4lyf.hypershop.data.MANUAL_TITLE
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.ui.common.UiMessage
@@ -221,7 +222,11 @@ class ListViewModel(
                         RecipeSection.Kind.SHARED,
                         sorted.map { r -> r.copy(from = src.uses[r.id].orEmpty().mapNotNull { src.titles[it] }.joinToString(", ")) },
                     )
-                BY_HAND -> RecipeSection(key, "Added by hand", RecipeSection.Kind.BY_HAND, sorted)
+                BY_HAND -> {
+                    // Named as the Recipes tab names it ("Household" once renamed).
+                    val manual = list.uses.values.firstOrNull { it.kind == UseKind.MANUAL && it.archivedAt == null }
+                    RecipeSection(key, manual?.let { src.titles[it.id] } ?: MANUAL_TITLE, RecipeSection.Kind.BY_HAND, sorted)
+                }
                 // The card already names the recipe.
                 else ->
                     RecipeSection(

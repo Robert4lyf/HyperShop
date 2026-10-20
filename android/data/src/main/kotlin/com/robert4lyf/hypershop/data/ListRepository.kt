@@ -349,6 +349,7 @@ class ListRepository(
                 .filter { (u, cs) -> u.archivedAt == null && cs.isNotEmpty() }
                 .sortedByDescending { (u, _) -> u.addedAt }
         if (shown.isEmpty()) return emptyList()
+        val manual = manualTitle()
         val recipes = recipesById(shown.mapNotNull { (u, _) -> u.recipeId })
         val inStock =
             shown.map { (u, _) -> u.id }.chunked(MAX_ARGS).flatMap { dao.decisionsFor(it) }
@@ -360,7 +361,7 @@ class ListRepository(
             UseSummary(
                 useId = u.id,
                 recipeId = u.recipeId,
-                title = r?.title ?: if (u.kind == UseKind.MANUAL) "Added by hand" else "Recipe",
+                title = r?.title ?: if (u.kind == UseKind.MANUAL) manual else "Recipe",
                 url = r?.url,
                 servings = u.servings.takeIf { r?.servingsOriginal != null },
                 itemCount = cs.map { it.itemId }.distinct().size,
@@ -377,11 +378,49 @@ class ListRepository(
         useIds: Collection<Long>,
     ): Map<Long, UseLink> {
         val recipes = recipesById(useIds.mapNotNull { l.uses[it]?.recipeId })
+        val manual = manualTitle()
         return useIds.associateWith { id ->
             val u = l.uses[id]
             val r = u?.recipeId?.let { recipes[it] }
-            UseLink(r?.title ?: if (u?.kind == UseKind.MANUAL) "Added by hand" else "Recipe", r?.url)
+            UseLink(r?.title ?: if (u?.kind == UseKind.MANUAL) manual else "Recipe", r?.url)
         }
+    }
+
+    /** What "Added by hand" is called. */
+    suspend fun manualTitle(): String = dao.meta()?.manualTitle ?: MANUAL_TITLE
+
+    /**
+     * Renames a use: a recipe's every copy (so the library shows it too), or
+     * "Added by hand" itself, where blank goes back to that. Bumps listRev, so
+     * the list and the Recipes tab re-read.
+     */
+    suspend fun renameUse(
+        useId: Long,
+        title: String,
+    ) = db.withTransaction {
+        val l = load()
+        val use = l.uses[useId] ?: return@withTransaction
+        val name = title.trim().take(MAX_TITLE)
+        val meta = dao.meta()!!
+        if (use.kind == UseKind.MANUAL) {
+            dao.putMeta(meta.copy(manualTitle = name.takeIf { it.isNotEmpty() && it != MANUAL_TITLE }, listRev = meta.listRev + 1))
+            return@withTransaction
+        }
+        if (name.isEmpty()) return@withTransaction
+        val r = use.recipeId?.let { dao.recipe(it) } ?: return@withTransaction
+        dao.renameRecipes(r.libraryKey ?: r.url ?: "r:${r.id}", name)
+        dao.putMeta(meta.copy(listRev = meta.listRev + 1))
+    }
+
+    /** Renames a library entry, and any copy of it on the list. */
+    suspend fun renameLibrary(
+        key: String,
+        title: String,
+    ) = db.withTransaction {
+        val name = title.trim().take(MAX_TITLE)
+        if (name.isEmpty() || dao.renameRecipes(key, name) == 0) return@withTransaction
+        val meta = dao.meta()!!
+        dao.putMeta(meta.copy(listRev = meta.listRev + 1))
     }
 
     private suspend fun recipesById(ids: Collection<Long>): Map<Long, RecipeEntity> =
@@ -976,3 +1015,8 @@ class ListRepository(
         private const val MAX_ARGS = 500
     }
 }
+
+/** "Added by hand", until it is renamed. */
+const val MANUAL_TITLE = "Added by hand"
+
+private const val MAX_TITLE = 80

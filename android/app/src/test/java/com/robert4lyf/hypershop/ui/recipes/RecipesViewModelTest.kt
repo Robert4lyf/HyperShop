@@ -259,6 +259,41 @@ class RecipesViewModelTest {
     }
 
     @Test
+    fun renamingShowsOnTheListAndInTheLibrary() {
+        val c = TestContainer.create()
+        c.add(*CHILLI)
+        runBlocking {
+            val p = c.ruleParser.parse("bin bags")
+            c.repository.manualAdd(p.name, p.shopBase(UnitLocale.METRIC), p.shopUnit)
+        }
+        val vm = RecipesViewModel(c).shown()
+        val start = await(vm.ui) { it.uses.size == 2 && it.library.size == 1 }
+        val chilli = start.uses.first { it.recipeId != null }
+        val byHand = start.uses.first { it.recipeId == null }
+        assertEquals("Added by hand", byHand.title)
+        // From the list: the library shows it too.
+        vm.rename(chilli, "  Friday chilli ")
+        val renamed =
+            await(vm.ui) { u -> u.library.single().title == "Friday chilli" && u.uses.any { it.title == "Friday chilli" } }
+        assertEquals(chilli.useId, renamed.uses.first { it.title == "Friday chilli" }.useId)
+        // From the library: the list shows it too.
+        vm.renameSaved(renamed.library.single(), "Chilli")
+        await(vm.ui) { u -> u.uses.any { it.title == "Chilli" } && u.library.single().title == "Chilli" }
+        // "Added by hand" becomes "Household", and stays so after Finish shopping.
+        vm.rename(byHand, "Household")
+        await(vm.ui) { u -> u.uses.any { it.recipeId == null && it.title == "Household" } }
+        runBlocking {
+            c.repository.finishShopping()
+            val p = c.ruleParser.parse("washing up liquid")
+            c.repository.manualAdd(p.name, p.shopBase(UnitLocale.METRIC), p.shopUnit)
+        }
+        assertEquals("Household", runBlocking { c.repository.manualTitle() })
+        // Blank puts the old name back.
+        vm.rename(byHand, " ")
+        await(vm.ui) { u -> u.uses.any { it.recipeId == null && it.title == "Added by hand" } }
+    }
+
+    @Test
     fun aSavedRecipeOpensWithItsIngredients() {
         val c = TestContainer.create()
         c.add(*CHILLI)

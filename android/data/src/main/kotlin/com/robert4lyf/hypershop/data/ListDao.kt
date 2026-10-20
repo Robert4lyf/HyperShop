@@ -314,6 +314,13 @@ interface ListDao {
     @Query("DELETE FROM WatchOpResult")
     suspend fun clearOpResults()
 
+    /** Every copy of a library entry, so the list and the library show the new name. */
+    @Query("UPDATE Recipe SET title = :title WHERE libraryKey = :key OR (libraryKey IS NULL AND (url = :key OR 'r:' || id = :key))")
+    suspend fun renameRecipes(
+        key: String,
+        title: String,
+    ): Int
+
     /** Bumped on every list write; the UI observes it. */
     @Query("SELECT listRev FROM Meta WHERE id = 1")
     fun observeListRev(): Flow<Long?>
