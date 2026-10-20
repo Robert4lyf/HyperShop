@@ -1,7 +1,8 @@
 # HyperShop watch app (Forerunner 245)
 
-Buttons only. The phone owns the list; the watch shows a paged copy, aisle by
-aisle, and sends each tick until the phone acknowledges it. Protocol:
+Buttons only. The phone owns the list; the watch shows a paged copy as one
+list in walking order (aisle names as headings, ticked items at the end), and
+sends each tick until the phone acknowledges it. Protocol:
 `docs/garmin-protocol.md`. App id `41c79afd24ac47168df768ef92d1bac0`
 (`manifest.xml`, `WatchProtocol.WATCH_APP_ID`).
 
@@ -41,12 +42,16 @@ build size to the job summary, compiles the tests for the device, and uploads
 - **Messages:** the payload probe got 4096 B through both ways (its largest
   size) on a real 245; the phone pages at 2048 B.
 - **CheckboxMenu** draws its box only on the focused row and adds a "Done"
-  item that closes the menu, so the aisle is a `CustomMenu` (`ItemRows.mc`).
+  item that closes the menu, so the list is a `CustomMenu` (`ItemRows.mc`).
+- **One list, not aisle screens** (after real use): a tick moves the focus to
+  the next item to get, past headings, so a shop is Start, walk, Start. The
+  aisle list, the per-aisle screen and the "aisle done" prompt are gone; Undo
+  is the row after the list.
 - Storage: one value may take 32 KB, so the snapshot is stored as the aisles
   (`sa`) plus the items 48 to a key (`si0`, `si1`, …), each tagged with its
   listRev; see "Watch rules › Storage" in `docs/garmin-protocol.md`.
-- Screens keep the open aisle by *code*, not index: a snapshot can reorder or
-  drop aisles, and the aisle list takes over when the open one is gone.
+- A snapshot that only changes ticks updates the rows in place; one that
+  adds or drops items rebuilds the list (the menu has no focus getter).
 - Link retries: an unanswered hello backs off and is sent again (cached list
   or not), and a hello goes out whenever `phoneConnected` turns true. On the
   phone, `WatchLink.retry()` restarts the Connect IQ SDK after a failure or

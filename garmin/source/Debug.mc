@@ -33,7 +33,7 @@ module Debug {
             view.begin();
             return;
         }
-        screens.showAisles(-1);
+        screens.showList(null);
     }
 
     //! 12 aisles of 5 items, with sub-labels as long as the phone sends.

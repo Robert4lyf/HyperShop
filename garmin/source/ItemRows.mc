@@ -158,3 +158,72 @@ class AisleTitle extends WatchUi.Drawable {
         );
     }
 }
+
+//! An aisle's name across the list, with how many are left in it. Selecting
+//! it does nothing; a tick moves past it to the next item to get.
+class HeaderRow extends WatchUi.CustomMenuItem {
+
+    private const ACCENT = 0x3DBE5C;
+    private const DIM = 0x8A8A8A;
+
+    private var _name as Lang.String;
+    private var _count as Lang.String or Null;
+
+    function initialize(id as Lang.Object, name as Lang.String, count as Lang.String or Null) {
+        CustomMenuItem.initialize(id, {});
+        _name = name;
+        _count = count;
+    }
+
+    function setCount(count as Lang.String or Null) as Void {
+        _count = count;
+    }
+
+    function draw(dc as Graphics.Dc) as Void {
+        var w = dc.getWidth();
+        var cy = dc.getHeight() / 2;
+        dc.setColor(ACCENT, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(28, cy, Graphics.FONT_XTINY, _name.toUpper(), Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        if (_count != null) {
+            dc.setColor(DIM, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(w - 28, cy, Graphics.FONT_XTINY, _count as Lang.String, Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
+        }
+        dc.setColor(0x333333, Graphics.COLOR_TRANSPARENT);
+        dc.drawLine(28, dc.getHeight() - 2, w - 28, dc.getHeight() - 2);
+    }
+}
+
+//! A plain row: the status line, Undo, Settings.
+class TextRow extends WatchUi.CustomMenuItem {
+
+    private const DIM = 0x8A8A8A;
+
+    private var _label as Lang.String;
+    private var _sub as Lang.String or Null;
+
+    function initialize(id as Lang.Object, label as Lang.String, sub as Lang.String or Null) {
+        CustomMenuItem.initialize(id, {});
+        _label = label;
+        _sub = sub;
+    }
+
+    function setText(label as Lang.String, sub as Lang.String or Null) as Void {
+        _label = label;
+        _sub = sub;
+    }
+
+    function draw(dc as Graphics.Dc) as Void {
+        var w = dc.getWidth();
+        var h = dc.getHeight();
+        var font = isFocused() ? Graphics.FONT_SMALL : Graphics.FONT_TINY;
+        var textH = dc.getFontHeight(font);
+        var subH = _sub != null ? dc.getFontHeight(Graphics.FONT_XTINY) : 0;
+        var top = (h - textH - subH) / 2;
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(w / 2, top, font, _label, Graphics.TEXT_JUSTIFY_CENTER);
+        if (_sub != null) {
+            dc.setColor(DIM, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(w / 2, top + textH, Graphics.FONT_XTINY, _sub as Lang.String, Graphics.TEXT_JUSTIFY_CENTER);
+        }
+    }
+}
