@@ -30,11 +30,9 @@
     <string id="OneMore">1 more</string>
     <string id="SyncWithPhone">Sync with phone</string>
 
-    <!-- Aisle done -->
-    <string id="AisleDoneTitle">$1$ done</string>
-    <string id="NextAisle">Next: $1$</string>
+    <!-- The end of the list -->
+    <string id="Ticked">Ticked</string>
     <string id="UndoItem">Undo $1$</string>
-    <string id="AllAisles">All aisles</string>
     <string id="AllDone">All done</string>
 
     <!-- Settings -->

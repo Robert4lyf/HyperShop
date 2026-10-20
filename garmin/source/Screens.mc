@@ -8,39 +8,37 @@ using Toybox.WatchUi;
 //
 // Every screen, buttons only (5 buttons, no touch).
 //
-// One menu is on the view stack at a time: moving between the aisle list, an
-// aisle and the "aisle done" prompt is switchToView, so Back from the aisle
-// list leaves the app and the stack never grows. Only a message ("Sync with
-// phone") is pushed on top, and Back pops it.
+// The list is one screen: every item in store walking order under thin aisle
+// headings, ticked items sunk to a "Ticked" section at the end. A tick moves
+// the focus to the next item to get, past any heading, so a shop is mostly
+// Start, walk, Start. Settings is pushed from the last row; Back from the list
+// leaves the app. Only a message ("Sync with phone") is pushed on top.
 //
-// The menus have no focus getter, so a snapshot arriving while one is open
-// updates its rows in place rather than rebuilding it and losing the place.
+// The menu has no focus getter, so a snapshot that only changes ticks updates
+// the rows in place; one that adds or drops items rebuilds the list.
 //
 class Screens {
 
     private const VIBRATE_KEY = "vb";
     private const DEBOUNCE_MS = 700;
     private const SUB_CHARS = 18;
-    //! An aisle's rows: the focused one is taller, for a name wrapped onto two lines and its sub-line.
+    //! Rows: the focused one is taller, for a name wrapped onto two lines and its sub-line.
     private const ROW_H = 48;
     private const FOCUS_ROW_H = 92;
 
-    private enum Screen { AISLES, AISLE, DONE, SETTINGS }
+    private enum Screen { LIST, SETTINGS }
 
     var link as PhoneLink;
     var vibrate as Lang.Boolean = true;
 
-    private var _screen as Screen = AISLES;
+    private var _screen as Screen = LIST;
     private var _menu as WatchUi.Menu2 or Null = null;
-    //! The aisle whose items are open, or whose "done" prompt is: its code,
-    //! which survives a snapshot, and its index into sync.aisles, which is
-    //! re-resolved from the code whenever a snapshot arrives.
-    private var _aisleCode as Lang.String or Null = null;
-    private var _aisle as Lang.Number = -1;
-    //! The aisle indexes the open aisle list was built with.
-    private var _aisleRows as Lang.Array<Lang.Number> = [] as Lang.Array<Lang.Number>;
+    //! The item ids and aisles the open list was built with, to tell a tick
+    //! from a change of items when a snapshot arrives.
+    private var _builtItems as Lang.Array<Lang.Number> = [] as Lang.Array<Lang.Number>;
+    private var _builtAisles as Lang.Array<Lang.Number> = [] as Lang.Array<Lang.Number>;
     private var _lastPress as Lang.Number = -DEBOUNCE_MS;
-    //! The item ticked last in the open aisle, for "Undo" on the done prompt.
+    //! The item ticked last, for the "Undo" row.
     private var _lastTicked as Lang.Number = -1;
 
     function initialize(phoneLink as PhoneLink) {
@@ -55,56 +53,92 @@ class Screens {
     }
 
     function initialView() as [WatchUi.Views, WatchUi.InputDelegates] {
-        var menu = aisleMenu(0);
-        return [menu, new AislesDelegate(self)];
+        return [listMenu(null), new ListDelegate(self)];
     }
 
-    // --- the aisle list
+    // --- the list
 
-    private function aisleMenu(focus as Lang.Number) as WatchUi.Menu2 {
-        var menu = new WatchUi.Menu2({:title => text(Rez.Strings.AppName)});
-        menu.addItem(new WatchUi.MenuItem(statusLine(), noticeLine(), :status, {}));
-        _aisleRows = [] as Lang.Array<Lang.Number>;
+    //! Builds the list with [focusId] focused, or the first item to get when null or gone.
+    private function listMenu(focusId as Lang.Number or Null) as WatchUi.Menu2 {
         var sync = link.sync;
         var view = sync.view();
+        var menu = new WatchUi.CustomMenu(ROW_H, Graphics.COLOR_BLACK, {
+            :title => new AisleTitle(text(Rez.Strings.AppName)),
+            :focusItemHeight => FOCUS_ROW_H
+        });
+        menu.addItem(new TextRow(:status, statusLine(), noticeLine()));
+        var rows = 1;
+        var focus = -1;
+        var firstOpen = -1;
+        _builtItems = [] as Lang.Array<Lang.Number>;
+        _builtAisles = [] as Lang.Array<Lang.Number>;
+        var done = [] as Lang.Array<Lang.Array>;
         for (var a = 0; a < sync.aisles.size(); a++) {
             if (!showAisle(a, view)) {
                 continue;
             }
-            menu.addItem(new WatchUi.MenuItem(sync.aisles[a][1] as Lang.String, aisleSub(a, view), a, {}));
-            _aisleRows.add(a);
+            _builtAisles.add(a);
+            var open = [] as Lang.Array<Lang.Array>;
+            for (var i = 0; i < sync.items.size(); i++) {
+                var item = sync.items[i];
+                if ((item[3] as Lang.Number) != a) {
+                    continue;
+                }
+                if (view.get(item[0] as Lang.Number) == true) {
+                    done.add(item);
+                } else {
+                    open.add(item);
+                }
+            }
+            var c = counts(a, view);
+            if (open.size() == 0 && c[2] == 0) {
+                continue;
+            }
+            menu.addItem(new HeaderRow("a" + a, sync.aisles[a][1] as Lang.String, aisleSub(a, view)));
+            rows += 1;
+            for (var i = 0; i < open.size(); i++) {
+                var id = open[i][0] as Lang.Number;
+                menu.addItem(new ItemRow(id, open[i][1] as Lang.String, itemSub(open[i]), false));
+                _builtItems.add(id);
+                if (firstOpen < 0) {
+                    firstOpen = rows;
+                }
+                if (focusId != null && id == focusId) {
+                    focus = rows;
+                }
+                rows += 1;
+            }
         }
-        menu.addItem(new WatchUi.MenuItem(text(Rez.Strings.Settings), null, :settings, {}));
-        menu.setFocus(focus);
+        if (sync.hasSnapshot && firstOpen < 0 && sync.items.size() > 0) {
+            menu.addItem(new HeaderRow("alldone", text(Rez.Strings.AllDone), null));
+            rows += 1;
+        }
+        if (done.size() > 0) {
+            menu.addItem(new HeaderRow("ticked", text(Rez.Strings.Ticked), "" + done.size()));
+            rows += 1;
+            for (var i = 0; i < done.size(); i++) {
+                var id = done[i][0] as Lang.Number;
+                menu.addItem(new ItemRow(id, done[i][1] as Lang.String, itemSub(done[i]), true));
+                _builtItems.add(id);
+                if (focusId != null && id == focusId) {
+                    focus = rows;
+                }
+                rows += 1;
+            }
+        }
+        if (_lastTicked >= 0) {
+            menu.addItem(new TextRow(:undo, Lang.format(text(Rez.Strings.UndoItem), [nameOf(_lastTicked)]), null));
+            rows += 1;
+        }
+        menu.addItem(new TextRow(:settings, text(Rez.Strings.Settings), null));
+        menu.setFocus(focus >= 0 ? focus : (firstOpen >= 0 ? firstOpen : 0));
         _menu = menu;
-        _screen = AISLES;
+        _screen = LIST;
         return menu;
     }
 
-    //! The index of the aisle with [code] in the current snapshot, or -1.
-    private function aisleIndex(code as Lang.String or Null) as Lang.Number {
-        if (code == null) {
-            return -1;
-        }
-        var aisles = link.sync.aisles;
-        for (var a = 0; a < aisles.size(); a++) {
-            if ((aisles[a][0] as Lang.String).equals(code)) {
-                return a;
-            }
-        }
-        return -1;
-    }
-
-    function showAisles(focusAisle as Lang.Number) as Void {
-        var focus = 0;
-        var menu = aisleMenu(0);
-        for (var i = 0; i < _aisleRows.size(); i++) {
-            if (_aisleRows[i] == focusAisle) {
-                focus = i + 1;
-            }
-        }
-        menu.setFocus(focus);
-        WatchUi.switchToView(menu, new AislesDelegate(self), WatchUi.SLIDE_RIGHT);
+    function showList(focusId as Lang.Number or Null) as Void {
+        WatchUi.switchToView(listMenu(focusId), new ListDelegate(self), WatchUi.SLIDE_IMMEDIATE);
     }
 
     //! [view] is sync.view(), computed once by the caller for every row.
@@ -149,7 +183,6 @@ class Screens {
         }
         return Lang.format(text(Rez.Strings.Left), [c[0]]);
     }
-
     //! The status row: what a glance at the list most needs to say.
     private function statusLine() as Lang.String {
         if (link.versionMismatch) {
@@ -208,64 +241,6 @@ class Screens {
         return null;
     }
 
-    function onAisleSelected(id as Lang.Object) as Void {
-        if (id == :settings) {
-            showSettings();
-        } else if (id == :status) {
-            // Asks the phone for the list now rather than at the next retry.
-            link.refresh();
-        } else if (id instanceof Lang.Number) {
-            openAisle(id as Lang.Number, 0, WatchUi.SLIDE_LEFT);
-        }
-    }
-
-    // --- one aisle
-
-    //! Unticked first, ticked sunk to the bottom, each in store order.
-    private function aisleItems(a as Lang.Number, view as Lang.Dictionary<Lang.Number, Lang.Boolean>) as Lang.Array<Lang.Array> {
-        var sync = link.sync;
-        var open = [] as Lang.Array<Lang.Array>;
-        var done = [] as Lang.Array<Lang.Array>;
-        for (var i = 0; i < sync.items.size(); i++) {
-            var item = sync.items[i];
-            if ((item[3] as Lang.Number) != a) {
-                continue;
-            }
-            if (view.get(item[0] as Lang.Number) == true) {
-                done.add(item);
-            } else {
-                open.add(item);
-            }
-        }
-        return open.addAll(done);
-    }
-
-    function openAisle(a as Lang.Number, focus as Lang.Number, transition as WatchUi.SlideType) as Void {
-        var sync = link.sync;
-        var menu = new WatchUi.CustomMenu(ROW_H, Graphics.COLOR_BLACK, {
-            :title => new AisleTitle(sync.aisles[a][1] as Lang.String),
-            :focusItemHeight => FOCUS_ROW_H
-        });
-        var view = sync.view();
-        var list = aisleItems(a, view);
-        for (var i = 0; i < list.size(); i++) {
-            var id = list[i][0] as Lang.Number;
-            menu.addItem(new ItemRow(id, list[i][1] as Lang.String, itemSub(list[i]), view.get(id) == true));
-        }
-        if (list.size() > 0) {
-            menu.setFocus(focus < list.size() ? focus : list.size() - 1);
-        }
-        var code = sync.aisles[a][0] as Lang.String;
-        if (_aisleCode == null || !(_aisleCode as Lang.String).equals(code)) {
-            _lastTicked = -1;
-        }
-        _aisle = a;
-        _aisleCode = code;
-        _menu = menu;
-        _screen = AISLE;
-        WatchUi.switchToView(menu, new AisleDelegate(self), transition);
-    }
-
     private function itemSub(item as Lang.Array) as Lang.String or Null {
         if (link.sync.partial.hasKey(item[0] as Lang.Number)) {
             return text(Rez.Strings.OneMore);
@@ -277,26 +252,36 @@ class Screens {
         return sub.length() > SUB_CHARS ? sub.substring(0, SUB_CHARS) : sub;
     }
 
-    //! Select on a row. The row only changes once the tick has happened.
-    function onItemSelected(item as ItemRow) as Void {
+    function onListSelected(item as WatchUi.MenuItem) as Void {
+        var id = item.getId();
+        if (item instanceof ItemRow) {
+            onItemSelected(item as ItemRow);
+        } else if (id == :status) {
+            // Asks the phone for the list now rather than at the next retry.
+            link.refresh();
+        } else if (id == :undo && _lastTicked >= 0) {
+            var undone = _lastTicked;
+            if (link.toggle(undone)) {
+                _lastTicked = -1;
+                buzz();
+                showList(undone);
+            }
+        } else if (id == :settings) {
+            showSettings();
+        }
+    }
+
+    //! Select on an item. The row only changes once the tick has happened.
+    private function onItemSelected(item as ItemRow) as Void {
         var id = item.getId() as Lang.Number;
         var now = System.getTimer();
         if (now - _lastPress < DEBOUNCE_MS) {
             return;
         }
         _lastPress = now;
-        if (_aisle < 0) {
-            // The aisle left the list under the open screen.
-            showAisles(-1);
-            return;
-        }
-        var list = aisleItems(_aisle, link.sync.view());
-        var index = 0;
-        for (var i = 0; i < list.size(); i++) {
-            if ((list[i][0] as Lang.Number) == id) {
-                index = i;
-            }
-        }
+        var wasDone = item.isDone();
+        // The item to get after this one, before the tick moves it.
+        var next = nextOpen(id);
         if (!link.toggle(id)) {
             WatchUi.pushView(
                 new MessageView(text(link.sync.outboxFull() ? Rez.Strings.SyncWithPhone : Rez.Strings.NoticeChanged)),
@@ -305,59 +290,40 @@ class Screens {
             );
             return;
         }
-        var view = link.sync.view();
-        if (view.get(id) == true) {
-            _lastTicked = id;
-        }
         buzz();
-        if (counts(_aisle, view)[0] == 0) {
-            showDone(_aisle);
-        } else {
-            // The row sinks; the same position now holds the next one to get.
-            openAisle(_aisle, index, WatchUi.SLIDE_IMMEDIATE);
+        if (wasDone) {
+            // Unticked: it goes back to its aisle, and the focus goes with it.
+            showList(id);
+            return;
         }
+        _lastTicked = id;
+        showList(next);
+    }
+
+    //! The open item listed after [id], else the one before it, else null.
+    private function nextOpen(id as Lang.Number) as Lang.Number or Null {
+        var view = link.sync.view();
+        var open = [] as Lang.Array<Lang.Number>;
+        for (var i = 0; i < _builtItems.size(); i++) {
+            if (view.get(_builtItems[i]) != true) {
+                open.add(_builtItems[i]);
+            }
+        }
+        for (var i = 0; i < open.size(); i++) {
+            if (open[i] == id) {
+                if (i + 1 < open.size()) {
+                    return open[i + 1];
+                }
+                return i > 0 ? open[i - 1] : null;
+            }
+        }
+        return null;
     }
 
     private function buzz() as Void {
         if (vibrate && (Attention has :vibrate)) {
             Attention.vibrate([new Attention.VibeProfile(50, 80)] as Lang.Array<Attention.VibeProfile>);
         }
-    }
-
-    // --- "aisle done"
-
-    //! The next aisle in store order with something left, or -1.
-    private function nextAisle(after as Lang.Number, view as Lang.Dictionary<Lang.Number, Lang.Boolean>) as Lang.Number {
-        var sync = link.sync;
-        for (var step = 1; step < sync.aisles.size(); step++) {
-            var a = (after + step) % sync.aisles.size();
-            if (showAisle(a, view) && counts(a, view)[0] > 0) {
-                return a;
-            }
-        }
-        return -1;
-    }
-
-    private function showDone(a as Lang.Number) as Void {
-        var sync = link.sync;
-        var menu = new WatchUi.Menu2({:title => Lang.format(text(Rez.Strings.AisleDoneTitle), [sync.aisles[a][1]])});
-        var next = nextAisle(a, sync.view());
-        if (next >= 0) {
-            menu.addItem(new WatchUi.MenuItem(Lang.format(text(Rez.Strings.NextAisle), [sync.aisles[next][1]]), null, :next, {}));
-        } else {
-            menu.addItem(new WatchUi.MenuItem(text(Rez.Strings.AllDone), null, :aisles, {}));
-        }
-        if (_lastTicked >= 0) {
-            menu.addItem(new WatchUi.MenuItem(Lang.format(text(Rez.Strings.UndoItem), [nameOf(_lastTicked)]), null, :undo, {}));
-        }
-        menu.addItem(new WatchUi.MenuItem(text(Rez.Strings.AllAisles), null, :aisles, {}));
-        // Next is focused: the common case is one press.
-        menu.setFocus(0);
-        _aisle = a;
-        _aisleCode = sync.aisles[a][0] as Lang.String;
-        _menu = menu;
-        _screen = DONE;
-        WatchUi.switchToView(menu, new DoneDelegate(self), WatchUi.SLIDE_LEFT);
     }
 
     private function nameOf(id as Lang.Number) as Lang.String {
@@ -368,29 +334,6 @@ class Screens {
             }
         }
         return "";
-    }
-
-    function onDoneSelected(id as Lang.Object) as Void {
-        if (_aisle < 0) {
-            // The aisle left the list under the prompt.
-            showAisles(-1);
-            return;
-        }
-        if (id == :next) {
-            var next = nextAisle(_aisle, link.sync.view());
-            if (next >= 0) {
-                openAisle(next, 0, WatchUi.SLIDE_LEFT);
-                return;
-            }
-        } else if (id == :undo && _lastTicked >= 0) {
-            var undone = _lastTicked;
-            if (link.toggle(undone)) {
-                _lastTicked = -1;
-                openAisle(_aisle, 0, WatchUi.SLIDE_RIGHT);
-                return;
-            }
-        }
-        showAisles(_aisle);
     }
 
     // --- settings
@@ -421,75 +364,27 @@ class Screens {
             Debug.onSelected(self, id);
             return;
         }
-        showAisles(-1);
+        showList(null);
     }
 
     // --- updates from the phone
 
-    //! The view is computed once here and handed down: it walks every item
-    //! and the outbox, and a refresh asks about every aisle.
     function onSyncChanged() as Void {
-        var view = link.sync.view();
         var menu = _menu;
-        if (menu == null) {
+        if (menu == null || _screen != LIST) {
             return;
         }
-        if (_screen == AISLES) {
-            refreshAisles(menu, view);
-        } else if (_screen == AISLE || _screen == DONE) {
-            // A snapshot can reorder or drop aisles: the open one is found
-            // again by code, and the aisle list takes over when it is gone.
-            _aisle = aisleIndex(_aisleCode);
-            if (_aisle < 0) {
-                showAisles(-1);
-                return;
-            }
-            if (_screen == AISLE) {
-                refreshAisle(menu, view);
-            }
-        }
-        WatchUi.requestUpdate();
-    }
-
-    private function refreshAisles(menu as WatchUi.Menu2, view as Lang.Dictionary<Lang.Number, Lang.Boolean>) as Void {
-        var rows = [] as Lang.Array<Lang.Number>;
-        for (var a = 0; a < link.sync.aisles.size(); a++) {
-            if (showAisle(a, view)) {
-                rows.add(a);
-            }
-        }
-        if (!sameRows(rows)) {
-            // A different set of aisles: there is no place worth keeping.
-            WatchUi.switchToView(aisleMenu(0), new AislesDelegate(self), WatchUi.SLIDE_IMMEDIATE);
+        var view = link.sync.view();
+        if (!sameItems(view)) {
+            // Items came or went: there is no place worth keeping.
+            showList(null);
             return;
         }
+        // Only ticks changed (here or on the phone): shown in place, sorted at the next tick.
         var status = menu.getItem(0);
-        if (status != null) {
-            status.setLabel(statusLine());
-            status.setSubLabel(noticeLine());
+        if (status instanceof TextRow) {
+            (status as TextRow).setText(statusLine(), noticeLine());
         }
-        for (var i = 0; i < rows.size(); i++) {
-            var row = menu.getItem(i + 1);
-            if (row != null) {
-                row.setSubLabel(aisleSub(rows[i], view));
-            }
-        }
-    }
-
-    private function sameRows(rows as Lang.Array<Lang.Number>) as Lang.Boolean {
-        if (rows.size() != _aisleRows.size()) {
-            return false;
-        }
-        for (var i = 0; i < rows.size(); i++) {
-            if (rows[i] != _aisleRows[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    //! Ticks from the phone show in place; new rows wait for the next visit.
-    private function refreshAisle(menu as WatchUi.Menu2, view as Lang.Dictionary<Lang.Number, Lang.Boolean>) as Void {
         var items = link.sync.items;
         for (var i = 0; i < items.size(); i++) {
             var id = items[i][0] as Lang.Number;
@@ -502,6 +397,30 @@ class Screens {
                 (row as ItemRow).setState(view.get(id) == true, itemSub(items[i]));
             }
         }
+        WatchUi.requestUpdate();
+    }
+
+    //! The same items and aisles as the open list was built with, in any order.
+    private function sameItems(view as Lang.Dictionary<Lang.Number, Lang.Boolean>) as Lang.Boolean {
+        var sync = link.sync;
+        var aisles = 0;
+        for (var a = 0; a < sync.aisles.size(); a++) {
+            if (showAisle(a, view)) {
+                if (_builtAisles.indexOf(a) < 0) {
+                    return false;
+                }
+                aisles += 1;
+            }
+        }
+        if (aisles != _builtAisles.size() || sync.items.size() != _builtItems.size()) {
+            return false;
+        }
+        for (var i = 0; i < sync.items.size(); i++) {
+            if (_builtItems.indexOf(sync.items[i][0] as Lang.Number) < 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     function text(id as Lang.ResourceId) as Lang.String {
@@ -509,7 +428,7 @@ class Screens {
     }
 }
 
-class AislesDelegate extends WatchUi.Menu2InputDelegate {
+class ListDelegate extends WatchUi.Menu2InputDelegate {
 
     private var _screens as Screens;
 
@@ -519,51 +438,7 @@ class AislesDelegate extends WatchUi.Menu2InputDelegate {
     }
 
     function onSelect(item as WatchUi.MenuItem) as Void {
-        var id = item.getId();
-        if (id != null) {
-            _screens.onAisleSelected(id);
-        }
-    }
-}
-
-class AisleDelegate extends WatchUi.Menu2InputDelegate {
-
-    private var _screens as Screens;
-
-    function initialize(screens as Screens) {
-        Menu2InputDelegate.initialize();
-        _screens = screens;
-    }
-
-    function onSelect(item as WatchUi.MenuItem) as Void {
-        if (item instanceof ItemRow) {
-            _screens.onItemSelected(item as ItemRow);
-        }
-    }
-
-    function onBack() as Void {
-        _screens.showAisles(-1);
-    }
-}
-
-class DoneDelegate extends WatchUi.Menu2InputDelegate {
-
-    private var _screens as Screens;
-
-    function initialize(screens as Screens) {
-        Menu2InputDelegate.initialize();
-        _screens = screens;
-    }
-
-    function onSelect(item as WatchUi.MenuItem) as Void {
-        var id = item.getId();
-        if (id != null) {
-            _screens.onDoneSelected(id);
-        }
-    }
-
-    function onBack() as Void {
-        _screens.showAisles(-1);
+        _screens.onListSelected(item);
     }
 }
 
@@ -581,7 +456,7 @@ class SettingsDelegate extends WatchUi.Menu2InputDelegate {
     }
 
     function onBack() as Void {
-        _screens.showAisles(-1);
+        _screens.showList(null);
     }
 }
 
