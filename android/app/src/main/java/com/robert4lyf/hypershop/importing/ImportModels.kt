@@ -62,10 +62,14 @@ data class ImportResult(
      * An edit, or "Add" from the library: a review of something already kept, not an
      * import. Leaving it drops it; it is never "ready to review" afterwards.
      */
-    val throwaway: Boolean get() = editsUse != null || method == LIBRARY
+    val throwaway: Boolean get() = editsUse != null || method == LIBRARY || method == LIBRARY_EDIT
+
+    /** "Edit" on a saved recipe: saving changes the library's copy, not the list. */
+    val savesToLibrary: Boolean get() = method == LIBRARY_EDIT
 
     companion object {
         const val BY_HAND = "BY_HAND"
         const val LIBRARY = "LIBRARY"
+        const val LIBRARY_EDIT = "LIBRARY_EDIT"
     }
 }

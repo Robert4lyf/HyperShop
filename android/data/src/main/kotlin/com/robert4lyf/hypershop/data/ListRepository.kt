@@ -512,12 +512,43 @@ class ListRepository(
         }
 
     /**
+     * "Edit" on a saved recipe: the copy the review stored becomes the library's
+     * entry, without touching the list. It keeps its place (a moment after the
+     * copy it replaces, not "added today"), and [jobId] is done in the same write.
+     */
+    suspend fun saveToLibrary(
+        recipeId: Long,
+        jobId: Long?,
+    ) = db.withTransaction {
+        val r = dao.recipe(recipeId) ?: return@withTransaction
+        val key = r.libraryKey ?: r.url ?: "r:${r.id}"
+        val previous = dao.recipesByKey(key).filter { it.id != recipeId }.mapNotNull { it.lastAddedAt }.maxOrNull()
+        dao.markAdded(recipeId, (previous ?: clock()) + 1)
+        addedToLibrary(recipeId, keepTime = true)
+        jobId?.let { dao.setJobState(it, "DONE") }
+        val meta = dao.meta()!!
+        dao.putMeta(meta.copy(listRev = meta.listRev + 1))
+    }
+
+    /**
      * In the transaction that put [recipeId] on the list: it becomes its library
      * entry's latest copy. Older unused copies go, except the one before it, which
      * Undo brings back.
      */
-    private suspend fun addedToLibrary(recipeId: Long) {
+    private suspend fun addedToLibrary(
+        recipeId: Long,
+        keepTime: Boolean = false,
+    ) {
+        if (keepTime) {
+            prune(recipeId)
+            return
+        }
         dao.markAdded(recipeId, clock())
+        prune(recipeId)
+    }
+
+    /** Older copies of [recipeId]'s entry that nothing on the list uses go, all but one. */
+    private suspend fun prune(recipeId: Long) {
         val key = dao.recipe(recipeId)?.libraryKey ?: return
         val older =
             dao.recipesByKey(key)

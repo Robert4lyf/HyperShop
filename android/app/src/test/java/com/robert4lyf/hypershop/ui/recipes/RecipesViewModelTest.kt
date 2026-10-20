@@ -282,6 +282,32 @@ class RecipesViewModelTest {
     }
 
     @Test
+    fun editingASavedRecipeChangesTheLibraryAndNotTheList() {
+        val c = TestContainer.create()
+        c.add(*CHILLI)
+        val vm = RecipesViewModel(c).shown()
+        val start = await(vm.ui) { it.uses.isNotEmpty() && it.library.isNotEmpty() }
+        val items = runBlocking { c.repository.snapshot() }.liveItems.size
+        vm.editSaved(start.library.single())
+        val edit = ReviewViewModel(c, nextReview(vm))
+        // On the list already, but an edit adds nothing: no "add again?".
+        val ready = await(edit.state) { it is ReviewState.Ready } as ReviewState.Ready
+        assertTrue(ready.ui.editing)
+        // Nothing goes on the list from here, so no in-stock or servings: just the ingredients.
+        assertTrue(ready.ui.savedOnly)
+        assertTrue(ready.ui.summary, ready.ui.summary.endsWith(" ingredients"))
+        edit.addLine("1 lime")
+        await(edit.state) { s -> s is ReviewState.Ready && s.ui.changed }
+        edit.confirm()
+        assertEquals("Weeknight chilli", (await(edit.state) { it is ReviewState.Added } as ReviewState.Added).edited)
+        val after = await(vm.ui) { u -> u.library.singleOrNull()?.lines == start.library.single().lines + 1 }
+        assertEquals(start.library.single().key, after.library.single().key)
+        // The list is as it was, and nothing waits to be reviewed.
+        assertEquals(items, runBlocking { c.repository.snapshot() }.liveItems.size)
+        assertTrue(runBlocking { c.importJobs.ready.first() }.isEmpty())
+    }
+
+    @Test
     fun leavingAnEditOrALibraryReAddLeavesNothingReadyToReview() {
         val c = TestContainer.create()
         c.add(*CHILLI)

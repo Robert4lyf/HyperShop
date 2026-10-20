@@ -108,6 +108,8 @@ data class ReviewUi(
     val retrying: Boolean = false,
     /** "Added by hand" being edited: no name or book to change. */
     val byHand: Boolean = false,
+    /** A saved recipe being edited: nothing goes on the list, so no in-stock or servings. */
+    val savedOnly: Boolean = false,
     /** No web page: a cookbook recipe, which can carry its book and page. */
     val cookbook: Boolean = false,
     val book: String? = null,
@@ -118,8 +120,19 @@ data class ReviewUi(
     val inStockCount: Int get() = rows.count { it.inStock }
     val checkCount: Int get() = rows.count { it.check && !it.inStock }
 
-    /** "4 to add · 2 in stock · 1 to check", without the zero parts. */
+    /** "4 to add · 2 in stock · 1 to check", without the zero parts ("12 ingredients" for a saved recipe). */
     val summary: String
+        get() =
+            if (savedOnly) {
+                listOfNotNull(
+                    if (rows.size == 1) "1 ingredient" else "${rows.size} ingredients",
+                    checkCount.takeIf { it > 0 }?.let { "$it to check" },
+                ).joinToString(" · ")
+            } else {
+                summaryForList
+            }
+
+    private val summaryForList: String
         get() =
             listOfNotNull(
                 addCount.takeIf { it > 0 }?.let { "$it to add" },
@@ -431,13 +444,14 @@ class ReviewViewModel(
                     notice = notice,
                     url = webLink(r.url),
                     busy = busy,
-                    editing = r.editsUse != null,
+                    editing = r.editsUse != null || r.savesToLibrary,
                     changed = changed,
                     claudeNote = claudeNote(r),
                     originalServings = r.servings,
                     retrying = retrying,
                     cookbook = webLink(r.url) == null && !r.byHand,
                     byHand = r.byHand,
+                    savedOnly = r.savesToLibrary,
                     book = r.book,
                     page = r.page,
                 ),
@@ -579,6 +593,14 @@ class ReviewViewModel(
         _state.value = ready.copy(ui = ready.ui.copy(busy = true))
         act {
             try {
+                if (result?.savesToLibrary == true) {
+                    val s = stored ?: return@act
+                    c.repository.saveToLibrary(s.recipe.id, jobId)
+                    // Kept now: leaving the screen must not discard it.
+                    stored = null
+                    _state.value = ReviewState.Added(0, 0, result?.title ?: "Recipe")
+                    return@act
+                }
                 val p = preview ?: return@act
                 when (
                     val r =
