@@ -134,17 +134,10 @@ class ListViewModelTest {
         c.add("2 onions")
         val vm = ListViewModel(c)
         val ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
-        // A tick is announced, with Undo; tapping again is the undo too.
+        // A tick is quiet; tapping again is the undo.
         vm.toggle(ui.row("onion"))
-        var m = nextMessage(vm)
-        assertEquals("Ticked onion", m.text)
         val done = await(vm.ui) { it.row("onion").state == TickState.DONE }
         vm.toggle(done.row("onion"))
-        await(vm.ui) { it.row("onion").state == TickState.OPEN }
-        vm.toggle(ui.row("onion"))
-        await(vm.ui) { it.row("onion").state == TickState.DONE }
-        m = nextMessage(vm)
-        runBlocking { m.undo!!() }
         await(vm.ui) { it.row("onion").state == TickState.OPEN }
         vm.toggle(ui.row("onion"))
         await(vm.ui) { it.row("onion").state == TickState.DONE }
@@ -166,7 +159,6 @@ class ListViewModelTest {
         runBlocking { m.undo!!() }
         ui = await(vm.ui) { u -> u.aisles.flatMap { it.second }.any { it.name == "carrot" } }
         vm.toggle(ui.row("onion"))
-        assertEquals("Ticked onion", nextMessage(vm).text)
         await(vm.ui) { it.doneCount == 1 }
         vm.finishShopping()
         m = nextMessage(vm)

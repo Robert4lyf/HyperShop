@@ -61,8 +61,6 @@ import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.theme.cardEdge
-import com.robert4lyf.hypershop.ui.theme.heroBrush
-import com.robert4lyf.hypershop.ui.theme.heroGlow
 import com.robert4lyf.hypershop.ui.theme.lowPoly
 import com.robert4lyf.hypershop.ui.theme.style
 
@@ -278,10 +276,9 @@ fun InfoBanner(
     }
 }
 
-/** A large icon in a soft circle, a headline and whatever explains the next step. */
+/** A headline and whatever explains the next step. */
 @Composable
 fun EmptyHero(
-    icon: ImageVector,
     title: String,
     modifier: Modifier = Modifier,
     body: String? = null,
@@ -292,12 +289,6 @@ fun EmptyHero(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Box(
-            Modifier.size(104.dp).clip(CircleShape).background(heroBrush).heroGlow(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, contentDescription = null, tint = Brand.OnHero, modifier = Modifier.size(52.dp))
-        }
         Text(title, style = MaterialTheme.typography.headlineSmall)
         body?.let {
             Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

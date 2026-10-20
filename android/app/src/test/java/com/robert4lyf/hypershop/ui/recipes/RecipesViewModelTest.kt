@@ -259,6 +259,29 @@ class RecipesViewModelTest {
     }
 
     @Test
+    fun aRecipeStaysOnceEverythingIsBoughtAndHandAddedGoes() {
+        val c = TestContainer.create()
+        c.add(*CHILLI)
+        runBlocking {
+            val p = c.ruleParser.parse("bin bags")
+            c.repository.manualAdd(p.name, p.shopBase(UnitLocale.METRIC), p.shopUnit)
+        }
+        val vm = RecipesViewModel(c).shown()
+        await(vm.ui) { it.uses.size == 2 }
+        // Everything bought: tick it all, then Finish shopping.
+        runBlocking {
+            for (item in c.repository.snapshot().liveItems) c.repository.toggle(item.id)
+            c.repository.finishShopping()
+        }
+        val after = await(vm.ui) { u -> u.uses.size == 1 && u.uses.single().itemCount == 0 }
+        // The recipe is still there to cook; the hand-added card went with its items.
+        assertEquals("Weeknight chilli", after.uses.single().title)
+        // And "Remove from list" still clears it.
+        vm.remove(after.uses.single())
+        await(vm.ui) { it.uses.isEmpty() }
+    }
+
+    @Test
     fun leavingAnEditOrALibraryReAddLeavesNothingReadyToReview() {
         val c = TestContainer.create()
         c.add(*CHILLI)
