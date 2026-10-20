@@ -190,27 +190,36 @@ class RecipesViewModel(
      * "Add to list" in Your recipes: the recipe on the review screen as it was saved,
      * at its own servings, staples ticked as usual. It then becomes the newest.
      */
-    fun addFromLibrary(row: LibraryRow) =
-        viewModelScope.launch {
-            val (r, lines) = c.repository.librarySource(row.recipeId) ?: return@launch
-            if (lines.isEmpty()) return@launch
-            val result =
-                ImportResult(
-                    url = r.url,
-                    title = r.title,
-                    servings = r.servingsOriginal,
-                    locale = UnitLocale.valueOf(r.unitLocale),
-                    method = ImportResult.LIBRARY,
-                    lines = lines,
-                    parsedBy = runCatching { ParsedBy.valueOf(r.parsedBy) }.getOrDefault(ParsedBy.RULES),
-                    model = r.model,
-                    rawLines = lines.map { it.raw },
-                    libraryKey = row.key,
-                    book = r.book,
-                    page = r.page,
-                )
-            reviews.send(c.importJobs.enqueueReady(ImportInput(r.url ?: "", r.title), result))
-        }
+    fun addFromLibrary(row: LibraryRow) = openSaved(row, ImportResult.LIBRARY)
+
+    /** "Edit" on a saved recipe: the review screen, saving back to the library and leaving the list alone. */
+    fun editSaved(row: LibraryRow) = openSaved(row, ImportResult.LIBRARY_EDIT)
+
+    private fun openSaved(
+        row: LibraryRow,
+        method: String,
+    ) = viewModelScope.launch {
+        val (r, lines) = c.repository.librarySource(row.recipeId) ?: return@launch
+        if (lines.isEmpty()) return@launch
+        val result =
+            ImportResult(
+                url = r.url,
+                title = r.title,
+                servings = r.servingsOriginal,
+                locale = UnitLocale.valueOf(r.unitLocale),
+                method = method,
+                lines = lines,
+                // An edit adds nothing, so no "already on your list?" and nothing ticked as a staple.
+                preTick = method != ImportResult.LIBRARY_EDIT,
+                parsedBy = runCatching { ParsedBy.valueOf(r.parsedBy) }.getOrDefault(ParsedBy.RULES),
+                model = r.model,
+                rawLines = lines.map { it.raw },
+                libraryKey = row.key,
+                book = r.book,
+                page = r.page,
+            )
+        reviews.send(c.importJobs.enqueueReady(ImportInput(r.url ?: "", r.title), result))
+    }
 
     private val _detail = MutableStateFlow<RecipeDetail?>(null)
 

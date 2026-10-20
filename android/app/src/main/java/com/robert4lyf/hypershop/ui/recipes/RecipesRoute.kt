@@ -119,6 +119,7 @@ fun RecipesRoute(
                 onRemove = vm::removeFromLibrary,
                 onOpen = vm::openDetail,
                 onRename = { row, title -> vm.renameSaved(row, title) },
+                onEdit = vm::editSaved,
             ),
         search =
             SearchBox(
@@ -297,6 +298,7 @@ fun RecipesScreen(
                             onRemove = { forget = row.key },
                             onOpen = { library.onOpen(row) },
                             onRename = { renamingSaved = row.key },
+                            onEdit = { library.onEdit(row) },
                         )
                     }
                 }
@@ -440,6 +442,8 @@ data class LibraryActions(
     /** Tap: see its ingredients. */
     val onOpen: (LibraryRow) -> Unit = {},
     val onRename: (LibraryRow, String) -> Unit = { _, _ -> },
+    /** The review screen, saving back to the library only. */
+    val onEdit: (LibraryRow) -> Unit = {},
 )
 
 /** One saved recipe: its name, where it's from, how big, when last added; Add to list. */
@@ -450,9 +454,8 @@ private fun LibraryCard(
     onRemove: () -> Unit,
     onOpen: () -> Unit,
     onRename: () -> Unit,
+    onEdit: () -> Unit,
 ) {
-    val dark = LocalDarkTheme.current
-    val hue = Brand.recipeHue(row.title)
     val now = remember { System.currentTimeMillis() }
     Surface(
         Modifier
@@ -469,18 +472,8 @@ private fun LibraryCard(
             Modifier.padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // The recipe's hue as a badge, the same shape as an aisle badge.
-            Box(
-                Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(Brand.tint(hue, dark)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Rounded.MenuBook,
-                    contentDescription = null,
-                    tint = Brand.strong(hue, dark),
-                    modifier = Modifier.size(22.dp),
-                )
-            }
+            // A tile of the recipe's own mosaic: the same colours as its card on the list.
+            Box(Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).lowPoly(row.title))
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(row.title, style = MaterialTheme.typography.titleMedium)
                 val bits =
@@ -511,6 +504,10 @@ private fun LibraryCard(
                     DropdownMenuItem(text = { Text("Rename") }, modifier = Modifier.testTag("lib-rename-${row.key}"), onClick = {
                         menu = false
                         onRename()
+                    })
+                    DropdownMenuItem(text = { Text("Edit") }, modifier = Modifier.testTag("lib-edit-${row.key}"), onClick = {
+                        menu = false
+                        onEdit()
                     })
                     DropdownMenuItem(text = { Text("Remove from your recipes") }, onClick = {
                         menu = false

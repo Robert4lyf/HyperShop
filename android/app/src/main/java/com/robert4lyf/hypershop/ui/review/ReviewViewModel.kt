@@ -431,7 +431,7 @@ class ReviewViewModel(
                     notice = notice,
                     url = webLink(r.url),
                     busy = busy,
-                    editing = r.editsUse != null,
+                    editing = r.editsUse != null || r.savesToLibrary,
                     changed = changed,
                     claudeNote = claudeNote(r),
                     originalServings = r.servings,
@@ -579,6 +579,14 @@ class ReviewViewModel(
         _state.value = ready.copy(ui = ready.ui.copy(busy = true))
         act {
             try {
+                if (result?.savesToLibrary == true) {
+                    val s = stored ?: return@act
+                    c.repository.saveToLibrary(s.recipe.id, jobId)
+                    // Kept now: leaving the screen must not discard it.
+                    stored = null
+                    _state.value = ReviewState.Added(0, 0, result?.title ?: "Recipe")
+                    return@act
+                }
                 val p = preview ?: return@act
                 when (
                     val r =
