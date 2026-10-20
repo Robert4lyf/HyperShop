@@ -70,9 +70,9 @@ class ScenariosTest {
         for (r in ui.aisles.flatMap { it.second }) vm.toggle(r)
         ui = await(vm.ui) { it.left == 0 && it.doneCount == 4 }
         vm.finishShopping()
-        ui = await(vm.ui) { it.isEmpty }
+        // The trip took everything: an empty list, back in planning (the mode write follows the finish).
+        ui = await(vm.ui) { it.isEmpty && it.mode == ListMode.PLAN }
         assertTrue(!ui.shopping)
-        assertEquals(ListMode.SHOP, ui.mode)
         // Undo is still there: the whole trip comes back, bought.
         val stamp = runBlocking { c.db.dao().meta()!! }
         assertTrue(stamp.listRev > 1)
