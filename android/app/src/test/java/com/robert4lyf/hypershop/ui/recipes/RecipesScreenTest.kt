@@ -74,12 +74,13 @@ class RecipesScreenTest {
     fun removeAsksFirst() {
         show()
         compose.onNodeWithContentDescription("Serves 4 · 6 items on the list · 3 in stock").assertExists()
-        // Every use can be removed, after a confirmation.
-        compose.onAllNodesWithText("Remove from list").assertCountEquals(3)
+        // Every use can be removed from its menu, after a confirmation.
         compose.onNodeWithContentDescription("Serves 8 · 5 items on the list").assertExists()
-        compose.onAllNodesWithText("Remove from list")[1].performClick()
+        compose.onNodeWithTag("more-2").performClick()
+        compose.onNodeWithTag("remove-2").performClick()
         compose.onNodeWithText("Keep").performClick()
-        compose.onAllNodesWithText("Remove from list")[1].performClick()
+        compose.onNodeWithTag("more-2").performClick()
+        compose.onNodeWithTag("remove-2").performClick()
         compose.onNodeWithText("Remove").performClick()
         assertEquals(listOf("remove 2"), events)
     }
@@ -212,17 +213,50 @@ class RecipesScreenTest {
         var ui by mutableStateOf(USES.copy(uses = USES.uses.take(1)))
         compose.setContent { HyperShopTheme(dynamicColor = false) { RecipesScreen(ui, onRemove = {}) } }
         // Opens on the list: its cards, not the library's.
-        compose.onNodeWithText("Remove from list").assertExists()
+        compose.onNodeWithTag("use-1").assertExists()
         compose.onNodeWithTag("lib-r:9").assertDoesNotExist()
         compose.onNodeWithTag("view-library").performClick()
         compose.onNodeWithTag("lib-r:9").assertExists()
-        compose.onNodeWithText("Remove from list").assertDoesNotExist()
+        compose.onNodeWithTag("use-1").assertDoesNotExist()
         compose.onRoot().captureRoboImage(Shots.path("recipes-library-light.png"))
         // A recipe added to the list brings the list back.
         ui = USES
         compose.waitForIdle()
-        compose.onAllNodesWithText("Remove from list").assertCountEquals(3)
+        compose.onNodeWithTag("use-3").assertExists()
         compose.onNodeWithTag("lib-r:9").assertDoesNotExist()
+    }
+
+    @Test
+    fun tapARecipeOnTheListToSeeItsIngredients() {
+        val opened = mutableListOf<Long>()
+        compose.setContent {
+            HyperShopTheme(dynamicColor = false) { RecipesScreen(USES, onRemove = {}, onOpenUse = { opened += it.useId }) }
+        }
+        compose.onNodeWithTag("use-2").performClick()
+        assertEquals(listOf(2L), opened)
+        // "Typed into the list" said nothing the card doesn't.
+        compose.onNodeWithText("Typed into the list").assertDoesNotExist()
+    }
+
+    @Test
+    fun aRecipeOnTheListShowsItsInStockLines() {
+        var edited = 0
+        val detail =
+            UseDetail(
+                USES.uses.first(),
+                writtenFor = 6,
+                sections =
+                    listOf(
+                        null to listOf("500g beef mince" to false, "2 onions" to false, "1 tsp salt" to true),
+                        "To serve" to listOf("Soured cream" to true),
+                    ),
+            )
+        compose.setContent { HyperShopTheme(dynamicColor = false) { UseDetailContent(detail, onEdit = { edited++ }, onRemove = {}) } }
+        compose.onNodeWithText("Serves 4 (written for 6)", substring = true).assertExists()
+        compose.onAllNodesWithText("In stock").assertCountEquals(2)
+        compose.onNodeWithTag("use-detail-edit").performClick()
+        assertEquals(1, edited)
+        compose.onRoot().captureRoboImage(Shots.path("use-detail-light.png"))
     }
 
     @Test

@@ -294,6 +294,29 @@ class RecipesViewModelTest {
     }
 
     @Test
+    fun aRecipeOnTheListOpensWithItsIngredientsInStockMarked() {
+        val c = TestContainer.create()
+        c.add(*CHILLI)
+        runBlocking {
+            val p = c.ruleParser.parse("bin bags")
+            c.repository.manualAdd(p.name, p.shopBase(UnitLocale.METRIC), p.shopUnit)
+        }
+        val vm = RecipesViewModel(c).shown()
+        val uses = await(vm.ui) { it.uses.size == 2 }.uses
+        vm.openUse(uses.first { it.recipeId != null })
+        val d = await(vm.useDetail) { it != null }!!
+        val lines = d.sections.flatMap { it.second }
+        assertEquals(CHILLI.toList(), lines.map { it.first })
+        // Salt, olive oil and the soured-cream garnish were left out as in stock.
+        assertEquals(3, lines.count { it.second })
+        vm.closeUse()
+        // Hand-added: the items as they are.
+        vm.openUse(uses.first { it.recipeId == null })
+        val hand = await(vm.useDetail) { it?.use?.recipeId == null && it != null }!!
+        assertEquals(listOf("bin bags"), hand.sections.single().second.map { it.first.lowercase() })
+    }
+
+    @Test
     fun aSavedRecipeOpensWithItsIngredients() {
         val c = TestContainer.create()
         c.add(*CHILLI)

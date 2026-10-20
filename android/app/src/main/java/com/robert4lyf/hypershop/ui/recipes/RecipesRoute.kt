@@ -26,7 +26,6 @@ import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.Inventory
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.MoreVert
@@ -94,6 +93,7 @@ import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.theme.lowPoly
 import com.robert4lyf.hypershop.ui.util.factoryFor
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecipesRoute(
     container: AppContainer,
@@ -111,6 +111,7 @@ fun RecipesRoute(
         onRemove = vm::remove,
         onEdit = vm::edit,
         onRename = { use, title -> vm.rename(use, title) },
+        onOpenUse = vm::openUse,
         library =
             LibraryActions(
                 onAdd = vm::addFromLibrary,
@@ -135,6 +136,22 @@ fun RecipesRoute(
             ),
         hasKey = hasKey,
     )
+    val useDetail by vm.useDetail.collectAsStateWithLifecycle()
+    useDetail?.let { d ->
+        ModalBottomSheet(onDismissRequest = vm::closeUse) {
+            UseDetailContent(
+                d,
+                onEdit = {
+                    vm.closeUse()
+                    vm.edit(d.use)
+                },
+                onRemove = {
+                    vm.closeUse()
+                    vm.remove(d.use)
+                },
+            )
+        }
+    }
     val detail by vm.detail.collectAsStateWithLifecycle()
     // The sheet's own confirmations: the sheet closes first, so the dialog is not under it.
     // Kept as the recipe's key (saveable), and looked up again after a rotation.
@@ -168,6 +185,8 @@ fun RecipesScreen(
     onRemove: (UseSummary) -> Unit,
     onEdit: (UseSummary) -> Unit = {},
     onRename: (UseSummary, String) -> Unit = { _, _ -> },
+    /** A card tapped: its ingredients. */
+    onOpenUse: (UseSummary) -> Unit = {},
     add: AddRecipeActions = AddRecipeActions(),
     library: LibraryActions = LibraryActions(),
     search: SearchBox = SearchBox(),
@@ -251,7 +270,13 @@ fun RecipesScreen(
                 }
                 if (!showLibrary) {
                     items(ui.uses, key = { it.useId }) { use ->
-                        UseCard(use, onRemove = { confirm = use.useId }, onEdit = { onEdit(use) }, onRename = { renaming = use.useId })
+                        UseCard(
+                            use,
+                            onRemove = { confirm = use.useId },
+                            onEdit = { onEdit(use) },
+                            onRename = { renaming = use.useId },
+                            onOpen = { onOpenUse(use) },
+                        )
                     }
                 }
                 if (showLibrary) {
@@ -506,11 +531,18 @@ private fun UseCard(
     onRemove: () -> Unit,
     onEdit: () -> Unit,
     onRename: () -> Unit,
+    onOpen: () -> Unit,
 ) {
     val url = webLink(use.url)
     val open = rememberOpenLink()
     Surface(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp).cardLift(MaterialTheme.shapes.large).testTag("use-${use.useId}"),
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .cardLift(MaterialTheme.shapes.large)
+            .clip(MaterialTheme.shapes.large)
+            .clickable(onClickLabel = "Show ingredients", onClick = onOpen)
+            .testTag("use-${use.useId}"),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.card,
     ) {
@@ -525,8 +557,30 @@ private fun UseCard(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(use.title, style = MaterialTheme.typography.titleLarge, color = Brand.OnHero, modifier = Modifier.weight(1f))
-                        IconButton(onClick = onRename, modifier = Modifier.testTag("rename-${use.useId}")) {
-                            Icon(Icons.Rounded.Edit, contentDescription = "Rename", tint = Brand.OnHeroSoft)
+                        // Everything that changes the recipe, in one place; a tap on the card shows it.
+                        var menu by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { menu = true }, modifier = Modifier.testTag("more-${use.useId}")) {
+                                Icon(Icons.Rounded.MoreVert, contentDescription = "More", tint = Brand.OnHero)
+                            }
+                            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                DropdownMenuItem(text = { Text("Rename") }, modifier = Modifier.testTag("rename-${use.useId}"), onClick = {
+                                    menu = false
+                                    onRename()
+                                })
+                                DropdownMenuItem(text = { Text("Edit") }, modifier = Modifier.testTag("edit-${use.useId}"), onClick = {
+                                    menu = false
+                                    onEdit()
+                                })
+                                DropdownMenuItem(text = {
+                                    Text(
+                                        "Remove from list",
+                                    )
+                                }, modifier = Modifier.testTag("remove-${use.useId}"), onClick = {
+                                    menu = false
+                                    onRemove()
+                                })
+                            }
                         }
                     }
                     val site = url?.let { siteName(it) }
@@ -534,7 +588,6 @@ private fun UseCard(
                     when {
                         site != null -> Meta(Icons.Rounded.Link, site)
                         book != null -> Meta(Icons.AutoMirrored.Rounded.MenuBook, book)
-                        use.recipeId == null -> Meta(Icons.Rounded.EditNote, "Typed into the list")
                     }
                 }
             }
@@ -557,28 +610,12 @@ private fun UseCard(
                     Fact(Icons.Rounded.ShoppingCart, if (use.itemCount == 1) "1 item" else "${use.itemCount} items", bg, fg)
                     if (use.inStockCount > 0) Fact(Icons.Rounded.Inventory, "${use.inStockCount} in stock", bg, fg)
                 }
-                // One filled button for the main thing, the rest as text; wraps on narrow
-                // phones and large text instead of squeezing the last button.
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (url != null) {
-                        FilledTonalButton(onClick = { open(url) }, modifier = Modifier.testTag("open-${use.useId}")) {
-                            Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.size(8.dp))
-                            Text("Open recipe")
-                        }
-                        TextButton(onClick = onEdit, modifier = Modifier.testTag("edit-${use.useId}")) { Text("Edit") }
-                    } else {
-                        FilledTonalButton(onClick = onEdit, modifier = Modifier.testTag("edit-${use.useId}")) {
-                            Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.size(8.dp))
-                            Text("Edit")
-                        }
+                if (url != null) {
+                    FilledTonalButton(onClick = { open(url) }, modifier = Modifier.testTag("open-${use.useId}")) {
+                        Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text("Open recipe")
                     }
-                    TextButton(onClick = onRemove) { Text("Remove from list") }
                 }
             }
         }
@@ -696,6 +733,86 @@ private fun DetailButtons(
                 Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
                 Text("Open recipe")
+            }
+        }
+    }
+}
+
+/**
+ * A recipe on the list: its ingredients as written, the ones left out as in
+ * stock marked so, with Edit (the review screen, where it changes), "Open
+ * recipe" and "Remove from list". Hand-added items are listed as they are.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun UseDetailContent(
+    detail: UseDetail,
+    onEdit: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    val open = rememberOpenLink()
+    val use = detail.use
+    val url = webLink(use.url)
+    LazyColumn(
+        Modifier.fillMaxWidth().testTag("use-detail"),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        item(key = "title") {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(use.title, style = MaterialTheme.typography.headlineSmall)
+                val bits =
+                    listOfNotNull(
+                        url?.let { siteName(it) } ?: use.bookRef,
+                        use.servings?.let { s -> "Serves $s" + (detail.writtenFor?.let { " (written for $it)" } ?: "") },
+                        if (use.itemCount == 1) "1 item on the list" else "${use.itemCount} items on the list",
+                    )
+                Text(
+                    bits.joinToString(" · "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                FlowRow(
+                    Modifier.padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Button(onClick = onEdit, modifier = Modifier.testTag("use-detail-edit")) {
+                        Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text("Edit")
+                    }
+                    url?.let { u ->
+                        OutlinedButton(onClick = { open(u) }) {
+                            Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.size(8.dp))
+                            Text("Open recipe")
+                        }
+                    }
+                    OutlinedButton(onClick = onRemove, modifier = Modifier.testTag("use-detail-remove")) { Text("Remove from list") }
+                }
+            }
+        }
+        detail.sections.forEachIndexed { i, (heading, lines) ->
+            heading?.let { h ->
+                item(key = "h-$i") {
+                    Text(h, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
+                }
+            }
+            items(lines.size, key = { j -> "l-$i-$j" }) { j ->
+                val (text, inStock) = lines[j]
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("•", color = if (inStock) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary)
+                    Text(
+                        text,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (inStock) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (inStock) {
+                        Text("In stock", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+                    }
+                }
             }
         }
     }
