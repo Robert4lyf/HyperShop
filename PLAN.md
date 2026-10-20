@@ -1,4 +1,4 @@
-# HyperShop — Plan (rev 5)
+# HyperShop — Plan (rev 6)
 
 A **personal** Android app that won't be published. You share a recipe URL, an Instagram reel or a cookbook photo. **Claude reads the ingredients.** You review them and tick off what you already have. The rest merges into a shopping list sorted by aisle, which is mirrored on your **Garmin Forerunner 245** so you can tick items there.
 
@@ -15,6 +15,8 @@ A **personal** Android app that won't be published. You share a recipe URL, an I
     - Stock learning and its banner. Staples and "Always in stock" stay.
     - JSON export and import. Android backup plus "Share list as text" cover this.
     - The "apply old watch ticks?" prompt.
+
+- **rev 6 (Run 3, docs/design/simplify.md):** a Shop mode on the list tab (the same list, laid out for a supermarket); "In stock" is "At home" and counts say "bought"; Claude is asked only when the rule parser is in doubt (the eval shows the rules beat Haiku on the lines they are sure about), and its reply is streamed so a dropped call is still metered; **JSON backup and restore are back** (Settings › Data, a file the user picks, validated before a row is written, with Undo) — the rev 5 cut assumed Android backup alone would do, and it leaves no way to move to a phone without it; a light "Meals this week" picker over the saved recipes, where the recipes on the list are the week's meals (no table of their own).
 
 ## 1. Architecture
 

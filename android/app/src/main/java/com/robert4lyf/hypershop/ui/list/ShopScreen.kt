@@ -35,6 +35,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -112,9 +113,11 @@ fun ShopScreen(
                     }
                 }
             }
+            // Recomputed only when the aisle at the top changes, not on every scrolled pixel.
+            val nextState = remember(cells) { derivedStateOf { nextAisle(cells, list.firstVisibleItemIndex) } }
             BottomActionBar(navigationBarInset = false) {
                 // The next aisle with something left, after the one at the top of the screen (round the list when none).
-                val next = nextAisle(cells, list.firstVisibleItemIndex)
+                val next = nextState.value
                 if (next != null) {
                     FilledTonalButton(
                         onClick = { scope.launch { list.animateScrollToItem(next.index) } },

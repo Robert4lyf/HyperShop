@@ -70,3 +70,47 @@ Problems found:
   the transaction commits.
 - **Meals could duplicate recipes.** A recipe already on the list shows as
   such and asks before a second use (the existing "Add again?" rule).
+
+## Outcome (Run 3, Step 8)
+
+What landed, by phase, with its evidence:
+
+| Phase | Done | Evidence |
+|---|---|---|
+| 1 Shop mode | `ShopScreen` on the same `ListUi`/`ListActions`; `Settings.listMode`; bought rows under one row per aisle; "Now" and "Next: <aisle>"; Plan/Shop pills | `ShopScreenTest` (10), `ListViewModelTest.shopModeIsASettingAndKeepsEveryTick`, `ScenariosTest`, `docs/screenshots/shop-*.png` |
+| 2 Words | "At home", "bought", "On the list / Saved", remove dialogs say what stays, empty states name the next action | screen tests updated, screenshots re-recorded |
+| 3 Extraction | `Uncertainty` + `HybridGateTest`; 45 held-out lines; Claude only when a line is flagged, for page text or a photo, or on "Ask Claude"; streamed replies with usage metered on a drop or a stall | `docs/reports/hybrid-gate.md`, `ClaudeClientTest` (5 new), `ImporterTest`, `ImportWorkerTest` |
+| 4 Backup | `BackupData` + `BackupValidator` + `restoreBackup`; `BackupManager` over the Storage Access Framework; Settings › Data with a confirmation and Undo | `BackupTest` (5), `BackupManagerTest`, `SettingsViewModelTest` (2) |
+| 4.3 Known issue 10 | fixed by streaming (KNOWN_ISSUES) | `aStreamThatDropsMidAnswerStillMetersWhatWasBilled`, `aStreamThatStallsIsATimeoutNotOffline` |
+| 5 Tests | the three scenarios, rapid ticks, recreation, review after process death | `ScenariosTest` (5) |
+| 6 Density | shorter hero, shorter recipe cards, "Open recipe" in the menu | `docs/contact-sheet.png` |
+| 7 Meals | `MealsViewModel`/`MealsScreen`; `ListRepository.addSavedRecipe`; no new table | `MealsViewModelTest` (3), `MealsScreenTest` (5) |
+
+### Adversarial review: what it found, and what was done
+
+- **A finished trip left the list in Shop mode.** With the list empty the
+  planning screen shows, but the next item typed would have flipped the
+  screen into the shop (no field to type into). Fixed: Finish shopping and
+  Clear all put the mode back to Plan when nothing is left; tested.
+- **"Next aisle" read the scroll position in composition**, recomposing the
+  bottom bar on every scrolled pixel. Now a `derivedStateOf`.
+- **The meals search field could sit under the keyboard.** The screen pads
+  for it.
+- **Stale flags after "Ask Claude".** A Claude read now clears `askClaude`
+  and `claudeSkipped`.
+- **Two ways to add a saved recipe** (Saved › "Add to list" opens the review;
+  This week › Add goes straight on). Kept on purpose: the review is where
+  amounts and "at home" are changed, the picker is for speed; each says so.
+- **Not fixed, written down** (KNOWN_ISSUES 13, 14): a line the rules misread
+  without flagging stays misread unless asked about; a restore's settings and
+  library edits are written after the database transaction.
+
+### Scores (1–5, honest)
+
+| | Before | After | Why |
+|---|---|---|---|
+| UX | 3 | 4 | One tap into a screen made for the shop; "at home" and "bought" say what they mean; meals in three taps. Still two tabs' worth of concepts (list, saved, meals). |
+| Visual polish | 4 | 4 | The identity is unchanged; the shop screen is plainer on purpose; cards are shorter. No new decoration. |
+| Reliability | 3 | 4 | Backup and restore with validation and Undo; metered Claude calls; the interrupted-trip scenario is a test. Restore's two-step write remains (KI 14). |
+| Maintainability | 4 | 4 | No new table, no new library, one new screen per feature, every write still through the repository. The list view model now carries a mode. |
+| Everyday usefulness | 3 | 4 | The shop screen and the meals picker are the two things a weekly shop needed; backup makes the library safe to rely on. |

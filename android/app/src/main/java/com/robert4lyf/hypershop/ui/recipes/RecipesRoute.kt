@@ -588,7 +588,11 @@ private fun UseCard(
                             }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                                 if (url != null) {
-                                    DropdownMenuItem(text = { Text("Open recipe") }, modifier = Modifier.testTag("open-${use.useId}"), onClick = {
+                                    DropdownMenuItem(text = {
+                                        Text(
+                                            "Open recipe",
+                                        )
+                                    }, modifier = Modifier.testTag("open-${use.useId}"), onClick = {
                                         menu = false
                                         open(url)
                                     })
@@ -620,7 +624,10 @@ private fun UseCard(
                     }
                 }
             }
-            Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 // The facts as one sentence for TalkBack, chips on screen.
                 val bits =
                     listOfNotNull(

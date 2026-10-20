@@ -172,7 +172,10 @@ class ShopScreenTest {
         compose.onNodeWithTag("item-3").assertExists()
         tester.emulateSavedInstanceStateRestore()
         compose.onNodeWithTag("item-3").assertExists()
-        assertEquals("Expanded", compose.onNodeWithTag("shop-bought-aisle-PRODUCE").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
+        assertEquals(
+            "Expanded",
+            compose.onNodeWithTag("shop-bought-aisle-PRODUCE").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription),
+        )
     }
 
     @Test

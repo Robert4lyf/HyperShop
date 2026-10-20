@@ -328,7 +328,12 @@ class ListViewModelTest {
         assertTrue(after.shopping)
         again.toggle(after.row("beef mince"))
         again.finishShopping()
-        assertTrue(!await(again.ui) { it.isEmpty }.shopping)
+        val empty = await(again.ui) { it.isEmpty }
+        assertTrue(!empty.shopping)
+        // A trip that took everything ends in planning, so the next item typed lands on the planning screen.
+        await(again.ui) { it.mode == ListMode.PLAN }
+        again.addTyped("milk")
+        assertTrue(!await(again.ui) { it.aisles.isNotEmpty() }.shopping)
     }
 
     /** Lets everything queued run: the main looper, and Room and background work. */

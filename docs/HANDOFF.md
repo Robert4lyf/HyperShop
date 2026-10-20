@@ -1,5 +1,55 @@
 # Hand-off notes
 
+## Status: Run 3 (simplify) — stopped at ⏸ Hand-off C
+
+Run 3 is the usability pass planned in `docs/design/simplify.md`: Shop mode,
+"At home" and "bought" wording, Claude only when the rules are in doubt (with
+streamed replies), backup and restore, and "Meals this week". Sub-steps and
+their checks are in `PROGRESS.md` (Step 8). `tools/verify.sh` is green.
+
+## ⏸ Hand-off C — your checks (yes/no)
+
+Nothing here could be tried on a phone or a watch in the container; the
+unit, Compose and sync-vector tests cover the logic, these cover the feel.
+
+**Shop mode** (List › Shop)
+- Walking a real list one-handed: the tick is easy to hit and the row's text
+  (details) is not hit by mistake. Ticked rows drop under "N bought" without
+  the list jumping about.
+- "Next: <aisle>" takes you to the next aisle with something left; "Plan"
+  brings back the add field. Rotate and come back: the opened "bought" rows
+  and the mode are as you left them.
+- Finish shopping with everything bought: the list is empty and back in
+  planning; Undo brings the trip back.
+
+**Watch** (Forerunner 245)
+- Tick two items on the watch with the phone out of reach, add a recipe on
+  the phone that needs more of one of them, reconnect: the phone shows
+  "1 more …" / "N already bought" for that item and the watch shows the same
+  after its next sync; the other item is done on both.
+
+**Backup** (Settings › Data)
+- "Back up to a file" opens the system file picker and writes a
+  `hypershop-backup-<date>.json` you can see in Files. "Restore" on that
+  file shows what it holds and asks first; after it the list, recipes,
+  aisle order and units are as backed up, the Claude key is still there,
+  and the watch takes the list afresh (it says "list replaced" once).
+- Restore from a photo or a text file: refused in words, nothing changed.
+
+**Claude**
+- Share a recipe page with a key set: a clean recipe says "Parsed offline —
+  every line was clear" with "Ask Claude" available; one with a line such as
+  "juice of 1 lemon" or "butter or margarine" goes to Claude as before.
+- Settings › Claude's spend meter moves after an import that Claude read,
+  including one you backed out of while it was reading.
+
+**Meals** (Recipes › This week)
+- Pick three saved recipes: the list has their ingredients merged, staples
+  at home; change a serving: the amounts follow; remove one: its items go,
+  the recipe stays saved; Undo on each.
+
+Run 2's notes are below.
+
 ## Status: Run 2 finished — stopped at ⏸ Hand-off B
 
 Steps 6–7 are done: the Forerunner 245 app (`garmin/`) and phone ↔ watch sync.
@@ -90,6 +140,8 @@ A ground-up visual refresh, planned in `docs/design/ui-overhaul.md`; behaviour i
 To check on the phone: everything reads well in daylight and at night, and nothing you used before is harder to find.
 
 ## Open items carried forward
+
+- Run 3: the shop screen has no "At home" section and no add field; both are one tap away on "Plan". Claude's aisle suggestions are only made for recipes Claude reads (a clear recipe is categorised by the catalogue alone, as offline imports always were). The Garmin simulator job is still non-blocking (below).
 
 - Monkey C tests: they compile against the real `fr245` definition in CI. The job that *runs* them in the simulator (`connectiq.yml` › simulator, Ubuntu 22.04 + Xvfb) is experimental and non-blocking until it has passed. The same logic is held to the Kotlin model step by step by the generated traces (`garmin/test/SyncTraces.mc`).
 - Auto-advance to the next aisle (optional, off by default in PLAN): not built.

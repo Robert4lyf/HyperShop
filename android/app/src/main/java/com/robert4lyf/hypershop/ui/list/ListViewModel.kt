@@ -356,12 +356,18 @@ class ListViewModel(
         viewModelScope.launch {
             // Counted inside the write: a tick still on its way to the screen is included.
             val (stamp, n) = c.repository.finish()
-            messages.send(
-                UiMessage(if (n == 1) "Finished: 1 bought item removed" else "Finished: $n bought items removed", undo = {
-                    c.repository.undoDelete(stamp)
-                }),
-            )
+            planIfEmpty()
+            val text = if (n == 1) "Finished: 1 bought item removed" else "Finished: $n bought items removed"
+            messages.send(UiMessage(text, undo = { c.repository.undoDelete(stamp) }))
         }
+
+    /**
+     * A trip that took everything ends in planning: the next item typed must not
+     * land in the shop screen (where there is no field to type into).
+     */
+    private suspend fun planIfEmpty() {
+        if (c.repository.snapshot().liveItems.isEmpty()) c.settings.setListMode(ListMode.PLAN)
+    }
 
     // ---- the item sheet (5.7) ---------------------------------------------------------------
 
@@ -558,6 +564,7 @@ class ListViewModel(
     fun clearAll() =
         viewModelScope.launch {
             val stamp = c.repository.clearAll()
+            planIfEmpty()
             messages.send(UiMessage("List cleared", undo = { c.repository.undoDelete(stamp) }))
         }
 

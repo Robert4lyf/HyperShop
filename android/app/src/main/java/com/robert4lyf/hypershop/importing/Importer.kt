@@ -162,6 +162,8 @@ class Importer(
                             parsedBy = ParsedBy.CLAUDE,
                             model = r.recipe.model,
                             claudePending = false,
+                            claudeSkipped = false,
+                            askClaude = false,
                             sourceUrls = r.recipe.sourceUrls,
                             locale = localeFor(base.url, r.recipe.ingredients.map { it.raw }),
                         ).also { PhotoStore.delete(photo) }
