@@ -245,6 +245,7 @@ class AppContainer(
             repository.rekeyIfCatalogChanged()
             repository.purgeDeleted()
             importJobs.finishDiscards()
+            importJobs.finishThrowaways()
             repository.purgeOldJobs(clock() - JOB_KEEP_MS)
         }
         // The receiver first, so nothing the link hears is missed.

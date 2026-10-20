@@ -142,6 +142,17 @@ class ImportJobs(
     ) = dao.updateJobResult(id, json.encodeToString(ImportResult.serializer(), result))
 
     /**
+     * Start-up: edits and library re-adds left with Back before this was caught
+     * (or by a process killed mid-review) leave the "ready to review" card.
+     */
+    suspend fun finishThrowaways() {
+        for (e in dao.observeJobs(JobState.READY.name).first()) {
+            val r = e.resultJson?.let { runCatching { json.decodeFromString(ImportResult.serializer(), it) }.getOrNull() }
+            if (r?.throwaway == true) done(e.id)
+        }
+    }
+
+    /**
      * Jobs ready to review, for the list's card: their results are not decoded (a
      * page's text can be tens of KB and this re-emits with every job change).
      */

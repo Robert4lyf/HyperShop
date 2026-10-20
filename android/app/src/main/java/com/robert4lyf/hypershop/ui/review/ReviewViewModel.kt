@@ -202,8 +202,8 @@ class ReviewViewModel(
     /** The use an edit replaces ([ImportResult.editsUse]). */
     private val replacing: Long? get() = result?.editsUse
 
-    /** An edit of something already on the list: leaving it changes nothing, so there's nothing to undo. */
-    val isEdit: Boolean get() = replacing != null
+    /** An edit or a library re-add: leaving it changes nothing, so there's nothing to undo or come back to. */
+    val isThrowaway: Boolean get() = result?.throwaway == true
 
     /** See [act]. Declared before init, which uses it. */
     private val ops = Mutex()

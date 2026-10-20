@@ -200,7 +200,7 @@ class RecipesViewModel(
                     title = r.title,
                     servings = r.servingsOriginal,
                     locale = UnitLocale.valueOf(r.unitLocale),
-                    method = "LIBRARY",
+                    method = ImportResult.LIBRARY,
                     lines = lines,
                     parsedBy = runCatching { ParsedBy.valueOf(r.parsedBy) }.getOrDefault(ParsedBy.RULES),
                     model = r.model,

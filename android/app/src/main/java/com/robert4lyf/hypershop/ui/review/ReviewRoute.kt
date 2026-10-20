@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.ui.review
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -96,6 +97,10 @@ fun ReviewRoute(
             dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Keep editing") } },
         )
     }
+    // Back on an edit or a library re-add is Cancel: left as it was, it sat on the
+    // list as "1 recipe ready to review" for something that was never an import.
+    val live = state is ReviewState.Ready || state is ReviewState.Loading
+    BackHandler(enabled = live && vm.isThrowaway) { vm.cancel() }
     when (val s = state) {
         is ReviewState.Loading -> LoadingView(s, onCancel = vm::cancel, onPaste = vm::pasteInstead)
         is ReviewState.Ready ->
@@ -159,7 +164,7 @@ fun ReviewRoute(
         ReviewState.Cancelled ->
             LaunchedEffect(Unit) {
                 onDone()
-                if (vm.isEdit) {
+                if (vm.isThrowaway) {
                     // Nothing was changed on the list, so "Import discarded" and its Undo would be noise.
                     container.applicationScope.launch(Dispatchers.Main) { vm.discardForGood() }
                     return@LaunchedEffect

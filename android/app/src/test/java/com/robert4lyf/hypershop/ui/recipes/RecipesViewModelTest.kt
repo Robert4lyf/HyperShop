@@ -259,6 +259,36 @@ class RecipesViewModelTest {
     }
 
     @Test
+    fun leavingAnEditOrALibraryReAddLeavesNothingReadyToReview() {
+        val c = TestContainer.create()
+        c.add(*CHILLI)
+        val vm = RecipesViewModel(c).shown()
+        val start = await(vm.ui) { it.uses.isNotEmpty() && it.library.isNotEmpty() }
+        // Edit, then Back (which is Cancel on these).
+        vm.edit(start.uses.single())
+        val edit = ReviewViewModel(c, nextReview(vm))
+        await(edit.state) { it is ReviewState.Ready }
+        assertTrue(edit.isThrowaway)
+        edit.cancel()
+        await(edit.state) { it is ReviewState.Cancelled }
+        runBlocking { edit.discardForGood() }
+        // "Add" from the library, then Back.
+        vm.addFromLibrary(start.library.single())
+        val again = ReviewViewModel(c, nextReview(vm))
+        // Already on the list: the review asks first, as it does in the app.
+        await(again.state) { it is ReviewState.AlreadyOnList }
+        again.addAgain()
+        await(again.state) { it is ReviewState.Ready }
+        assertTrue(again.isThrowaway)
+        again.cancel()
+        await(again.state) { it is ReviewState.Cancelled }
+        runBlocking { again.discardForGood() }
+        assertTrue(runBlocking { c.importJobs.ready.first() }.isEmpty())
+        // The recipe on the list is untouched.
+        assertEquals(1, await(vm.ui) { it.uses.size == 1 }.uses.size)
+    }
+
+    @Test
     fun renamingShowsOnTheListAndInTheLibrary() {
         val c = TestContainer.create()
         c.add(*CHILLI)
