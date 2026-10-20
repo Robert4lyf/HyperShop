@@ -62,6 +62,7 @@ import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.library.LibraryRoute
 import com.robert4lyf.hypershop.ui.list.ListRoute
 import com.robert4lyf.hypershop.ui.list.show
+import com.robert4lyf.hypershop.ui.meals.MealsRoute
 import com.robert4lyf.hypershop.ui.recipes.RecipesRoute
 import com.robert4lyf.hypershop.ui.review.ReviewRoute
 import com.robert4lyf.hypershop.ui.settings.SettingsRoute
@@ -75,6 +76,7 @@ object Routes {
     const val DEBUG = "debug"
     const val LIBRARY = "library"
     const val VOICE_TEST = "voice-test"
+    const val MEALS = "meals"
 
     fun review(job: Long) = "review/$job"
 }
@@ -161,7 +163,28 @@ fun HyperShopApp(
             popExitTransition = { fadeOut(tween(100)) },
         ) {
             composable(Routes.LIST) { ListRoute(container, snackbar, onReview = openReview) }
-            composable(Routes.RECIPES) { RecipesRoute(container, snackbar, onReview = openReview) }
+            composable(Routes.RECIPES) {
+                RecipesRoute(
+                    container,
+                    snackbar,
+                    onReview = openReview,
+                    onMeals = { nav.navigate(Routes.MEALS) { launchSingleTop = true } },
+                )
+            }
+            composable(Routes.MEALS) {
+                MealsRoute(
+                    container,
+                    snackbar,
+                    onBack = { nav.popBackStack() },
+                    onList = {
+                        nav.navigate(Routes.LIST) {
+                            popUpTo(Routes.LIST) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
+            }
             composable(Routes.SETTINGS) {
                 SettingsRoute(
                     container,
@@ -222,8 +245,11 @@ private fun CompactNavBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             for ((r, label, on, off) in tabs) {
-                // The library and the voice test are part of Settings, so the Settings tab stays lit there.
-                val selected = route == r || (r == Routes.SETTINGS && (route == Routes.LIBRARY || route == Routes.VOICE_TEST))
+                // The library and the voice test are part of Settings, and the meals of Recipes, so those tabs stay lit there.
+                val selected =
+                    route == r ||
+                        (r == Routes.SETTINGS && (route == Routes.LIBRARY || route == Routes.VOICE_TEST)) ||
+                        (r == Routes.RECIPES && route == Routes.MEALS)
                 Column(
                     Modifier
                         .weight(1f)

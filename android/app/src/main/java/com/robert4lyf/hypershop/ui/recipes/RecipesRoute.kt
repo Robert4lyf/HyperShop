@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.Edit
@@ -76,6 +77,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.EmptyHero
+import com.robert4lyf.hypershop.ui.common.HeroButton
 import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.PillShape
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
@@ -100,6 +102,7 @@ fun RecipesRoute(
     container: AppContainer,
     snackbar: SnackbarHostState,
     onReview: (Long) -> Unit,
+    onMeals: () -> Unit = {},
 ) {
     val vm: RecipesViewModel = viewModel(factory = factoryFor { RecipesViewModel(container) })
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -137,6 +140,7 @@ fun RecipesRoute(
                 onPhoto = { uri, book, page -> vm.addPhoto(uri, book, page) },
             ),
         hasKey = hasKey,
+        onMeals = onMeals,
     )
     val useDetail by vm.useDetail.collectAsStateWithLifecycle()
     useDetail?.let { d ->
@@ -194,6 +198,8 @@ fun RecipesScreen(
     search: SearchBox = SearchBox(),
     /** A Claude key is saved: the photo option needs one. */
     hasKey: Boolean = true,
+    /** "Meals this week": pick saved recipes for the list. */
+    onMeals: () -> Unit = {},
 ) {
     // Which use or saved recipe a dialog is about, by id or key, so it survives a rotation.
     var confirm by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -231,11 +237,23 @@ fun RecipesScreen(
                                 n == 1 -> "1 recipe on your list"
                                 else -> "$n recipes on your list"
                             },
+                        actions = {
+                            if (ui.hasLibrary) {
+                                HeroButton(onClick = onMeals, modifier = Modifier.testTag("open-meals")) {
+                                    Icon(Icons.Rounded.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.size(6.dp))
+                                    Text("This week")
+                                }
+                            }
+                        },
                     )
                 }
                 if (ui.loaded && ui.uses.isEmpty() && !ui.hasLibrary) {
                     item(key = "empty") {
-                        EmptyHero("No recipes yet")
+                        EmptyHero(
+                            "No recipes yet",
+                            body = "Share a recipe link to HyperShop, or tap + to paste a link, type one in or photograph a cookbook page.",
+                        )
                     }
                 }
                 if (ui.hasLibrary) {
@@ -254,14 +272,14 @@ fun RecipesScreen(
                                 shape = SegmentedButtonDefaults.itemShape(1, 2),
                                 colors = basilSegmentedColors(),
                                 modifier = Modifier.testTag("view-library"),
-                            ) { Text("Library") }
+                            ) { Text("Saved") }
                         }
                     }
                 }
                 if (ui.loaded && ui.uses.isEmpty() && ui.hasLibrary && !showLibrary) {
                     item(key = "nothing-yet") {
                         InfoBanner(
-                            "Nothing on the list",
+                            "Nothing on the list. Pick this week's meals, or tap + for a new recipe.",
                             Icons.AutoMirrored.Rounded.MenuBook,
                             Modifier.padding(horizontal = 16.dp).testTag("nothing-yet"),
                         )
@@ -330,7 +348,16 @@ fun RecipesScreen(
     confirm?.let { id -> ui.uses.firstOrNull { it.useId == id } }?.let { use ->
         AlertDialog(
             onDismissRequest = { confirm = null },
-            title = { Text("Remove ${use.title}?") },
+            title = { Text("Remove ${use.title} from the list?") },
+            text = {
+                Text(
+                    if (use.recipeId == null) {
+                        "Its items come off the list."
+                    } else {
+                        "Its items come off the list. The recipe stays in your saved recipes."
+                    },
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     confirm = null
@@ -342,7 +369,7 @@ fun RecipesScreen(
     }
 }
 
-/** "Remove from your recipes": asks first. [onDismiss] runs whichever way it closes. */
+/** "Remove from your recipes": asks first, and says the list is untouched. [onDismiss] runs whichever way it closes. */
 @Composable
 private fun ForgetRecipeDialog(
     row: LibraryRow,
@@ -351,7 +378,8 @@ private fun ForgetRecipeDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Remove ${row.title} from your recipes?") },
+        title = { Text("Remove ${row.title} from your saved recipes?") },
+        text = { Text(if (row.onList) "What it put on the list stays there." else "You can add it again from a link or a photo.") },
         confirmButton = {
             TextButton(onClick = {
                 onDismiss()
@@ -495,7 +523,7 @@ private fun LibraryCard(
                 }
             }
             FilledTonalButton(onClick = onAdd, modifier = Modifier.testTag("lib-add-${row.key}")) {
-                Text(if (row.onList) "Add again" else "Add")
+                Text(if (row.onList) "Add again" else "Add to list")
             }
             var menu by remember { mutableStateOf(false) }
             Box {
@@ -592,7 +620,7 @@ private fun UseCard(
                     listOfNotNull(
                         use.servings?.let { "Serves $it" },
                         itemsLine(use.itemCount),
-                        use.inStockCount.takeIf { it > 0 }?.let { "$it in stock" },
+                        use.inStockCount.takeIf { it > 0 }?.let { "$it at home" },
                     )
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -607,7 +635,7 @@ private fun UseCard(
                         1 -> Fact(Icons.Rounded.ShoppingCart, "1 item", bg, fg)
                         else -> Fact(Icons.Rounded.ShoppingCart, "${use.itemCount} items", bg, fg)
                     }
-                    if (use.inStockCount > 0) Fact(Icons.Rounded.Inventory, "${use.inStockCount} in stock", bg, fg)
+                    if (use.inStockCount > 0) Fact(Icons.Rounded.Inventory, "${use.inStockCount} at home", bg, fg)
                 }
                 if (url != null) {
                     FilledTonalButton(onClick = { open(url) }, modifier = Modifier.testTag("open-${use.useId}")) {
@@ -809,7 +837,7 @@ fun UseDetailContent(
                         modifier = Modifier.weight(1f, fill = false),
                     )
                     if (inStock) {
-                        Text("In stock", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+                        Text("At home", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
                     }
                 }
             }
