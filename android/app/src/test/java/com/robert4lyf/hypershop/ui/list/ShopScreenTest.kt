@@ -8,6 +8,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -160,6 +161,18 @@ class ShopScreenTest {
         compose.onNodeWithTag("shop-recipe-use-1").assertExists()
         compose.onNodeWithTag("shop-aisle-PRODUCE").assertDoesNotExist()
         compose.onNodeWithTag("shop-next").assertTextContains("Next: Added by hand")
+    }
+
+    @Test
+    fun shownBoughtRowsSurviveRecreation() {
+        // A rotation or a process recreation: the aisle whose bought rows were opened stays open.
+        val tester = StateRestorationTester(compose)
+        tester.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(shop, actions) } }
+        compose.onNodeWithTag("shop-bought-aisle-PRODUCE").performClick()
+        compose.onNodeWithTag("item-3").assertExists()
+        tester.emulateSavedInstanceStateRestore()
+        compose.onNodeWithTag("item-3").assertExists()
+        assertEquals("Expanded", compose.onNodeWithTag("shop-bought-aisle-PRODUCE").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
     }
 
     @Test

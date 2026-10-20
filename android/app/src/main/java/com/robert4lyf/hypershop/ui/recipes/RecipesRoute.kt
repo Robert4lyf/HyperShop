@@ -575,8 +575,8 @@ private fun UseCard(
             // The recipe's own colour band: the same hue as its review screen.
             Box(Modifier.fillMaxWidth().lowPoly(use.title)) {
                 Column(
-                    Modifier.padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    Modifier.padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(use.title, style = MaterialTheme.typography.titleLarge, color = Brand.OnHero, modifier = Modifier.weight(1f))
@@ -587,6 +587,12 @@ private fun UseCard(
                                 Icon(Icons.Rounded.MoreVert, contentDescription = "More", tint = Brand.OnHero)
                             }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                if (url != null) {
+                                    DropdownMenuItem(text = { Text("Open recipe") }, modifier = Modifier.testTag("open-${use.useId}"), onClick = {
+                                        menu = false
+                                        open(url)
+                                    })
+                                }
                                 DropdownMenuItem(text = { Text("Rename") }, modifier = Modifier.testTag("rename-${use.useId}"), onClick = {
                                     menu = false
                                     onRename()
@@ -614,7 +620,7 @@ private fun UseCard(
                     }
                 }
             }
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 // The facts as one sentence for TalkBack, chips on screen.
                 val bits =
                     listOfNotNull(
@@ -636,13 +642,6 @@ private fun UseCard(
                         else -> Fact(Icons.Rounded.ShoppingCart, "${use.itemCount} items", bg, fg)
                     }
                     if (use.inStockCount > 0) Fact(Icons.Rounded.Inventory, "${use.inStockCount} at home", bg, fg)
-                }
-                if (url != null) {
-                    FilledTonalButton(onClick = { open(url) }, modifier = Modifier.testTag("open-${use.useId}")) {
-                        Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.size(8.dp))
-                        Text("Open recipe")
-                    }
                 }
             }
         }
