@@ -51,7 +51,7 @@ class MigrationTest {
         val room =
             Room.databaseBuilder(ApplicationProvider.getApplicationContext(), HyperShopDatabase::class.java, name)
                 .addCallback(HyperShopDatabase.CALLBACK)
-                .addMigrations(HyperShopDatabase.MIGRATION_1_2, HyperShopDatabase.MIGRATION_2_3)
+                .addMigrations(HyperShopDatabase.MIGRATION_1_2, HyperShopDatabase.MIGRATION_2_3, HyperShopDatabase.MIGRATION_3_4)
                 .allowMainThreadQueries()
                 .build()
         val idx =
@@ -75,7 +75,7 @@ class MigrationTest {
         val room =
             Room.databaseBuilder(ApplicationProvider.getApplicationContext(), HyperShopDatabase::class.java, name)
                 .addCallback(HyperShopDatabase.CALLBACK)
-                .addMigrations(HyperShopDatabase.MIGRATION_1_2, HyperShopDatabase.MIGRATION_2_3)
+                .addMigrations(HyperShopDatabase.MIGRATION_1_2, HyperShopDatabase.MIGRATION_2_3, HyperShopDatabase.MIGRATION_3_4)
                 .allowMainThreadQueries()
                 .build()
         val meta = runBlocking { room.dao().meta() }
@@ -100,6 +100,21 @@ class MigrationTest {
         val c = db.query("SELECT title, libraryKey, book, page FROM Recipe")
         assertTrue(c.moveToFirst())
         assertEquals(listOf("Soup", "r:1", "Simple", "142"), (0..3).map { c.getString(it) })
+        c.close()
+        db.close()
+    }
+
+    @Test
+    fun theHandAddedNameStartsUnset() {
+        helper.createDatabase(name, 3).apply {
+            execSQL("INSERT INTO Meta VALUES (1, 7, 12, 'old', 'marker', 99)")
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(name, 4, true, HyperShopDatabase.MIGRATION_3_4)
+        val c = db.query("SELECT listRev, manualTitle FROM Meta")
+        assertTrue(c.moveToFirst())
+        assertEquals(12L, c.getLong(0))
+        assertTrue(c.isNull(1))
         c.close()
         db.close()
     }

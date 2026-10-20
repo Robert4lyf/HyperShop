@@ -254,6 +254,18 @@ class RecipesViewModel(
             )
         }
 
+    /** The pencil on a card: the recipe everywhere it shows, or "Added by hand" itself. */
+    fun rename(
+        use: UseSummary,
+        title: String,
+    ) = viewModelScope.launch { c.repository.renameUse(use.useId, title) }
+
+    /** "Rename" on a saved recipe, and any copy of it on the list. */
+    fun renameSaved(
+        row: LibraryRow,
+        title: String,
+    ) = viewModelScope.launch { c.repository.renameLibrary(row.key, title) }
+
     /**
      * "Edit": the recipe back on the review screen as it went on the list (its lines,
      * servings and in-stock rows). Saving replaces this use; leaving changes nothing.

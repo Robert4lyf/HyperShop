@@ -23,6 +23,11 @@ data class MetaEntity(
     val epochMarker: String,
     /** The next id for any list row (ShoppingList.nextId); ids are never reused. */
     val nextId: Long,
+    /**
+     * What "Added by hand" is called ("Household"), or null for that. Kept here
+     * rather than on the use: a new hand-added use after "Finish shopping" keeps it.
+     */
+    val manualTitle: String? = null,
 )
 
 @Entity(tableName = "Item", indices = [Index("mergeKey"), Index("aisleCode")])

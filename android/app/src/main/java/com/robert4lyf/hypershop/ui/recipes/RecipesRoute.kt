@@ -87,6 +87,7 @@ import com.robert4lyf.hypershop.ui.common.rememberOpenLink
 import com.robert4lyf.hypershop.ui.common.siteName
 import com.robert4lyf.hypershop.ui.common.webLink
 import com.robert4lyf.hypershop.ui.list.show
+import com.robert4lyf.hypershop.ui.review.TitleDialog
 import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.theme.card
@@ -109,7 +110,14 @@ fun RecipesRoute(
         ui,
         onRemove = vm::remove,
         onEdit = vm::edit,
-        library = LibraryActions(onAdd = vm::addFromLibrary, onRemove = vm::removeFromLibrary, onOpen = vm::openDetail),
+        onRename = { use, title -> vm.rename(use, title) },
+        library =
+            LibraryActions(
+                onAdd = vm::addFromLibrary,
+                onRemove = vm::removeFromLibrary,
+                onOpen = vm::openDetail,
+                onRename = { row, title -> vm.renameSaved(row, title) },
+            ),
         search =
             SearchBox(
                 text = vm.searchText,
@@ -159,6 +167,7 @@ fun RecipesScreen(
     ui: RecipesUi,
     onRemove: (UseSummary) -> Unit,
     onEdit: (UseSummary) -> Unit = {},
+    onRename: (UseSummary, String) -> Unit = { _, _ -> },
     add: AddRecipeActions = AddRecipeActions(),
     library: LibraryActions = LibraryActions(),
     search: SearchBox = SearchBox(),
@@ -169,6 +178,8 @@ fun RecipesScreen(
     var confirm by rememberSaveable { mutableStateOf<Long?>(null) }
     var forget by rememberSaveable { mutableStateOf<String?>(null) }
     var addAgain by rememberSaveable { mutableStateOf<String?>(null) }
+    var renaming by rememberSaveable { mutableStateOf<Long?>(null) }
+    var renamingSaved by rememberSaveable { mutableStateOf<String?>(null) }
     var adding by rememberSaveable { mutableStateOf(false) }
     // Null until a toggle is tapped: the list when it has anything, else the library.
     var picked by rememberSaveable { mutableStateOf<Boolean?>(null) }
@@ -240,7 +251,7 @@ fun RecipesScreen(
                 }
                 if (!showLibrary) {
                     items(ui.uses, key = { it.useId }) { use ->
-                        UseCard(use, onRemove = { confirm = use.useId }, onEdit = { onEdit(use) })
+                        UseCard(use, onRemove = { confirm = use.useId }, onEdit = { onEdit(use) }, onRename = { renaming = use.useId })
                     }
                 }
                 if (showLibrary) {
@@ -262,6 +273,7 @@ fun RecipesScreen(
                             onAdd = { if (row.onList) addAgain = row.key else library.onAdd(row) },
                             onRemove = { forget = row.key },
                             onOpen = { library.onOpen(row) },
+                            onRename = { renamingSaved = row.key },
                         )
                     }
                 }
@@ -278,6 +290,18 @@ fun RecipesScreen(
     if (adding) AddRecipeSheet(add, onDismiss = { adding = false }, hasKey = hasKey, lastBook = ui.lastBook)
     ui.libraryRow(forget)?.let { row -> ForgetRecipeDialog(row, onConfirm = { library.onRemove(row) }, onDismiss = { forget = null }) }
     ui.libraryRow(addAgain)?.let { row -> AddAgainDialog(row, onConfirm = { library.onAdd(row) }, onDismiss = { addAgain = null }) }
+    renaming?.let { id -> ui.uses.firstOrNull { it.useId == id } }?.let { use ->
+        val byHand = use.recipeId == null
+        TitleDialog(
+            use.title,
+            onDismiss = { renaming = null },
+            heading = if (byHand) "Rename" else "Rename recipe",
+            label = if (byHand) "Name, e.g. Household" else "Recipe name",
+        ) { onRename(use, it) }
+    }
+    ui.libraryRow(renamingSaved)?.let { row ->
+        TitleDialog(row.title, onDismiss = { renamingSaved = null }) { library.onRename(row, it) }
+    }
     confirm?.let { id -> ui.uses.firstOrNull { it.useId == id } }?.let { use ->
         AlertDialog(
             onDismissRequest = { confirm = null },
@@ -392,6 +416,7 @@ data class LibraryActions(
     val onRemove: (LibraryRow) -> Unit = {},
     /** Tap: see its ingredients. */
     val onOpen: (LibraryRow) -> Unit = {},
+    val onRename: (LibraryRow, String) -> Unit = { _, _ -> },
 )
 
 /** One saved recipe: its name, where it's from, how big, when last added; Add to list. */
@@ -401,6 +426,7 @@ private fun LibraryCard(
     onAdd: () -> Unit,
     onRemove: () -> Unit,
     onOpen: () -> Unit,
+    onRename: () -> Unit,
 ) {
     val dark = LocalDarkTheme.current
     val hue = Brand.recipeHue(row.title)
@@ -459,6 +485,10 @@ private fun LibraryCard(
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text("Rename") }, modifier = Modifier.testTag("lib-rename-${row.key}"), onClick = {
+                        menu = false
+                        onRename()
+                    })
                     DropdownMenuItem(text = { Text("Remove from your recipes") }, onClick = {
                         menu = false
                         onRemove()
@@ -475,6 +505,7 @@ private fun UseCard(
     use: UseSummary,
     onRemove: () -> Unit,
     onEdit: () -> Unit,
+    onRename: () -> Unit,
 ) {
     val url = webLink(use.url)
     val open = rememberOpenLink()
@@ -488,8 +519,16 @@ private fun UseCard(
         Column {
             // The recipe's own colour band: the same hue as its review screen.
             Box(Modifier.fillMaxWidth().lowPoly(use.title)) {
-                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(use.title, style = MaterialTheme.typography.titleLarge, color = Brand.OnHero)
+                Column(
+                    Modifier.padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(use.title, style = MaterialTheme.typography.titleLarge, color = Brand.OnHero, modifier = Modifier.weight(1f))
+                        IconButton(onClick = onRename, modifier = Modifier.testTag("rename-${use.useId}")) {
+                            Icon(Icons.Rounded.Edit, contentDescription = "Rename", tint = Brand.OnHeroSoft)
+                        }
+                    }
                     val site = url?.let { siteName(it) }
                     val book = use.bookRef
                     when {
