@@ -1,4 +1,4 @@
-# HyperShop — progress (Runs 1–2)
+# HyperShop — progress (Runs 1–3)
 
 Legend: `[ ]` todo · `[x]` done · `[~]` stubbed · `[!]` blocked. Each item notes its check command.
 Find a sub-step's commit with `git log --grep '^\[<id>\]'`.
@@ -96,3 +96,8 @@ Run 1 stops here. The yes/no checks are in `docs/HANDOFF.md`. No PR: there is no
 Run 2 stops here. The yes/no checks (install, probe, sync, offline, memory, glance) are in `docs/HANDOFF.md`. The watch builds (`hypershop-fr245.prg`, `hypershop-fr245-debug.prg`) are attached to the rolling release once this run is merged.
 - [x] Hand-off B checklist written (docs/HANDOFF.md)
 - [x] Hand-off B checks on a real Forerunner 245: all pass; the glance is dropped (the 245 offers none for a watch app)
+
+# Run 3 — Simplify (docs/design/simplify.md)
+
+## Step 8 — Simpler to use, safer to keep
+- [x] 8.4 Backup and restore: `BackupData` (every user-data table, `@Serializable` entities) + `BackupValidator` (ids, references, enums, JSON, live keys, sizes) in `:data`; `ListRepository.exportBackup` / `restoreBackup` (one transaction, new list epoch and marker, watch installs and import jobs dropped, catalogue re-key after); `BackupManager` in `:app` (versioned `hypershop-backup` JSON with settings and ingredient edits, never the key, through the Storage Access Framework); Settings › Data: "Back up to a file", "Restore" with a confirmation that says what the file holds, and Undo after a restore — check: `tools/gradle.sh :data:testDebugUnitTest --tests "*BackupTest*" :app:testDebugUnitTest --tests "*Backup*" --tests "*SettingsViewModelTest*"`

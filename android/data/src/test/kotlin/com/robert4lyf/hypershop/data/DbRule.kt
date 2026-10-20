@@ -9,12 +9,17 @@ class DbRule : ExternalResource() {
     lateinit var repo: ListRepository
     var now = 1_000_000L
 
-    override fun before() {
+    override fun before() = open()
+
+    override fun after() = close()
+
+    /** A second database in one test (a restore onto "another phone"). */
+    fun open() {
         db = HyperShopDatabase.inMemory(ApplicationProvider.getApplicationContext())
         repo = ListRepository(db, clock = { now })
     }
 
-    override fun after() = db.close()
+    fun close() = db.close()
 
     /** Every table except revs, listRev and nextId: "equal apart from revs". */
     fun dump(): String {

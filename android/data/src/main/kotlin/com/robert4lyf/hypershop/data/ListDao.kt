@@ -324,4 +324,90 @@ interface ListDao {
     /** Bumped on every list write; the UI observes it. */
     @Query("SELECT listRev FROM Meta WHERE id = 1")
     fun observeListRev(): Flow<Long?>
+
+    // ---- backup and restore (Backup.kt) ------------------------------------------
+    @Query("SELECT * FROM LineDecision")
+    suspend fun allDecisions(): List<LineDecisionEntity>
+
+    @Query("SELECT * FROM Recipe")
+    suspend fun allRecipes(): List<RecipeEntity>
+
+    @Query("SELECT * FROM RecipeLine ORDER BY id")
+    suspend fun allLines(): List<RecipeLineEntity>
+
+    @Query("SELECT * FROM StoreProfile")
+    suspend fun stores(): List<StoreProfileEntity>
+
+    @Query("SELECT * FROM AisleOrder")
+    suspend fun allAisleOrder(): List<AisleOrderEntity>
+
+    @Query("SELECT * FROM DeletedItem")
+    suspend fun allDeleted(): List<DeletedItemEntity>
+
+    @Insert
+    suspend fun insertRecipes(rows: List<RecipeEntity>)
+
+    @Insert
+    suspend fun insertAisles(rows: List<AisleEntity>)
+
+    @Insert
+    suspend fun insertStores(rows: List<StoreProfileEntity>)
+
+    @Insert
+    suspend fun insertOverrides(rows: List<CategoryOverrideEntity>)
+
+    @Insert
+    suspend fun insertStaples(rows: List<StapleEntity>)
+
+    @Insert
+    suspend fun insertUsage(rows: List<ClaudeUsageEntity>)
+
+    /** Children first, then parents: every user-data table, in an order the foreign keys allow. */
+    @Query("DELETE FROM LineDecision")
+    suspend fun clearDecisions()
+
+    @Query("DELETE FROM Contribution")
+    suspend fun clearContributions()
+
+    @Query("DELETE FROM Tick")
+    suspend fun clearTicks()
+
+    @Query("DELETE FROM RecipeUse")
+    suspend fun clearUses()
+
+    @Query("DELETE FROM RecipeLine")
+    suspend fun clearLines()
+
+    @Query("DELETE FROM Recipe")
+    suspend fun clearRecipes()
+
+    @Query("DELETE FROM ItemAlias")
+    suspend fun clearAliases()
+
+    @Query("DELETE FROM DeletedItem")
+    suspend fun clearDeleted()
+
+    @Query("DELETE FROM Item")
+    suspend fun clearItems()
+
+    @Query("DELETE FROM AisleOrder")
+    suspend fun clearAisleOrder()
+
+    @Query("DELETE FROM StoreProfile")
+    suspend fun clearStores()
+
+    @Query("DELETE FROM Aisle")
+    suspend fun clearAisles()
+
+    @Query("DELETE FROM CategoryOverride")
+    suspend fun clearOverrides()
+
+    @Query("DELETE FROM Staple")
+    suspend fun clearStaples()
+
+    @Query("DELETE FROM ClaudeUsage")
+    suspend fun clearUsage()
+
+    @Query("DELETE FROM ImportJob")
+    suspend fun clearJobs()
 }

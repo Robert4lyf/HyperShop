@@ -589,6 +589,43 @@ class ListRepository(
         }
 
     /**
+     * "Meals this week": a saved recipe straight on to the list, as "Add to list"
+     * and then "Add N items" would put it with nothing changed on the review:
+     * staples at home, every other line added, at [servings] (the recipe's own
+     * when null). A fresh copy of the recipe is stored, as the review does. The
+     * result, or null when the recipe is gone or has no lines.
+     */
+    suspend fun addSavedRecipe(
+        recipeId: Long,
+        servings: Int? = null,
+    ): ApplyResult? {
+        val (r, lines) = librarySource(recipeId) ?: return null
+        if (lines.isEmpty()) return null
+        val stored =
+            storeRecipe(
+                r.url,
+                r.title,
+                r.servingsOriginal,
+                UnitLocale.valueOf(r.unitLocale),
+                r.source,
+                runCatching { ParsedBy.valueOf(r.parsedBy) }.getOrDefault(ParsedBy.RULES),
+                r.model,
+                false,
+                lines,
+                r.libraryKey ?: r.url ?: "r:${r.id}",
+                r.book,
+                r.page,
+            )
+        // The preview reads the list outside apply's transaction: a change in between is Stale, so try again.
+        repeat(3) {
+            val result = apply(preview(stored, servings ?: r.servingsOriginal))
+            if (result is ApplyResult.Applied) return result
+        }
+        discardRecipe(stored.recipe.id)
+        return ApplyResult.Stale
+    }
+
+    /**
      * "Edit" on the Recipes tab: the recipe as it went on the list for [useId] —
      * the recipe, its lines in order, the indices of those marked in stock — and
      * the use's servings. Null when the use or recipe is gone.
@@ -1039,6 +1076,108 @@ class ListRepository(
 
     /** Import jobs long finished (reviewed, cancelled or failed) go: their result text is the page, tens of KB each. */
     suspend fun purgeOldJobs(before: Long) = dao.deleteFinishedJobsBefore(before)
+
+    // ---- backup and restore (Backup.kt) ----------------------------------------------------
+
+    /** Every user-data table, read in one transaction. */
+    suspend fun exportBackup(): BackupData =
+        db.withTransaction {
+            val meta = dao.meta()!!
+            BackupData(
+                listRev = meta.listRev,
+                nextId = meta.nextId,
+                catalogVersion = meta.catalogVersion,
+                manualTitle = meta.manualTitle,
+                items = dao.items(),
+                aliases = dao.aliases(),
+                recipes = dao.allRecipes(),
+                lines = dao.allLines(),
+                uses = dao.uses(),
+                ticks = dao.ticks(),
+                contributions = dao.contributions(),
+                decisions = dao.allDecisions(),
+                aisles = dao.aisles(),
+                stores = dao.stores(),
+                aisleOrder = dao.allAisleOrder(),
+                overrides = dao.overrides(),
+                staples = dao.staples(),
+                usage = dao.usage(),
+                deleted = dao.allDeleted(),
+            )
+        }
+
+    /**
+     * Replaces every user-data table with [b], in one transaction, after
+     * [BackupValidator] has passed it (the problems are returned and nothing is
+     * written otherwise). The list gets a new epoch and marker, and every watch
+     * install is forgotten: the watch sees a replaced list, as after a system
+     * restore. Import jobs go too (they belong to the old data). The catalogue
+     * re-key runs afterwards, so items keyed by an older catalogue still merge.
+     */
+    suspend fun restoreBackup(
+        b: BackupData,
+        marker: EpochMarker,
+    ): List<String> {
+        val problems = BackupValidator.validate(b)
+        if (problems.isNotEmpty()) return problems
+        val fresh = EpochMarker.newMarker()
+        db.withTransaction {
+            dao.clearDecisions()
+            dao.clearContributions()
+            dao.clearTicks()
+            dao.clearUses()
+            dao.clearLines()
+            dao.clearRecipes()
+            dao.clearAliases()
+            dao.clearDeleted()
+            dao.clearItems()
+            dao.clearAisleOrder()
+            dao.clearStores()
+            dao.clearAisles()
+            dao.clearOverrides()
+            dao.clearStaples()
+            dao.clearUsage()
+            dao.clearJobs()
+            dao.clearInstalls()
+            dao.clearOpResults()
+            // Parents before children. Every aisle must exist: a backup from before an aisle was added gets it at the end.
+            val known = b.aisles.map { it.code }.toSet()
+            val missing = AisleCode.entries.filter { it.name !in known }.map { AisleEntity(it.name, it.displayName, false, it.ordinal) }
+            dao.insertAisles(b.aisles + missing)
+            dao.insertStores(b.stores.ifEmpty { listOf(StoreProfileEntity(1, "My store")) })
+            val ordered = b.aisleOrder.filter { it.storeId == 1L }
+            val had = ordered.map { it.aisleCode }.toSet()
+            val after = (ordered.maxOfOrNull { it.position } ?: -1) + 1
+            val tail = AisleCode.entries.filter { it.name !in had }.mapIndexed { i, a -> AisleOrderEntity(1, a.name, after + i) }
+            dao.putAisleOrder(b.aisleOrder + tail)
+            dao.insertOverrides(b.overrides)
+            dao.insertStaples(b.staples)
+            dao.insertUsage(b.usage)
+            dao.upsertItems(b.items)
+            dao.upsertAliases(b.aliases)
+            dao.putDeleted(b.deleted)
+            dao.insertRecipes(b.recipes)
+            dao.insertLines(b.lines)
+            dao.upsertUses(b.uses)
+            dao.upsertTicks(b.ticks)
+            dao.upsertContributions(b.contributions)
+            dao.putDecisions(b.decisions)
+            val meta = dao.meta()!!
+            dao.putMeta(
+                meta.copy(
+                    listEpoch = EpochMarker.newEpoch(),
+                    epochMarker = fresh,
+                    listRev = maxOf(b.listRev, meta.listRev) + 1,
+                    nextId = b.nextId,
+                    catalogVersion = b.catalogVersion,
+                    manualTitle = b.manualTitle,
+                ),
+            )
+        }
+        marker.write(fresh)
+        rekeyIfCatalogChanged()
+        return emptyList()
+    }
 
     companion object {
         const val RESULT_HISTORY = 64

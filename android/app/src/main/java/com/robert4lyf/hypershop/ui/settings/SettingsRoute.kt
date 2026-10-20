@@ -2,7 +2,10 @@ package com.robert4lyf.hypershop.ui.settings
 
 import android.app.Activity
 import android.content.ClipboardManager
+import android.net.Uri
 import android.view.WindowManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -41,6 +44,7 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Route
+import androidx.compose.material.icons.rounded.SaveAlt
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Watch
 import androidx.compose.material3.AlertDialog
@@ -93,6 +97,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.robert4lyf.hypershop.backup.BackupManager
 import com.robert4lyf.hypershop.claude.ClaudeModel
 import com.robert4lyf.hypershop.core.merge.UnitsSetting
 import com.robert4lyf.hypershop.core.model.AisleCode
@@ -139,6 +144,11 @@ data class SettingsActions(
     val onVoiceTest: () -> Unit = {},
     /** Debug builds only. */
     val onDebug: (() -> Unit)? = null,
+    /** Data: the file pickers (Storage Access Framework) are the route's; the view model gets the Uri. */
+    val onBackup: () -> Unit = {},
+    val onRestore: () -> Unit = {},
+    val onConfirmRestore: () -> Unit = {},
+    val onCancelRestore: () -> Unit = {},
 )
 
 @Composable
@@ -155,6 +165,12 @@ fun SettingsRoute(
     val own = remember { SnackbarHostState() }
     val host = snackbar ?: own
     LaunchedEffect(vm, host) { vm.events.collect { show(container, host, it) } }
+    // The user picks where the backup goes and which file to restore; the app never sees any other file.
+    val createBackup =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.CreateDocument("application/json"),
+        ) { uri: Uri? -> uri?.let(vm::backupTo) }
+    val openBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? -> uri?.let(vm::inspectRestore) }
     SettingsScreen(
         ui,
         SettingsActions(
@@ -178,6 +194,10 @@ fun SettingsRoute(
             onDebug = onDebug,
             onLibrary = onLibrary,
             onVoiceTest = onVoiceTest,
+            onBackup = { createBackup.launch(BackupManager.suggestedName(container.clock())) },
+            onRestore = { openBackup.launch(arrayOf("application/json", "application/octet-stream", "text/plain", "*/*")) },
+            onConfirmRestore = vm::confirmRestore,
+            onCancelRestore = vm::cancelRestore,
         ),
         snackbar = own.takeIf { snackbar == null },
     )
@@ -220,10 +240,33 @@ fun SettingsScreen(
                     EdgeDivider()
                     CapsSection(ui, actions)
                 }
+                card("Data", Icons.Rounded.SaveAlt, hue = 45f) { DataGroup(ui, actions) }
                 card("Advanced", Icons.Rounded.Code, hue = 180f) { AdvancedGroup(ui, actions) }
             }
             snackbar?.let { SnackbarHost(it, Modifier.align(Alignment.BottomCenter)) }
         }
+    }
+    ui.restorePrompt?.let { p ->
+        val date = android.text.format.DateFormat.getMediumDateFormat(LocalContext.current).format(java.util.Date(p.createdAt))
+        AlertDialog(
+            onDismissRequest = actions.onCancelRestore,
+            icon = { Icon(Icons.Rounded.SaveAlt, contentDescription = null) },
+            title = { Text("Restore this backup?") },
+            text = {
+                Text(
+                    "From $date: ${if (p.recipes == 1) "1 recipe" else "${p.recipes} recipes"} and " +
+                        "${if (p.itemsOnList == 1) "1 item" else "${p.itemsOnList} items"} on the list.\n\n" +
+                        "Everything on this phone is replaced (Undo is offered afterwards). Your Claude key stays as it is.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = actions.onConfirmRestore,
+                    modifier = Modifier.testTag("restore-confirm"),
+                ) { Text("Restore") }
+            },
+            dismissButton = { TextButton(onClick = actions.onCancelRestore) { Text("Cancel") } },
+        )
     }
     if (ui.keyLost) {
         AlertDialog(
@@ -337,7 +380,7 @@ private fun ListGroup(
         }
     }
     Spacer(Modifier.height(4.dp))
-    SectionLabel("Always in stock")
+    SectionLabel("Always at home")
     if (ui.staples.isEmpty()) {
         Hint("None")
     } else {
@@ -416,6 +459,23 @@ private fun AislesGroup(
             },
             dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Keep") } },
         )
+    }
+}
+
+/** Back up to a file the user picks, or restore from one; what travels and what never does. */
+@Composable
+private fun DataGroup(
+    ui: SettingsUi,
+    actions: SettingsActions,
+) {
+    Hint("Your recipes, list, ingredient edits and settings go in one file you choose. Your Claude key never does.")
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FilledTonalButton(
+            onClick = actions.onBackup,
+            enabled = !ui.dataBusy,
+            modifier = Modifier.testTag("backup"),
+        ) { Text("Back up to a file") }
+        OutlinedButton(onClick = actions.onRestore, enabled = !ui.dataBusy, modifier = Modifier.testTag("restore")) { Text("Restore") }
     }
 }
 
