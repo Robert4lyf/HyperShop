@@ -17,6 +17,7 @@ import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.data.InStockLine
 import com.robert4lyf.hypershop.data.MANUAL_TITLE
 import com.robert4lyf.hypershop.di.AppContainer
+import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.common.webLink
@@ -110,11 +111,16 @@ data class ListUi(
     val view: ListView = ListView.STORE,
     /** The recipe view's cards, in the order the recipes were added; empty in the other views. */
     val recipes: List<RecipeSection> = emptyList(),
+    /** Planning or shopping (Settings.listMode). */
+    val mode: ListMode = ListMode.PLAN,
 ) {
     /** Rows grouped within each aisle, with a label per group. */
     val categorised: Boolean get() = view == ListView.TYPE
 
     val isEmpty: Boolean get() = loaded && aisles.isEmpty()
+
+    /** The shop screen is showing: shopping mode, with something to shop for (an empty list is planned, never shopped). */
+    val shopping: Boolean get() = mode == ListMode.SHOP && loaded && aisles.isNotEmpty()
     val left: Int get() = aisles.sumOf { (_, r) -> r.count { it.state != TickState.DONE } }
     val doneCount: Int get() = aisles.sumOf { (_, r) -> r.count { it.state == TickState.DONE } }
 }
@@ -150,8 +156,8 @@ class ListViewModel(
     /** The item sheet being loaded: a newer open, or a close, cancels it. */
     private var openJob: Job? = null
 
-    /** The walking order and the layout. */
-    private val view = combine(order, c.settings.listView) { o, v -> o to v }
+    /** The walking order, the layout and the mode. */
+    private val view = combine(order, c.settings.listView, c.settings.listMode) { o, v, m -> Triple(o, v, m) }
 
     /**
      * The list with its in-stock lines and recipe titles, read together on every
@@ -162,10 +168,16 @@ class ListViewModel(
     private val listWithInStock = c.repository.list.map { Triple(it, c.repository.inStockOnList(it), sources(it)) }
 
     val ui: StateFlow<ListUi> =
-        combine(listWithInStock, c.settings.units, view, c.importJobs.ready, plusOne) { (list, lines, src), units, (ord, v), ready, p ->
+        combine(listWithInStock, c.settings.units, view, c.importJobs.ready, plusOne) { (list, lines, src), units, (ord, v, m), ready, p ->
             lastList = list
             lastUnits = units
-            build(list, units, ord, v, src).copy(readyJobs = ready.map { it.id }, plusOne = p, inStock = inStockRows(lines, units))
+            build(
+                list,
+                units,
+                ord,
+                v,
+                src,
+            ).copy(readyJobs = ready.map { it.id }, plusOne = p, inStock = inStockRows(lines, units), mode = m)
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.Eagerly, ListUi())
 
@@ -320,6 +332,9 @@ class ListViewModel(
     /** The menu's choice of layout. */
     fun setView(v: ListView) = viewModelScope.launch { c.settings.setListView(v) }
 
+    /** "Shop" / "Plan": the mode is a setting, so it survives a restart mid-shop. Nothing on the list changes. */
+    fun setMode(m: ListMode) = viewModelScope.launch { c.settings.setListMode(m) }
+
     /** The round tick: tick, or untick a DONE row. */
     fun toggle(row: ListRow) = toggle(row.id)
 
@@ -341,7 +356,11 @@ class ListViewModel(
         viewModelScope.launch {
             // Counted inside the write: a tick still on its way to the screen is included.
             val (stamp, n) = c.repository.finish()
-            messages.send(UiMessage("Finished: removed $n ticked items", undo = { c.repository.undoDelete(stamp) }))
+            messages.send(
+                UiMessage(if (n == 1) "Finished: 1 bought item removed" else "Finished: $n bought items removed", undo = {
+                    c.repository.undoDelete(stamp)
+                }),
+            )
         }
 
     // ---- the item sheet (5.7) ---------------------------------------------------------------

@@ -51,6 +51,9 @@ sealed interface ClaudeResult {
         /** No network: switch to offline mode (rule parser, "Claude pending"). */
         OFFLINE,
 
+        /** The reply started and then stalled past the read timeout; what was billed is recorded. */
+        TIMEOUT,
+
         /** `stop_reason: max_tokens`: treated as an error, never half-used. */
         MAX_TOKENS,
 

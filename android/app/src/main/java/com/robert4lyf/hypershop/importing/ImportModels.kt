@@ -37,6 +37,10 @@ data class ImportResult(
     val targetServings: Int? = null,
     /** Claude was already called for this import (and failed or refused); don't call it again on open. */
     val claudeTried: Boolean = false,
+    /** The rule parser read every line without doubt, so Claude was not asked (the hybrid gate). */
+    val claudeSkipped: Boolean = false,
+    /** "Ask Claude" on the review: call it whatever the gate says. */
+    val askClaude: Boolean = false,
     /** "Edit" on the Recipes tab: the use this review replaces when saved. */
     val editsUse: Long? = null,
     /** With [editsUse]: the indices of [lines] that were marked in stock. */
