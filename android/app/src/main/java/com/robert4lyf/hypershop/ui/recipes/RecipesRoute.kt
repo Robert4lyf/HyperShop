@@ -557,8 +557,30 @@ private fun UseCard(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(use.title, style = MaterialTheme.typography.titleLarge, color = Brand.OnHero, modifier = Modifier.weight(1f))
-                        IconButton(onClick = onRename, modifier = Modifier.testTag("rename-${use.useId}")) {
-                            Icon(Icons.Rounded.Edit, contentDescription = "Rename", tint = Brand.OnHeroSoft)
+                        // Everything that changes the recipe, in one place; a tap on the card shows it.
+                        var menu by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { menu = true }, modifier = Modifier.testTag("more-${use.useId}")) {
+                                Icon(Icons.Rounded.MoreVert, contentDescription = "More", tint = Brand.OnHero)
+                            }
+                            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                DropdownMenuItem(text = { Text("Rename") }, modifier = Modifier.testTag("rename-${use.useId}"), onClick = {
+                                    menu = false
+                                    onRename()
+                                })
+                                DropdownMenuItem(text = { Text("Edit") }, modifier = Modifier.testTag("edit-${use.useId}"), onClick = {
+                                    menu = false
+                                    onEdit()
+                                })
+                                DropdownMenuItem(text = {
+                                    Text(
+                                        "Remove from list",
+                                    )
+                                }, modifier = Modifier.testTag("remove-${use.useId}"), onClick = {
+                                    menu = false
+                                    onRemove()
+                                })
+                            }
                         }
                     }
                     val site = url?.let { siteName(it) }
@@ -588,28 +610,12 @@ private fun UseCard(
                     Fact(Icons.Rounded.ShoppingCart, if (use.itemCount == 1) "1 item" else "${use.itemCount} items", bg, fg)
                     if (use.inStockCount > 0) Fact(Icons.Rounded.Inventory, "${use.inStockCount} in stock", bg, fg)
                 }
-                // One filled button for the main thing, the rest as text; wraps on narrow
-                // phones and large text instead of squeezing the last button.
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (url != null) {
-                        FilledTonalButton(onClick = { open(url) }, modifier = Modifier.testTag("open-${use.useId}")) {
-                            Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.size(8.dp))
-                            Text("Open recipe")
-                        }
-                        TextButton(onClick = onEdit, modifier = Modifier.testTag("edit-${use.useId}")) { Text("Edit") }
-                    } else {
-                        FilledTonalButton(onClick = onEdit, modifier = Modifier.testTag("edit-${use.useId}")) {
-                            Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.size(8.dp))
-                            Text("Edit")
-                        }
+                if (url != null) {
+                    FilledTonalButton(onClick = { open(url) }, modifier = Modifier.testTag("open-${use.useId}")) {
+                        Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text("Open recipe")
                     }
-                    TextButton(onClick = onRemove) { Text("Remove from list") }
                 }
             }
         }
