@@ -121,7 +121,7 @@ fun ManualLinesView(
                 }
                 if (candidates.isNotEmpty()) {
                     item(key = "from-page") {
-                        SectionLabel("Or tick lines from the page", Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp))
+                        SectionLabel("Or pick lines from the page", Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp))
                     }
                 }
                 itemsIndexed(candidates) { i, line ->

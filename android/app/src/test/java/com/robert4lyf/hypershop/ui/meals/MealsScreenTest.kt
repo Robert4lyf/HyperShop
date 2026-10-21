@@ -63,7 +63,7 @@ class MealsScreenTest {
         compose.onNodeWithTag("meal-remove-2").performClick()
         compose.onNodeWithTag("meals-remove-confirm").performClick()
         compose.onNodeWithTag("meals-list").performClick()
-        assertEquals(listOf("serves 1 5", "serves 1 3", "remove 2", "list"), events)
+        assertEquals(listOf("serves 1 1", "serves 1 -1", "remove 2", "list"), events)
     }
 
     @Test

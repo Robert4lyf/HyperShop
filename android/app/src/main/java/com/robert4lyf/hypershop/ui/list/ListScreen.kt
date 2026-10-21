@@ -599,7 +599,7 @@ private fun ListRowItem(
             Modifier
                 .size(56.dp)
                 .clip(CircleShape)
-                // clickable carries the spoken action ("Tick"/"Untick") and the role; the
+                // clickable carries the spoken action ("Mark bought"/"Mark not bought") and the role; the
                 // name and state are added below (the tick's icons have no labels of their own).
                 .clickable(onClickLabel = if (done) "Mark not bought" else "Mark bought", role = Role.Checkbox) { actions.onToggle(row) }
                 .semantics {

@@ -8,6 +8,7 @@ import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.testutil.await
+import com.robert4lyf.hypershop.testutil.awaitTrue
 import com.robert4lyf.hypershop.testutil.readyJob
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.recipes.RecipesViewModel
@@ -99,8 +100,12 @@ class MealsViewModelTest {
         assertEquals(4, ui.meals.single().servings)
         vm.setServings(ui.meals.single(), 8)
         ui = await(vm.ui) { it.meals.single().servings == 8 }
-        val l = runBlocking { c.repository.snapshot() }
-        assertEquals(Rational.of(4), l.total(l.itemByKey("cat:onion")!!.id)[BaseKey.ITEMS])
+        awaitTrue {
+            runBlocking { c.repository.snapshot() }.let {
+                    l ->
+                l.total(l.itemByKey("cat:onion")!!.id)[BaseKey.ITEMS] == Rational.of(4)
+            }
+        }
         vm.remove(ui.meals.single())
         ui = await(vm.ui) { it.meals.isEmpty() }
         assertTrue(runBlocking { c.repository.snapshot() }.liveItems.isEmpty())
@@ -110,6 +115,43 @@ class MealsViewModelTest {
         runBlocking { got[1].undo!!.invoke() }
         ui = await(vm.ui) { it.meals.size == 1 }
         assertEquals(8, ui.meals.single().servings)
+    }
+
+    @Test
+    fun rapidServingsTapsAllCountAndUndoOnceToWhereTheyBegan() {
+        val c = TestContainer.create()
+        save(c, "Weeknight chilli", "2 onions")
+        val vm = MealsViewModel(c).shown()
+        val got = messages(vm)
+        vm.add(await(vm.ui) { it.loaded && it.picks.size == 1 }.picks.single())
+        await(vm.ui) { it.meals.size == 1 && got.size == 1 }
+        // Four taps inside one frame: each counts from the last, not from the list's stale 4.
+        repeat(4) { vm.stepServings(vm.ui.value.meals.single(), 1) }
+        assertEquals(8, vm.ui.value.meals.single().servings)
+        awaitTrue { got.size == 2 }
+        assertEquals("Weeknight chilli serves 8", got[1].text)
+        val onion = { runBlocking { c.repository.snapshot() }.let { l -> l.total(l.itemByKey("cat:onion")!!.id)[BaseKey.ITEMS] } }
+        assertEquals(Rational.of(4), onion())
+        // Never below one, and one Undo goes back to 4.
+        runBlocking { got[1].undo!!.invoke() }
+        assertEquals(Rational.of(2), onion())
+        assertEquals(4, await(vm.ui) { it.meals.single().servings == 4 }.meals.single().servings)
+        repeat(10) { vm.stepServings(vm.ui.value.meals.single(), -1) }
+        assertEquals(1, vm.ui.value.meals.single().servings)
+    }
+
+    @Test
+    fun aServingsChangeOnAMealRemovedElsewhereSaysSo() {
+        val c = TestContainer.create()
+        save(c, "Weeknight chilli", "2 onions")
+        val vm = MealsViewModel(c).shown()
+        val got = messages(vm)
+        vm.add(await(vm.ui) { it.loaded && it.picks.size == 1 }.picks.single())
+        val meal = await(vm.ui) { it.meals.size == 1 && got.size == 1 }.meals.single()
+        runBlocking { c.repository.removeUse(meal.useId) }
+        vm.stepServings(meal, 1)
+        awaitTrue { got.size == 2 }
+        assertEquals("Couldn't change Weeknight chilli: it is no longer on the list", got[1].text)
     }
 
     @Test
