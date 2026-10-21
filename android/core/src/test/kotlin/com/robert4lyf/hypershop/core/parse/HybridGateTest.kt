@@ -57,11 +57,11 @@ class HybridGateTest {
             )
         }
 
-    private fun heldOut(): List<Line> =
-        Json.parseToJsonElement(File("../../testdata/eval/held-out-2026.json").readText()).jsonArray.map {
+    private fun heldOut(set: String = "held-out-2026"): List<Line> =
+        Json.parseToJsonElement(File("../../testdata/eval/$set.json").readText()).jsonArray.map {
             val o = it.jsonObject
             Line(
-                "held-out-2026",
+                set,
                 o.getValue("id").jsonPrimitive.content,
                 o.getValue("raw").jsonPrimitive.content,
                 o.getValue("name").jsonPrimitive.content,
@@ -103,7 +103,7 @@ class HybridGateTest {
 
     @Test
     fun passedLinesScoreAtLeastAsWellAsClaude() {
-        val all = score(golden("frozen.json") + golden("synthetic-uk.json") + heldOut())
+        val all = score(golden("frozen.json") + golden("synthetic-uk.json") + heldOut() + heldOut("held-out-2026b"))
         val report = StringBuilder("# Hybrid gate: the rule parser on the lines it would keep\n\n")
         report.append("Uncertainty = the parser's `check` flag, no name, a digit with no amount read, or a sentence-length name.\n\n")
         report.append(
@@ -147,7 +147,7 @@ class HybridGateTest {
         File("build/reports/hybrid-gate.md").writeText(report.toString())
         println(report)
         // The golden sets alone (the held-out lines are reported, not gated: they were written for this test).
-        val gold = all.filter { it.line.set != "held-out-2026" && it.reason == null }
+        val gold = all.filter { !it.line.set.startsWith("held-out") && it.reason == null }
         val name = gold.count { it.nameOk }.toDouble() / gold.size
         val qty = gold.count { it.qtyOk }.toDouble() / gold.size
         assertTrue(name >= 0.94, "passed lines: name ${"%.1f".format(name * 100)}% < Haiku's 94%; see build/reports/hybrid-gate.md")
