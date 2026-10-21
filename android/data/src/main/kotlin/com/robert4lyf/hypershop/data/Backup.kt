@@ -180,7 +180,15 @@ object BackupValidator {
         for (st in b.staples) check(st.key.length in 1..MAX_TEXT, "staple: bad key")
         check(b.staples.map { it.key }.toSet().size == b.staples.size, "duplicate staples")
         for (d in b.deleted) check(d.id in items, "deleted ${d.id}: item is missing")
-        for (u in b.usage) check(u.date.length <= 10 && u.model.length <= 100, "usage ${u.date}: bad row")
+        for (u in b.usage) {
+            check(u.date.length <= 10 && u.model.length <= 100, "usage ${u.date.take(10)}: bad row")
+            check(
+                u.inputTokens >= 0 && u.outputTokens >= 0 && u.cacheWrite >= 0 && u.cacheRead >= 0 && u.calls >= 0,
+                "usage ${u.date.take(10)}: a negative count",
+            )
+        }
+        check(b.catalogVersion.length <= MAX_TEXT, "the catalogue version is too long")
+        check((b.manualTitle?.length ?: 0) <= MAX_TEXT, "the hand-added title is too long")
         return problems
     }
 }

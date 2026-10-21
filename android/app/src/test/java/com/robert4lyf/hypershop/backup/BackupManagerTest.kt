@@ -42,4 +42,17 @@ class BackupManagerTest {
         // The key never travels.
         assertTrue(!file.readText().contains("sk-ant"))
     }
+
+    @Test
+    fun theFirstFormatStaysReadable() {
+        val c = TestContainer.create()
+        // As the first version wrote it, before settings and library edits had defaults to lean on.
+        val v1 =
+            """{"format":"hypershop-backup","version":1,"createdAt":1760000000000,""" +
+                """"data":{"listRev":1,"nextId":1,"catalogVersion":"x"}}"""
+        val i = BackupManager(c).inspectText(v1)
+        assertTrue(i.toString(), i is Inspection.Ok)
+        // A required field missing is a broken file, not a crash.
+        assertTrue(BackupManager(c).inspectText("""{"format":"hypershop-backup","version":1,"data":{}}""") is Inspection.Broken)
+    }
 }

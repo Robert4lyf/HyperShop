@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.work.WorkManager
+import com.robert4lyf.hypershop.BuildConfig
+import com.robert4lyf.hypershop.backup.BackupManager
 import com.robert4lyf.hypershop.catalog.IngredientLibrary
 import com.robert4lyf.hypershop.claude.ClaudeClient
 import com.robert4lyf.hypershop.claude.GuardedClaude
@@ -144,6 +146,12 @@ class AppContainer(
      */
     val pendingReviews = MutableStateFlow<List<Long>>(emptyList())
 
+    /** Backups and restores, one at a time ([BackupManager.recover] runs in [startUp]). */
+    val backups by lazy { BackupManager(this, BuildConfig.VERSION_NAME) }
+
+    /** A one-off app-wide notice (an interrupted restore's outcome); the UI shows it and clears it. */
+    val notice = MutableStateFlow<String?>(null)
+
     fun queueReview(jobId: Long) {
         pendingReviews.update { if (jobId in it) it else it + jobId }
     }
@@ -244,6 +252,13 @@ class AppContainer(
         // while the activity is still being created, rather than when it first asks.
         applicationScope.launch { settings.theme.first() }
         applicationScope.launch {
+            // First: a restore the process died in decides what everything after reads.
+            when (backups.recover()) {
+                BackupManager.Recovery.FINISHED -> notice.value = "A restore was interrupted; it has been finished"
+                BackupManager.Recovery.ROLLED_BACK -> notice.value = "A restore was interrupted; your data is as it was before it"
+                BackupManager.Recovery.STUCK -> notice.value = "A restore was interrupted and couldn't be finished. Restore the file again."
+                null -> Unit
+            }
             repository.checkEpoch(marker)
             repository.rekeyIfCatalogChanged()
             repository.purgeDeleted()
