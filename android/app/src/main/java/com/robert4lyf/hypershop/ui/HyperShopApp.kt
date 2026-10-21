@@ -109,6 +109,12 @@ fun HyperShopApp(
         }
         container.shareHandled(s)
     }
+    val notice by container.notice.collectAsState()
+    LaunchedEffect(notice) {
+        val n = notice ?: return@LaunchedEffect
+        container.notice.value = null
+        show(container, snackbar, UiMessage(n))
+    }
     // One review at a time: the next share opens once this review closes (its job waits on the ready card meanwhile).
     // The queue lives in the container, so a rotation loses nothing; an id leaves it only once its review is opened.
     val pending by container.pendingReviews.collectAsState()

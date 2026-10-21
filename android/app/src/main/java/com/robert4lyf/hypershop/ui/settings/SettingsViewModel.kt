@@ -3,11 +3,10 @@ package com.robert4lyf.hypershop.ui.settings
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.robert4lyf.hypershop.BuildConfig
 import com.robert4lyf.hypershop.backup.BackupFile
-import com.robert4lyf.hypershop.backup.BackupManager
 import com.robert4lyf.hypershop.backup.BackupSummary
 import com.robert4lyf.hypershop.backup.Inspection
+import com.robert4lyf.hypershop.backup.RestoreOutcome
 import com.robert4lyf.hypershop.claude.ClaudeModel
 import com.robert4lyf.hypershop.claude.KeyCheck
 import com.robert4lyf.hypershop.claude.SpendGuard
@@ -92,7 +91,7 @@ class SettingsViewModel(
     /** Each key test, save and removal takes a new number; a test result for an older one is dropped. */
     private var keyGen = 0
 
-    private val backups = BackupManager(c, BuildConfig.VERSION_NAME)
+    private val backups = c.backups
 
     /** The backup read and checked, waiting for "Restore". */
     private var pendingRestore: BackupFile? = null
@@ -269,22 +268,47 @@ class SettingsViewModel(
             val file = pendingRestore ?: return@launch
             pendingRestore = null
             _ui.update { it.copy(restorePrompt = null, dataBusy = true) }
-            val before = backups.snapshot()
-            // A refused row (the transaction rolls back) is a message, never a crash.
-            val problems = runCatching { backups.restore(file) }.getOrElse { listOf("it could not be written: ${it.javaClass.simpleName}") }
+            val outcome = restoreSafely(file)
             _ui.update { it.copy(dataBusy = false) }
-            if (problems.isNotEmpty()) {
-                messages.send(UiMessage("That backup is damaged (${problems.first()}), so nothing was changed"))
-                return@launch
-            }
+            if (outcome !is RestoreOutcome.Restored) return@launch
             val s = backups.summary(file)
             messages.send(
                 UiMessage(
                     "Restored ${plural(s.recipes, "recipe")} and ${plural(s.itemsOnList, "item")}",
-                    undo = { backups.restore(before) },
+                    undo = { restoreSafely(outcome.before) },
                 ),
             )
         }
+
+    /** A restore, with anything but success said in words; "nothing was changed" only when that is true. */
+    private suspend fun restoreSafely(file: BackupFile): RestoreOutcome {
+        val outcome =
+            try {
+                backups.restore(file)
+            } catch (e: Exception) {
+                // Thrown before the first write (the journal couldn't be saved): nothing changed.
+                messages.send(UiMessage("Couldn't restore (${e.javaClass.simpleName}), so nothing was changed"))
+                return RestoreOutcome.Failed(rolledBack = true)
+            }
+        when (outcome) {
+            is RestoreOutcome.Restored -> Unit
+            is RestoreOutcome.Refused ->
+                messages.send(
+                    UiMessage("That backup is damaged (${outcome.problems.first()}), so nothing was changed"),
+                )
+            is RestoreOutcome.Failed ->
+                messages.send(
+                    UiMessage(
+                        if (outcome.rolledBack) {
+                            "The restore couldn't be finished, so your data is as it was"
+                        } else {
+                            "The restore stopped part-way. HyperShop will finish it the next time it starts."
+                        },
+                    ),
+                )
+        }
+        return outcome
+    }
 
     private fun plural(
         n: Int,

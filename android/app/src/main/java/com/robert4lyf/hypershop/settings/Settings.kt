@@ -88,6 +88,28 @@ class Settings(
 
     suspend fun setKeyLostNotice(on: Boolean) = store.edit { it[KEY_LOST] = on }
 
+    /**
+     * A backup's settings in one write, so a restore never leaves half of them
+     * changed; null leaves that one as it is. The list comes back planned, not
+     * mid-shop. The key's own flags are not touched: the key never travels.
+     */
+    suspend fun restore(
+        units: UnitsSetting?,
+        theme: ThemeMode?,
+        listView: ListView?,
+        model: ClaudeModel?,
+        monthlyCapUsd: Double?,
+        dailyCalls: Int?,
+    ) = store.edit { p ->
+        units?.let { p[UNITS] = it.name }
+        theme?.let { p[THEME] = it.name }
+        listView?.let { p[LIST_VIEW] = it.name }
+        model?.let { p[MODEL] = it.id }
+        monthlyCapUsd?.takeIf { it.isFinite() }?.let { p[MONTHLY_CAP] = it.coerceIn(0.0, 100.0) }
+        dailyCalls?.let { p[DAILY_CALLS] = it.coerceIn(0, 1000) }
+        p[LIST_MODE] = ListMode.PLAN.name
+    }
+
     suspend fun guard(): SpendGuard = SpendGuard(monthlyCapUsd.first(), dailyCalls.first())
 
     private companion object {
