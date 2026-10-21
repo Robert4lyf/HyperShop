@@ -79,12 +79,12 @@ class ListScreenTest {
     fun onlyTheTickTicksAndTheRowOpensDetails() {
         show()
         val tick = compose.onNodeWithTag("tick-1").fetchSemanticsNode()
-        assertEquals("Partly ticked", tick.config.getOrNull(SemanticsProperties.StateDescription))
+        assertEquals("Partly bought", tick.config.getOrNull(SemanticsProperties.StateDescription))
         assertEquals(listOf("1 more onion"), tick.config.getOrNull(SemanticsProperties.ContentDescription))
         assertEquals(Role.Checkbox, tick.config.getOrNull(SemanticsProperties.Role))
         compose.onNodeWithTag("item-1").performClick()
         compose.onNodeWithTag("tick-1").performClick()
-        assertEquals("Ticked", compose.onNodeWithTag("tick-3").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
+        assertEquals("Bought", compose.onNodeWithTag("tick-3").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
         // "Finish shopping" sits in the bar at the bottom, in reach, once something is ticked.
         compose.onNodeWithText("Finish shopping").performClick()
         compose.onNodeWithTag("finish").assertExists()

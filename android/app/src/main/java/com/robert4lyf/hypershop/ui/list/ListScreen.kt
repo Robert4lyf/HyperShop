@@ -581,9 +581,9 @@ private fun ListRowItem(
 ) {
     val state =
         when (row.state) {
-            TickState.DONE -> "Ticked"
-            TickState.PARTIAL -> "Partly ticked"
-            TickState.OPEN -> "Not ticked"
+            TickState.DONE -> "Bought"
+            TickState.PARTIAL -> "Partly bought"
+            TickState.OPEN -> "Still needed"
         }
     val done = row.state == TickState.DONE
     Row(
@@ -601,7 +601,7 @@ private fun ListRowItem(
                 .clip(CircleShape)
                 // clickable carries the spoken action ("Tick"/"Untick") and the role; the
                 // name and state are added below (the tick's icons have no labels of their own).
-                .clickable(onClickLabel = if (done) "Untick" else "Tick", role = Role.Checkbox) { actions.onToggle(row) }
+                .clickable(onClickLabel = if (done) "Mark not bought" else "Mark bought", role = Role.Checkbox) { actions.onToggle(row) }
                 .semantics {
                     testTag = "tick-${row.id}"
                     contentDescription = row.main

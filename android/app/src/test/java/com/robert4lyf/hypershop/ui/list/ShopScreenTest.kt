@@ -61,7 +61,7 @@ class ShopScreenTest {
         compose.onNodeWithTag("add-item").assertDoesNotExist()
         compose.onNodeWithTag("in-stock").assertDoesNotExist()
         compose.onNodeWithTag("shop-left").assertTextContains("5 left")
-        compose.onNodeWithText("1 of 6 bought").assertExists()
+        compose.onNodeWithText("1 of 6 bought · Now: Produce").assertExists()
         compose.onNodeWithTag("shop-plan").performClick()
         assertEquals(listOf("mode PLAN"), events)
     }
@@ -90,7 +90,7 @@ class ShopScreenTest {
         compose.onNodeWithText("1 bought").assertExists()
         toggle.performClick()
         compose.onNodeWithTag("item-3").assertExists()
-        assertEquals("Ticked", compose.onNodeWithTag("tick-3").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
+        assertEquals("Bought", compose.onNodeWithTag("tick-3").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
         // Unticking from the shown bought rows is the same tick target as always.
         compose.onNodeWithTag("tick-3").performClick()
         assertEquals(listOf("toggle 3"), events)
@@ -158,7 +158,7 @@ class ShopScreenTest {
     }
 
     @Test
-    fun byRecipeWalksRecipeCards() {
+    fun planningByRecipeStillShopsAisleByAisle() {
         val rows = SAMPLE_LIST.aisles.flatMap { it.second }
         val ui =
             shop.copy(
@@ -170,9 +170,40 @@ class ShopScreenTest {
                     ),
             )
         show(ui)
-        compose.onNodeWithTag("shop-recipe-use-1").assertExists()
-        compose.onNodeWithTag("shop-aisle-PRODUCE").assertDoesNotExist()
-        compose.onNodeWithTag("shop-next").assertTextContains("Next: Added by hand")
+        // The shop is walked in the store's order; the plan keeps its own grouping for when you go back.
+        compose.onNodeWithTag("shop-aisle-PRODUCE").assertExists()
+        compose.onNodeWithTag("shop-recipe-use-1").assertDoesNotExist()
+        compose.onNodeWithTag("shop-next").assertTextContains("Next: Dairy & Eggs")
+    }
+
+    @Test
+    fun nowIsTheAisleAtTheTopWhileItHasSomethingLeft() {
+        val cells = cells(groups(shop), emptySet())
+        val dairy = cells.indexOfFirst { it is ShopCell.Header && it.group.key == "aisle-DAIRY_EGGS" }
+        assertEquals("aisle-PRODUCE", nowAisle(cells, 0)!!.key)
+        // Scrolled into Dairy's rows: Dairy is "Now", and "Next" is the aisle after it, never Dairy itself.
+        assertEquals("aisle-DAIRY_EGGS", nowAisle(cells, dairy + 1)!!.key)
+        assertEquals("aisle-TINS_JARS", nextAisle(cells, dairy + 1)!!.cell.group.key)
+        // An aisle all bought is not "Now": "Next" says where to go.
+        val produceDone =
+            shop.copy(
+                aisles =
+                    shop.aisles.mapIndexed {
+                            i,
+                            (a, rows),
+                        ->
+                        a to if (i == 0) rows.map { it.copy(state = TickState.DONE) } else rows
+                    },
+            )
+        val done = cells(groups(produceDone), emptySet())
+        assertNull(nowAisle(done, 0))
+        assertEquals("aisle-DAIRY_EGGS", nextAisle(done, 0)!!.cell.group.key)
+    }
+
+    @Test
+    fun theTopBarNamesTheCurrentAisle() {
+        show()
+        compose.onNodeWithText("Now: Produce", substring = true).assertExists()
     }
 
     @Test

@@ -114,7 +114,7 @@ fun ItemSheetContent(
             Button(onClick = actions.onToggle, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("toggle-item")) {
                 Icon(if (sheet.done) Icons.Rounded.Undo else Icons.Rounded.Check, contentDescription = null, Modifier.size(20.dp))
                 Spacer(Modifier.size(8.dp))
-                Text(if (sheet.done) "Untick" else "Tick")
+                Text(if (sheet.done) "Mark not bought" else "Mark bought")
             }
             if (sheet.totals.isNotEmpty()) {
                 val amount = sheet.totals.joinToString(" + ")

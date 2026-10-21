@@ -20,12 +20,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -58,7 +56,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.settings.ListMode
-import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.ui.common.AisleBadge
 import com.robert4lyf.hypershop.ui.common.BottomActionBar
 import com.robert4lyf.hypershop.ui.common.CountPill
@@ -66,8 +63,6 @@ import com.robert4lyf.hypershop.ui.common.TickMark
 import com.robert4lyf.hypershop.ui.common.sectionItem
 import com.robert4lyf.hypershop.ui.common.sectionPosition
 import com.robert4lyf.hypershop.ui.theme.AisleStyle
-import com.robert4lyf.hypershop.ui.theme.Brand
-import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.theme.style
 import kotlinx.coroutines.launch
@@ -85,16 +80,20 @@ fun ShopScreen(
     ui: ListUi,
     actions: ListActions,
 ) {
-    val groups = remember(ui.aisles, ui.recipes, ui.view) { groups(ui) }
+    val groups = remember(ui.aisles) { groups(ui) }
     // Aisles whose bought rows are shown: kept across tab switches and rotation.
     var shownBought by rememberSaveable { mutableStateOf(emptyList<String>()) }
     val cells = remember(groups, shownBought) { cells(groups, shownBought.toSet()) }
-    val current = groups.firstOrNull { g -> g.rows.any { it.state != TickState.DONE } }?.key
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    // Both read the aisle at the top of the screen, so "Now" and "Next" never disagree; recomputed only
+    // when that aisle changes, not on every scrolled pixel.
+    val nowState = remember(cells) { derivedStateOf { nowAisle(cells, list.firstVisibleItemIndex) } }
+    val nextState = remember(cells) { derivedStateOf { nextAisle(cells, list.firstVisibleItemIndex) } }
+    val current = nowState.value
     Surface(Modifier.fillMaxSize().testTag("shop"), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
-            ShopTop(ui, onPlan = { actions.onMode(ListMode.PLAN) })
+            ShopTop(ui, current, onPlan = { actions.onMode(ListMode.PLAN) })
             val card = MaterialTheme.colorScheme.card
             LazyColumn(
                 Modifier.weight(1f).fillMaxWidth().testTag("list"),
@@ -104,7 +103,7 @@ fun ShopScreen(
                 items(cells, key = { it.key }, contentType = { it.javaClass.simpleName }) { cell ->
                     val tile = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).sectionItem(cell.position, card)
                     when (cell) {
-                        is ShopCell.Header -> GroupHeader(cell, now = cell.group.key == current, tile)
+                        is ShopCell.Header -> GroupHeader(cell, now = cell.group.key == current?.key, tile)
                         is ShopCell.Item -> ShopRow(cell.row, actions, tile)
                         is ShopCell.Bought ->
                             BoughtRow(cell, tile) {
@@ -113,15 +112,16 @@ fun ShopScreen(
                     }
                 }
             }
-            // Recomputed only when the aisle at the top changes, not on every scrolled pixel.
-            val nextState = remember(cells) { derivedStateOf { nextAisle(cells, list.firstVisibleItemIndex) } }
             BottomActionBar(navigationBarInset = false) {
                 // The next aisle with something left, after the one at the top of the screen (round the list when none).
                 val next = nextState.value
                 if (next != null) {
                     FilledTonalButton(
                         onClick = { scope.launch { list.animateScrollToItem(next.index) } },
-                        modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("shop-next"),
+                        modifier =
+                            Modifier.weight(1f).heightIn(min = 52.dp).testTag("shop-next").semantics {
+                                contentDescription = "Next aisle: ${next.cell.group.title}"
+                            },
                     ) {
                         Text("Next: ${next.cell.group.title}", maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Spacer(Modifier.size(6.dp))
@@ -144,6 +144,7 @@ fun ShopScreen(
 @Composable
 private fun ShopTop(
     ui: ListUi,
+    now: ShopGroup?,
     onPlan: () -> Unit,
 ) {
     val total = ui.left + ui.doneCount
@@ -163,7 +164,7 @@ private fun ShopTop(
                         modifier = Modifier.semantics { heading() }.testTag("shop-left"),
                     )
                     Text(
-                        "${ui.doneCount} of $total bought",
+                        listOfNotNull("${ui.doneCount} of $total bought", now?.let { "Now: ${it.title}" }).joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -188,25 +189,22 @@ private fun ShopTop(
     }
 }
 
-/** An aisle (or, by recipe, a recipe) as the shop screen walks it. */
+/**
+ * An aisle as the shop screen walks it. Always the store's walking order, even
+ * when planning groups the list by recipe: the shop is walked aisle by aisle,
+ * and grouping it by recipe would send you back to the same shelf twice.
+ */
 internal data class ShopGroup(
     val key: String,
     val title: String,
-    /** The aisle, or null for a recipe card. */
-    val aisle: AisleCode?,
-    val kind: RecipeSection.Kind?,
+    val aisle: AisleCode,
     val rows: List<ListRow>,
 ) {
     val open: List<ListRow> get() = rows.filter { it.state != TickState.DONE }
     val bought: List<ListRow> get() = rows.filter { it.state == TickState.DONE }
 }
 
-internal fun groups(ui: ListUi): List<ShopGroup> =
-    if (ui.view == ListView.RECIPE) {
-        ui.recipes.map { s -> ShopGroup("recipe-${s.key}", s.title, null, s.kind, s.rows) }
-    } else {
-        ui.aisles.map { (a, rows) -> ShopGroup("aisle-${a.name}", a.displayName, a, null, rows) }
-    }
+internal fun groups(ui: ListUi): List<ShopGroup> = ui.aisles.map { (a, rows) -> ShopGroup("aisle-${a.name}", a.displayName, a, rows) }
 
 /** One lazy item of the shop screen. The bought rows come after the open ones, under a toggle row. */
 internal sealed interface ShopCell {
@@ -264,6 +262,18 @@ internal data class NextAisle(
 )
 
 /**
+ * The aisle you are in: the one at the top of the screen, while it has
+ * something left. Null once it is all bought: then "Next" says where to go.
+ */
+internal fun nowAisle(
+    cells: List<ShopCell>,
+    firstVisible: Int,
+): ShopGroup? {
+    val top = cells.take(firstVisible + 1).lastOrNull { it is ShopCell.Header } as ShopCell.Header?
+    return top?.group?.takeIf { it.open.isNotEmpty() }
+}
+
+/**
  * The header to jump to from "Next aisle": the first aisle with something left
  * after the aisle the top of the screen is in; failing that, the first with
  * something left from the top of the list. Null when nothing is left anywhere
@@ -288,15 +298,7 @@ private fun GroupHeader(
 ) {
     val g = cell.group
     val left = g.open.size
-    val dark = LocalDarkTheme.current
-    val (container, content) =
-        when {
-            g.aisle != null -> g.aisle.style.let { it.container to it.content }
-            g.kind == RecipeSection.Kind.RECIPE -> Brand.recipeHue(g.title).let { Brand.tint(it, dark) to Brand.strong(it, dark) }
-            g.kind == RecipeSection.Kind.SHARED ->
-                MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
-            else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
-        }
+    val (container, content) = g.aisle.style.let { it.container to it.content }
     Row(
         tile
             .background(container)
@@ -308,22 +310,11 @@ private fun GroupHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        when {
-            g.aisle != null -> AisleBadge(g.aisle, size = 28.dp)
-            else ->
-                Box(Modifier.size(28.dp).clip(CircleShape).background(content), contentAlignment = Alignment.Center) {
-                    Icon(
-                        if (g.kind == RecipeSection.Kind.SHARED) Icons.Rounded.Layers else Icons.AutoMirrored.Rounded.MenuBook,
-                        contentDescription = null,
-                        tint = container,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-        }
+        AisleBadge(g.aisle, size = 28.dp)
         Text(
             g.title,
             style = MaterialTheme.typography.titleSmall,
-            color = if (g.aisle != null) MaterialTheme.colorScheme.onSurface else content,
+            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
@@ -386,9 +377,9 @@ private fun ShopRow(
     val done = row.state == TickState.DONE
     val state =
         when (row.state) {
-            TickState.DONE -> "Ticked"
-            TickState.PARTIAL -> "Partly ticked"
-            TickState.OPEN -> "Not ticked"
+            TickState.DONE -> "Bought"
+            TickState.PARTIAL -> "Partly bought"
+            TickState.OPEN -> "Still needed"
         }
     val tint: AisleStyle = row.aisle.style
     Row(
@@ -399,7 +390,7 @@ private fun ShopRow(
             Modifier
                 .size(52.dp)
                 .clip(CircleShape)
-                .clickable(onClickLabel = if (done) "Untick" else "Tick", role = Role.Checkbox) { actions.onToggle(row) }
+                .clickable(onClickLabel = if (done) "Mark not bought" else "Mark bought", role = Role.Checkbox) { actions.onToggle(row) }
                 .semantics {
                     testTag = "tick-${row.id}"
                     contentDescription = row.main
