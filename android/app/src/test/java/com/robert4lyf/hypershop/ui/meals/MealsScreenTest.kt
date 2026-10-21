@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.robert4lyf.hypershop.core.merge.UseProgress
 import com.robert4lyf.hypershop.testutil.Shots
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
 import org.junit.Assert.assertEquals
@@ -28,8 +29,8 @@ class MealsScreenTest {
             loaded = true,
             meals =
                 listOf(
-                    Meal(1, "Weeknight chilli", 4, 6, 2, "bbcgoodfood.com"),
-                    Meal(2, "Red lentil dal", null, 0, 0, "Ottolenghi Simple · p. 142"),
+                    Meal(1, "Weeknight chilli", 4, UseProgress(6, 0, 0, 0), 2, "bbcgoodfood.com"),
+                    Meal(2, "Red lentil dal", null, UseProgress(0, 0, 4, 0), 0, "Ottolenghi Simple · p. 142"),
                 ),
             picks =
                 listOf(
@@ -50,8 +51,8 @@ class MealsScreenTest {
     @Test
     fun mealsShowProgressServingsAndRemoveWithAsk() {
         compose.setContent { HyperShopTheme(dynamicColor = false) { MealsScreen(ui, actions) } }
-        compose.onNodeWithText("2 meals · 6 items to buy").assertExists()
-        compose.onNodeWithText("6 items · 2 at home · bbcgoodfood.com").assertExists()
+        compose.onNodeWithText("2 meals · 6 items still needed").assertExists()
+        compose.onNodeWithText("6 still needed · 2 at home · bbcgoodfood.com").assertExists()
         compose.onNodeWithText("All bought · Ottolenghi Simple · p. 142").assertExists()
         compose.onNodeWithTag("meal-more-1").performClick()
         compose.onNodeWithTag("meal-fewer-1").performClick()

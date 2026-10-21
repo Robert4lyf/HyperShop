@@ -19,6 +19,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.robert4lyf.hypershop.core.merge.UseProgress
 import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.testutil.Shots
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
@@ -32,9 +33,9 @@ import org.robolectric.annotation.GraphicsMode
 private val USES =
     RecipesUi(
         listOf(
-            UseSummary(1, 1, "Weeknight chilli", "https://example.com/chilli", 4, 6, 3),
-            UseSummary(2, 2, "Lemon drizzle cake", null, 8, 5, 0),
-            UseSummary(3, null, "Added by hand", null, null, 2, 0),
+            UseSummary(1, 1, "Weeknight chilli", "https://example.com/chilli", 4, UseProgress(6, 0, 0, 0), 3),
+            UseSummary(2, 2, "Lemon drizzle cake", null, 8, UseProgress(5, 0, 0, 0), 0),
+            UseSummary(3, null, "Added by hand", null, null, UseProgress(2, 0, 0, 0), 0),
         ),
         loaded = true,
         library =
@@ -73,9 +74,9 @@ class RecipesScreenTest {
     @Test
     fun removeAsksFirst() {
         show()
-        compose.onNodeWithContentDescription("Serves 4 · 6 items on the list · 3 at home").assertExists()
+        compose.onNodeWithContentDescription("Serves 4 · 6 still needed · 3 at home").assertExists()
         // Every use can be removed from its menu, after a confirmation.
-        compose.onNodeWithContentDescription("Serves 8 · 5 items on the list").assertExists()
+        compose.onNodeWithContentDescription("Serves 8 · 5 still needed").assertExists()
         compose.onNodeWithTag("more-2").performClick()
         compose.onNodeWithTag("remove-2").performClick()
         compose.onNodeWithText("Keep").performClick()

@@ -16,6 +16,8 @@ import com.robert4lyf.hypershop.core.merge.ShoppingList
 import com.robert4lyf.hypershop.core.merge.TickSource
 import com.robert4lyf.hypershop.core.merge.UseKind
 import com.robert4lyf.hypershop.core.merge.UseLineAdd
+import com.robert4lyf.hypershop.core.merge.UseProgress
+import com.robert4lyf.hypershop.core.merge.UseState
 import com.robert4lyf.hypershop.core.merge.WatchTickResult
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.ParsedBy
@@ -82,8 +84,9 @@ data class UseSummary(
     val title: String,
     val url: String?,
     val servings: Int?,
-    val itemCount: Int,
-    /** Lines left out as in stock on import. */
+    /** Its items to buy, bought and taken off ([ShoppingList.progress]): one source for every screen. */
+    val progress: UseProgress,
+    /** Lines left out as at home on import. */
     val inStockCount: Int,
     /** Its recipe's library entry ([LibraryRecipe.key]), for "On your list" in the library. */
     val libraryKey: String? = null,
@@ -346,12 +349,15 @@ class ListRepository(
         val shown =
             l.uses.values
                 .map { u -> u to l.contributionsOfUse(u.id).filter { it.itemId in live } }
-                // A recipe stays once everything is bought, as the week's reminder of what to
-                // cook, until "Remove from list" or the 7-day archive at "Finish shopping".
-                // Items removed by hand or by "Clear all" were not bought (their contributions
-                // are uncovered), so that takes the recipe off the list with them; Undo brings
-                // both back. Hand-added items are only shopping, so that card goes with its last item.
-                .filter { (u, cs) -> u.archivedAt == null && (cs.isNotEmpty() || (u.kind == UseKind.RECIPE && l.allBought(u.id))) }
+                // A recipe stays once its shopping is done (bought, or nothing to buy) as the
+                // week's reminder of what to cook, until "Remove from list" or the 7-day archive.
+                // Items taken off unbought ("Clear all", deleted by hand) with none bought
+                // take the recipe off with them; Undo brings both back. Hand-added items are
+                // only shopping, so that card goes with its last item.
+                .filter {
+                        (u, cs) ->
+                    u.archivedAt == null && (cs.isNotEmpty() || (u.kind == UseKind.RECIPE && l.progress(u.id).state in KEPT))
+                }
                 .sortedByDescending { (u, _) -> u.addedAt }
         if (shown.isEmpty()) return emptyList()
         val manual = manualTitle()
@@ -369,7 +375,7 @@ class ListRepository(
                 title = r?.title ?: if (u.kind == UseKind.MANUAL) manual else "Recipe",
                 url = r?.url,
                 servings = u.servings.takeIf { r?.servingsOriginal != null },
-                itemCount = cs.map { it.itemId }.distinct().size,
+                progress = l.progress(u.id),
                 inStockCount = inStock[u.id] ?: 0,
                 libraryKey = r?.let { it.libraryKey ?: it.url ?: "r:${it.id}" },
                 bookRef = r?.let { bookRef(it.book, it.page) },
@@ -1204,3 +1210,6 @@ class ListRepository(
 const val MANUAL_TITLE = "Added by hand"
 
 private const val MAX_TITLE = 80
+
+/** A recipe whose shopping is over but which is still this week's to cook. */
+private val KEPT = setOf(UseState.ALL_BOUGHT, UseState.BOUGHT_THE_REST, UseState.NOTHING_TO_BUY)

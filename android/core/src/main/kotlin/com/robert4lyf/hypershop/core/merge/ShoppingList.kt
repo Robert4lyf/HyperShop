@@ -23,6 +23,38 @@ data class ListItem(
     val deletedAt: Long? = null,
 )
 
+/**
+ * A use's shopping, counted in items ([ShoppingList.progress]). [partlyBought] are
+ * among [toBuy]: some of the item is bought, more is still needed.
+ */
+data class UseProgress(
+    val toBuy: Int,
+    val partlyBought: Int,
+    val bought: Int,
+    val removed: Int,
+) {
+    val state: UseState
+        get() =
+            when {
+                toBuy > 0 -> UseState.STILL_NEEDED
+                bought == 0 && removed == 0 -> UseState.NOTHING_TO_BUY
+                bought == 0 -> UseState.DROPPED
+                removed == 0 -> UseState.ALL_BOUGHT
+                else -> UseState.BOUGHT_THE_REST
+            }
+}
+
+/**
+ * - [STILL_NEEDED]: something it needs is on the list, unbought.
+ * - [ALL_BOUGHT]: it needed shopping, and every item was bought.
+ * - [BOUGHT_THE_REST]: bought what it needed, after taking some items off unbought.
+ * - [NOTHING_TO_BUY]: it added nothing (every line at home).
+ * - [DROPPED]: its items were taken off unbought, none bought ("Clear all", deleted by hand).
+ *
+ * "No longer planned" is not a state here: that is the use removed or archived.
+ */
+enum class UseState { STILL_NEEDED, ALL_BOUGHT, BOUGHT_THE_REST, NOTHING_TO_BUY, DROPPED }
+
 data class RecipeUse(
     val id: Long,
     val recipeId: Long?,
@@ -95,11 +127,33 @@ data class ShoppingList(
     fun contributionsOfUse(useId: Long): List<Contribution> = byUse[useId] ?: emptyList()
 
     /**
-     * Everything the use put on the list has been bought: each of its contributions
-     * is covered by a tick (a use with none, every line at home, counts). Items
-     * removed by hand or cleared leave uncovered contributions, so they don't.
+     * Where a use's shopping stands, item by item, from its own contributions: an
+     * item it still needs (an uncovered contribution on a live item), one it has
+     * bought (every one of its contributions on the item covered), and one taken
+     * off the list unbought (an uncovered contribution on a deleted item). Ticks
+     * cover exactly what existed when they were made, so more of an item added
+     * later (another recipe, more servings) is still needed by the use that added
+     * it, and already bought for the one that didn't. Derived, never stored.
      */
-    fun allBought(useId: Long): Boolean = contributionsOfUse(useId).all { it.coveredBy != null }
+    fun progress(useId: Long): UseProgress {
+        var toBuy = 0
+        var partly = 0
+        var bought = 0
+        var removed = 0
+        for ((itemId, cs) in contributionsOfUse(useId).groupBy { it.itemId }) {
+            val live = items[itemId]?.deletedAt == null
+            val open = cs.any { it.coveredBy == null }
+            when {
+                open && live -> {
+                    toBuy++
+                    if (isPartial(itemId)) partly++
+                }
+                open -> removed++
+                else -> bought++
+            }
+        }
+        return UseProgress(toBuy, partly, bought, removed)
+    }
 
     /**
      * Archives the recipe uses added before [before] with nothing left on the list
@@ -333,11 +387,53 @@ data class ShoppingList(
         val use = uses[useId] ?: return this
         if (servings <= 0 || servings == use.servings) return this
         val f = Rational.of(servings.toLong(), use.servings.toLong())
-        val affected = contributions.filter { it.useId == useId && !it.noScale }.map { it.itemId }.toSet()
+        val scaled = contributions.filter { it.useId == useId && !it.noScale }
+        val rev = listRev + 1
+        var nextId = nextId
+        val replaced = HashMap<Long, Contribution?>()
+        val added = ArrayList<Contribution>()
+        val revived = HashSet<Long>()
+        for (group in scaled.groupBy { it.itemId to it.recipeLineId }.values) {
+            val covered = group.filter { it.coveredBy != null }
+            val open = group.filter { it.coveredBy == null }
+            val target = group.fold(QtyBase.PRESENCE) { acc, c -> acc + c.qty }.times(f)
+            val bought = covered.fold(QtyBase.PRESENCE) { acc, c -> acc + c.qty }
+            when {
+                covered.isEmpty() || target.isPresence -> group.forEach { replaced[it.id] = it.copy(qty = it.qty.times(f)) }
+                // What was bought stays bought, and only the difference is still needed: a
+                // tick covers the amount there was when it was made, never an amount added later.
+                bought.parts.all { (k, v) -> (target.parts[k] ?: Rational.ZERO) >= v } -> {
+                    val rest = target.minusClamped(bought)
+                    open.forEach { replaced[it.id] = null }
+                    if (!rest.isPresence) {
+                        val first = open.firstOrNull()
+                        if (first != null) {
+                            replaced[first.id] = first.copy(qty = rest)
+                        } else {
+                            // Bought and finished: the extra goes back on the list, onto the live row for it if there is one.
+                            val c = covered.first()
+                            val item = items.getValue(c.itemId)
+                            val onto =
+                                if (item.deletedAt == null) item.id else itemByKey(item.mergeKey)?.id ?: item.id.also { revived += it }
+                            added += Contribution(nextId++, useId, c.recipeLineId, onto, rest, false, rev, unitHint = c.unitHint)
+                        }
+                    }
+                }
+                // Fewer servings than were bought for: nothing left to buy, the bought amount shrinks with it.
+                else -> {
+                    val k = bought.parts.keys.first()
+                    val r = (target.parts[k] ?: Rational.ZERO) / bought.parts.getValue(k)
+                    covered.forEach { replaced[it.id] = it.copy(qty = it.qty.times(r)) }
+                    open.forEach { replaced[it.id] = null }
+                }
+            }
+        }
         return copy(
             uses = uses + (useId to use.copy(servings = servings)),
-            contributions = contributions.map { if (it.useId == useId && !it.noScale) it.copy(qty = it.qty.times(f)) else it },
-        ).bumped(affected)
+            items = items.mapValues { (id, i) -> if (id in revived) i.copy(deletedAt = null) else i },
+            contributions = contributions.mapNotNull { if (it.id in replaced) replaced[it.id] else it } + added,
+            nextId = nextId,
+        ).bumped(scaled.map { it.itemId }.toSet() + added.map { it.itemId })
     }
 
     /**

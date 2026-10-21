@@ -52,6 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.robert4lyf.hypershop.core.merge.UseState
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.BottomActionBar
 import com.robert4lyf.hypershop.ui.common.EmptyHero
@@ -59,6 +60,7 @@ import com.robert4lyf.hypershop.ui.common.PillShape
 import com.robert4lyf.hypershop.ui.common.SectionLabel
 import com.robert4lyf.hypershop.ui.common.cardLift
 import com.robert4lyf.hypershop.ui.common.fieldLift
+import com.robert4lyf.hypershop.ui.common.label
 import com.robert4lyf.hypershop.ui.common.pillFieldColors
 import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.theme.card
@@ -121,7 +123,7 @@ fun MealsScreen(
                         Text(
                             when {
                                 ui.meals.isEmpty() -> "Pick what you'll cook; the ingredients go on the list"
-                                else -> "${plural(ui.meals.size, "meal")} · ${plural(ui.itemsLeft, "item")} to buy"
+                                else -> "${plural(ui.meals.size, "meal")} · ${plural(ui.itemsLeft, "item")} still needed"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -245,8 +247,8 @@ private fun MealCard(
                 Text(m.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 val bits =
                     listOfNotNull(
-                        if (m.itemsLeft == 0) "All bought" else plural(m.itemsLeft, "item"),
-                        m.atHome.takeIf { it > 0 }?.let { "$it at home" },
+                        m.progress.label(),
+                        m.atHome.takeIf { it > 0 && m.progress.state != UseState.NOTHING_TO_BUY }?.let { "$it at home" },
                         m.source,
                     )
                 Text(
