@@ -100,7 +100,8 @@ class DeviceScenariosTest {
             c.repository.addSavedRecipe(dal)
         }
         show(c)
-        compose.onNodeWithText("3 onions", substring = true).assertIsDisplayed()
+        // The merged row is on the list (below the fold on a small emulator screen).
+        compose.onNodeWithText("3 onions", substring = true).assertExists()
         val uses = runBlocking { c.repository.usesOnList() }
         assertEquals(2, uses.size)
         assertTrue(uses.all { it.progress.state == UseState.STILL_NEEDED })
