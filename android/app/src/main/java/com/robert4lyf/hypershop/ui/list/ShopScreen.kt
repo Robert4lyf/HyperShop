@@ -266,7 +266,8 @@ internal data class NextAisle(
 /**
  * The header to jump to from "Next aisle": the first aisle with something left
  * after the aisle the top of the screen is in; failing that, the first with
- * something left from the top of the list. Null when nothing is left anywhere.
+ * something left from the top of the list. Null when nothing is left anywhere
+ * else: the aisle you are in is never "next".
  */
 internal fun nextAisle(
     cells: List<ShopCell>,
@@ -276,7 +277,7 @@ internal fun nextAisle(
     val open = headers.filter { it.cell.group.open.isNotEmpty() }
     if (open.isEmpty()) return null
     val top = headers.lastOrNull { it.index <= firstVisible } ?: return open.first()
-    return open.firstOrNull { it.index > top.index } ?: open.first()
+    return open.firstOrNull { it.index > top.index } ?: open.firstOrNull { it.index < top.index }
 }
 
 @Composable

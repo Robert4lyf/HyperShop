@@ -186,22 +186,28 @@ class ClaudeClient(
                         call: Call,
                         response: Response,
                     ) {
+                        // Whatever the reply holds, the caller is resumed: an exception out of here
+                        // would be swallowed by OkHttp and leave the review waiting for ever.
                         val outcome =
-                            response.use { r ->
-                                // Status only: request and response bodies never reach the log.
-                                log.log("POST ${req.url} ${model.id} → ${r.code}")
-                                val streamed = r.header("content-type").orEmpty().contains("text/event-stream")
-                                val retryAfter = r.header("retry-after")?.toLongOrNull()
-                                if (r.code == 200 && streamed) {
-                                    readStream(r)
-                                } else {
-                                    try {
+                            try {
+                                response.use { r ->
+                                    // Status only: request and response bodies never reach the log.
+                                    log.log("POST ${req.url} ${model.id} → ${r.code}")
+                                    val streamed = r.header("content-type").orEmpty().contains("text/event-stream")
+                                    val retryAfter = r.header("retry-after")?.toLongOrNull()
+                                    if (r.code == 200 && streamed) {
+                                        readStream(r)
+                                    } else {
                                         Outcome.Http(r.code, r.body?.string().orEmpty(), retryAfter)
-                                    } catch (e: IOException) {
-                                        log.log("POST ${req.url} body failed: ${e.javaClass.simpleName}")
-                                        Outcome.Offline
                                     }
                                 }
+                            } catch (e: IOException) {
+                                log.log("POST ${req.url} body failed: ${e.javaClass.simpleName}")
+                                Outcome.Offline
+                            } catch (e: RuntimeException) {
+                                // A reply of an unexpected shape: an answer that can't be read, not a hang.
+                                log.log("POST ${req.url} reply unreadable: ${e.javaClass.simpleName}")
+                                Outcome.Http(200, "", null)
                             }
                         cont.resume(outcome)
                     }
@@ -238,48 +244,53 @@ class ClaudeClient(
                     line.startsWith("data:") -> {
                         val payload = line.removePrefix("data:").trim()
                         val data = runCatching { lenient.parseToJsonElement(payload).jsonObject }.getOrNull() ?: continue
-                        when (event) {
-                            "message_start" -> {
-                                started = true
-                                val m = data["message"]?.jsonObject
-                                model = m?.get("model")?.jsonPrimitive?.content
-                                m?.get("usage")?.jsonObject?.let { u ->
-                                    inputTokens = u.long("input_tokens")
-                                    cacheWrite = u.long("cache_creation_input_tokens")
-                                    cacheRead = u.long("cache_read_input_tokens")
-                                }
-                            }
-                            "content_block_start" -> {
-                                val type = data["content_block"]?.jsonObject?.get("type")?.jsonPrimitive?.content
-                                if (type == "text") text.clear()
-                            }
-                            "content_block_delta" -> {
-                                val d = data["delta"]?.jsonObject
-                                if (d?.get("type")?.jsonPrimitive?.content == "text_delta") {
-                                    text.append(
-                                        d["text"]?.jsonPrimitive?.content.orEmpty(),
-                                    )
-                                }
-                            }
-                            "message_delta" -> {
-                                data["delta"]?.jsonObject?.get("stop_reason")?.jsonPrimitive?.content?.let { stopReason = it }
-                                data["usage"]?.jsonObject?.get(
-                                    "output_tokens",
-                                )?.jsonPrimitive?.content?.toLongOrNull()?.let { outputTokens = it }
-                            }
-                            "message_stop" -> stopped = true
-                            "error" -> {
-                                val type = data["error"]?.jsonObject?.get("type")?.jsonPrimitive?.content
-                                val code =
-                                    if (type == "overloaded_error") {
-                                        529
-                                    } else if (type == "rate_limit_error") {
-                                        429
-                                    } else {
-                                        500
+                        // An event of the wrong shape (a null where an object is due) is skipped, not fatal.
+                        try {
+                            when (event) {
+                                "message_start" -> {
+                                    started = true
+                                    val m = data["message"]?.jsonObject
+                                    model = m?.get("model")?.jsonPrimitive?.content
+                                    m?.get("usage")?.jsonObject?.let { u ->
+                                        inputTokens = u.long("input_tokens")
+                                        cacheWrite = u.long("cache_creation_input_tokens")
+                                        cacheRead = u.long("cache_read_input_tokens")
                                     }
-                                return Outcome.Http(code, "", null)
+                                }
+                                "content_block_start" -> {
+                                    val type = data["content_block"]?.jsonObject?.get("type")?.jsonPrimitive?.content
+                                    if (type == "text") text.clear()
+                                }
+                                "content_block_delta" -> {
+                                    val d = data["delta"]?.jsonObject
+                                    if (d?.get("type")?.jsonPrimitive?.content == "text_delta") {
+                                        text.append(
+                                            d["text"]?.jsonPrimitive?.content.orEmpty(),
+                                        )
+                                    }
+                                }
+                                "message_delta" -> {
+                                    data["delta"]?.jsonObject?.get("stop_reason")?.jsonPrimitive?.content?.let { stopReason = it }
+                                    data["usage"]?.jsonObject?.get(
+                                        "output_tokens",
+                                    )?.jsonPrimitive?.content?.toLongOrNull()?.let { outputTokens = it }
+                                }
+                                "message_stop" -> stopped = true
+                                "error" -> {
+                                    val type = data["error"]?.jsonObject?.get("type")?.jsonPrimitive?.content
+                                    val code =
+                                        if (type == "overloaded_error") {
+                                            529
+                                        } else if (type == "rate_limit_error") {
+                                            429
+                                        } else {
+                                            500
+                                        }
+                                    return Outcome.Http(code, "", null)
+                                }
                             }
+                        } catch (e: IllegalArgumentException) {
+                            log.log("stream event $event unreadable")
                         }
                     }
                 }

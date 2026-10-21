@@ -270,7 +270,8 @@ class SettingsViewModel(
             pendingRestore = null
             _ui.update { it.copy(restorePrompt = null, dataBusy = true) }
             val before = backups.snapshot()
-            val problems = backups.restore(file)
+            // A refused row (the transaction rolls back) is a message, never a crash.
+            val problems = runCatching { backups.restore(file) }.getOrElse { listOf("it could not be written: ${it.javaClass.simpleName}") }
             _ui.update { it.copy(dataBusy = false) }
             if (problems.isNotEmpty()) {
                 messages.send(UiMessage("That backup is damaged (${problems.first()}), so nothing was changed"))

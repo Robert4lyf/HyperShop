@@ -348,8 +348,10 @@ class ListRepository(
                 .map { u -> u to l.contributionsOfUse(u.id).filter { it.itemId in live } }
                 // A recipe stays once everything is bought, as the week's reminder of what to
                 // cook, until "Remove from list" or the 7-day archive at "Finish shopping".
-                // Hand-added items are only shopping, so that card goes with its last item.
-                .filter { (u, cs) -> u.archivedAt == null && (cs.isNotEmpty() || u.kind == UseKind.RECIPE) }
+                // Items removed by hand or by "Clear all" were not bought (their contributions
+                // are uncovered), so that takes the recipe off the list with them; Undo brings
+                // both back. Hand-added items are only shopping, so that card goes with its last item.
+                .filter { (u, cs) -> u.archivedAt == null && (cs.isNotEmpty() || (u.kind == UseKind.RECIPE && l.allBought(u.id))) }
                 .sortedByDescending { (u, _) -> u.addedAt }
         if (shown.isEmpty()) return emptyList()
         val manual = manualTitle()
@@ -878,11 +880,18 @@ class ListRepository(
      */
     suspend fun purgeDeleted() =
         db.withTransaction {
-            val before = clock() - ShoppingList.SEVEN_DAYS
+            val now = clock()
+            val before = now - ShoppingList.SEVEN_DAYS
             val ids = dao.deletedBefore(before)
-            if (ids.isNotEmpty()) {
-                val old = load()
-                persist(old, old.copy(items = old.items - ids.toSet(), contributions = old.contributions.filter { it.itemId !in ids }))
+            val old = load()
+            val gone = ids.toSet()
+            val purged = old.copy(items = old.items - gone, contributions = old.contributions.filter { it.itemId !in gone })
+            // A recipe left with nothing on the list a week after it was added (its bought
+            // items purged, or every line at home) is archived, as "Finish shopping" would
+            // have done: it is not the week's reminder any more, and not "on your list".
+            val next = purged.archiveSpentUses(before, now)
+            if (ids.isNotEmpty() || next != null) {
+                persist(old, next ?: purged)
                 dao.undelete(ids)
             }
             dao.deleteForgottenRecipes(before)
@@ -1174,7 +1183,9 @@ class ListRepository(
                 ),
             )
         }
-        marker.write(fresh)
+        // The database holds the new marker already; a file that can't be written now means one more
+        // new epoch at the next start-up (checkEpoch), never a restore reported as failed.
+        runCatching { marker.write(fresh) }
         rekeyIfCatalogChanged()
         return emptyList()
     }

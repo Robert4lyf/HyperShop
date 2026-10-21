@@ -94,6 +94,30 @@ data class ShoppingList(
     /** A use's contributions, in id order. */
     fun contributionsOfUse(useId: Long): List<Contribution> = byUse[useId] ?: emptyList()
 
+    /**
+     * Everything the use put on the list has been bought: each of its contributions
+     * is covered by a tick (a use with none, every line at home, counts). Items
+     * removed by hand or cleared leave uncovered contributions, so they don't.
+     */
+    fun allBought(useId: Long): Boolean = contributionsOfUse(useId).all { it.coveredBy != null }
+
+    /**
+     * Archives the recipe uses added before [before] with nothing left on the list
+     * (their bought items purged, or every line at home), as [finishShopping] would
+     * have: they are not the week's reminder any more. Null when there are none.
+     */
+    fun archiveSpentUses(
+        before: Long,
+        now: Long,
+    ): ShoppingList? {
+        val spent =
+            uses.values.filter {
+                it.kind == UseKind.RECIPE && it.archivedAt == null && it.addedAt < before && contributionsOfUse(it.id).isEmpty()
+            }
+        if (spent.isEmpty()) return null
+        return copy(uses = uses + spent.map { it.id to it.copy(archivedAt = now) }).bumped(emptySet())
+    }
+
     fun isDone(itemId: Long): Boolean = contributionsOf(itemId).let { cs -> cs.isNotEmpty() && cs.all { it.coveredBy != null } }
 
     fun isPartial(itemId: Long): Boolean =

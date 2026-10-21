@@ -375,6 +375,20 @@ class ClaudeClientTest {
     }
 
     @Test
+    fun aStreamOfTheWrongShapeIsUnreadableNotAHang() =
+        runTest {
+            // "usage": null where an object is due, then "message": 5: neither may leave the caller waiting.
+            val odd =
+                "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"model\":\"m\",\"usage\":null}}\n\n" +
+                    "event: message_start\ndata: {\"type\":\"message_start\",\"message\":5}\n\n" +
+                    "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+            server.enqueue(stream(odd))
+            // runTest's own timeout is the hang guard (a real withTimeout here would run on virtual time).
+            val r = client().parse(input, ClaudeModel.HAIKU) as ClaudeResult.Failed
+            assertEquals(ClaudeResult.Reason.INVALID_RESPONSE, r.reason)
+        }
+
+    @Test
     fun aStreamedErrorEventFollowsTheHttpRules() =
         runTest {
             // Overloaded mid-stream, then fine: the back-off and retry are the same as for a 529.
