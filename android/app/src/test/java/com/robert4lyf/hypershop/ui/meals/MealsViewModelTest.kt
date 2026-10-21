@@ -141,6 +141,19 @@ class MealsViewModelTest {
     }
 
     @Test
+    fun leavingTheScreenStraightAfterATapStillSavesIt() {
+        val c = TestContainer.create()
+        save(c, "Weeknight chilli", "2 onions")
+        val vm = MealsViewModel(c).shown()
+        vm.add(await(vm.ui) { it.loaded && it.picks.size == 1 }.picks.single())
+        val meal = await(vm.ui) { it.meals.size == 1 }.meals.single()
+        vm.stepServings(meal, 2)
+        // Back out at once: the screen's scope goes, the write does not.
+        androidx.lifecycle.ViewModelStore().apply { put("meals", vm) }.clear()
+        awaitTrue { runBlocking { c.repository.usesOnList() }.single().servings == 6 }
+    }
+
+    @Test
     fun aServingsChangeOnAMealRemovedElsewhereSaysSo() {
         val c = TestContainer.create()
         save(c, "Weeknight chilli", "2 onions")

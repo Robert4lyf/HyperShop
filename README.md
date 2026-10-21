@@ -1,9 +1,14 @@
 # HyperShop
 
-A personal Android shopping-list app. Share a recipe URL; Claude reads the
-ingredients; you review them, tick what you already have, and the rest merges
-into a list sorted by aisle. A Forerunner 245 companion app (Run 2) mirrors the
-list so it can be ticked from the wrist.
+A personal Android shopping-list app. Share a recipe link (or type, paste or
+photograph one); HyperShop reads the ingredients on the phone and asks Claude,
+with your own key, only for a line it isn't sure of or a photo. Review them,
+mark what you already have at home, and the rest merges into one list sorted by
+aisle. Plan on the List tab, then tap **Shop** for a one-handed screen that
+walks the aisles. Saved recipes become the week's meals in two taps. Everything
+stays on the phone; Settings › Data backs it up to a file you choose. A
+Forerunner 245 companion app mirrors the list so it can be ticked from the
+wrist, offline too.
 
 See [PLAN.md](PLAN.md) for the design and [PROGRESS.md](PROGRESS.md) for where
 the build is.

@@ -1,0 +1,362 @@
+[
+ {
+  "id": "hob-01",
+  "group": "uk",
+  "raw": "1 x 250g pack unsalted butter, softened",
+  "name": "unsalted butter",
+  "quantity": 1,
+  "quantity_max": null,
+  "unit": "packet"
+ },
+ {
+  "id": "hob-02",
+  "group": "uk",
+  "raw": "2 tbsp clear honey",
+  "name": "clear honey",
+  "quantity": 2,
+  "quantity_max": null,
+  "unit": "tbsp"
+ },
+ {
+  "id": "hob-03",
+  "group": "uk",
+  "raw": "400ml can coconut milk",
+  "name": "coconut milk",
+  "quantity": 400,
+  "quantity_max": null,
+  "unit": "ml"
+ },
+ {
+  "id": "hob-04",
+  "group": "uk",
+  "raw": "150g self-raising flour",
+  "name": "self-raising flour",
+  "quantity": 150,
+  "quantity_max": null,
+  "unit": "g"
+ },
+ {
+  "id": "hob-05",
+  "group": "uk",
+  "raw": "1 large leek, trimmed and sliced",
+  "name": "leek",
+  "quantity": 1,
+  "quantity_max": null,
+  "unit": null
+ },
+ {
+  "id": "hob-06",
+  "group": "uk",
+  "raw": "2 garlic cloves, crushed",
+  "name": "garlic",
+  "quantity": 2,
+  "quantity_max": null,
+  "unit": "clove"
+ },
+ {
+  "id": "hob-07",
+  "group": "uk",
+  "raw": "500g pack beef mince (20% fat)",
+  "name": "beef mince",
+  "quantity": 500,
+  "quantity_max": null,
+  "unit": "g"
+ },
+ {
+  "id": "hob-08",
+  "group": "uk",
+  "raw": "1 tsp English mustard powder",
+  "name": "english mustard powder",
+  "quantity": 1,
+  "quantity_max": null,
+  "unit": "tsp"
+ },
+ {
+  "id": "hob-09",
+  "group": "us",
+  "raw": "1/2 cup heavy cream",
+  "name": "heavy cream",
+  "quantity": 0.5,
+  "quantity_max": null,
+  "unit": "cup"
+ },
+ {
+  "id": "hob-10",
+  "group": "us",
+  "raw": "2 cups shredded mozzarella cheese",
+  "name": "shredded mozzarella cheese",
+  "quantity": 2,
+  "quantity_max": null,
+  "unit": "cup"
+ },
+ {
+  "id": "hob-11",
+  "group": "us",
+  "raw": "1 (15-ounce) can black beans, rinsed and drained",
+  "name": "black beans",
+  "quantity": 1,
+  "quantity_max": null,
+  "unit": "tin"
+ },
+ {
+  "id": "hob-12",
+  "group": "us",
+  "raw": "3 tablespoons all-purpose flour",
+  "name": "all-purpose flour",
+  "quantity": 3,
+  "quantity_max": null,
+  "unit": "tbsp"
+ },
+ {
+  "id": "hob-13",
+  "group": "us",
+  "raw": "1 pound ground beef",
+  "name": "ground beef",
+  "quantity": 1,
+  "quantity_max": null,
+  "unit": "lb"
+ },
+ {
+  "id": "hob-14",
+  "group": "us",
+  "raw": "4 ounces cream cheese, softened",
+  "name": "cream cheese",
+  "quantity": 4,
+  "quantity_max": null,
+  "unit": "oz"
+ },
+ {
+  "id": "hob-15",
+  "group": "us",
+  "raw": "1/4 teaspoon cayenne pepper",
+  "name": "cayenne pepper",
+  "quantity": 0.25,
+  "quantity_max": null,
+  "unit": "tsp"
+ },
+ {
+  "id": "hob-16",
+  "group": "fractions_ranges",
+  "raw": "¾ cup granulated sugar",
+  "name": "granulated sugar",
+  "quantity": 0.75,
+  "quantity_max": null,
+  "unit": "cup"
+ },
+ {
+  "id": "hob-17",
+  "group": "fractions_ranges",
+  "raw": "2 ½ tsp baking powder",
+  "name": "baking powder",
+  "quantity": 2.5,
+  "quantity_max": null,
+  "unit": "tsp"
+ },
+ {
+  "id": "hob-18",
+  "group": "fractions_ranges",
+  "raw": "3 to 4 medium carrots",
+  "name": "carrots",
+  "quantity": 3,
+  "quantity_max": 4,
+  "unit": null
+ },
+ {
+  "id": "hob-19",
+  "group": "fractions_ranges",
+  "raw": "200-250g spaghetti",
+  "name": "spaghetti",
+  "quantity": 200,
+  "quantity_max": 250,
+  "unit": "g"
+ },
+ {
+  "id": "hob-20",
+  "group": "fractions_ranges",
+  "raw": "1-1½ litres vegetable stock",
+  "name": "vegetable stock",
+  "quantity": 1,
+  "quantity_max": 1.5,
+  "unit": "l"
+ },
+ {
+  "id": "hob-21",
+  "group": "fractions_ranges",
+  "raw": "⅛ tsp ground cloves",
+  "name": "ground cloves",
+  "quantity": 0.125,
+  "quantity_max": null,
+  "unit": "tsp"
+ },
+ {
+  "id": "hob-22",
+  "group": "alternatives",
+  "raw": "2 cups (480ml) whole milk",
+  "name": "whole milk",
+  "quantity": 2,
+  "quantity_max": null,
+  "unit": "cup"
+ },
+ {
+  "id": "hob-23",
+  "group": "alternatives",
+  "raw": "1 tbsp fresh thyme leaves or 1 tsp dried",
+  "name": "thyme",
+  "quantity": 1,
+  "quantity_max": null,
+  "unit": "tbsp"
+ },
+ {
+  "id": "hob-24",
+  "group": "alternatives",
+  "raw": "100g (3½oz) dark chocolate, chopped",
+  "name": "dark chocolate",
+  "quantity": 100,
+  "quantity_max": null,
+  "unit": "g"
+ },
+ {
+  "id": "hob-25",
+  "group": "alternatives",
+  "raw": "1 lb (450g) dried pasta",
+  "name": "dried pasta",
+  "quantity": 1,
+  "quantity_max": null,
+  "unit": "lb"
+ },
+ {
+  "id": "hob-26",
+  "group": "unusual_names",
+  "raw": "1 tbsp doenjang",
+  "name": "doenjang",
+  "quantity": 1,
+  "quantity_max": null,
+  "unit": "tbsp"
+ },
+ {
+  "id": "hob-27",
+  "group": "unusual_names",
+  "raw": "2 tsp za'atar",
+  "name": "za'atar",
+  "quantity": 2,
+  "quantity_max": null,
+  "unit": "tsp"
+ },
+ {
+  "id": "hob-28",
+  "group": "unusual_names",
+  "raw": "100g paneer, cubed",
+  "name": "paneer",
+  "quantity": 100,
+  "quantity_max": null,
+  "unit": "g"
+ },
+ {
+  "id": "hob-29",
+  "group": "unusual_names",
+  "raw": "1 tsp asafoetida",
+  "name": "asafoetida",
+  "quantity": 1,
+  "quantity_max": null,
+  "unit": "tsp"
+ },
+ {
+  "id": "hob-30",
+  "group": "unusual_names",
+  "raw": "2 tbsp mirin",
+  "name": "mirin",
+  "quantity": 2,
+  "quantity_max": null,
+  "unit": "tbsp"
+ },
+ {
+  "id": "hob-31",
+  "group": "optional",
+  "raw": "1 red chilli, deseeded and finely chopped (optional)",
+  "name": "red chilli",
+  "quantity": 1,
+  "quantity_max": null,
+  "unit": null
+ },
+ {
+  "id": "hob-32",
+  "group": "optional",
+  "raw": "Fresh mint leaves, to garnish",
+  "name": "mint",
+  "quantity": null,
+  "quantity_max": null,
+  "unit": null
+ },
+ {
+  "id": "hob-33",
+  "group": "optional",
+  "raw": "Lemon wedges, to serve",
+  "name": "lemon",
+  "quantity": null,
+  "quantity_max": null,
+  "unit": null
+ },
+ {
+  "id": "hob-34",
+  "group": "formatting",
+  "raw": "- 3 eggs",
+  "name": "egg",
+  "quantity": 3,
+  "quantity_max": null,
+  "unit": null
+ },
+ {
+  "id": "hob-35",
+  "group": "formatting",
+  "raw": "250 G PLAIN FLOUR",
+  "name": "plain flour",
+  "quantity": 250,
+  "quantity_max": null,
+  "unit": "g"
+ },
+ {
+  "id": "hob-36",
+  "group": "formatting",
+  "raw": "1tbsp olive oil",
+  "name": "olive oil",
+  "quantity": 1,
+  "quantity_max": null,
+  "unit": "tbsp"
+ },
+ {
+  "id": "hob-37",
+  "group": "formatting",
+  "raw": "2 x large onions, sliced",
+  "name": "onion",
+  "quantity": 2,
+  "quantity_max": null,
+  "unit": null
+ },
+ {
+  "id": "hob-38",
+  "group": "servings",
+  "raw": "8 chicken thighs, skin on",
+  "name": "chicken thighs",
+  "quantity": 8,
+  "quantity_max": null,
+  "unit": null
+ },
+ {
+  "id": "hob-39",
+  "group": "servings",
+  "raw": "1 kg potatoes, peeled",
+  "name": "potatoes",
+  "quantity": 1,
+  "quantity_max": null,
+  "unit": "kg"
+ },
+ {
+  "id": "hob-40",
+  "group": "servings",
+  "raw": "4 slices bread",
+  "name": "bread",
+  "quantity": 4,
+  "quantity_max": null,
+  "unit": "slice"
+ }
+]

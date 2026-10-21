@@ -123,7 +123,13 @@ fun ShopScreen(
                                 contentDescription = "Next aisle: ${next.cell.group.title}"
                             },
                     ) {
-                        Text("Next: ${next.cell.group.title}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        // The label gives way to a long aisle name, never the arrow.
+                        Text(
+                            "Next: ${next.cell.group.title}",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
                         Spacer(Modifier.size(6.dp))
                         Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
                     }

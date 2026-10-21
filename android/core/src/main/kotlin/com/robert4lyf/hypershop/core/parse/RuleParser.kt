@@ -47,11 +47,18 @@ class RuleParser(
 
     fun parse(raw: String): ParsedIngredient = Line(raw.take(Tokeniser.MAX_LINE)).parse()
 
+    /**
+     * "• 2 tbsp soy sauce", "- 3 eggs": a list marker pasted in front of the
+     * amount hid it (held-out ho-37, hob-34). A dash only counts as a marker
+     * when a space follows it, so "-1" or "half-fat" are never touched.
+     */
+    private fun withoutMarker(text: String): String = LIST_MARKER.replaceFirst(text, "")
+
     /** One parse; holds the cursor over the tokens. */
     private inner class Line(
         val text: String,
     ) {
-        val toks: List<Token> = Tokeniser.tokenise(text)
+        val toks: List<Token> = Tokeniser.tokenise(withoutMarker(text))
         var i = 0
         var check = false
         var checkReason: String? = null
@@ -513,6 +520,9 @@ class RuleParser(
     }
 
     private companion object {
+        /** A bullet, or a dash followed by a space, at the start of a pasted line. */
+        val LIST_MARKER = Regex("^\\s*(?:[•·▪◦‣⁃*]|[-–—](?=\\s))\\s*")
+
         /** R3.3: leading unit words that mean "one of". */
         val R33 = setOf(QtyUnit.PINCH, QtyUnit.DASH, QtyUnit.BUNCH, QtyUnit.SPRIG, QtyUnit.HEAD)
 

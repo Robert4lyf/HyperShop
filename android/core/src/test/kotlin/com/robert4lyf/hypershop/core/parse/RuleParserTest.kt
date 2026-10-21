@@ -25,6 +25,20 @@ class RuleParserTest {
     }
 
     @Test
+    fun aPastedListMarkerIsNotPartOfTheLine() {
+        for (line in listOf("- 3 eggs", "• 3 eggs", "  * 3 eggs", "– 3 eggs")) {
+            val r = p.parse(line)
+            assertEquals(Rational.of(3), r.quantity, line)
+            assertEquals("eggs", r.name, line)
+        }
+        val soy = p.parse("•  2  tbsp   soy sauce")
+        assertEquals(Rational.of(2), soy.quantity)
+        assertEquals(QtyUnit.TBSP, soy.unit)
+        // A dash that is part of a word or a number is not a marker.
+        assertEquals("half-fat crème fraîche", p.parse("200ml half-fat crème fraîche").name)
+    }
+
+    @Test
     fun r2CaseSensitiveSpoonsAndFluidOunces() {
         assertEquals(QtyUnit.TBSP, p.parse("1 T soy sauce").unit)
         assertEquals(QtyUnit.TSP, p.parse("1 t cumin").unit)

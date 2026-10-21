@@ -1,5 +1,27 @@
 # Hand-off notes
 
+## Status: Run 4 (fourth pass) — ⏸ Hand-off D
+
+Steps 9.1–9.6 are on `main` (PROGRESS.md). Everything below was tested on the JVM (Robolectric) and the device scenarios were compiled, but **none of it has been run on a phone or a watch here**: the container has no emulator. Each check takes a minute or two.
+
+## ⏸ Hand-off D — your checks (yes/no)
+
+Use the debug APK from the latest `build-N` release. **Back up first** (Settings › Data › Back up to a file).
+
+1. **Recipe states.** Add two saved recipes from Meals that share an ingredient. Tick that ingredient. Do both recipe cards and Meals say "N still needed" with the right N, and the recipe that needed nothing else say "All bought"?
+2. **At home only.** Add a recipe whose every line is marked at home. Does its card say "Nothing to buy — all at home", not "All bought"?
+3. **More servings after buying.** Tick everything for a recipe, then raise its servings on Meals. Does the extra come back on the list as partly bought ("1 more…"), and lowering servings again remove it?
+4. **Fast servings taps.** Tap + four times quickly on a meal. Does it land four higher, with one "serves N" message whose Undo goes back to where you started?
+5. **Shop mode, recipe view.** Set the list to group by recipe, then tap Shop. Is the shop in aisle order, and does Plan bring the recipe grouping back?
+6. **Now and Next.** Scroll the shop screen slowly. Does the top bar's "Now: …" follow the aisle at the top, and "Next" always name a different aisle?
+7. **TalkBack.** On the shop screen, does a row's tick read "<item>, Still needed, checkbox" and change to "Bought" when double-tapped?
+8. **Restore interrupted.** Restore a backup and force-stop HyperShop from Android's app info *while* "Restoring…" is showing (it is quick; try a large backup). Reopen: does a message say the restore was finished (or put back), with the list, theme and ingredient edits all from one side?
+9. **Restore refused.** Edit a backup file so a setting reads `"theme": "PURPLE"` and restore it. Is it refused with "nothing was changed", and is your data untouched?
+10. **Key kept.** After any restore, is your Claude key still saved (Settings › Claude)?
+11. **Watch after a restore.** With the watch app open, restore a backup. Does the watch pick up the restored list within a few seconds, with no stale ticks?
+
+**Device scenarios.** `cd android && ./gradlew :app:connectedDebugAndroidTest` runs `DeviceScenariosTest` (quick shop, weekly meals, backup through a file, interrupted restore, shop-screen accessibility). Run it **on an emulator only**: Gradle uninstalls the app after the run, which deletes the list on a phone. CI's `device-tests` job runs it on an emulator, non-blocking until it has passed on a run of PRs.
+
 ## Status: Run 3 (simplify) — stopped at ⏸ Hand-off C
 
 Run 3 is the usability pass planned in `docs/design/simplify.md`: Shop mode,
