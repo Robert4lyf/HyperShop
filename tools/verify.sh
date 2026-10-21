@@ -30,7 +30,7 @@ tools/gradle.sh ktlintCheck --rerun-tasks --no-configuration-cache --no-build-ca
 tools/gradle.sh \
   :core:test :extract:test :claude:test \
   :data:testDebugUnitTest :app:testDebugUnitTest \
-  :app:assembleDebug
+  :app:assembleDebug :app:assembleDebugAndroidTest
 
 step "Catalogue"
 python3 tools/catalog/build_catalog.py --check

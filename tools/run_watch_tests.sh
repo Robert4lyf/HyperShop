@@ -41,7 +41,19 @@ for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
         cat "${SIM_LOG}" >&2
         exit 1
     fi
-    if timeout 600 "${SDK_DIR}/bin/monkeydo" "${OUT}" "${DEVICE}" -t > "${LOG}" 2>&1; then
+    # Ten minutes is far longer than the suite takes; past it, monkeydo has hung
+    # after connecting (seen in CI: connected on attempt 3, then silence), and
+    # the simulator's own log is the only account of why.
+    status=0
+    timeout 600 "${SDK_DIR}/bin/monkeydo" "${OUT}" "${DEVICE}" -t > "${LOG}" 2>&1 || status=$?
+    if [[ ${status} -eq 124 ]]; then
+        echo "monkeydo connected but never finished (10 min). Its output:" >&2
+        cat "${LOG}" >&2
+        echo "The simulator's log:" >&2
+        cat "${SIM_LOG}" >&2
+        exit 1
+    fi
+    if [[ ${status} -eq 0 ]]; then
         break
     fi
     if ! grep -q "Unable to connect" "${LOG}"; then
