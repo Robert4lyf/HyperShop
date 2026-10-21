@@ -131,6 +131,18 @@ class ShopScreenTest {
         assertEquals("aisle-TINS_JARS", nextAisle(cells, dairy)!!.cell.group.key)
         val tins = cells.indexOfFirst { it is ShopCell.Header && it.group.key == "aisle-TINS_JARS" }
         assertEquals("aisle-PRODUCE", nextAisle(cells, tins)!!.cell.group.key)
+        // Only the aisle you are in has anything left: there is no "next".
+        val onlyProduce =
+            shop.copy(
+                aisles =
+                    shop.aisles.mapIndexed {
+                            i,
+                            (a, rows),
+                        ->
+                        a to if (i == 0) rows else rows.map { it.copy(state = TickState.DONE) }
+                    },
+            )
+        assertNull(nextAisle(cells(groups(onlyProduce), emptySet()), 0))
         val allDone = shop.copy(aisles = shop.aisles.map { (a, rows) -> a to rows.map { it.copy(state = TickState.DONE) } })
         assertNull(nextAisle(cells(groups(allDone), emptySet()), 0))
     }

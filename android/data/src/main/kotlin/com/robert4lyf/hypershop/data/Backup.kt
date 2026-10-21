@@ -113,6 +113,13 @@ object BackupValidator {
         val liveKeys = b.items.filter { it.deletedAt == null }.map { it.mergeKey }
         check(liveKeys.size == liveKeys.toSet().size, "two live items share a key")
         for (a in b.aliases) check(a.newId in items, "alias ${a.oldId}: points at a missing item ${a.newId}")
+        check(b.aliases.map { it.oldId }.toSet().size == b.aliases.size, "duplicate aliases")
+        check(b.deleted.map { it.id }.toSet().size == b.deleted.size, "duplicate deleted items")
+        check(b.stores.map { it.id }.toSet().size == b.stores.size, "duplicate stores")
+        val orderKeys = b.aisleOrder.map { it.storeId to it.aisleCode }
+        check(orderKeys.size == orderKeys.toSet().size, "duplicate aisle order rows")
+        val usageKeys = b.usage.map { it.date to it.model }
+        check(usageKeys.size == usageKeys.toSet().size, "duplicate usage rows")
         for (r in b.recipes) {
             check((r.title?.length ?: 0) <= MAX_TEXT && (r.url?.length ?: 0) <= MAX_TEXT, "recipe ${r.id}: text too long")
             check(

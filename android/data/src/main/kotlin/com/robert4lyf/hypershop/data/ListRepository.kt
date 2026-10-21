@@ -1174,7 +1174,9 @@ class ListRepository(
                 ),
             )
         }
-        marker.write(fresh)
+        // The database holds the new marker already; a file that can't be written now means one more
+        // new epoch at the next start-up (checkEpoch), never a restore reported as failed.
+        runCatching { marker.write(fresh) }
         rekeyIfCatalogChanged()
         return emptyList()
     }

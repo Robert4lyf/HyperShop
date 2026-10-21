@@ -124,7 +124,7 @@ class MealsViewModel(
                         ),
                     )
                 ApplyResult.Stale -> messages.send(UiMessage("The list changed; try ${pick.title} again"))
-                null -> messages.send(UiMessage("${pick.title} has no ingredients to add"))
+                null -> messages.send(UiMessage("${pick.title} couldn't be added; it may have just changed. Try again."))
             }
         }
 

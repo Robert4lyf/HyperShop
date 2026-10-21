@@ -187,7 +187,8 @@ fun MealsScreen(
                 }
             }
             if (ui.meals.isNotEmpty()) {
-                BottomActionBar(navigationBarInset = true) {
+                // Above the tab bar, which already clears the navigation bar: no inset of its own.
+                BottomActionBar(navigationBarInset = false) {
                     Button(onClick = actions.onList, modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("meals-list")) {
                         Icon(Icons.Rounded.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.size(8.dp))

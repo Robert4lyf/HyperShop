@@ -109,6 +109,9 @@ class BackupTest {
                     "an unreadable amount" to b.copy(contributions = b.contributions.map { it.copy(qtyBase = "{not json") }),
                     "an unreadable parse" to b.copy(lines = b.lines.map { it.copy(parsedJson = "[]") }),
                     "a decision for a missing line" to b.copy(decisions = b.decisions.map { it.copy(recipeLineId = 999) }),
+                    "two usage rows for one day and model" to b.copy(usage = b.usage + b.usage),
+                    "two aisle order rows for one aisle" to b.copy(aisleOrder = b.aisleOrder + b.aisleOrder.first()),
+                    "two aliases for one old id" to b.copy(aliases = List(2) { ItemAliasEntity(999, b.items.first().id) }),
                     "too many rows" to
                         b.copy(
                             staples =

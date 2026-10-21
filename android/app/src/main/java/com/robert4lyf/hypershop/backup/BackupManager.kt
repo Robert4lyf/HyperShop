@@ -135,7 +135,13 @@ class BackupManager(
             runCatching {
                 val file = snapshot()
                 val text = writer.encodeToString(BackupFile.serializer(), file)
-                val out = context.contentResolver.openOutputStream(uri, "wt") ?: throw IOException("could not open the file")
+                // "wt" truncates what was there; a provider that refuses the mode (Drive did) gets plain "w".
+                val out =
+                    try {
+                        context.contentResolver.openOutputStream(uri, "wt")
+                    } catch (e: Exception) {
+                        null
+                    } ?: context.contentResolver.openOutputStream(uri, "w") ?: throw IOException("could not open the file")
                 out.use { it.write(text.toByteArray()) }
                 summary(file)
             }.onFailure { Timber.w(it, "Backup failed") }
