@@ -119,6 +119,43 @@ class UsesTest {
         }
 
     @Test
+    fun clearingOrRemovingItemsByHandTakesTheRecipeOffTheListAndUndoBringsItBack() =
+        runBlocking {
+            val a = r.import("2 onions", "1 carrot")
+            assertEquals(listOf(a.useId), r.repo.usesOnList().map { it.useId })
+            val stamp = r.repo.clearAll()
+            assertTrue(r.repo.usesOnList().isEmpty())
+            r.repo.undoDelete(stamp)
+            assertEquals(listOf(a.useId), r.repo.usesOnList().map { it.useId })
+            // One item removed by hand: the recipe stays with the other; the last one takes it off.
+            val l = r.repo.snapshot()
+            r.repo.softDelete(l.itemByKey("cat:onion")!!.id)
+            assertEquals(1, r.repo.usesOnList().single().itemCount)
+            r.repo.softDelete(l.itemByKey("cat:carrot")!!.id)
+            assertTrue(r.repo.usesOnList().isEmpty())
+        }
+
+    @Test
+    fun aBoughtRecipeStaysAsAReminderUntilItsItemsArePurged() =
+        runBlocking {
+            val a = r.import("2 onions")
+            r.repo.tick(r.repo.snapshot().itemByKey("cat:onion")!!.id)
+            r.repo.finishShopping()
+            val shown = r.repo.usesOnList().single()
+            assertEquals(a.useId, shown.useId)
+            assertEquals(0, shown.itemCount)
+            // The same day: nothing to purge, nothing archived, the list not touched.
+            val rev = r.repo.snapshot().listRev
+            r.repo.purgeDeleted()
+            assertEquals(1, r.repo.usesOnList().size)
+            assertEquals(rev, r.repo.snapshot().listRev)
+            r.now += 8L * 24 * 3600 * 1000
+            r.repo.purgeDeleted()
+            assertTrue(r.repo.usesOnList().isEmpty())
+            assertTrue(r.repo.snapshot().uses.getValue(a.useId).archivedAt != null)
+        }
+
+    @Test
     fun removeUseThenRestoreBringsBackItemsTicksAndContributions() =
         runBlocking {
             val a = r.import("2 onions", "1 carrot")
