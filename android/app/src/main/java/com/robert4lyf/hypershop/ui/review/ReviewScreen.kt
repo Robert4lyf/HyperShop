@@ -184,7 +184,7 @@ fun ReviewScreen(
                     Text(
                         when {
                             ui.editing -> "Save changes"
-                            ui.addCount == 0 && ui.inStockCount > 0 -> "Nothing to add — all in stock"
+                            ui.addCount == 0 && ui.inStockCount > 0 -> "Nothing to add — all at home"
                             ui.addCount == 0 -> "Nothing to add"
                             ui.addCount == 1 -> "Add 1 item"
                             else -> "Add ${ui.addCount} items"
@@ -201,7 +201,7 @@ fun ReviewScreen(
 @Composable
 private fun TopBar(
     onCancel: () -> Unit,
-    /** Null when there's no in stock to clear (a saved recipe being edited). */
+    /** Null when there is nothing "at home" to clear (a saved recipe being edited). */
     onClearInStock: (() -> Unit)?,
     onAddIngredient: () -> Unit,
 ) {
@@ -222,7 +222,7 @@ private fun TopBar(
                     onAddIngredient()
                 })
                 onClearInStock?.let { clear ->
-                    DropdownMenuItem(text = { Text("Clear in stock") }, onClick = {
+                    DropdownMenuItem(text = { Text("Clear \"at home\"") }, onClick = {
                         menu = false
                         clear()
                     })
@@ -278,16 +278,7 @@ private fun Hero(
                 val centred = Modifier.align(Alignment.CenterVertically)
                 when (ui.badge) {
                     Badge.CLAUDE -> Badge("Parsed by Claude", Icons.Rounded.AutoAwesome, centred)
-                    Badge.CLAUDE_PENDING -> {
-                        Badge("Claude pending", Icons.Rounded.HourglassTop, centred)
-                        if (!ui.retrying) {
-                            TextButton(onClick = onRetryClaude, enabled = !ui.busy, colors = onHero, modifier = centred) {
-                                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.size(6.dp))
-                                Text("Retry with Claude")
-                            }
-                        }
-                    }
+                    Badge.CLAUDE_PENDING -> Badge("Claude pending", Icons.Rounded.HourglassTop, centred)
                     // Typed by hand: there is nothing for Claude to have read.
                     Badge.RULES ->
                         if (!ui.byHand) {
@@ -298,6 +289,14 @@ private fun Hero(
                                 onClick = { explainOffline = true },
                             )
                         }
+                }
+                // With a key: a second opinion is one tap away, whether Claude could not run or was not needed.
+                if (ui.canAskClaude && !ui.retrying) {
+                    TextButton(onClick = onRetryClaude, enabled = !ui.busy, colors = onHero, modifier = centred.testTag("ask-claude")) {
+                        Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(6.dp))
+                        Text(if (ui.badge == Badge.CLAUDE_PENDING) "Retry with Claude" else "Ask Claude")
+                    }
                 }
                 if (ui.retrying) {
                     CircularProgressIndicator(centred.size(20.dp), color = Brand.OnHero, strokeWidth = 2.dp)
@@ -623,7 +622,7 @@ private fun AisleHeader(
                 when {
                     onAisleInStock == null -> "${rows.size}"
                     adding > 0 -> "$adding to add"
-                    rows.all { it.inStock } -> "All in stock"
+                    rows.all { it.inStock } -> "All at home"
                     else -> "Nothing to add"
                 },
                 Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -634,7 +633,7 @@ private fun AisleHeader(
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "${aisle.displayName} options") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text("Mark this aisle in stock") }, onClick = {
+                    DropdownMenuItem(text = { Text("Mark this aisle as at home") }, onClick = {
                         menu = false
                         onAisleInStock(aisle)
                     })
@@ -652,7 +651,7 @@ private fun AisleHeader(
 @Composable
 private fun ReviewRowItem(
     row: ReviewRow,
-    /** Null for a saved recipe being edited: no "In stock" pill. */
+    /** Null for a saved recipe being edited: no "At home" pill. */
     onInStock: ((String, Boolean) -> Unit)?,
     onRow: (String) -> Unit,
     position: SectionPosition,
@@ -690,7 +689,7 @@ private fun ReviewRowItem(
                     textDecoration = struck,
                 )
             }
-            // What this row does: "+200 ml" goes on, "needs 200 ml" is in stock, or the list has it already.
+            // What this row does: "+200 ml" goes on, "needs 200 ml" is at home, or the list has it already.
             val sub =
                 when {
                     row.inStock -> row.quantity?.let { "needs $it" }
@@ -723,7 +722,7 @@ private fun ReviewRowItem(
     }
 }
 
-/** "In stock" as a pill: outlined when off, filled with a tick when on. A 48 dp target either way. */
+/** "At home" (you already have it): a pill, outlined when off, filled with a tick when on. A 48 dp target either way. */
 @Composable
 private fun InStockPill(
     on: Boolean,
@@ -742,8 +741,8 @@ private fun InStockPill(
                 .clip(shape)
                 .toggleable(value = on, role = Role.Checkbox, onValueChange = onChange)
                 .semantics {
-                    contentDescription = "In stock: $name"
-                    stateDescription = if (on) "In stock" else "Not in stock"
+                    contentDescription = "At home: $name"
+                    stateDescription = if (on) "Already at home" else "Need to buy"
                 },
     ) {
         Row(
@@ -752,7 +751,7 @@ private fun InStockPill(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (on) Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-            Text("In stock", style = MaterialTheme.typography.labelLarge)
+            Text("At home", style = MaterialTheme.typography.labelLarge)
         }
     }
 }

@@ -60,6 +60,7 @@ fun ListRoute(
             onOpenItem = { vm.openItem(it.id) },
             onNeed = vm::needIt,
             onView = vm::setView,
+            onMode = vm::setMode,
             onShare = {
                 val send =
                     Intent(Intent.ACTION_SEND)

@@ -110,6 +110,8 @@ data class ReviewUi(
     val byHand: Boolean = false,
     /** A saved recipe being edited: nothing goes on the list, so no in-stock or servings. */
     val savedOnly: Boolean = false,
+    /** A key is saved and Claude hasn't read this recipe: "Ask Claude" is offered. */
+    val canAskClaude: Boolean = false,
     /** No web page: a cookbook recipe, which can carry its book and page. */
     val cookbook: Boolean = false,
     val book: String? = null,
@@ -120,7 +122,7 @@ data class ReviewUi(
     val inStockCount: Int get() = rows.count { it.inStock }
     val checkCount: Int get() = rows.count { it.check && !it.inStock }
 
-    /** "4 to add · 2 in stock · 1 to check", without the zero parts ("12 ingredients" for a saved recipe). */
+    /** "4 to add · 2 at home · 1 to check", without the zero parts ("12 ingredients" for a saved recipe). */
     val summary: String
         get() =
             if (savedOnly) {
@@ -136,7 +138,7 @@ data class ReviewUi(
         get() =
             listOfNotNull(
                 addCount.takeIf { it > 0 }?.let { "$it to add" },
-                inStockCount.takeIf { it > 0 }?.let { "$it in stock" },
+                inStockCount.takeIf { it > 0 }?.let { "$it at home" },
                 checkCount.takeIf { it > 0 }?.let { "$it to check" },
             ).joinToString(" · ")
 }
@@ -287,8 +289,9 @@ class ReviewViewModel(
         if (r.claudePending && !r.claudeTried && c.reviewGate.visible.value) {
             _state.value = ReviewState.Loading(STAGE_CLAUDE)
             // Kept on the job, so reopening this review neither pays for Claude again nor
-            // retries a failure (claudeTried is set on those).
-            r = parseWithClaude(r)
+            // retries a failure (claudeTried is set on those). Pending means the worker
+            // already found a line worth asking about: the gate is not asked twice.
+            r = parseWithClaude(r.copy(askClaude = true))
         }
         if (r.lines.isEmpty()) return fail(r.error ?: ImportError.NO_RECIPE, candidates(r))
         result = r
@@ -452,6 +455,7 @@ class ReviewViewModel(
                     cookbook = webLink(r.url) == null && !r.byHand,
                     byHand = r.byHand,
                     savedOnly = r.savesToLibrary,
+                    canAskClaude = r.parsedBy != ParsedBy.CLAUDE && !r.byHand && c.apiKeyStore.hasKey.value,
                     book = r.book,
                     page = r.page,
                 ),
@@ -465,6 +469,7 @@ class ReviewViewModel(
             r.claudeNote != null -> Importer.claudeNoteText(r.claudeNote)
             // Claude answered that there was nothing to read; the rule parser's lines stand.
             r.claudeTried && !r.claudePending -> "Claude found no ingredient list here; the lines were read offline"
+            r.claudeSkipped -> "Every line was clear, so Claude wasn't needed"
             else -> null
         }
 
@@ -518,7 +523,7 @@ class ReviewViewModel(
             for (r in rows) decisions[r.target.mergeKey] = r.decision.copy(inStock = true)
             changed = true
             recompute()
-            _events.send(UiMessage("${aisle.displayName} marked in stock", undo = { restoreDecisions(before) }))
+            _events.send(UiMessage("${aisle.displayName} marked as at home", undo = { restoreDecisions(before) }))
         }
 
     /** Overflow menu: clear in stock (with Undo). */
@@ -529,7 +534,7 @@ class ReviewViewModel(
             decisions.replaceAll { _, d -> d.copy(inStock = false) }
             changed = true
             recompute()
-            _events.send(UiMessage("Cleared in stock", undo = { restoreDecisions(before) }))
+            _events.send(UiMessage("Cleared \"at home\"", undo = { restoreDecisions(before) }))
         }
 
     /** Undo of [clearInStock] and [aisleInStock]: the decisions as they were. */
@@ -549,7 +554,7 @@ class ReviewViewModel(
             }
         }
 
-    /** "Retry with Claude". */
+    /** "Retry with Claude" / "Ask Claude": called whatever the hybrid gate says. */
     fun retryWithClaude() {
         // A second tap while the first is still queued behind the lock would ask twice.
         if (retryJob?.isActive == true) return
@@ -562,7 +567,7 @@ class ReviewViewModel(
                 retrying = true
                 (state.value as? ReviewState.Ready)?.let { _state.value = it.copy(ui = it.ui.copy(busy = true, retrying = true)) }
                 try {
-                    val again = parseWithClaude(r.copy(claudePending = true)) { it.parsedBy == ParsedBy.CLAUDE }
+                    val again = parseWithClaude(r.copy(claudePending = true, askClaude = true)) { it.parsedBy == ParsedBy.CLAUDE }
                     store(again)
                     result = again
                 } finally {
@@ -681,7 +686,7 @@ class ReviewViewModel(
         val after = Display.amount(row.onListAfter, units, produce, null, entry?.gramsPerCup, entry?.displayPolicy)
         val effect =
             when {
-                row.decision.inStock -> "$name: in stock, nothing added"
+                row.decision.inStock -> "$name: at home, nothing added"
                 adding == null && row.existing != null -> "$name: already on the list"
                 adding == null -> "$name: added to the list"
                 row.existing == null || before == null -> "$name: +$adding (new)"
@@ -730,7 +735,7 @@ class ReviewViewModel(
             p.note?.let { "($it)" },
         ).joinToString(" ")
 
-    /** "Always in stock": a staple from now on, and ticked here. */
+    /** "Always at home": a staple from now on, and marked here. */
     fun alwaysInStock(key: String) =
         act {
             c.repository.setStaple(key, true)

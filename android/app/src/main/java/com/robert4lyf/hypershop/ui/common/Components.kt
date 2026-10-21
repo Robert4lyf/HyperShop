@@ -179,9 +179,9 @@ fun ScreenHeader(
             .lowPoly(title, end = HEADER_END),
     ) {
         CompositionLocalProvider(LocalContentColor provides Brand.OnHero) {
-            Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 18.dp, bottom = 18.dp)) {
+            Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 14.dp, bottom = 14.dp)) {
                 Row(verticalAlignment = Alignment.Top) {
-                    Column(Modifier.weight(1f).padding(top = 4.dp)) {
+                    Column(Modifier.weight(1f).padding(top = 2.dp)) {
                         overline?.let {
                             // Soft white, not citrus: citrus only clears 3:1 on the brighter hero.
                             Text(it.uppercase(), style = MaterialTheme.typography.labelMedium, color = Brand.OnHeroSoft)

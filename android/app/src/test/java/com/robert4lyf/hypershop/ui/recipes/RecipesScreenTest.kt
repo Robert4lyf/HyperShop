@@ -73,7 +73,7 @@ class RecipesScreenTest {
     @Test
     fun removeAsksFirst() {
         show()
-        compose.onNodeWithContentDescription("Serves 4 · 6 items on the list · 3 in stock").assertExists()
+        compose.onNodeWithContentDescription("Serves 4 · 6 items on the list · 3 at home").assertExists()
         // Every use can be removed from its menu, after a confirmation.
         compose.onNodeWithContentDescription("Serves 8 · 5 items on the list").assertExists()
         compose.onNodeWithTag("more-2").performClick()
@@ -136,7 +136,7 @@ class RecipesScreenTest {
         compose.onNodeWithTag("lib-r:9").assertExists()
         compose.onNodeWithTag("view-list").performClick()
         compose.onNodeWithTag("nothing-yet").assertExists()
-        compose.onNodeWithText("Nothing on the list").assertExists()
+        compose.onNodeWithText("Nothing on the list", substring = true).assertExists()
     }
 
     @Test
@@ -253,7 +253,7 @@ class RecipesScreenTest {
             )
         compose.setContent { HyperShopTheme(dynamicColor = false) { UseDetailContent(detail, onEdit = { edited++ }, onRemove = {}) } }
         compose.onNodeWithText("Serves 4 (written for 6)", substring = true).assertExists()
-        compose.onAllNodesWithText("In stock").assertCountEquals(2)
+        compose.onAllNodesWithText("At home").assertCountEquals(2)
         compose.onNodeWithTag("use-detail-edit").performClick()
         assertEquals(1, edited)
         compose.onRoot().captureRoboImage(Shots.path("use-detail-light.png"))

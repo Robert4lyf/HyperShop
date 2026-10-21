@@ -282,7 +282,7 @@ class ReviewViewModelTest {
         vm.clearInStock()
         val cleared = await(vm.state) { it is ReviewState.Ready && it.ui.inStockCount == 0 } as ReviewState.Ready
         assertEquals(cleared.ui.aisles.sumOf { it.second.size }, cleared.ui.addCount)
-        await(vm.state) { events.any { it.text == "Cleared in stock" && it.undo != null } }
+        await(vm.state) { events.any { it.text == "Cleared \"at home\"" && it.undo != null } }
         runBlocking { events.single().undo!!.invoke() }
         val restored = await(vm.state) { it is ReviewState.Ready && it.ui.row("cat:salt").inStock } as ReviewState.Ready
         assertTrue(restored.ui.row("cat:olive_oil").inStock)
@@ -298,7 +298,7 @@ class ReviewViewModelTest {
         assertEquals("\"A or B\": one of two", flagged.checkReason)
         assertTrue(ui.row("cat:onion").adds)
         assertTrue("a staple, pre-ticked", ui.row("cat:salt").inStock)
-        assertEquals("3 to add · 1 in stock · 1 to check", ui.summary)
+        assertEquals("3 to add · 1 at home · 1 to check", ui.summary)
     }
 
     @Test

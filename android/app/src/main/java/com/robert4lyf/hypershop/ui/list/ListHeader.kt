@@ -197,6 +197,7 @@ fun EmptyState(
 ) {
     EmptyHero(
         title = "Your list is empty",
+        body = "Type an item above, share a recipe link to HyperShop, or add a saved recipe from the Recipes tab.",
         modifier = Modifier.padding(top = 8.dp).testTag("empty"),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 
 /*
  * Schema v1 (PLAN §4). Enums are stored by name, never ordinal. Two rules Room
@@ -11,8 +12,12 @@ import androidx.room.PrimaryKey
  *  - Item.mergeKey is unique among live items (a partial unique index), so a
  *    soft-deleted item does not block a new one with the same key;
  *  - RecipeUse: kind = 'MANUAL' OR recipeId IS NOT NULL (insert/update triggers).
+ *
+ * The user-data entities are @Serializable: a backup file (Backup.kt) carries
+ * them as they are, so the format and the schema cannot drift apart.
  */
 
+@Serializable
 @Entity(tableName = "Meta")
 data class MetaEntity(
     @PrimaryKey val id: Int = 1,
@@ -30,6 +35,7 @@ data class MetaEntity(
     val manualTitle: String? = null,
 )
 
+@Serializable
 @Entity(tableName = "Item", indices = [Index("mergeKey"), Index("aisleCode")])
 data class ItemEntity(
     @PrimaryKey(autoGenerate = true) val id: Long,
@@ -44,12 +50,14 @@ data class ItemEntity(
     val updatedAt: Long,
 )
 
+@Serializable
 @Entity(tableName = "ItemAlias")
 data class ItemAliasEntity(
     @PrimaryKey val oldId: Long,
     val newId: Long,
 )
 
+@Serializable
 @Entity(tableName = "Recipe", indices = [Index("url"), Index("libraryKey")])
 data class RecipeEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -88,6 +96,7 @@ fun bookRef(
     return listOfNotNull(b, p).joinToString(" · ").ifEmpty { null }
 }
 
+@Serializable
 @Entity(
     tableName = "RecipeLine",
     foreignKeys = [
@@ -109,6 +118,7 @@ data class RecipeLineEntity(
     val parsedJson: String,
 )
 
+@Serializable
 @Entity(
     tableName = "RecipeUse",
     foreignKeys = [
@@ -130,6 +140,7 @@ data class RecipeUseEntity(
     val archivedAt: Long?,
 )
 
+@Serializable
 @Entity(
     tableName = "Tick",
     foreignKeys = [
@@ -151,6 +162,7 @@ data class TickEntity(
     val seq: Int?,
 )
 
+@Serializable
 @Entity(
     tableName = "Contribution",
     foreignKeys = [
@@ -179,6 +191,7 @@ data class ContributionEntity(
     val unitHint: String?,
 )
 
+@Serializable
 @Entity(
     tableName = "LineDecision",
     primaryKeys = ["useId", "recipeLineId"],
@@ -209,6 +222,7 @@ data class ImportJobEntity(
     val createdAt: Long,
 )
 
+@Serializable
 @Entity(tableName = "Aisle")
 data class AisleEntity(
     @PrimaryKey val code: String,
@@ -217,12 +231,14 @@ data class AisleEntity(
     val defaultOrder: Int,
 )
 
+@Serializable
 @Entity(tableName = "StoreProfile")
 data class StoreProfileEntity(
     @PrimaryKey val id: Long,
     val name: String,
 )
 
+@Serializable
 @Entity(
     tableName = "AisleOrder",
     primaryKeys = ["storeId", "aisleCode"],
@@ -241,6 +257,7 @@ data class AisleOrderEntity(
     val position: Int,
 )
 
+@Serializable
 @Entity(tableName = "CategoryOverride")
 data class CategoryOverrideEntity(
     @PrimaryKey val key: String,
@@ -248,12 +265,14 @@ data class CategoryOverrideEntity(
     val source: String,
 )
 
+@Serializable
 @Entity(tableName = "Staple")
 data class StapleEntity(
     @PrimaryKey val key: String,
     val source: String,
 )
 
+@Serializable
 @Entity(tableName = "ClaudeUsage", primaryKeys = ["date", "model"])
 data class ClaudeUsageEntity(
     /** ISO date, UTC. */
@@ -266,6 +285,7 @@ data class ClaudeUsageEntity(
     val calls: Int,
 )
 
+@Serializable
 @Entity(tableName = "DeletedItem")
 data class DeletedItemEntity(
     @PrimaryKey val id: Long,

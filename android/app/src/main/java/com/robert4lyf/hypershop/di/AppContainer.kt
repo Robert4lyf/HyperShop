@@ -87,6 +87,9 @@ class AppContainer(
 
     /** Read before the repository and parsers are built, so they never see the catalogue without your edits. */
     val library = IngredientLibrary(File(context.filesDir, "library/edits.json"), catalog)
+
+    /** The list epoch's restore guard (never backed up); [startUp] checks it, a backup restore rewrites it. */
+    val epochMarker: EpochMarker = EpochMarker(context.noBackupFilesDir)
     val repository = ListRepository(db, catalog, clock)
     val settings = Settings(dataStore)
     val log = RingLog()
@@ -236,7 +239,7 @@ class AppContainer(
         }
 
     /** Start-up housekeeping: the epoch marker, a catalogue re-key, the 7-day purge. */
-    fun startUp(marker: EpochMarker) {
+    fun startUp(marker: EpochMarker = epochMarker) {
         // The first frame waits for the theme setting; start reading the settings file now,
         // while the activity is still being created, rather than when it first asks.
         applicationScope.launch { settings.theme.first() }

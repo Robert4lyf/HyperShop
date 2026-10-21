@@ -89,7 +89,7 @@ class DisplayTest {
         assertEquals(RowText("250g butter", "1 × 250g block"), Display.row(l, butter, cat.byId["butter"]))
         l = l.tick(onion.id, 1)!!
         l = add(l, listOf("1 onion")).first
-        assertEquals(RowText("1 more onion", "2 already ticked"), Display.row(l, l.items.getValue(onion.id), cat.byId["onion"]))
+        assertEquals(RowText("1 more onion", "2 already bought"), Display.row(l, l.items.getValue(onion.id), cat.byId["onion"]))
         val salt = add(ShoppingList(), listOf("1 tsp salt")).first
         assertEquals("salt", Display.row(salt, salt.liveItems.single(), cat.byId["salt"]).main)
     }

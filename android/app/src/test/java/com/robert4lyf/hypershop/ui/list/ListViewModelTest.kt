@@ -4,6 +4,7 @@ import android.os.Looper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.di.AppContainer
+import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.testutil.await
@@ -144,7 +145,7 @@ class ListViewModelTest {
         c.add("1 onion")
         val partial = await(vm.ui) { it.row("onion").state == TickState.PARTIAL }
         assertEquals("1 more onion", partial.row("onion").main)
-        assertEquals("2 already ticked", partial.row("onion").sub)
+        assertEquals("2 already bought", partial.row("onion").sub)
     }
 
     @Test
@@ -162,7 +163,7 @@ class ListViewModelTest {
         await(vm.ui) { it.doneCount == 1 }
         vm.finishShopping()
         m = nextMessage(vm)
-        assertEquals("Finished: removed 1 ticked items", m.text)
+        assertEquals("Finished: 1 bought item removed", m.text)
         await(vm.ui) { it.left == 1 && it.doneCount == 0 }
         vm.clearAll()
         m = nextMessage(vm)
@@ -266,7 +267,7 @@ class ListViewModelTest {
         // Straight after the tick: the screen may not show it yet; the count comes from the write.
         runBlocking { c.repository.tick(ui.row("onion").id) }
         vm.finishShopping()
-        assertEquals("Finished: removed 1 ticked items", nextMessage(vm).text)
+        assertEquals("Finished: 1 bought item removed", nextMessage(vm).text)
     }
 
     @Test
@@ -295,6 +296,44 @@ class ListViewModelTest {
         await(vm.ui) { it.row("onion").aisle == AisleCode.TINS_JARS }
         settle()
         assertEquals(carrot, vm.sheet.value?.id)
+    }
+
+    @Test
+    fun shopModeIsASettingAndKeepsEveryTick() {
+        val c = TestContainer.create()
+        c.add("2 onions", "1 carrot", "500g beef mince")
+        val vm = ListViewModel(c)
+        var ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
+        assertEquals(ListMode.PLAN, ui.mode)
+        assertTrue(!ui.shopping)
+        vm.setMode(ListMode.SHOP)
+        ui = await(vm.ui) { it.shopping }
+        vm.toggle(ui.row("onion"))
+        vm.toggle(ui.row("carrot"))
+        ui = await(vm.ui) { it.doneCount == 2 }
+        // Back to planning: the same rows, the same ticks, the same count.
+        vm.setMode(ListMode.PLAN)
+        ui = await(vm.ui) { !it.shopping }
+        assertEquals(2, ui.doneCount)
+        assertEquals(TickState.DONE, ui.row("onion").state)
+        // A new view model (the process came back) reads the mode from the setting.
+        vm.setMode(ListMode.SHOP)
+        await(vm.ui) { it.shopping }
+        val again = ListViewModel(c)
+        assertTrue(await(again.ui) { it.loaded && it.aisles.isNotEmpty() }.shopping)
+        // Finishing takes the bought rows away and, with nothing left, the shop screen with them.
+        again.finishShopping()
+        assertEquals("Finished: 2 bought items removed", nextMessage(again).text)
+        val after = await(again.ui) { it.doneCount == 0 && it.left == 1 }
+        assertTrue(after.shopping)
+        again.toggle(after.row("beef mince"))
+        again.finishShopping()
+        val empty = await(again.ui) { it.isEmpty }
+        assertTrue(!empty.shopping)
+        // A trip that took everything ends in planning, so the next item typed lands on the planning screen.
+        await(again.ui) { it.mode == ListMode.PLAN }
+        again.addTyped("milk")
+        assertTrue(!await(again.ui) { it.aisles.isNotEmpty() }.shopping)
     }
 
     /** Lets everything queued run: the main looper, and Room and background work. */

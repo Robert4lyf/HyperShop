@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -264,11 +265,126 @@ class ClaudeClientTest {
         }
 
     @Test
-    fun readTimeoutCoversASlowReply() {
-        // A non-streamed Opus reply can take ~14 s before the first byte.
+    fun aStreamedReplyStillNeedsAWholeCallBudget() {
+        // Streamed: a minute with no bytes is a dead connection, but a long Opus answer needs minutes in all.
         val h = ClaudeClient.defaultHttp()
-        assertEquals(h.callTimeoutMillis, h.readTimeoutMillis)
+        assertTrue(h.readTimeoutMillis < h.callTimeoutMillis)
+        assertTrue(h.callTimeoutMillis >= 180_000)
     }
+
+    /** The Messages API event stream for [text], as the real API sends it. */
+    private fun sse(
+        text: String = output(),
+        stop: String = "end_turn",
+        model: String = "claude-haiku-5-5",
+        outputTokens: Long = 900,
+        /** Unknown-key padding in the first event, so a throttled server sends it whole before stalling. */
+        padding: Int = 0,
+    ): String =
+        buildString {
+            append("event: message_start\n")
+            append(
+                "data: {\"type\":\"message_start\",\"pad\":\"${"x".repeat(padding)}\"," +
+                    "\"message\":{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\"," +
+                    "\"model\":\"$model\",\"content\":[],\"stop_reason\":null,\"usage\":{\"input_tokens\":1200,\"output_tokens\":1," +
+                    "\"cache_creation_input_tokens\":10,\"cache_read_input_tokens\":20}}}\n\n",
+            )
+            append(
+                "event: content_block_start\n" +
+                    "data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n",
+            )
+            // The text in three deltas, as a real stream chops it.
+            for (part in text.chunked((text.length + 2) / 3)) {
+                val escaped = Json.encodeToString(String.serializer(), part)
+                append(
+                    "event: content_block_delta\n" +
+                        "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":$escaped}}\n\n",
+                )
+            }
+            append("event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n")
+            append(
+                "event: message_delta\n" +
+                    "data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"$stop\",\"stop_sequence\":null}," +
+                    "\"usage\":{\"output_tokens\":$outputTokens}}\n\n",
+            )
+            append("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
+        }
+
+    private fun stream(body: String) = MockResponse().setResponseCode(200).setHeader("content-type", "text/event-stream").setBody(body)
+
+    @Test
+    fun aStreamedReplyIsReadLikeAPlainOne() =
+        runTest {
+            server.enqueue(stream(sse()))
+            val r = client().parse(input, ClaudeModel.HAIKU) as ClaudeResult.Parsed
+            assertEquals(2, r.recipe.ingredients.size)
+            assertEquals("onion", r.recipe.ingredients[0].name)
+            assertEquals(listOf("claude-haiku-5-5" to Usage(1200, 900, 10, 20)), recorded)
+            // The request asked for the stream.
+            val sent = Json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject
+            assertEquals("true", sent["stream"]!!.jsonPrimitive.content)
+        }
+
+    @Test
+    fun aStreamedRefusalAndMaxTokensReadTheStopReasonFirst() =
+        runTest {
+            server.enqueue(stream(sse(stop = "refusal")))
+            assertTrue(client().parse(input, ClaudeModel.HAIKU) is ClaudeResult.Refused)
+            server.enqueue(stream(sse(stop = "max_tokens")))
+            assertEquals(ClaudeResult.Reason.MAX_TOKENS, (client().parse(input, ClaudeModel.HAIKU) as ClaudeResult.Failed).reason)
+            // Both were billed, both metered.
+            assertEquals(2, recorded.size)
+        }
+
+    @Test
+    fun aStreamThatDropsMidAnswerStillMetersWhatWasBilled() =
+        runTest {
+            // The answer started (input tokens known, some text sent), then the connection went.
+            server.enqueue(stream(sse()).setSocketPolicy(SocketPolicy.DISCONNECT_DURING_RESPONSE_BODY))
+            val r = client().parse(input, ClaudeModel.HAIKU) as ClaudeResult.Failed
+            assertEquals(ClaudeResult.Reason.OFFLINE, r.reason)
+            val (model, usage) = recorded.single()
+            assertEquals("claude-haiku-5-5", model)
+            assertEquals(1200, usage.inputTokens)
+            assertEquals(10, usage.cacheWriteTokens)
+            // Half the body went: the output is estimated from the text that arrived, never zero.
+            assertTrue(usage.outputTokens > 0, "$usage")
+            assertEquals(r.usage, usage)
+        }
+
+    @Test
+    fun aStreamThatStallsIsATimeoutNotOffline() {
+        // Bytes stop coming after the first event; a short read timeout stands in for the real minute.
+        // MockWebServer throttles the request body it reads with the same figure, so the first chunk must be
+        // bigger than the request (a few KB of prompt and schema): the padding makes the first event 64 KB.
+        val body = sse(padding = 64 * 1024)
+        val firstEvent = body.indexOf("event: content_block_start").toLong()
+        server.enqueue(stream(body).throttleBody(firstEvent, 10, TimeUnit.SECONDS))
+        val http = ClaudeClient.defaultHttp().newBuilder().readTimeout(2, TimeUnit.SECONDS).build()
+        val c =
+            ClaudeClient(
+                apiKey = { key },
+                baseUrl = server.url("").toString().trimEnd('/'),
+                http = http,
+                usageSink = { m, u -> recorded += m to u },
+                log = log,
+            )
+        val r = runBlocking { withTimeout(20_000) { c.parse(input, ClaudeModel.HAIKU) } } as ClaudeResult.Failed
+        assertEquals(ClaudeResult.Reason.TIMEOUT, r.reason, log.snapshot().joinToString("\n"))
+        assertEquals(1200, recorded.single().second.inputTokens)
+    }
+
+    @Test
+    fun aStreamedErrorEventFollowsTheHttpRules() =
+        runTest {
+            // Overloaded mid-stream, then fine: the back-off and retry are the same as for a 529.
+            server.enqueue(
+                stream("event: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"busy\"}}\n\n"),
+            )
+            server.enqueue(stream(sse()))
+            assertTrue(client().parse(input, ClaudeModel.HAIKU) is ClaudeResult.Parsed)
+            assertEquals(2, server.requestCount)
+        }
 
     @Test
     fun ringLogKeepsTheLast500() {

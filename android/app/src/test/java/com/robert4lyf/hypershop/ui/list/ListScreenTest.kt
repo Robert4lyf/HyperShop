@@ -37,7 +37,7 @@ internal val SAMPLE_LIST =
             listOf(
                 AisleCode.PRODUCE to
                     listOf(
-                        ListRow(1, "onion", "1 more onion", "2 already ticked", TickState.PARTIAL, AisleCode.PRODUCE),
+                        ListRow(1, "onion", "1 more onion", "2 already bought", TickState.PARTIAL, AisleCode.PRODUCE),
                         ListRow(2, "coriander", "coriander", "1 × 30 g pack", TickState.OPEN, AisleCode.PRODUCE),
                         ListRow(3, "carrot", "2 carrots", null, TickState.DONE, AisleCode.PRODUCE),
                     ),
@@ -105,14 +105,14 @@ class ListScreenTest {
         val rows =
             listOf(
                 ListRow(1, "milk", "700 ml milk", null, TickState.OPEN, AisleCode.DAIRY_EGGS, from = "Weeknight chilli"),
-                ListRow(2, "onion", "1 more onion", "2 already ticked", TickState.PARTIAL, AisleCode.DAIRY_EGGS, from = "Weeknight chilli"),
+                ListRow(2, "onion", "1 more onion", "2 already bought", TickState.PARTIAL, AisleCode.DAIRY_EGGS, from = "Weeknight chilli"),
                 ListRow(3, "butter", "250 g butter", "1 × 250 g block", TickState.OPEN, AisleCode.DAIRY_EGGS, from = "Weeknight chilli"),
             )
         val ui = SAMPLE_LIST.copy(aisles = listOf(AisleCode.DAIRY_EGGS to rows))
         compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions) } }
         compose.onNodeWithText("700 ml Milk").assertExists()
         compose.onNodeWithText("1 more Onion").assertExists()
-        compose.onNodeWithText("2 already ticked · Weeknight chilli").assertExists()
+        compose.onNodeWithText("2 already bought · Weeknight chilli").assertExists()
         compose.onNodeWithText("1 × 250 g block").assertExists()
         // The pack note keeps its line; the recipe goes under it.
         assertEquals(listOf("1 × 250 g block", "Weeknight chilli"), subLines(rows[2]))

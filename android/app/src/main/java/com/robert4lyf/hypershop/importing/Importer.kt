@@ -9,6 +9,7 @@ import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.QtyUnit
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.parse.RuleParser
+import com.robert4lyf.hypershop.core.parse.Uncertainty
 import com.robert4lyf.hypershop.extract.Extractor
 import com.robert4lyf.hypershop.extract.FetchResult
 import com.robert4lyf.hypershop.extract.Method
@@ -42,7 +43,14 @@ class ReviewGate {
     }
 }
 
-/** Fetch → extract → parse (PLAN §3.1). Rules always; Claude when allowed, keyed and online. */
+/**
+ * Fetch → extract → parse (PLAN §3.1). Rules always; Claude when allowed, keyed,
+ * online **and worth it**: a recipe whose every line the rule parser read with
+ * no doubt ([Uncertainty]) is kept as read, and Claude is only asked when a
+ * line is flagged, when nothing structured was found (page text, a photo), or
+ * when the user asks ([ImportResult.askClaude]). The eval behind this is
+ * `HybridGateTest` (docs/design/simplify.md phase 3).
+ */
 class Importer(
     private val fetcher: SafeFetcher,
     private val rules: RuleParser,
@@ -97,7 +105,11 @@ class Importer(
             model,
         )
 
-    /** Parses [base]'s raw lines (or page text): Claude when allowed, else the rule parser marked "Claude pending". */
+    /**
+     * Parses [base]'s raw lines (or page text): the rule parser first; Claude when
+     * allowed and the rules left a doubt, else the rule parser's reading stands
+     * (marked "Claude pending" only when Claude was wanted and could not run).
+     */
     suspend fun parse(
         base: ImportResult,
         allowClaude: Boolean,
@@ -107,6 +119,10 @@ class Importer(
         val keyed = claude != null && hasKey()
         val photo = base.photo?.takeIf { base.rawLines.isEmpty() }
         if (photo != null && !keyed) return ruled.copy(claudePending = false, error = ImportError.PHOTO_NEEDS_KEY)
+        // The gate: structured lines the rules read cleanly need no second opinion (and cost nothing).
+        if (photo == null && base.rawLines.isNotEmpty() && !base.askClaude && !Uncertainty.needsClaude(ruled.lines)) {
+            return ruled.copy(claudePending = false, claudeSkipped = true)
+        }
         val input =
             when {
                 photo != null ->
@@ -146,6 +162,8 @@ class Importer(
                             parsedBy = ParsedBy.CLAUDE,
                             model = r.recipe.model,
                             claudePending = false,
+                            claudeSkipped = false,
+                            askClaude = false,
                             sourceUrls = r.recipe.sourceUrls,
                             locale = localeFor(base.url, r.recipe.ingredients.map { it.raw }),
                         ).also { PhotoStore.delete(photo) }
@@ -180,6 +198,7 @@ class Importer(
                 "BAD_KEY" -> "Claude rejected the key"
                 "CAP_REACHED" -> "Monthly cap reached"
                 "OFFLINE" -> "Offline"
+                "TIMEOUT" -> "Claude took too long"
                 "RATE_LIMITED", "OVERLOADED" -> "Claude is busy"
                 "SERVER" -> "Claude had a problem"
                 "MAX_TOKENS" -> "Too long for Claude"

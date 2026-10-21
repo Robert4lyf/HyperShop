@@ -101,9 +101,9 @@ class LibraryScreenTest {
         compose.onNodeWithTag("entry-name").performTextInput("Gochugaru")
         compose.onNodeWithTag("entry-synonyms").performTextInput("korean chilli flakes")
         compose.onNodeWithText(AisleCode.WORLD_FOODS.displayName).performScrollTo().performClick()
-        compose.onNodeWithText("Always in stock").performScrollTo().performClick()
-        compose.onNodeWithText("Always in stock").assertIsOn()
-        compose.onNodeWithText("Always in stock").performClick()
+        compose.onNodeWithText("Always at home").performScrollTo().performClick()
+        compose.onNodeWithText("Always at home").assertIsOn()
+        compose.onNodeWithText("Always at home").performClick()
         // The rarely-needed fields wait under "Advanced" for a new ingredient.
         compose.onNodeWithText("Weight").assertDoesNotExist()
         compose.onNodeWithTag("entry-advanced").performScrollTo().performClick()

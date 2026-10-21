@@ -59,7 +59,7 @@ object Display {
             }
     }
 
-    /** The row text for an item: main line "<amount> <name>", sub-line the pack note or "2 already ticked". */
+    /** The row text for an item: main line "<amount> <name>", sub-line the pack note or "2 already bought". */
     fun row(
         list: ShoppingList,
         item: ListItem,
@@ -93,7 +93,7 @@ object Display {
                         hint,
                         entry?.gramsPerCup,
                         entry?.displayPolicy,
-                    )?.let { "$it already ticked" }
+                    )?.let { "$it already bought" }
                 else -> entry?.packNote?.let(::compactUnits)
             }
         return RowText(main, sub)

@@ -152,6 +152,24 @@ class IngredientLibrary(
             SaveResult.Saved(id)
         }
 
+    /**
+     * A backup restore: these edits and no others. Each is cleaned as [save]
+     * would clean it, but nothing is refused: the backup was written by this
+     * code from a library that passed those checks.
+     */
+    suspend fun replaceAll(edits: List<EntryEdit>) =
+        lock.withLock {
+            val next =
+                edits
+                    .filter { it.id.isNotBlank() && it.name.isNotBlank() }
+                    .associateBy { it.id }
+                    .mapValues {
+                            (id, e) ->
+                        e.copy(custom = !isBundled(id), name = e.name.trim(), plural = e.plural.trim().ifEmpty { e.name.trim() })
+                    }
+            write(next)
+        }
+
     /** Back to the bundled version, or gone if you added it. */
     suspend fun reset(id: String) =
         lock.withLock {

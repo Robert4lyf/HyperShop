@@ -1,7 +1,13 @@
 package com.robert4lyf.hypershop.ui.settings
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.robert4lyf.hypershop.BuildConfig
+import com.robert4lyf.hypershop.backup.BackupFile
+import com.robert4lyf.hypershop.backup.BackupManager
+import com.robert4lyf.hypershop.backup.BackupSummary
+import com.robert4lyf.hypershop.backup.Inspection
 import com.robert4lyf.hypershop.claude.ClaudeModel
 import com.robert4lyf.hypershop.claude.KeyCheck
 import com.robert4lyf.hypershop.claude.SpendGuard
@@ -56,6 +62,10 @@ data class SettingsUi(
     val logLines: List<String> = emptyList(),
     /** False until the saved settings are read, so the screen never shows defaults and then jumps. */
     val loaded: Boolean = false,
+    /** A backup file was read and checked: "Restore this backup?" with what it holds. */
+    val restorePrompt: BackupSummary? = null,
+    /** A backup or restore is running: the Data buttons wait. */
+    val dataBusy: Boolean = false,
 )
 
 /** Settings (PLAN §3.5 groups; Claude per §3.7). */
@@ -81,6 +91,11 @@ class SettingsViewModel(
 
     /** Each key test, save and removal takes a new number; a test result for an older one is dropped. */
     private var keyGen = 0
+
+    private val backups = BackupManager(c, BuildConfig.VERSION_NAME)
+
+    /** The backup read and checked, waiting for "Restore". */
+    private var pendingRestore: BackupFile? = null
 
     /** Aisle moves are written in tap order. */
     private val aisleWrites = Mutex()
@@ -173,7 +188,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             val key = c.repository.staples().firstOrNull { stapleName(it) == name } ?: return@launch
             c.repository.setStaple(key, false)
-            messages.send(UiMessage("$name is no longer always in stock", undo = { c.repository.setStaple(key, true) }))
+            messages.send(UiMessage("$name is no longer always at home", undo = { c.repository.setStaple(key, true) }))
         }
 
     // ---- Aisles ----------------------------------------------------------------------------
@@ -212,6 +227,68 @@ class SettingsViewModel(
         _ui.update { it.copy(aisles = order) }
         viewModelScope.launch { aisleWrites.withLock { c.repository.setAisleOrder(order) } }
     }
+
+    // ---- Data: backup and restore ------------------------------------------------------------
+
+    /** "Back up to a file": the file the user picked. */
+    fun backupTo(uri: Uri) =
+        viewModelScope.launch {
+            _ui.update { it.copy(dataBusy = true) }
+            val r = backups.writeTo(c.context, uri)
+            _ui.update { it.copy(dataBusy = false) }
+            r.onSuccess { s -> messages.send(UiMessage("Backed up ${plural(s.recipes, "recipe")} and ${plural(s.itemsOnList, "item")}")) }
+                .onFailure { messages.send(UiMessage("Couldn't write the backup file")) }
+        }
+
+    /** "Restore from a file": read and check it, then ask. Nothing changes until [confirmRestore]. */
+    fun inspectRestore(uri: Uri) =
+        viewModelScope.launch {
+            _ui.update { it.copy(dataBusy = true) }
+            val i = backups.inspect(c.context, uri)
+            _ui.update { it.copy(dataBusy = false) }
+            when (i) {
+                is Inspection.Ok -> {
+                    pendingRestore = i.file
+                    _ui.update { it.copy(restorePrompt = i.summary) }
+                }
+                Inspection.NotABackup -> messages.send(UiMessage("That file isn't a HyperShop backup"))
+                is Inspection.Newer -> messages.send(UiMessage("That backup was made by a newer HyperShop. Update the app first."))
+                is Inspection.Broken -> messages.send(UiMessage("That backup is damaged (${i.problems.first()}), so nothing was changed"))
+                Inspection.Unreadable -> messages.send(UiMessage("Couldn't read that file"))
+            }
+        }
+
+    fun cancelRestore() {
+        pendingRestore = null
+        _ui.update { it.copy(restorePrompt = null) }
+    }
+
+    /** "Restore": everything on the phone is replaced; Undo puts back what was there. */
+    fun confirmRestore() =
+        viewModelScope.launch {
+            val file = pendingRestore ?: return@launch
+            pendingRestore = null
+            _ui.update { it.copy(restorePrompt = null, dataBusy = true) }
+            val before = backups.snapshot()
+            val problems = backups.restore(file)
+            _ui.update { it.copy(dataBusy = false) }
+            if (problems.isNotEmpty()) {
+                messages.send(UiMessage("That backup is damaged (${problems.first()}), so nothing was changed"))
+                return@launch
+            }
+            val s = backups.summary(file)
+            messages.send(
+                UiMessage(
+                    "Restored ${plural(s.recipes, "recipe")} and ${plural(s.itemsOnList, "item")}",
+                    undo = { backups.restore(before) },
+                ),
+            )
+        }
+
+    private fun plural(
+        n: Int,
+        word: String,
+    ) = if (n == 1) "1 $word" else "$n ${word}s"
 
     // ---- Watch -----------------------------------------------------------------------------
 

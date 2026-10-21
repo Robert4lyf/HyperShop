@@ -395,7 +395,7 @@ fun EntryEditor(
             Modifier.fillMaxWidth().toggleable(value = f.alwaysInStock, role = Role.Switch) { edit(f.copy(alwaysInStock = it)) },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Always in stock", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Text("Always at home", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Switch(checked = f.alwaysInStock, onCheckedChange = null)
         }
         // A tonal button that reads as a switch: TalkBack says whether Advanced is open.

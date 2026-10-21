@@ -55,6 +55,7 @@ internal val SAMPLE_REVIEW =
             ),
         badge = Badge.CLAUDE_PENDING,
         originalServings = 4,
+        canAskClaude = true,
     )
 
 @RunWith(AndroidJUnit4::class)
@@ -100,7 +101,7 @@ class ReviewScreenTest {
     @Test
     fun aSavedRecipeBeingEditedHasNoInStockOrServings() {
         show(SAMPLE_REVIEW.copy(editing = true, savedOnly = true))
-        compose.onAllNodesWithContentDescription("In stock", substring = true).assertCountEquals(0)
+        compose.onAllNodesWithContentDescription("At home", substring = true).assertCountEquals(0)
         compose.onAllNodesWithText("Serves", substring = true).assertCountEquals(0)
         compose.onNodeWithText("Save changes").assertExists()
     }
@@ -119,8 +120,8 @@ class ReviewScreenTest {
     @Test
     fun theInStockPillTogglesWithoutOpeningTheSheet() {
         show()
-        compose.onAllNodesWithText("In stock")[0].performClick()
-        compose.onAllNodesWithText("In stock")[3].performClick()
+        compose.onAllNodesWithText("At home")[0].performClick()
+        compose.onAllNodesWithText("At home")[3].performClick()
         assertEquals(listOf("stock cat:onion true", "stock cat:salt false"), events)
     }
 
@@ -130,7 +131,7 @@ class ReviewScreenTest {
         compose.onNodeWithText("Serves ?").fetchSemanticsNode()
         compose.onNodeWithContentDescription("More servings").performClick()
         assertEquals(listOf("servings 1"), events)
-        compose.onNodeWithTag("summary").assertTextEquals("4 to add · 1 in stock · 1 to check")
+        compose.onNodeWithTag("summary").assertTextEquals("4 to add · 1 at home · 1 to check")
         compose.onNodeWithText("Check: has 'or'").fetchSemanticsNode()
     }
 
@@ -138,7 +139,7 @@ class ReviewScreenTest {
     fun nothingToAddKeepsTheButtonButDisabled() {
         val all = SAMPLE_REVIEW.aisles.map { (a, rows) -> a to rows.map { it.copy(inStock = true) } }
         show(SAMPLE_REVIEW.copy(aisles = all, servings = 6))
-        compose.onNodeWithText("Nothing to add — all in stock").assertIsNotEnabled()
+        compose.onNodeWithText("Nothing to add — all at home").assertIsNotEnabled()
         compose.onNodeWithTag("servings-original").assertTextEquals("(recipe: 4)")
         compose.onNodeWithText("Already on your list").assertDoesNotExist()
     }

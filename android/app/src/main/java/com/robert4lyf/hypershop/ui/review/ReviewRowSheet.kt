@@ -139,7 +139,7 @@ fun ReviewRowSheet(
             for (reason in sheet.lines.mapNotNull { it.checkReason }.distinct()) {
                 InfoBanner("Check: $reason", Icons.Rounded.ReportProblem, tone = Tone.WARNING)
             }
-            SwitchRow("In stock", sheet.inStock, actions.onInStock)
+            SwitchRow("At home", sheet.inStock, actions.onInStock)
             key(sheet.key) { Rename(sheet.name, actions.onRename, actions.renamePreview) }
             SectionLabel(if (sheet.lines.size == 1) "From the recipe" else "From the recipe (${sheet.lines.size} lines)")
             for (line in sheet.lines) key(line.id) { LineEditor(line, actions, canRemove = sheet.canRemove) }
@@ -148,7 +148,7 @@ fun ReviewRowSheet(
                 FilledTonalButton(onClick = actions.onAlwaysInStock) {
                     Icon(Icons.Rounded.Inventory, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(8.dp))
-                    Text("Always in stock")
+                    Text("Always at home")
                 }
             }
             MoveAisle(sheet.aisle, actions.onMoveAisle, immediate = true)

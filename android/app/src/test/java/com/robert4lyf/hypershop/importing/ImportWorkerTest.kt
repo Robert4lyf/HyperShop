@@ -9,6 +9,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -40,19 +41,44 @@ class ImportWorkerTest {
 
     private fun servePage() = pages.enqueue(MockResponse().setHeader("Content-Type", "text/html").setBody(page))
 
+    /** A page whose one line the rule parser cannot settle ("juice of"): the hybrid gate wants Claude for it. */
+    private fun serveDoubtfulPage() =
+        pages.enqueue(
+            MockResponse().setHeader("Content-Type", "text/html").setBody(
+                """<html><head><title>Lemon drizzle</title><script type="application/ld+json">{"@context":"https://schema.org",""" +
+                    """"@type":"Recipe","name":"Lemon drizzle","recipeIngredient":["200g golden caster sugar","juice of 1 lemon"]}""" +
+                    """</script></head><body></body></html>""",
+            ),
+        )
+
     @Test
-    fun inTheBackgroundItParsesWithRulesAndNeverCallsClaude() =
+    fun aClearRecipeIsReadByRulesAloneAndNeverNeedsClaude() =
         runBlocking {
+            // Every line of the cake is read without doubt: the gate keeps the rule parser's reading, key or no key.
             val c = TestContainer.create(pages, claude, key = "sk-ant-test")
+            c.reviewGate.acquire()
             servePage()
             val id = c.importJobs.enqueue(ImportInput(pages.url("/recipes/easy-chocolate-cake").toString(), "Cake"))
             val job = c.awaitJob(id)
             assertEquals(JobState.READY, job.state)
             val r = job.result!!
             assertEquals(ParsedBy.RULES, r.parsedBy)
-            assertTrue("marked for Claude when the review opens", r.claudePending)
+            assertFalse("nothing pending: Claude was not needed", r.claudePending)
+            assertTrue(r.claudeSkipped)
             assertEquals(16, r.lines.size)
             assertEquals("Easy chocolate cake", r.title)
+            assertEquals(0, claude.requestCount)
+        }
+
+    @Test
+    fun inTheBackgroundADoubtfulLineIsLeftPendingForTheReview() =
+        runBlocking {
+            val c = TestContainer.create(pages, claude, key = "sk-ant-test")
+            serveDoubtfulPage()
+            val r = c.awaitJob(c.importJobs.enqueue(ImportInput(pages.url("/r").toString()))).result!!
+            assertEquals(ParsedBy.RULES, r.parsedBy)
+            assertTrue("marked for Claude when the review opens", r.claudePending)
+            assertFalse(r.claudeSkipped)
             assertEquals(0, claude.requestCount)
         }
 
@@ -61,7 +87,7 @@ class ImportWorkerTest {
         runBlocking {
             val c = TestContainer.create(pages, claude, key = "sk-ant-test")
             c.reviewGate.acquire()
-            servePage()
+            serveDoubtfulPage()
             claude.enqueue(MockResponse().setBody(CLAUDE_OK))
             val id = c.importJobs.enqueue(ImportInput(pages.url("/r").toString()))
             val r = c.awaitJob(id).result!!
@@ -76,7 +102,7 @@ class ImportWorkerTest {
         runBlocking {
             val c = TestContainer.create(pages, claude, key = null)
             c.reviewGate.acquire()
-            servePage()
+            serveDoubtfulPage()
             val r = c.awaitJob(c.importJobs.enqueue(ImportInput(pages.url("/r").toString()))).result!!
             assertEquals(ParsedBy.RULES, r.parsedBy)
             assertEquals(false, r.claudePending)

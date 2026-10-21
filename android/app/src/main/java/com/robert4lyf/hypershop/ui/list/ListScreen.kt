@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -76,10 +77,12 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
+import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.ui.common.AisleBadge
 import com.robert4lyf.hypershop.ui.common.BottomActionBar
 import com.robert4lyf.hypershop.ui.common.CountPill
+import com.robert4lyf.hypershop.ui.common.HeroButton
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
 import com.robert4lyf.hypershop.ui.common.TickMark
 import com.robert4lyf.hypershop.ui.common.sectionItem
@@ -100,12 +103,15 @@ data class ListActions(
     val onNeed: (InStockRow) -> Unit = {},
     /** The menu's choice of layout: store order, by type, or by recipe. */
     val onView: (ListView) -> Unit = {},
+    /** "Shop" on the planning screen, "Plan" on the shop screen. */
+    val onMode: (ListMode) -> Unit = {},
 )
 
 /**
  * The list (PLAN §3.5), stateless: the count and progress, then [header] (the
  * "Add item" field and cards, Step 5.6b), then one card per aisle, and once
- * something is ticked a "Finish shopping" bar within thumb's reach.
+ * something is ticked a "Finish shopping" bar within thumb's reach. This is
+ * the planning screen; in shopping mode the same state draws as [ShopScreen].
  */
 @Composable
 fun ListScreen(
@@ -114,6 +120,10 @@ fun ListScreen(
     header: LazyListScope.() -> Unit = {},
     empty: @Composable () -> Unit = { Text("Nothing on the list", Modifier.padding(24.dp)) },
 ) {
+    if (ui.shopping) {
+        ShopScreen(ui, actions)
+        return
+    }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
             // Pinned: the count and the menu stay in reach on a long list.
@@ -260,8 +270,8 @@ private fun ListBody(
 }
 
 /**
- * "In stock": what you marked in stock on review for the recipes on the list,
- * to check before you go. Open until closed; "Need it" puts one on the list.
+ * "At home": what you said you already had when reviewing the recipes on the
+ * list, to check before you go. Open until closed; "Need it" puts one on the list.
  */
 private fun LazyListScope.inStockSection(
     rows: List<InStockRow>,
@@ -300,7 +310,7 @@ private fun LazyListScope.inStockSection(
                     )
                 }
                 Text(
-                    "In stock",
+                    "At home",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.weight(1f),
@@ -407,10 +417,18 @@ private fun ListTop(
             when {
                 !ui.loaded -> null
                 !shopping -> null
-                ui.left == 0 -> "All done"
-                else -> "${ui.doneCount} of $total ticked"
+                ui.left == 0 -> "All bought"
+                else -> "${ui.doneCount} of $total bought"
             },
         actions = {
+            if (shopping) {
+                // The way into the shop screen: one tap, in reach of either thumb.
+                HeroButton(onClick = { actions.onMode(ListMode.SHOP) }, modifier = Modifier.testTag("start-shopping")) {
+                    Icon(Icons.Rounded.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.size(6.dp))
+                    Text("Shop")
+                }
+            }
             var menu by remember { mutableStateOf(false) }
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
