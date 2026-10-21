@@ -10,8 +10,9 @@ import com.robert4lyf.hypershop.core.merge.UseState
  */
 fun UseProgress.label(): String =
     when (state) {
-        UseState.STILL_NEEDED ->
-            "$toBuy still needed" + if (partlyBought > 0) " ($partlyBought partly bought)" else ""
+        // Not "(1 partly bought)": that is the item's state, shown on the list, and read
+        // under a recipe whose own share is not bought at all it says the opposite.
+        UseState.STILL_NEEDED -> "$toBuy still needed"
         UseState.ALL_BOUGHT -> "All bought"
         UseState.BOUGHT_THE_REST -> "Nothing left to buy"
         UseState.NOTHING_TO_BUY -> "Nothing to buy — all at home"

@@ -82,7 +82,7 @@ class DeviceScenariosTest {
             compose.waitForIdle()
         }
         waitFor { runBlocking { c.repository.snapshot() }.let { l -> l.liveItems.all { l.isDone(it.id) } } }
-        compose.onNodeWithText("All bought").assertIsDisplayed()
+        waitFor { compose.onNodeWithTag("shop-left").fetchSemanticsNode().config.toString().contains("All bought") }
         compose.onNodeWithTag("finish").performClick()
         waitFor { runBlocking { c.repository.snapshot() }.liveItems.isEmpty() }
         waitFor { runBlocking { c.settings.listMode.first() } == ListMode.PLAN }

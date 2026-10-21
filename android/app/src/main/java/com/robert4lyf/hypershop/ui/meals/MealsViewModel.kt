@@ -12,8 +12,10 @@ import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.data.bookRef
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.UiMessage
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -173,9 +175,15 @@ class MealsViewModel(
         burstFrom.putIfAbsent(meal.useId, start)
         asked.update { it + (meal.useId to target) }
         announce.remove(meal.useId)?.cancel()
+        // The write outlives the screen (leaving Meals mid-tap must not lose it) and starts
+        // undispatched, so writes reach the lock in tap order; only the message is the screen's.
+        val write =
+            c.applicationScope.async(start = CoroutineStart.UNDISPATCHED) {
+                rescaling.withLock { runCatching { c.repository.rescaleUse(meal.useId, target) }.getOrDefault(false) }
+            }
         announce[meal.useId] =
             viewModelScope.launch {
-                val ok = rescaling.withLock { c.repository.rescaleUse(meal.useId, target) }
+                val ok = write.await()
                 if (!ok) {
                     settle(meal.useId)
                     messages.send(UiMessage("Couldn't change ${meal.title}: it is no longer on the list"))

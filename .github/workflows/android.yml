@@ -118,6 +118,21 @@ jobs:
           working-directory: android
           script: ./gradlew --max-workers=2 :app:connectedDebugAndroidTest
 
+      # The report is HTML in an artifact; the failures themselves belong in the log.
+      - name: Show failing device tests
+        if: failure()
+        run: |
+          for f in android/app/build/outputs/androidTest-results/connected/debug/*.xml; do
+            [ -f "$f" ] || continue
+            python3 - "$f" <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          for case in ET.parse(sys.argv[1]).getroot().iter("testcase"):
+              for bad in list(case.findall("failure")) + list(case.findall("error")):
+                  print(f"::error::{case.get('classname')}.{case.get('name')}")
+                  print((bad.text or bad.get("message") or "")[:3000])
+          PY
+          done
+
       - name: Upload the device report
         if: failure()
         uses: actions/upload-artifact@v4
