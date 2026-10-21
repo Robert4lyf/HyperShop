@@ -3,6 +3,7 @@ package com.robert4lyf.hypershop.data
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.robert4lyf.hypershop.core.catalog.CatalogLoader
 import com.robert4lyf.hypershop.core.merge.ApplyResult
+import com.robert4lyf.hypershop.core.merge.UseState
 import com.robert4lyf.hypershop.core.model.BaseKey
 import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.QtyBase
@@ -130,7 +131,7 @@ class UsesTest {
             // One item removed by hand: the recipe stays with the other; the last one takes it off.
             val l = r.repo.snapshot()
             r.repo.softDelete(l.itemByKey("cat:onion")!!.id)
-            assertEquals(1, r.repo.usesOnList().single().itemCount)
+            assertEquals(1, r.repo.usesOnList().single().progress.toBuy)
             r.repo.softDelete(l.itemByKey("cat:carrot")!!.id)
             assertTrue(r.repo.usesOnList().isEmpty())
         }
@@ -143,7 +144,7 @@ class UsesTest {
             r.repo.finishShopping()
             val shown = r.repo.usesOnList().single()
             assertEquals(a.useId, shown.useId)
-            assertEquals(0, shown.itemCount)
+            assertEquals(UseState.ALL_BOUGHT, shown.progress.state)
             // The same day: nothing to purge, nothing archived, the list not touched.
             val rev = r.repo.snapshot().listRev
             r.repo.purgeDeleted()

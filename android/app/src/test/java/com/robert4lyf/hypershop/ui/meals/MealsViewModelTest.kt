@@ -68,7 +68,7 @@ class MealsViewModelTest {
         ui = await(vm.ui) { it.meals.size == 1 }
         assertEquals("Weeknight chilli", ui.meals.single().title)
         // Salt is a staple: at home, not added. The pick now says it is on the list.
-        assertEquals(2, ui.meals.single().itemsLeft)
+        assertEquals(2, ui.meals.single().progress.toBuy)
         assertEquals(1, ui.meals.single().atHome)
         assertTrue(ui.picks.first { it.title == "Weeknight chilli" }.onList)
         await(vm.ui) { got.size == 1 }

@@ -74,6 +74,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.robert4lyf.hypershop.core.merge.UseState
 import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.EmptyHero
@@ -83,7 +84,9 @@ import com.robert4lyf.hypershop.ui.common.PillShape
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
 import com.robert4lyf.hypershop.ui.common.basilSegmentedColors
 import com.robert4lyf.hypershop.ui.common.cardLift
+import com.robert4lyf.hypershop.ui.common.chip
 import com.robert4lyf.hypershop.ui.common.fieldLift
+import com.robert4lyf.hypershop.ui.common.label
 import com.robert4lyf.hypershop.ui.common.pillFieldColors
 import com.robert4lyf.hypershop.ui.common.rememberOpenLink
 import com.robert4lyf.hypershop.ui.common.siteName
@@ -632,8 +635,8 @@ private fun UseCard(
                 val bits =
                     listOfNotNull(
                         use.servings?.let { "Serves $it" },
-                        itemsLine(use.itemCount),
-                        use.inStockCount.takeIf { it > 0 }?.let { "$it at home" },
+                        use.progress.label(),
+                        use.inStockCount.takeIf { it > 0 && use.progress.state != UseState.NOTHING_TO_BUY }?.let { "$it at home" },
                     )
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -643,12 +646,20 @@ private fun UseCard(
                     val bg = Brand.tint(hue, dark)
                     val fg = Brand.strong(hue, dark)
                     use.servings?.let { Fact(Icons.Rounded.People, "Serves $it", bg, fg) }
-                    when (use.itemCount) {
-                        0 -> Fact(Icons.Rounded.DoneAll, "All bought", bg, fg)
-                        1 -> Fact(Icons.Rounded.ShoppingCart, "1 item", bg, fg)
-                        else -> Fact(Icons.Rounded.ShoppingCart, "${use.itemCount} items", bg, fg)
+                    val p = use.progress
+                    Fact(
+                        when (p.state) {
+                            UseState.STILL_NEEDED -> Icons.Rounded.ShoppingCart
+                            UseState.NOTHING_TO_BUY -> Icons.Rounded.Inventory
+                            else -> Icons.Rounded.DoneAll
+                        },
+                        p.chip(),
+                        bg,
+                        fg,
+                    )
+                    if (use.inStockCount > 0 && p.state != UseState.NOTHING_TO_BUY) {
+                        Fact(Icons.Rounded.Inventory, "${use.inStockCount} at home", bg, fg)
                     }
-                    if (use.inStockCount > 0) Fact(Icons.Rounded.Inventory, "${use.inStockCount} at home", bg, fg)
                 }
             }
         }
@@ -798,7 +809,7 @@ fun UseDetailContent(
                     listOfNotNull(
                         url?.let { siteName(it) } ?: use.bookRef,
                         use.servings?.let { s -> "Serves $s" + (detail.writtenFor?.let { " (written for $it)" } ?: "") },
-                        itemsLine(use.itemCount),
+                        use.progress.label(),
                     )
                 Text(
                     bits.joinToString(" · "),
@@ -850,11 +861,3 @@ fun UseDetailContent(
         }
     }
 }
-
-/** "6 items on the list", or "All bought" once a recipe's shopping is done and it stays as a reminder. */
-private fun itemsLine(n: Int): String =
-    when (n) {
-        0 -> "All bought"
-        1 -> "1 item on the list"
-        else -> "$n items on the list"
-    }

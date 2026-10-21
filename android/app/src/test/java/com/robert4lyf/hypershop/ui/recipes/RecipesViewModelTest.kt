@@ -5,6 +5,7 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.robert4lyf.hypershop.catalog.EntryEdit
 import com.robert4lyf.hypershop.catalog.SaveResult
+import com.robert4lyf.hypershop.core.merge.UseState
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.parse.RuleParser
 import com.robert4lyf.hypershop.importing.ImportInput
@@ -125,7 +126,7 @@ class RecipesViewModelTest {
         runBlocking { got[0].undo!!.invoke() }
         // Back as it was: the use, its items and the library's "on your list".
         val back = await(vm.ui) { it.uses.size == 1 && it.library.single().onList }
-        assertEquals(use.itemCount, back.uses.single().itemCount)
+        assertEquals(use.progress, back.uses.single().progress)
         assertTrue(runBlocking { c.repository.snapshot() }.itemByKey("cat:onion") != null)
         vm.removeFromLibrary(back.library.single())
         await(vm.ui) { it.library.isEmpty() && got.size == 2 }
@@ -244,7 +245,7 @@ class RecipesViewModelTest {
         edit.confirm()
         await(edit.state) { it is ReviewState.Added }
         // Still hand-added: one use with no recipe, and nothing in the library.
-        val after = await(vm.ui) { u -> u.uses.singleOrNull()?.itemCount == 2 }
+        val after = await(vm.ui) { u -> u.uses.singleOrNull()?.progress?.toBuy == 2 }
         assertEquals(null, after.uses.single().recipeId)
         assertEquals("Added by hand", after.uses.single().title)
         assertTrue(after.library.isEmpty())
@@ -255,7 +256,7 @@ class RecipesViewModelTest {
             val p = c.ruleParser.parse("milk")
             c.repository.manualAdd(p.name, p.shopBase(UnitLocale.METRIC), p.shopUnit)
         }
-        assertEquals(3, await(vm.ui) { u -> u.uses.singleOrNull()?.itemCount == 3 }.uses.single().itemCount)
+        assertEquals(3, await(vm.ui) { u -> u.uses.singleOrNull()?.progress?.toBuy == 3 }.uses.single().progress.toBuy)
     }
 
     @Test
@@ -273,7 +274,7 @@ class RecipesViewModelTest {
             for (item in c.repository.snapshot().liveItems) c.repository.toggle(item.id)
             c.repository.finishShopping()
         }
-        val after = await(vm.ui) { u -> u.uses.size == 1 && u.uses.single().itemCount == 0 }
+        val after = await(vm.ui) { u -> u.uses.size == 1 && u.uses.single().progress.state == UseState.ALL_BOUGHT }
         // The recipe is still there to cook; the hand-added card went with its items.
         assertEquals("Weeknight chilli", after.uses.single().title)
         // And "Remove from list" still clears it.

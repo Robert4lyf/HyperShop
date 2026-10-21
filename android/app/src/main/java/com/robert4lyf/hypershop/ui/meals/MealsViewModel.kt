@@ -7,6 +7,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.robert4lyf.hypershop.core.merge.ApplyResult
+import com.robert4lyf.hypershop.core.merge.UseProgress
 import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.data.bookRef
 import com.robert4lyf.hypershop.di.AppContainer
@@ -31,8 +32,8 @@ data class Meal(
     val title: String,
     /** The use's servings, when the recipe says how many it serves. */
     val servings: Int?,
-    /** What is still on the list for it (0 once everything is bought). */
-    val itemsLeft: Int,
+    /** Its shopping ([UseProgress]): what is still to buy, bought, or at home. */
+    val progress: UseProgress,
     val atHome: Int,
     /** "Ottolenghi Simple · p. 142" or the site. */
     val source: String?,
@@ -57,7 +58,7 @@ data class MealsUi(
     val hasLibrary: Boolean = false,
     val query: String = "",
 ) {
-    val itemsLeft: Int get() = meals.sumOf { it.itemsLeft }
+    val itemsLeft: Int get() = meals.sumOf { it.progress.toBuy }
 }
 
 /**
@@ -100,7 +101,7 @@ class MealsViewModel(
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MealsUi())
 
-    private fun UseSummary.meal() = Meal(useId, title, servings, itemCount, inStockCount, url?.let { siteOf(it) } ?: bookRef)
+    private fun UseSummary.meal() = Meal(useId, title, servings, progress, inStockCount, url?.let { siteOf(it) } ?: bookRef)
 
     private fun siteOf(url: String): String? =
         com.robert4lyf.hypershop.ui.common.webLink(url)?.let {
