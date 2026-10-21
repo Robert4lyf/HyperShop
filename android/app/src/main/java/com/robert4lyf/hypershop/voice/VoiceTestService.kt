@@ -86,6 +86,10 @@ class VoiceTestService : Service() {
     private var errors = 0
     private var routed = false
     private var stopping = false
+    private val retry = RetryPolicy()
+
+    /** Cleared when the on-device recognizer keeps dropping out; the rest of the test uses the default one. */
+    private var useOnDevice = true
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -151,7 +155,7 @@ class VoiceTestService : Service() {
     private fun listen() {
         if (stopping) return
         recognizer?.destroy()
-        val onDevice = options.onDevice && SpeechRecognizer.isOnDeviceRecognitionAvailable(this)
+        val onDevice = options.onDevice && useOnDevice && SpeechRecognizer.isOnDeviceRecognitionAvailable(this)
         if (options.onDevice && !onDevice) VoiceTestLog.log("on-device recognizer unavailable; using the default one")
         val r = if (onDevice) SpeechRecognizer.createOnDeviceSpeechRecognizer(this) else SpeechRecognizer.createSpeechRecognizer(this)
         recognizer = r
@@ -170,10 +174,14 @@ class VoiceTestService : Service() {
         r.startListening(intent)
     }
 
+    private val listenAgain = Runnable { listen() }
+
+    /** One pending restart at most: two errors in a row used to queue two recognizers. */
     private fun restart(delayMs: Long) {
         if (stopping) return
         restarts++
-        main.postDelayed({ listen() }, delayMs)
+        main.removeCallbacks(listenAgain)
+        main.postDelayed(listenAgain, delayMs)
     }
 
     private fun results(
@@ -207,32 +215,50 @@ class VoiceTestService : Service() {
                 params: Bundle?,
             ) = Unit
 
-            override fun onSegmentResults(segmentResults: Bundle) = results(segmentResults, "heard")
+            override fun onSegmentResults(segmentResults: Bundle) {
+                retry.succeeded()
+                results(segmentResults, "heard")
+            }
 
             override fun onEndOfSegmentedSession() {
+                retry.succeeded()
                 VoiceTestLog.log("session ended by Android after ${minutes()} min; restarting")
-                restart(300)
+                restart(RetryPolicy.QUICK_MS)
             }
 
             override fun onResults(b: Bundle?) {
+                retry.succeeded()
                 results(b, "heard")
-                restart(300)
+                restart(RetryPolicy.QUICK_MS)
             }
 
             override fun onError(error: Int) {
-                // Silence is normal: no log line, quick restart.
                 val quiet = error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+                val onDevice = options.onDevice && useOnDevice
+                val d = retry.onError(error, onDevice)
+                // Silence is normal: no log line.
                 if (!quiet) {
                     errors++
-                    VoiceTestLog.log("error ${errorName(error)}")
+                    VoiceTestLog.log("error ${errorName(error)}" + if (d.giveUp) "" else "; retry in ${d.delayMs / 1000.0} s")
                 }
-                restart(
-                    when (error) {
-                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY, SpeechRecognizer.ERROR_TOO_MANY_REQUESTS -> 2_000
-                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS, SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED -> 10_000
-                        else -> if (quiet) 300 else 1_000
-                    },
-                )
+                // The recognizer that failed goes now, not when the next one is made: a new one
+                // created while the old is still letting go is what answered RECOGNIZER_BUSY.
+                recognizer?.destroy()
+                recognizer = null
+                if (d.giveUp) {
+                    VoiceTestLog.log("${RetryPolicy.GIVE_UP_AFTER} failures in a row: test stopped")
+                    stopSelf()
+                    return
+                }
+                if (d.fallBack) {
+                    useOnDevice = false
+                    // A long (segmented) session is an on-device feature; the default recognizer restarts each phrase.
+                    options = options.copy(mode = Mode.RESTART)
+                    VoiceTestLog.log(
+                        "on-device recognizer keeps disconnecting: switching to the default recognizer, restarting each phrase",
+                    )
+                }
+                restart(d.delayMs)
             }
         }
 
