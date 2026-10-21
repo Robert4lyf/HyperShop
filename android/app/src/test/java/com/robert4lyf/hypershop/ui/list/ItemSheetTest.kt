@@ -129,10 +129,10 @@ class ItemSheetTest {
                 ItemSheetContent(sheet, actions)
             }
         }
-        compose.onNodeWithText("Tick").performClick()
+        compose.onNodeWithText("Mark bought").performClick()
         assertEquals(listOf("toggle"), events)
         sheet = SHEET.copy(done = true)
-        compose.onNodeWithTag("toggle-item").assertTextEquals("Untick")
+        compose.onNodeWithTag("toggle-item").assertTextEquals("Mark not bought")
     }
 
     @Test

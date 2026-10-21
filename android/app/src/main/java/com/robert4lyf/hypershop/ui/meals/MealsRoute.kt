@@ -69,6 +69,7 @@ import com.robert4lyf.hypershop.ui.util.factoryFor
 
 data class MealsActions(
     val onAdd: (Pick) -> Unit = {},
+    /** One more (+1) or one fewer (-1) serving. */
     val onServings: (Meal, Int) -> Unit = { _, _ -> },
     val onRemove: (Meal) -> Unit = {},
     val onSearch: (String) -> Unit = {},
@@ -91,7 +92,7 @@ fun MealsRoute(
         ui,
         MealsActions(
             onAdd = vm::add,
-            onServings = { m, n -> vm.setServings(m, n) },
+            onServings = { m, d -> vm.stepServings(m, d) },
             onRemove = vm::remove,
             onSearch = vm::search,
             onBack = onBack,
@@ -262,7 +263,7 @@ private fun MealCard(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(top = 2.dp).semantics(mergeDescendants = true) { contentDescription = "Serves $s" },
                     ) {
-                        IconButton(onClick = { onServings(s - 1) }, enabled = s > 1, modifier = Modifier.testTag("meal-fewer-${m.useId}")) {
+                        IconButton(onClick = { onServings(-1) }, enabled = s > 1, modifier = Modifier.testTag("meal-fewer-${m.useId}")) {
                             Icon(Icons.Rounded.Remove, contentDescription = "Fewer servings")
                         }
                         Text(
@@ -270,7 +271,11 @@ private fun MealCard(
                             style = MaterialTheme.typography.labelLarge,
                             modifier = Modifier.testTag("meal-serves-${m.useId}"),
                         )
-                        IconButton(onClick = { onServings(s + 1) }, enabled = s < 99, modifier = Modifier.testTag("meal-more-${m.useId}")) {
+                        IconButton(
+                            onClick = { onServings(1) },
+                            enabled = s < MealsViewModel.MAX_SERVINGS,
+                            modifier = Modifier.testTag("meal-more-${m.useId}"),
+                        ) {
                             Icon(Icons.Rounded.Add, contentDescription = "More servings")
                         }
                     }

@@ -788,10 +788,11 @@ class ListRepository(
             true
         }
 
+    /** False when the use is gone (removed meanwhile, from another screen or by Undo). */
     suspend fun rescaleUse(
         useId: Long,
         servings: Int,
-    ) = write { it.rescaleUse(useId, servings) to Unit }
+    ): Boolean = write { l -> if (useId in l.uses) l.rescaleUse(useId, servings) to true else null } ?: false
 
     suspend fun lineStatuses(useId: Long): Map<Long, LineStatus> =
         dao.decisions(useId).associate {

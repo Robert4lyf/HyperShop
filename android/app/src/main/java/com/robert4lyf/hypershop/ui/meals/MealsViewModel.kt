@@ -13,8 +13,11 @@ import com.robert4lyf.hypershop.data.bookRef
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -22,6 +25,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -81,13 +85,30 @@ class MealsViewModel(
     /** Adds run one at a time: two taps on two recipes land in order, each on a list that holds the other. */
     private val adding = Mutex()
 
+    /**
+     * Servings asked for and not yet announced, by use: the stepper shows these at
+     * once, so taps faster than the database count from the last tap, not from
+     * whatever the list said a frame ago. Main thread only.
+     */
+    private val asked = MutableStateFlow<Map<Long, Int>>(emptyMap())
+
+    /** What each burst of taps started from, for its one Undo. */
+    private val burstFrom = HashMap<Long, Int>()
+    private val announce = HashMap<Long, Job>()
+    private val rescaling = Mutex()
+
     val ui: StateFlow<MealsUi> =
         combine(
             c.repository.list.map { c.repository.usesOnList(it) },
             c.repository.observeLibrary(),
             snapshotFlow { query },
-        ) { uses, lib, q ->
-            val meals = uses.filter { it.recipeId != null }.map { it.meal() }
+            asked,
+        ) { uses, lib, q, asked ->
+            val meals =
+                uses.filter { it.recipeId != null }.map {
+                        u ->
+                    u.meal().let { m -> asked[m.useId]?.let { m.copy(servings = it) } ?: m }
+                }
             val onList = uses.mapNotNull { it.libraryKey }.toSet()
             val term = q.trim().lowercase()
             val picks =
@@ -129,16 +150,62 @@ class MealsViewModel(
             }
         }
 
-    /** The stepper: the meal's items rescale on the list. */
+    /** The stepper: one more or one fewer serving, counted from the last tap. */
+    fun stepServings(
+        meal: Meal,
+        delta: Int,
+    ) {
+        val from = asked.value[meal.useId] ?: meal.servings ?: return
+        setServings(meal, from + delta)
+    }
+
+    /**
+     * The meal's items rescale on the list at once; a burst of taps is one
+     * message with one Undo, sent once the taps stop, back to where it began.
+     */
     fun setServings(
         meal: Meal,
         n: Int,
-    ) = viewModelScope.launch { if (n in 1..99) c.repository.rescaleUse(meal.useId, n) }
+    ) {
+        val start = asked.value[meal.useId] ?: meal.servings ?: return
+        val target = n.coerceIn(1, MAX_SERVINGS)
+        if (target == start) return
+        burstFrom.putIfAbsent(meal.useId, start)
+        asked.update { it + (meal.useId to target) }
+        announce.remove(meal.useId)?.cancel()
+        announce[meal.useId] =
+            viewModelScope.launch {
+                val ok = rescaling.withLock { c.repository.rescaleUse(meal.useId, target) }
+                if (!ok) {
+                    settle(meal.useId)
+                    messages.send(UiMessage("Couldn't change ${meal.title}: it is no longer on the list"))
+                    return@launch
+                }
+                delay(SETTLE_MS)
+                val was = settle(meal.useId) ?: return@launch
+                if (was == target) return@launch
+                messages.send(
+                    UiMessage(
+                        "${meal.title} serves $target",
+                        undo = { rescaling.withLock { c.repository.rescaleUse(meal.useId, was) } },
+                    ),
+                )
+            }
+    }
+
+    /** The burst is over: the list now shows what was asked. Returns where it began. */
+    private fun settle(useId: Long): Int? {
+        asked.update { it - useId }
+        announce.remove(useId)
+        return burstFrom.remove(useId)
+    }
 
     /** "Remove": the meal's items come off the list; the saved recipe stays. Undo puts them back. */
     fun remove(meal: Meal) =
         viewModelScope.launch {
-            val removed = c.repository.removeUse(meal.useId) ?: return@launch
+            // A servings change still settling is not announced over the removal, and lands first.
+            settle(meal.useId)
+            val removed = rescaling.withLock { c.repository.removeUse(meal.useId) } ?: return@launch
             messages.send(
                 UiMessage(
                     "Removed ${meal.title}",
@@ -151,4 +218,11 @@ class MealsViewModel(
         n: Int,
         word: String,
     ) = if (n == 1) "1 $word" else "$n ${word}s"
+
+    companion object {
+        const val MAX_SERVINGS = 99
+
+        /** How long the stepper waits for another tap before saying what changed. */
+        const val SETTLE_MS = 1_500L
+    }
 }
