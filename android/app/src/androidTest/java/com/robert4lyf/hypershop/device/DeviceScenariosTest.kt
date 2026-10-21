@@ -12,7 +12,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
@@ -22,6 +21,7 @@ import com.robert4lyf.hypershop.backup.BackupManager
 import com.robert4lyf.hypershop.backup.Inspection
 import com.robert4lyf.hypershop.backup.RestoreOutcome
 import com.robert4lyf.hypershop.core.merge.UseState
+import com.robert4lyf.hypershop.core.model.BaseKey
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
@@ -100,8 +100,10 @@ class DeviceScenariosTest {
             c.repository.addSavedRecipe(dal)
         }
         show(c)
-        // The merged row is on the list (below the fold on a small emulator screen).
-        compose.onNodeWithText("3 onions", substring = true).assertExists()
+        // One merged row: 2 + 1 onions. The list capitalises the name ("3 Onions").
+        val onion = runBlocking { c.repository.snapshot() }.let { l -> l.total(l.itemByKey("cat:onion")!!.id)[BaseKey.ITEMS] }
+        assertEquals(Rational.of(3), onion)
+        waitFor { compose.onAllNodesWithText("3 onions", substring = true, ignoreCase = true).fetchSemanticsNodes().isNotEmpty() }
         val uses = runBlocking { c.repository.usesOnList() }
         assertEquals(2, uses.size)
         assertTrue(uses.all { it.progress.state == UseState.STILL_NEEDED })
