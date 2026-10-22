@@ -39,6 +39,24 @@ watch 25/32/49 ms, recipe add 18 ms, shop first frame 558 ms, tap median 188 ms 
 517 ms), scroll 128 ms, PSS 124 MB, 0 main-thread violations. Run to run, the hosted
 emulator varies by up to about 2x, which is why the budgets sit at about 3x.
 
+## Release B: planning and history at scale (run 39771428395, commit 9481c10)
+
+`PerformanceProbeTest.planningAndHistoryAtScale`: 300 saved recipes, twelve weeks
+of plans (5 meals each), the full 26 trips of 60 items each, and 6 meals waiting.
+
+| What | Time | Budget |
+|---|---|---|
+| Preview of 6 meals to add (applied to a copy of the list) | 97 ms | 300 ms |
+| 6 meals onto the list, one transaction | 404 ms | 1300 ms |
+| Another week's meals | 20 ms | 150 ms |
+| Buy again suggestions from 26 trips | 26 ms | 150 ms |
+| At home check over the week's list | 25 ms | 150 ms |
+
+The same run kept Release A's numbers inside their budgets (list, ticks, watch,
+shop screen; first 300-recipe search 2.5 s, later 89 ms) and found no disk access
+on the main thread. Every Release B read runs on `Dispatchers.Default` (the
+view models' `flowOn`) or in the repository's transactions; none on the main thread.
+
 ## What it says
 
 - Data work scales gently: 20 → 150 items roughly doubles list and tick latency, and
