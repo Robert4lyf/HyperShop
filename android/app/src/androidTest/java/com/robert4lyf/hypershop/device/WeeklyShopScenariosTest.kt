@@ -2,13 +2,14 @@ package com.robert4lyf.hypershop.device
 
 import android.net.Uri
 import android.util.Log
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.robert4lyf.hypershop.backup.BackupManager
@@ -57,10 +58,15 @@ class WeeklyShopScenariosTest {
 
     private fun has(tag: String) = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
 
-    /** A shopper's tap: waits for the control to be there, as a person looks before tapping. */
+    /**
+     * A shopper's tap: waits for the control to be there, as a person looks before
+     * tapping, and presses the control itself (its click action, as TalkBack does).
+     * An Undo snackbar can sit over part of a list for a few seconds; a person taps
+     * around it, a touch injected at the control's centre would land on it.
+     */
     private fun tap(tag: String) {
         waitFor { has(tag) }
-        compose.onNodeWithTag(tag).performClick()
+        compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.OnClick)
         taps++
         compose.waitForIdle()
     }
