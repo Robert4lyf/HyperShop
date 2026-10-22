@@ -1044,16 +1044,16 @@ class ReviewViewModel(
          */
         fun plainReason(reason: String): String =
             when {
-                reason.startsWith("\"A or B\"") -> "the recipe offers a choice: swap to the other on the sheet if you'd rather"
-                reason.startsWith("\"X and Y\"") -> "this may be two ingredients: edit the line to split them"
-                reason == "an unknown unit" -> "a measure the app doesn't know, so the amount may be off: set it on the sheet"
-                reason == "an amount left in the name" -> "a number stayed in the name: check the amount"
-                reason == "a count times a count" -> "two counts multiplied (like 2 x 400 g): check the total"
-                reason == "a range that goes down" -> "the range reads backwards: check the amount"
-                reason == "several items on one line" -> "several items on one line: add each as its own line"
-                reason == "no ingredient name" -> "no ingredient name was found: edit the line"
-                reason == "an amount it couldn't read" -> "an amount it couldn't read: set it on the sheet"
-                reason == "a name that reads like a sentence" -> "the name reads like a sentence: edit the line"
+                reason.startsWith("\"A or B\"") -> "the recipe offers a choice; the swap button takes the other"
+                reason.startsWith("\"X and Y\"") -> "this may be two ingredients; edit the line to split them"
+                reason == "an unknown unit" -> "a measure the app doesn't know, so the amount may be off; the Amount field sets it"
+                reason == "an amount left in the name" -> "a number stayed in the name; check the amount"
+                reason == "a count times a count" -> "two counts multiplied (like 2 x 400 g); check the total"
+                reason == "a range that goes down" -> "the range reads backwards; check the amount"
+                reason == "several items on one line" -> "several items on one line; add each as its own line"
+                reason == "no ingredient name" -> "no ingredient name was found; edit the line"
+                reason == "an amount it couldn't read" -> "an amount it couldn't read; the Amount field sets it"
+                reason == "a name that reads like a sentence" -> "the name reads like a sentence; edit the line"
                 else -> reason
             }
 

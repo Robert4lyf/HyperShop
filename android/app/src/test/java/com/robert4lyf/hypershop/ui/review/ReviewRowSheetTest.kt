@@ -210,7 +210,7 @@ class ReviewCorrectionsTest {
         val row = (vm.state.value as ReviewState.Ready).ui.row("cat:lemon")
         assertEquals("1 lemon or lime", row.raw)
         assertEquals(
-            "the recipe offers a choice: swap to the other on the sheet if you'd rather",
+            "the recipe offers a choice; the swap button takes the other",
             ReviewViewModel.plainReason(row.checkReason!!),
         )
         assertEquals("Claude's own words", ReviewViewModel.plainReason("Claude's own words"))
@@ -305,7 +305,7 @@ class ReviewRowSheetScreenTest {
     fun theLastLineCannotBeRemoved() {
         compose.setContent { HyperShopTheme(dark = false, dynamicColor = false) { ReviewRowSheet(sheet.copy(canRemove = false), actions) } }
         compose.onNodeWithText("Remove from recipe").assertDoesNotExist()
-        compose.onNodeWithText("Check: the recipe offers a choice: swap to the other on the sheet if you'd rather").fetchSemanticsNode()
+        compose.onNodeWithText("Check: the recipe offers a choice; the swap button takes the other").fetchSemanticsNode()
     }
 
     @Test
