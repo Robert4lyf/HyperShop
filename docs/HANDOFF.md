@@ -21,9 +21,10 @@ Release A is on branch `claude/release-a-verified` (PROGRESS.md › Release A). 
 10. **Rapid ticks.** Tick five items as fast as the watch allows: all five bought on the phone, none twice?
 11. **Restore with the watch open.** With the watch app open, restore a backup on the phone. Does the watch switch to the restored list within a few seconds, with none of its old ticks applied to it?
 12. **Phone restart.** Force-stop HyperShop on the phone (App info › Force stop) while the watch app is open, tick an item on the watch, then open HyperShop. Does the tick arrive?
+13. **Watch tests on a desktop** (CI cannot run them, KNOWN_ISSUES #12). On a computer with the Connect IQ SDK Manager and the Forerunner 245 device installed: on Linux, `tools/run_watch_tests.sh` (it uses your display when `DISPLAY` is set); on macOS or Windows, the three commands at the top of `tools/build_watch.sh` (`monkeyc … -t`, `connectiq`, `monkeydo … -t`). Every test PASSED? If the simulator shows an "Error" dialog here too, what does it say?
 
 **What the emulator and simulator cannot tell us**
-- The Connect IQ simulator job still does not run the Monkey C tests (an "Error" dialog blocks it; KNOWN_ISSUES #12). The watch's sync logic is covered by the Kotlin model and its replayed traces, and the phone side by WatchAcceptanceTest, but nothing has run the watch's own code except your watch.
+- CI cannot run the Monkey C tests: headless, the simulator never loads the device and its "Error" dialog does not draw (KNOWN_ISSUES #12); check 13 runs them on a desktop. The watch's sync logic is covered by the Kotlin model and its replayed traces, and the phone side by WatchAcceptanceTest, but nothing has run the watch's own code except your watch.
 - Real Bluetooth timing, Garmin Connect's message delivery, and the 245's memory limits.
 - Cloud document providers (Drive): only MediaStore's local Downloads provider is automated.
 

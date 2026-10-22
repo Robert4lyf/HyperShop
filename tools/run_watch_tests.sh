@@ -26,9 +26,19 @@ if [[ -z "${DISPLAY:-}" ]]; then
     Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
     export DISPLAY=:99
     sleep 2
+    # Without a window manager, the simulator's Error dialog was mapped but never
+    # framed or painted. Only for our own Xvfb: a desktop has its own.
+    if command -v openbox > /dev/null; then
+        openbox > /dev/null 2>&1 &
+        sleep 1
+    fi
 fi
 SIM_LOG="${ROOT}/garmin/build/simulator.log"
-"${SDK_DIR}/bin/simulator" > "${SIM_LOG}" 2>&1 &
+# With openbox the Error dialog got its frame but its contents stayed transparent,
+# and the device screen blank: GTK/WebKit drawing through GL that Xvfb does not
+# provide. Software rendering and no compositing are the usual cure.
+LIBGL_ALWAYS_SOFTWARE=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 GDK_BACKEND=x11 \
+    "${SDK_DIR}/bin/simulator" > "${SIM_LOG}" 2>&1 &
 sim=$!
 trap 'kill ${sim} 2>/dev/null || true' EXIT
 
@@ -41,13 +51,13 @@ for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
         cat "${SIM_LOG}" >&2
         exit 1
     fi
-    # Ten minutes is far longer than the suite takes; past it, monkeydo has hung
-    # after connecting (seen in CI: connected on attempt 3, then silence), and
-    # the simulator's own log is the only account of why.
+    # Three minutes is far longer than the suite takes; past it, monkeydo has hung
+    # after connecting (seen in CI: a dialog over the device window, then silence),
+    # and the simulator's own log is the only account of why.
     status=0
-    timeout 600 "${SDK_DIR}/bin/monkeydo" "${OUT}" "${DEVICE}" -t > "${LOG}" 2>&1 || status=$?
+    timeout 180 "${SDK_DIR}/bin/monkeydo" "${OUT}" "${DEVICE}" -t > "${LOG}" 2>&1 || status=$?
     if [[ ${status} -eq 124 ]]; then
-        echo "monkeydo connected but never finished (10 min). Its output:" >&2
+        echo "monkeydo connected but never finished (3 min). Its output:" >&2
         cat "${LOG}" >&2
         echo "The simulator's log:" >&2
         cat "${SIM_LOG}" >&2
@@ -58,13 +68,27 @@ for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
                 echo "  $(xdotool getwindowname "$w" 2> /dev/null) ($(xdotool getwindowgeometry "$w" 2> /dev/null | tr '\n' ' '))" >&2
             done
         fi
-        # The dialog's words, read off the screen (its text is not reachable through X).
-        if command -v import > /dev/null && command -v tesseract > /dev/null; then
-            import -window root /tmp/simulator-screen.png 2> /dev/null &&
-                { echo "Text on the virtual display:" >&2; tesseract /tmp/simulator-screen.png - 2> /dev/null | grep -v '^\s*$' >&2; } || true
+        # Each window on its own, enlarged: read off the whole screen, the dialog's small
+        # text was lost (only the menu bar came through). The pictures are kept for the
+        # job's artifact as well, so a person can read what OCR cannot.
+        SHOTS="${ROOT}/garmin/build/simulator-screens"
+        mkdir -p "${SHOTS}"
+        if command -v import > /dev/null; then
+            import -window root "${SHOTS}/screen.png" 2> /dev/null || true
+            for w in $(xdotool search --onlyvisible --name '.' 2> /dev/null); do
+                import -window "$w" "${SHOTS}/window-$w.png" 2> /dev/null || continue
+                if command -v tesseract > /dev/null; then
+                    echo "Text in window $w ($(xdotool getwindowname "$w" 2> /dev/null)):" >&2
+                    convert "${SHOTS}/window-$w.png" -resize 300% -colorspace Gray "${SHOTS}/ocr-$w.png" 2> /dev/null &&
+                        tesseract "${SHOTS}/ocr-$w.png" - 2> /dev/null | grep -v '^\s*$' >&2 || true
+                    rm -f "${SHOTS}/ocr-$w.png"
+                fi
+            done
         fi
         echo "Connect IQ files:" >&2
-        ls -la "${HOME}/.Garmin/ConnectIQ" "${HOME}/.Garmin/ConnectIQ/Devices" "${HOME}/.Garmin/ConnectIQ/Fonts" 2> /dev/null | head -30 >&2 || true
+        ls -la "${HOME}/.Garmin/ConnectIQ" >&2 2> /dev/null || true
+        ls -laR "${HOME}/.Garmin/ConnectIQ/Devices" >&2 2> /dev/null || true
+        echo "Fonts: $(ls "${HOME}/.Garmin/ConnectIQ/Fonts" 2> /dev/null | wc -l) files" >&2
         cat "${HOME}/.Garmin/ConnectIQ/simulator.ini" >&2 2> /dev/null || true
         exit 1
     fi
