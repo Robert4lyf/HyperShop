@@ -24,7 +24,7 @@ recomposition, the fold animation and the test's own synchronisation.
 |---|---|---|
 | A 15-line saved recipe onto the list | 26 ms | 150 ms |
 | Search 300 saved recipes: first search, which builds the index (run 39738064579) | 2785 ms | 8000 ms |
-| Search 300 saved recipes: a second search (index reused) | measured from the next run | 2000 ms |
+| Search 300 saved recipes: a second search (index reused; run 39740019670) | 1235 ms | 3700 ms |
 | Shop screen: first frame with 150 items (cold) | 1227 ms | 4000 ms |
 | Shop: tap to "N of 150 bought", median of 10 | 254 ms | 750 ms |
 | Shop: tap to "N of 150 bought", worst of 10 | 963 ms | — |
@@ -50,8 +50,9 @@ emulator varies by up to about 2x, which is why the budgets sit at about 3x.
   made on a guess. It is the number to look at first on a real phone (Hand-off E), and
   the first candidate if a shopper finds ticking sluggish.
 - The first recipe search over 300 recipes (2.8 s) is the slowest thing measured. It
-  builds the index from every line of every recipe; later searches reuse it. Not
-  profiled yet, so not optimised (KNOWN_ISSUES #16).
+  builds the index from every line of every recipe. A second search, reusing the index,
+  still took 1.2 s (run 39740019670; the first was 3.9 s there), so the index build is
+  not the whole cost. Not profiled yet, so not optimised (KNOWN_ISSUES #16).
 - The worst tap (963 ms) is the first one after the screen opened (cold code paths).
 
 ## Not measured

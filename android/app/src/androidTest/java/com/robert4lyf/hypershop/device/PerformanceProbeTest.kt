@@ -167,7 +167,7 @@ class PerformanceProbeTest {
             }.second
         // The first search builds the index (every line of every recipe); later ones reuse it.
         budget("search 300 saved recipes: first search (builds the index)", search("avocado"), 8000.0)
-        budget("search 300 saved recipes: a second search", search("cumin"), 2000.0)
+        budget("search 300 saved recipes: a second search", search("cumin"), 3700.0)
     }
 
     @Test
