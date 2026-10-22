@@ -83,4 +83,33 @@ class HomeCheckTest {
             assertTrue("cat:salt" in r.repo.staples())
             assertTrue(rows().single { it.mergeKey == "cat:salt" }.let { !it.have && it.usual })
         }
+
+    @Test
+    fun aCupboardLineSetAsideAfterTheRestWasBoughtAndFinishedCanBePutBack() =
+        runBlocking {
+            r.import("2 onions", "500 g spaghetti")
+            r.repo.tick(r.repo.snapshot().itemByKey("cat:onion")!!.id)
+            r.repo.finish()
+            val pasta = rows().single { !it.have }.mergeKey
+            val moved = home.have(listOf(pasta))
+            assertTrue(rows().single { it.mergeKey == pasta }.have)
+            assertEquals(moved, home.needLines(moved))
+            val l = r.repo.snapshot()
+            assertEquals(Rational.of(500), l.total(l.itemByKey(pasta)!!.id)[BaseKey.MASS])
+        }
+
+    @Test
+    fun aLinePartlyBoughtIsNotSetAside() =
+        runBlocking {
+            val planner = Planner(r.repo)
+            planner.plan(planner.currentWeek(), r.save("Pasta", "500 g spaghetti"))
+            planner.addWeekToList(planner.currentWeek())
+            val pasta = r.repo.snapshot().liveItems.single()
+            r.repo.tick(pasta.id)
+            planner.setServings(planner.week(planner.currentWeek()).single().id, 8)
+            assertTrue(rows().none { it.mergeKey == pasta.mergeKey && !it.have })
+            assertTrue(home.have(listOf(pasta.mergeKey)).isEmpty())
+            val l = r.repo.snapshot()
+            assertEquals(Rational.of(1000), l.total(pasta.id)[BaseKey.MASS])
+        }
 }

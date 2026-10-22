@@ -16,9 +16,12 @@ import com.robert4lyf.hypershop.testutil.awaitTrue
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -33,8 +36,23 @@ import java.util.concurrent.CopyOnWriteArrayList
 class MealsViewModelTest {
     private val parser = RuleParser()
 
+    /** Collectors and containers made by a test, stopped after it: nothing may read a database Robolectric has reset. */
+    private val collectors = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val made = ArrayList<AppContainer>()
+
+    private fun container() = TestContainer.create().also { made += it }
+
+    @After
+    fun stop() {
+        collectors.cancel()
+        for (c in made) {
+            c.applicationScope.cancel()
+            c.db.close()
+        }
+    }
+
     private fun MealsViewModel.shown(): MealsViewModel {
-        CoroutineScope(Dispatchers.Main).launch { ui.collect {} }
+        collectors.launch { ui.collect {} }
         return this
     }
 
@@ -55,7 +73,7 @@ class MealsViewModelTest {
 
     private fun messages(vm: MealsViewModel): MutableList<UiMessage> {
         val got = CopyOnWriteArrayList<UiMessage>()
-        CoroutineScope(Dispatchers.Main).launch { vm.events.collect { got += it } }
+        collectors.launch { vm.events.collect { got += it } }
         return got
     }
 
@@ -64,7 +82,7 @@ class MealsViewModelTest {
 
     @Test
     fun planTwoMealsThenOneTapPutsTheWeekOnTheListMergedAndUndoTakesItOff() {
-        val c = TestContainer.create()
+        val c = container()
         save(c, "Chilli", "2 onions", "Salt, to taste")
         save(c, "Soup", "1 onion", "2 carrots")
         val vm = MealsViewModel(c).shown()
@@ -91,7 +109,7 @@ class MealsViewModelTest {
 
     @Test
     fun aRepeatedTapOnAddAddsTheWeekOnce() {
-        val c = TestContainer.create()
+        val c = container()
         save(c, "Chilli", "2 onions")
         val vm = MealsViewModel(c).shown()
         vm.plan(await(vm.ui) { it.picks.isNotEmpty() }.picks.single())
@@ -105,7 +123,7 @@ class MealsViewModelTest {
 
     @Test
     fun weeksMoveAndAnEmptyWeekOffersTheLastPlannedOne() {
-        val c = TestContainer.create()
+        val c = container()
         val chilli = save(c, "Chilli", "2 onions")
         val soup = save(c, "Soup", "1 carrot")
         val week = c.planner.currentWeek()
@@ -134,7 +152,7 @@ class MealsViewModelTest {
 
     @Test
     fun servingsOnAMealOnTheListRescaleItAndRemoveTakesItsItemsOffWithUndo() {
-        val c = TestContainer.create()
+        val c = container()
         save(c, "Chilli", "2 onions")
         val vm = MealsViewModel(c).shown()
         val got = messages(vm)
@@ -157,7 +175,7 @@ class MealsViewModelTest {
 
     @Test
     fun buyAgainAddsAllInOneGoAndNeverDoublesWhatIsThere() {
-        val c = TestContainer.create()
+        val c = container()
         runBlocking {
             repeat(2) {
                 for (n in listOf(
@@ -183,7 +201,7 @@ class MealsViewModelTest {
 
     @Test
     fun theAtHomeCheckMovesSharedCupboardIngredientsOnceAndShopsAfter() {
-        val c = TestContainer.create()
+        val c = container()
         save(c, "Chilli", "200 g basmati rice", "2 onions")
         save(c, "Curry", "100 g basmati rice", "1 tsp cumin")
         val vm = MealsViewModel(c).shown()

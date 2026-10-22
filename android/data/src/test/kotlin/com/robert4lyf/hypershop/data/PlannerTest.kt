@@ -161,19 +161,76 @@ class PlannerTest {
         }
 
     @Test
-    fun removingAMealPartlyBoughtKeepsTheOtherMealsPurchase() =
+    fun removingAMealPartlyBoughtKeepsEveryPurchaseAndUndoPutsTheRestBack() =
         runBlocking {
             planner.plan(week, r.save("Chilli", "2 onions", "1 courgette"))
             planner.plan(week, r.save("Soup", "1 onion"))
             planner.addWeekToList(week)
             r.repo.tick(r.repo.snapshot().itemByKey("cat:onion")!!.id)
-            planner.unplan(meals().first().id)
+            val removal = planner.unplan(meals().first().id)!!
             val l = r.repo.snapshot()
             val onion = l.itemByKey("cat:onion")!!.id
-            // The soup's onion is still bought; the chilli's pepper is gone.
+            // Every onion bought stays bought, the chilli's two included (Review B #1); its courgette, not bought, goes.
             assertTrue(l.isDone(onion))
-            assertEquals(Rational.of(1), l.total(onion)[BaseKey.ITEMS])
+            assertEquals(Rational.of(3), l.covered(onion)[BaseKey.ITEMS])
+            assertEquals(1, l.ticks.size)
             assertNull(l.itemByKey("cat:courgette"))
+            planner.restore(removal)
+            assertTrue(r.repo.snapshot().itemByKey("cat:courgette") != null)
+            assertEquals(2, meals().size)
+            assertEquals(MealShopping.TO_BUY, meals().single { it.title == "Chilli" }.shopping)
+        }
+
+    @Test
+    fun removingAMealWhoseOnlyPurchaseIsItsOwnKeepsThatPurchase() =
+        runBlocking {
+            planner.plan(week, r.save("Chilli", "2 onions", "1 courgette"))
+            planner.addWeekToList(week)
+            r.repo.tick(r.repo.snapshot().itemByKey("cat:courgette")!!.id)
+            planner.unplan(meals().single().id)
+            val l = r.repo.snapshot()
+            assertTrue(l.isDone(l.itemByKey("cat:courgette")!!.id))
+            assertNull(l.itemByKey("cat:onion"))
+            r.repo.finish()
+            // The trip still records what was bought.
+            assertEquals(listOf("cat:courgette"), r.db.dao().allTripItems().map { it.mergeKey })
+        }
+
+    @Test
+    fun undoOfAddingTheWeekKeepsSomethingBoughtSince() =
+        runBlocking {
+            planner.plan(week, r.save("Chilli", "2 onions", "1 courgette"))
+            val added = planner.addWeekToList(week)!!
+            r.repo.tick(r.repo.snapshot().itemByKey("cat:onion")!!.id)
+            planner.undoAddWeek(added)
+            val l = r.repo.snapshot()
+            assertTrue(l.isDone(l.itemByKey("cat:onion")!!.id))
+            assertNull(l.itemByKey("cat:courgette"))
+            assertEquals(1, l.ticks.size)
+        }
+
+    @Test
+    fun undoOfARemovalAfterTheMealWentOnAgainIsRefusedRatherThanDoubled() =
+        runBlocking {
+            planner.plan(week, r.save("Chilli", "2 onions"))
+            planner.addWeekToList(week)
+            val removal = r.repo.removeUse(meals().single().useId!!)!!
+            assertNotNull(planner.addWeekToList(week))
+            assertFalse(r.repo.restoreUse(removal))
+            assertEquals(Rational.of(2), onions())
+        }
+
+    @Test
+    fun aRecipeAlreadyPlannedThatGoesOnFromElsewhereIsThatMeal() =
+        runBlocking {
+            val key = r.save("Chilli", "2 onions")
+            planner.plan(week, key)
+            val id = r.db.dao().recipesByKey(key).maxOf { it.id }
+            r.repo.addSavedRecipe(id)
+            assertEquals(1, meals().size)
+            assertEquals(MealShopping.TO_BUY, meals().single().shopping)
+            assertNull(planner.addWeekToList(week))
+            assertEquals(Rational.of(2), onions())
         }
 
     @Test

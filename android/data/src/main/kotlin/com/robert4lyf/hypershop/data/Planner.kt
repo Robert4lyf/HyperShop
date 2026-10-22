@@ -53,10 +53,14 @@ data class PlannedMeal(
     val saved: Boolean,
 )
 
-/** "Remove" on a planned meal, for Undo: the row, and its use if it took that off the list too. */
+/**
+ * "Remove" on a planned meal, for Undo: the row, and what it took off the list —
+ * its whole use when nothing of it was bought, else only its unbought shares.
+ */
 data class MealRemoval(
     val meal: PlannedMealEntity,
     val use: UseRemoval?,
+    val withdrawn: com.robert4lyf.hypershop.core.merge.Withdrawn? = null,
 )
 
 /** "Add to the list" for a week: what was put on, for the summary and Undo. */
@@ -169,9 +173,22 @@ class Planner(
             val stillNeeded = m.useId?.takeIf { it in l.uses && l.progress(it).toBuy > 0 }
             // Another meal sharing the use (an edit relinked two) keeps it.
             val shared = m.useId?.let { u -> dao.mealsOfUse(u).any { it.id != id } } == true
-            val use = if (stillNeeded != null && !shared) repo.removeUse(stillNeeded) else null
+            var use: UseRemoval? = null
+            var withdrawn: com.robert4lyf.hypershop.core.merge.Withdrawn? = null
+            if (stillNeeded != null && !shared) {
+                val cs = l.contributionsOfUse(stillNeeded)
+                if (cs.none { it.coveredBy != null }) {
+                    use = repo.removeUse(stillNeeded)
+                } else {
+                    // Something of it was bought: a purchase is never undone, so only what is still needed goes.
+                    l.withdrawKeeping(cs.filter { it.coveredBy == null }.map { it.id }.toSet())?.let { (next, w) ->
+                        repo.persist(l, next)
+                        withdrawn = w
+                    }
+                }
+            }
             dao.deletePlannedMeals(listOf(id))
-            MealRemoval(m, use)
+            MealRemoval(m, use, withdrawn)
         }
 
     /** Undo of [unplan]. */
@@ -179,6 +196,10 @@ class Planner(
         db.withTransaction {
             if (dao.plannedMeal(r.meal.id) != null) return@withTransaction
             val restored = r.use?.let { repo.restoreUse(it.copy(meals = emptyList())) } ?: false
+            r.withdrawn?.let { w ->
+                val old = repo.load()
+                old.reinstate(w)?.let { repo.persist(old, it) }
+            }
             val useId = r.meal.useId?.takeIf { restored || (it in repo.load().uses) }
             dao.upsertPlannedMeals(listOf(r.meal.copy(useId = useId)))
         }
@@ -335,12 +356,21 @@ class Planner(
             WeekAdded(added, repo.load().contributions.filter { it.useId in uses }.map { it.itemId }.toSet().size)
         }
 
-    /** Undo of [addWeekToList]: each use it made comes off, and its meal is planned but not on the list again. */
+    /**
+     * Undo of [addWeekToList]: each use it made comes off, and its meal is planned
+     * but not on the list again. A use something was bought for since keeps that
+     * purchase (and its meal its link): only what is still needed goes.
+     */
     suspend fun undoAddWeek(w: WeekAdded) =
         db.withTransaction {
             for ((mealId, useId) in w.meals) {
-                if (dao.plannedMeal(mealId)?.useId == useId) dao.linkMeal(mealId, null)
                 val old = repo.load()
+                val cs = old.contributionsOfUse(useId)
+                if (cs.any { it.coveredBy != null }) {
+                    old.withdraw(cs.filter { it.coveredBy == null }.map { it.id }.toSet())?.let { repo.persist(old, it) }
+                    continue
+                }
+                if (dao.plannedMeal(mealId)?.useId == useId) dao.linkMeal(mealId, null)
                 val recipeId = old.uses[useId]?.recipeId ?: continue
                 repo.persist(old, old.removeUse(useId))
                 if (dao.usesOfRecipe(recipeId) == 0) repo.discardRecipe(recipeId)

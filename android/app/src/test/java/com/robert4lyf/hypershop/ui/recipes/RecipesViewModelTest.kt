@@ -149,7 +149,7 @@ class RecipesViewModelTest {
         // The copy went meanwhile, as the start-up purge does once it is forgotten and old.
         runBlocking { c.db.dao().deleteRecipe(use.recipeId!!) }
         runBlocking { got[0].undo!!.invoke() }
-        assertEquals("Can't undo: the recipe is gone", await(vm.ui) { got.size == 2 }.let { got[1].text })
+        assertEquals("Can't undo: the list has changed since", await(vm.ui) { got.size == 2 }.let { got[1].text })
         assertTrue(vm.ui.value.uses.isEmpty())
         assertTrue(runBlocking { c.repository.snapshot() }.liveItems.isEmpty())
         watching.cancel()

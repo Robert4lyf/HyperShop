@@ -447,12 +447,13 @@ class ListRepository(
      */
     suspend fun inStockOnList(l: ShoppingList): List<InStockLine> {
         val live = l.liveItems.map { it.id }.toSet()
-        // A recipe with something on the list, or with nothing on it at all because every line is at home
-        // (the At home check can set them all aside): its lines are still there to put back.
+        // The recipes the Recipes tab shows ([usesOnList]'s rule): something on the list, or its shopping
+        // done (bought, finished, or every line at home) — its at-home lines are still there to put back.
+        // A recipe taken off the list unbought ("Clear all") takes them with it.
         val uses =
             l.uses.values.filter { u ->
                 u.archivedAt == null && u.recipeId != null &&
-                    l.contributionsOfUse(u.id).let { cs -> cs.isEmpty() || cs.any { it.itemId in live } }
+                    (l.contributionsOfUse(u.id).any { it.itemId in live } || l.progress(u.id).state in KEPT)
             }
         if (uses.isEmpty()) return emptyList()
         val inStock =
@@ -780,6 +781,14 @@ class ListRepository(
         }
         if (replacedMeals.isNotEmpty() || !planNew) return
         val week = Week.of(clock()).startEpochDay
+        val key = recipe.libraryKey ?: recipe.url ?: "r:${recipe.id}"
+        // Already planned this week and not on the list yet: this is that meal going on, not a second one.
+        val live = load().uses.keys
+        dao.plannedMeals(week).firstOrNull { it.libraryKey == key && (it.useId == null || it.useId !in live) }?.let {
+            dao.linkMeal(it.id, useId)
+            dao.setMealServings(it.id, servings)
+            return
+        }
         dao.insertPlannedMeal(
             PlannedMealEntity(
                 weekStart = week,
@@ -827,6 +836,8 @@ class ListRepository(
         db.withTransaction {
             val recipeId = r.removed.use.recipeId
             if (recipeId != null && dao.recipe(recipeId) == null) return@withTransaction false
+            // Its meal went on the list again meanwhile (Add to the list): bringing this back would need it twice.
+            if (r.meals.any { id -> dao.plannedMeal(id)?.useId.let { it != null && it != r.removed.use.id } }) return@withTransaction false
             val old = load()
             var next = old.restoreUse(r.removed) ?: return@withTransaction false
             // An item that came back under a key the catalogue has since moved on from
@@ -917,7 +928,11 @@ class ListRepository(
         }
     }
 
-    /** One row per item bought, however many recipes wanted it; [TripItemEntity.byHand] if any of it was added by hand. */
+    /**
+     * One row per item bought, however many recipes wanted it. [TripItemEntity.byHand]
+     * only when nothing but hands put it there: a recipe's onions whose amount was
+     * raised (a hand-added share) are still a recipe's, not a household regular.
+     */
     private suspend fun recordTrip(
         l: ShoppingList,
         bought: List<com.robert4lyf.hypershop.core.merge.ListItem>,
@@ -928,7 +943,8 @@ class ListRepository(
         val manual = l.uses.values.filter { it.kind == UseKind.MANUAL }.map { it.id }.toSet()
         dao.insertTripItems(
             bought.map { item ->
-                val byHand = l.contributionsOf(item.id).filter { it.useId in manual }
+                val cs = l.contributionsOf(item.id)
+                val byHand = cs.filter { it.useId in manual }.takeIf { it.size == cs.size }.orEmpty()
                 TripItemEntity(
                     tripId = tripId,
                     mergeKey = item.mergeKey,

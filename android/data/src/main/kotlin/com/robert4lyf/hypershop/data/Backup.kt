@@ -201,7 +201,12 @@ object BackupValidator {
                 "usage ${u.date.take(10)}: a negative count",
             )
         }
-        for ((t, n) in listOf("planned meals" to b.plannedMeals.size, "trip items" to b.tripItems.size, "regulars" to b.regulars.size)) {
+        for ((t, n) in listOf(
+            "planned meals" to b.plannedMeals.size,
+            "trips" to b.trips.size,
+            "trip items" to b.tripItems.size,
+            "regulars" to b.regulars.size,
+        )) {
             check(n <= MAX_ROWS, "$t: $n rows is more than a backup can hold")
         }
         check(b.planVersion in 0..1, "unknown plan version ${b.planVersion}")

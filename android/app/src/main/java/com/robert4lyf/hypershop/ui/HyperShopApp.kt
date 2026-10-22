@@ -155,7 +155,16 @@ private fun AppShell(
                 ScaffoldDefaults.contentWindowInsets
             },
         snackbarHost = {
-            SnackbarHost(snackbar, if (reviewing) Modifier.navigationBarsPadding().padding(bottom = 80.dp) else Modifier)
+            // Above a screen's own bottom action (the review's Add, the plan's Add / Start shopping), never over it:
+            // an Undo up for its few seconds must not stand between a shopper and the next step.
+            SnackbarHost(
+                snackbar,
+                when {
+                    reviewing -> Modifier.navigationBarsPadding().padding(bottom = 80.dp)
+                    route == Routes.MEALS -> Modifier.padding(bottom = 80.dp)
+                    else -> Modifier
+                },
+            )
         },
         bottomBar = {
             if (route != Routes.REVIEW) {

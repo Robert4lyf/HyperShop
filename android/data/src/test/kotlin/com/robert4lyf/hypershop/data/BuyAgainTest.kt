@@ -167,4 +167,16 @@ class BuyAgainTest {
             }
             assertEquals(ListRepository.MAX_TRIPS, r.db.dao().trips().size)
         }
+
+    @Test
+    fun aRecipeItemWhoseAmountWasRaisedIsNotARegular() =
+        runBlocking {
+            repeat(2) {
+                r.import("2 onions", url = "https://example.com/$it")
+                val onion = r.repo.snapshot().itemByKey("cat:onion")!!.id
+                r.repo.editQuantity(onion, QtyBase.of(Rational.of(3), null, UnitLocale.METRIC))
+                shop()
+            }
+            assertTrue(buy.view().regulars.isEmpty())
+        }
 }

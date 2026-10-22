@@ -67,13 +67,21 @@ class HomeCheck(
             (need + have.filter { h -> need.none { it.mergeKey == h.mergeKey } }).sortedBy { it.name.lowercase() }
         }
 
-    /** Recipe lines on live rows not bought yet, by item: what "Have it" can take off. */
-    private fun open(l: ShoppingList) =
-        l.contributions
+    /**
+     * Recipe lines on live rows not bought yet, by item: what "Have it" can take off.
+     * A line part of which is bought is not among them: it stays on the list as it
+     * is (its amount can be edited), since setting aside the rest would leave a line
+     * both bought and "at home" that Need it could not put back at the right amount.
+     */
+    private fun open(l: ShoppingList): List<Pair<Long, com.robert4lyf.hypershop.core.merge.Contribution>> {
+        val partly = l.contributions.filter { it.coveredBy != null && it.recipeLineId != null }.map { it.useId to it.recipeLineId }.toSet()
+        return l.contributions
             .filter { c ->
                 c.coveredBy == null && c.recipeLineId != null && l.items[c.itemId]?.deletedAt == null &&
+                    (c.useId to c.recipeLineId) !in partly &&
                     l.uses[c.useId]?.let { it.kind == UseKind.RECIPE && it.archivedAt == null } == true
             }.map { it.itemId to it }
+    }
 
     private suspend fun titles(l: ShoppingList): Map<Long, String> {
         val recipes = l.uses.values.mapNotNull { u -> u.recipeId?.let { u.id to it } }
