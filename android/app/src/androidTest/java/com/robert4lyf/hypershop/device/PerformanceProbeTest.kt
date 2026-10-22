@@ -167,8 +167,8 @@ class PerformanceProbeTest {
                 runBlocking { withTimeout(30_000) { vm.ui.first { it.terms == listOf(text) } } }
             }.second
         // The first search builds the index (every line of every recipe); later ones reuse it.
-        budget("search 300 saved recipes: first search (builds the index)", search("avocado"), 8000.0)
-        budget("search 300 saved recipes: a second search", search("cumin"), 3700.0)
+        budget("search 300 saved recipes: first search (builds the index)", search("avocado"), 4000.0)
+        budget("search 300 saved recipes: a second search", search("cumin"), 250.0)
         // Where the time goes (KNOWN_ISSUES #16): what the first search's index is built from, and the match alone.
         val (lines300, read) = timed { runBlocking { c.repository.ingredientsOf(ids) } }
         report("search: read and decode 300 recipes' lines", read)

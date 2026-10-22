@@ -23,8 +23,8 @@ recomposition, the fold animation and the test's own synchronisation.
 | What | Value | Budget |
 |---|---|---|
 | A 15-line saved recipe onto the list | 26 ms | 150 ms |
-| Search 300 saved recipes: first search, which builds the index (run 39738064579) | 2785 ms | 8000 ms |
-| Search 300 saved recipes: a second search (index reused; run 39740019670) | 1235 ms | 3700 ms |
+| Search 300 saved recipes: first search, which builds the index | 2785–4003 ms before; **1268 ms** after (run 39744922298) | 4000 ms |
+| Search 300 saved recipes: a second search (index reused) | 1235 ms before; **40 ms** after (run 39744922298) | 250 ms |
 | Shop screen: first frame with 150 items (cold) | 1227 ms | 4000 ms |
 | Shop: tap to "N of 150 bought", median of 10 | 254 ms | 750 ms |
 | Shop: tap to "N of 150 bought", worst of 10 | 963 ms | — |
@@ -49,10 +49,14 @@ emulator varies by up to about 2x, which is why the budgets sit at about 3x.
   software-rendered emulator; it was not profiled further here, so no optimisation was
   made on a guess. It is the number to look at first on a real phone (Hand-off E), and
   the first candidate if a shopper finds ticking sluggish.
-- The first recipe search over 300 recipes (2.8 s) is the slowest thing measured. It
-  builds the index from every line of every recipe. A second search, reusing the index,
-  still took 1.2 s (run 39740019670; the first was 3.9 s there), so the index build is
-  not the whole cost. Not profiled yet, so not optimised (KNOWN_ISSUES #16).
+- Recipe search (KNOWN_ISSUES #16, fixed). Measured first, then fixed what the numbers
+  showed. Every search normalised all 22,500 ingredient names into words again (about
+  90% of a warm search on a JVM); they are now made once per index. Building the index
+  ran the full merge `target` (key and aisle too) for all 4,500 lines, 1.45 s on the
+  emulator; it now asks only for the catalogue entry (`Merger.catalogEntry`, 173 ms).
+  First search 4.0 s → 1.3 s, later searches 1.2 s → 40 ms. The second search's budget
+  is about 6x rather than 3x: at 40 ms the runners' 2x spread is a larger share, and
+  250 ms still fails long before the old 1.2 s.
 - The worst tap (963 ms) is the first one after the screen opened (cold code paths).
 
 ## Not measured
