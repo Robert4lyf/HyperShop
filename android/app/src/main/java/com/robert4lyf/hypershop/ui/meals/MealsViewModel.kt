@@ -63,9 +63,12 @@ data class MealsUi(
     val picks: List<Pick> = emptyList(),
     val hasLibrary: Boolean = false,
     val query: String = "",
-) {
-    val itemsLeft: Int get() = meals.sumOf { it.progress.toBuy }
-}
+    /**
+     * Rows on the list the meals still need, each once ([com.robert4lyf.hypershop.core.merge.ShoppingList.rowsStillNeeded]):
+     * two meals wanting onions are one onion to buy. Each meal's own card keeps its count.
+     */
+    val itemsLeft: Int = 0,
+)
 
 /**
  * "Meals this week" (docs/design/simplify.md phase 7): the recipes on the list
@@ -101,11 +104,11 @@ class MealsViewModel(
 
     val ui: StateFlow<MealsUi> =
         combine(
-            c.repository.list.map { c.repository.usesOnList(it) },
+            c.repository.list.map { it to c.repository.usesOnList(it) },
             c.repository.observeLibrary(),
             snapshotFlow { query },
             asked,
-        ) { uses, lib, q, asked ->
+        ) { (list, uses), lib, q, asked ->
             val meals =
                 uses.filter { it.recipeId != null }.map {
                         u ->
@@ -120,7 +123,14 @@ class MealsViewModel(
                         Pick(r.recipeId, r.key, r.title, r.lines, r.key in onList, r.url?.let { siteOf(it) } ?: bookRef(r.book, r.page))
                     }
                     .filter { term.isEmpty() || it.title.lowercase().contains(term) }
-            MealsUi(loaded = true, meals = meals, picks = picks, hasLibrary = lib.isNotEmpty(), query = q)
+            MealsUi(
+                loaded = true,
+                meals = meals,
+                picks = picks,
+                hasLibrary = lib.isNotEmpty(),
+                query = q,
+                itemsLeft = list.rowsStillNeeded(meals.map { it.useId }).size,
+            )
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MealsUi())
 

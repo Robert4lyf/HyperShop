@@ -776,6 +776,8 @@ class ListRepository(
             // An item that came back under a key the catalogue has since moved on from
             // (an ingredient edit) joins the item now at the new key, or takes it.
             for (item in r.removed.items) {
+                // Only rows this Undo brought back; a row that stayed is the re-key's business.
+                if (item.id in old.items) continue
                 val restored = next.items[item.id] ?: continue
                 if (restored.normName.isEmpty()) continue
                 val target = merger.target(restored.normName, null, overrides())

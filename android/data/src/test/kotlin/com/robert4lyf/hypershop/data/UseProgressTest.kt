@@ -110,18 +110,59 @@ class UseProgressTest {
         }
 
     @Test
-    fun moreServingsAfterFinishingPutTheExtraBackOnTheList() =
+    fun moreServingsAfterFinishingPutTheExtraBackOnTheListAndFewerTakeItOffAgain() =
+        runBlocking {
+            val a = r.import("2 onions", servings = 4)
+            r.repo.tick(id("cat:onion"))
+            val stamp = r.repo.finishShopping()
+            assertTrue(r.repo.snapshot().liveItems.isEmpty())
+            // More servings: the one extra onion is back on the list, on a row of its own; the two
+            // bought stay with the finished trip.
+            r.repo.rescaleUse(a.useId, 6)
+            var l = r.repo.snapshot()
+            val extra = l.itemByKey("cat:onion")!!
+            assertEquals(Rational.ONE, l.total(extra.id)[BaseKey.ITEMS])
+            assertTrue(l.contributionsOf(extra.id).all { it.coveredBy == null })
+            assertEquals(UseProgress(1, 0, 1, 0), l.progress(a.useId))
+            assertEquals(UseState.STILL_NEEDED, shown(a.useId)!!.progress.state)
+            // Back to four: nothing extra is needed, and no bought onion is left showing on the list.
+            r.repo.rescaleUse(a.useId, 4)
+            l = r.repo.snapshot()
+            assertTrue(l.liveItems.isEmpty())
+            assertEquals(UseState.ALL_BOUGHT, l.progress(a.useId).state)
+            assertEquals(1, l.ticks.size)
+            // Up again and down past what was bought: still nothing on the list, the bought amount shrinks.
+            r.repo.rescaleUse(a.useId, 8)
+            assertEquals(Rational.of(2), r.repo.snapshot().let { it.total(it.itemByKey("cat:onion")!!.id)[BaseKey.ITEMS] })
+            r.repo.rescaleUse(a.useId, 2)
+            l = r.repo.snapshot()
+            assertTrue(l.liveItems.isEmpty())
+            assertEquals(UseState.ALL_BOUGHT, l.progress(a.useId).state)
+            // Undo of the finish brings the trip's row back, bought, at the amount it scaled to.
+            r.repo.undoDelete(stamp)
+            l = r.repo.snapshot()
+            val onion = l.itemByKey("cat:onion")!!
+            assertTrue(l.isDone(onion.id))
+            assertEquals(Rational.ONE, l.total(onion.id)[BaseKey.ITEMS])
+        }
+
+    @Test
+    fun moreServingsAfterFinishingJoinAnOnionAlreadyBackOnTheList() =
         runBlocking {
             val a = r.import("2 onions", servings = 4)
             r.repo.tick(id("cat:onion"))
             r.repo.finishShopping()
-            assertTrue(r.repo.snapshot().liveItems.isEmpty())
+            // Another recipe has put onions on the list since.
+            r.import("1 onion", url = "https://example.com/b")
+            val live = id("cat:onion")
             r.repo.rescaleUse(a.useId, 6)
-            val l = r.repo.snapshot()
-            val onion = l.itemByKey("cat:onion")!!
-            assertEquals(UseProgress(1, 1, 0, 0), l.progress(a.useId))
-            assertTrue(l.isPartial(onion.id))
-            assertEquals(UseState.STILL_NEEDED, shown(a.useId)!!.progress.state)
+            var l = r.repo.snapshot()
+            assertEquals(live, l.itemByKey("cat:onion")!!.id)
+            assertEquals(Rational.of(2), l.total(live)[BaseKey.ITEMS])
+            // Back down: the other recipe's onion stays, the extra goes.
+            r.repo.rescaleUse(a.useId, 4)
+            l = r.repo.snapshot()
+            assertEquals(Rational.ONE, l.total(l.itemByKey("cat:onion")!!.id)[BaseKey.ITEMS])
         }
 
     @Test

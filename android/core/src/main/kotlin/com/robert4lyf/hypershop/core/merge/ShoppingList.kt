@@ -127,6 +127,19 @@ data class ShoppingList(
     fun contributionsOfUse(useId: Long): List<Contribution> = byUse[useId] ?: emptyList()
 
     /**
+     * The live rows [useIds] still need something from, each counted once
+     * however many of the uses share it: two recipes wanting onions are one
+     * onion row on the list, so one item still needed, not two.
+     */
+    fun rowsStillNeeded(useIds: Collection<Long>): Set<Long> {
+        val wanted = useIds.toSet()
+        return contributions
+            .filter { it.useId in wanted && it.coveredBy == null && items[it.itemId]?.deletedAt == null }
+            .map { it.itemId }
+            .toSet()
+    }
+
+    /**
      * Where a use's shopping stands, item by item, from its own contributions: an
      * item it still needs (an uncovered contribution on a live item), one it has
      * bought (every one of its contributions on the item covered), and one taken
@@ -135,6 +148,7 @@ data class ShoppingList(
      * later (another recipe, more servings) is still needed by the use that added
      * it, and already bought for the one that didn't. Derived, never stored.
      */
+
     fun progress(useId: Long): UseProgress {
         var toBuy = 0
         var partly = 0
@@ -341,7 +355,9 @@ data class ShoppingList(
             use?.let {
                 RemovedUse(
                     use = it,
-                    items = empty.mapNotNull { id -> items[id] },
+                    // Every row it was on, not only the ones it emptied: a shared row can go later
+                    // (another recipe removed, the purge), and Undo must not point at nothing.
+                    items = affected.mapNotNull { id -> items[id] },
                     contributions = gone,
                     ticks = ticks.filter { t -> t.id !in covering },
                 )
@@ -366,10 +382,17 @@ data class ShoppingList(
         var items = this.items
         val redirect = HashMap<Long, Long>()
         for (i in r.items) {
+            if (i.id in items) continue
             val live = itemByKey(i.mergeKey)
             if (live != null) redirect[i.id] = live.id else items = items + (i.id to i)
         }
-        val cs = r.contributions.map { c -> redirect[c.itemId]?.let { c.copy(itemId = it) } ?: c }
+        // A tick that has gone since (an untick) no longer covers anything: what it covered is needed again.
+        val tickIds = ticks.map { it.id }.toSet() + r.ticks.map { it.id }
+        val cs =
+            r.contributions.map { c ->
+                val moved = redirect[c.itemId]?.let { c.copy(itemId = it) } ?: c
+                if (moved.coveredBy != null && moved.coveredBy !in tickIds) moved.copy(coveredBy = null) else moved
+            }
         val ts = r.ticks.map { t -> redirect[t.itemId]?.let { t.copy(itemId = it) } ?: t }
         return copy(
             uses = uses + (r.use.id to r.use),
@@ -392,8 +415,10 @@ data class ShoppingList(
         var nextId = nextId
         val replaced = HashMap<Long, Contribution?>()
         val added = ArrayList<Contribution>()
-        val revived = HashSet<Long>()
-        for (group in scaled.groupBy { it.itemId to it.recipeLineId }.values) {
+        val created = LinkedHashMap<Long, ListItem>()
+        // By recipe line, not by row: after a finished trip a line's bought part stays on the finished
+        // (deleted) row and its extra lives on a new one, and the two have to be scaled as one amount.
+        for (group in scaled.groupBy { it.recipeLineId ?: -it.itemId }.values) {
             val covered = group.filter { it.coveredBy != null }
             val open = group.filter { it.coveredBy == null }
             val target = group.fold(QtyBase.PRESENCE) { acc, c -> acc + c.qty }.times(f)
@@ -410,11 +435,24 @@ data class ShoppingList(
                         if (first != null) {
                             replaced[first.id] = first.copy(qty = rest)
                         } else {
-                            // Bought and finished: the extra goes back on the list, onto the live row for it if there is one.
+                            // Bought and finished: the extra goes back on the list, onto the live row for it if
+                            // there is one, else a new row. The finished row stays finished with what was bought:
+                            // reviving it would leave a bought row on the list once the extra went again.
                             val c = covered.first()
                             val item = items.getValue(c.itemId)
                             val onto =
-                                if (item.deletedAt == null) item.id else itemByKey(item.mergeKey)?.id ?: item.id.also { revived += it }
+                                if (item.deletedAt == null) {
+                                    item.id
+                                } else {
+                                    itemByKey(item.mergeKey)?.id
+                                        ?: created.values.firstOrNull { it.mergeKey == item.mergeKey }?.id
+                                        ?: item.copy(
+                                            id = nextId++,
+                                            rev = 1,
+                                            deletedAt = null,
+                                            position = nextPosition(item.aisle) + created.size,
+                                        ).also { created[it.id] = it }.id
+                                }
                             added += Contribution(nextId++, useId, c.recipeLineId, onto, rest, false, rev, unitHint = c.unitHint)
                         }
                     }
@@ -428,12 +466,19 @@ data class ShoppingList(
                 }
             }
         }
+        val kept = contributions.mapNotNull { if (it.id in replaced) replaced[it.id] else it } + added
+        // A live row this left with nothing on it (the extra of a finished trip, scaled away again) goes:
+        // it was never bought, so there is no tick to keep. A row still holding anything stays.
+        val touched = scaled.map { it.itemId }.toSet() + added.map { it.itemId }
+        val holding = kept.map { it.itemId }.toSet()
+        val emptied = touched.filter { id -> id !in holding && (items[id] ?: created[id])?.deletedAt == null }.toSet()
         return copy(
             uses = uses + (useId to use.copy(servings = servings)),
-            items = items.mapValues { (id, i) -> if (id in revived) i.copy(deletedAt = null) else i },
-            contributions = contributions.mapNotNull { if (it.id in replaced) replaced[it.id] else it } + added,
+            items = items + created - emptied,
+            contributions = kept,
+            ticks = ticks.filter { it.itemId !in emptied },
             nextId = nextId,
-        ).bumped(scaled.map { it.itemId }.toSet() + added.map { it.itemId })
+        ).bumped(touched - emptied)
     }
 
     /**
@@ -627,7 +672,7 @@ enum class WatchTickResult { OK, NOOP, PARTIAL, STILL_DONE }
 /** What [ShoppingList.removeUseKeeping] took off the list, for Undo. */
 data class RemovedUse(
     val use: RecipeUse,
-    /** Items left with nothing, removed with the use. */
+    /** Every row the use had contributions on, as they were: Undo re-adds the ones gone since. */
     val items: List<ListItem>,
     val contributions: List<Contribution>,
     /** Ticks that covered nothing else. */

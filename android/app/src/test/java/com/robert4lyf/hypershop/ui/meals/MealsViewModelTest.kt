@@ -118,6 +118,27 @@ class MealsViewModelTest {
     }
 
     @Test
+    fun theHeadlineCountsASharedRowOnce() {
+        val c = TestContainer.create()
+        save(c, "Weeknight chilli", "2 onions", "500g beef mince")
+        save(c, "Red lentil dal", "1 onion", "200g red lentils")
+        val vm = MealsViewModel(c).shown()
+        var ui = await(vm.ui) { it.loaded && it.picks.size == 2 }
+        vm.add(ui.picks[0])
+        await(vm.ui) { it.meals.size == 1 }
+        vm.add(ui.picks[1])
+        ui = await(vm.ui) { it.meals.size == 2 }
+        // Each meal still needs its two rows; the list has three (one onion row), and so does the headline.
+        assertEquals(listOf(2, 2), ui.meals.map { it.progress.toBuy })
+        assertEquals(3, ui.itemsLeft)
+        assertEquals(3, runBlocking { c.repository.snapshot() }.liveItems.size)
+        // The onion bought: one row fewer for both.
+        runBlocking { c.repository.tick(c.repository.snapshot().itemByKey("cat:onion")!!.id) }
+        ui = await(vm.ui) { it.itemsLeft == 2 }
+        assertEquals(listOf(1, 1), ui.meals.map { it.progress.toBuy })
+    }
+
+    @Test
     fun rapidServingsTapsAllCountAndUndoOnceToWhereTheyBegan() {
         val c = TestContainer.create()
         save(c, "Weeknight chilli", "2 onions")

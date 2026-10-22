@@ -258,4 +258,37 @@ class UsesTest {
             // The restored item's old id still finds it (a watch op in flight).
             assertEquals(l.liveItems.single().id, l.resolve(removed.removed.items.single().id)?.id)
         }
+
+    @Test
+    fun undoOfARemovalAfterTheSharedRowHasGoneBringsTheRowBack() =
+        runBlocking {
+            // Release A: found by ListInvariantsTest. A's onion row is shared with B; A is removed,
+            // then B, which empties the row and takes it off. Undo of A pointed at a row that was gone.
+            val a = r.import("2 onions", "1 carrot")
+            val b = r.import("1 onion", url = "https://example.com/b")
+            val removedA = r.repo.removeUse(a.useId)!!
+            r.repo.removeUse(b.useId)!!
+            assertTrue(r.repo.snapshot().liveItems.isEmpty())
+            assertTrue(r.repo.restoreUse(removedA))
+            val l = r.repo.snapshot()
+            assertEquals(setOf("cat:onion", "cat:carrot"), l.liveItems.map { it.mergeKey }.toSet())
+            assertEquals(Rational.of(2), l.total(l.itemByKey("cat:onion")!!.id)[BaseKey.ITEMS])
+        }
+
+    @Test
+    fun undoOfARemovalAfterAnUntickBringsTheItemBackStillNeeded() =
+        runBlocking {
+            val a = r.import("2 onions")
+            val b = r.import("1 onion", url = "https://example.com/b")
+            val onion = r.repo.snapshot().itemByKey("cat:onion")!!.id
+            r.repo.tick(onion)
+            val removedA = r.repo.removeUse(a.useId)!!
+            // The tick covered both recipes, so it stays with B; then it is undone.
+            r.repo.untick(onion)
+            assertTrue(r.repo.restoreUse(removedA))
+            val l = r.repo.snapshot()
+            assertTrue(l.contributionsOf(onion).all { it.coveredBy == null })
+            assertEquals(Rational.of(3), l.total(onion)[BaseKey.ITEMS])
+            assertEquals(1, l.progress(b.useId).toBuy)
+        }
 }
