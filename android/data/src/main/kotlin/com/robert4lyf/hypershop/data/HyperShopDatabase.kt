@@ -10,14 +10,15 @@ import com.robert4lyf.hypershop.core.catalog.CatalogLoader
 import com.robert4lyf.hypershop.core.model.AisleCode
 
 @Database(
-    version = 4,
+    version = 5,
     exportSchema = true,
     entities = [
         MetaEntity::class, ItemEntity::class, ItemAliasEntity::class, RecipeEntity::class, RecipeLineEntity::class,
         RecipeUseEntity::class, TickEntity::class, ContributionEntity::class, LineDecisionEntity::class,
         ImportJobEntity::class, AisleEntity::class, StoreProfileEntity::class, AisleOrderEntity::class,
         CategoryOverrideEntity::class, StapleEntity::class, ClaudeUsageEntity::class, DeletedItemEntity::class,
-        WatchInstallEntity::class, WatchOpResultEntity::class,
+        WatchInstallEntity::class, WatchOpResultEntity::class, PlannedMealEntity::class, TripEntity::class,
+        TripItemEntity::class, RegularEntity::class,
     ],
 )
 abstract class HyperShopDatabase : RoomDatabase() {
@@ -81,6 +82,41 @@ abstract class HyperShopDatabase : RoomDatabase() {
                 }
             }
 
+        /**
+         * v5 (Release B): the meal plan, shopping history and Buy again preferences.
+         * Recipes on the list become this plan's meals, linked to their uses ([PlanSeed]).
+         */
+        val MIGRATION_4_5: Migration =
+            object : LiveKeyMigration(4, 5) {
+                override fun migrateTables(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `PlannedMeal` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                            "`weekStart` INTEGER NOT NULL, `libraryKey` TEXT NOT NULL, `servings` INTEGER, `position` INTEGER NOT NULL, " +
+                            "`useId` INTEGER, `addedAt` INTEGER NOT NULL, FOREIGN KEY(`useId`) REFERENCES `RecipeUse`(`id`) " +
+                            "ON UPDATE NO ACTION ON DELETE SET NULL )",
+                    )
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_PlannedMeal_weekStart` ON `PlannedMeal` (`weekStart`)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_PlannedMeal_useId` ON `PlannedMeal` (`useId`)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_PlannedMeal_libraryKey` ON `PlannedMeal` (`libraryKey`)")
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `Trip` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                            "`finishedAt` INTEGER NOT NULL)",
+                    )
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `TripItem` (`tripId` INTEGER NOT NULL, `mergeKey` TEXT NOT NULL, " +
+                            "`displayName` TEXT NOT NULL, `aisleCode` TEXT NOT NULL, `byHand` INTEGER NOT NULL, `qty` TEXT, " +
+                            "`unitHint` TEXT, PRIMARY KEY(`tripId`, `mergeKey`), FOREIGN KEY(`tripId`) REFERENCES `Trip`(`id`) " +
+                            "ON UPDATE NO ACTION ON DELETE CASCADE )",
+                    )
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_TripItem_mergeKey` ON `TripItem` (`mergeKey`)")
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `Regular` (`mergeKey` TEXT NOT NULL, `displayName` TEXT NOT NULL, " +
+                            "`pinned` INTEGER NOT NULL, PRIMARY KEY(`mergeKey`))",
+                    )
+                    PlanSeed.fromUses(db)
+                }
+            }
+
         /** Seeds aisles, the store and its aisle order, staples and Meta (PLAN §3.4, §4). */
         val CALLBACK =
             object : Callback() {
@@ -123,7 +159,7 @@ abstract class HyperShopDatabase : RoomDatabase() {
                 context,
                 HyperShopDatabase::class.java,
                 NAME,
-            ).addCallback(CALLBACK).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
+            ).addCallback(CALLBACK).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
 
         /**
          * Tests: [queryExecutor] can run Room's background work (invalidation

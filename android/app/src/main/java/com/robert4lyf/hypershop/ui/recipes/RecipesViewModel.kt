@@ -298,7 +298,7 @@ class RecipesViewModel(
                     "Removed ${use.title} from the list",
                     undo = {
                         // The recipe copy can go meanwhile (the start-up purge); the use can't come back without it.
-                        if (!c.repository.restoreUse(removed)) messages.send(UiMessage("Can't undo: the recipe is gone"))
+                        if (!c.repository.restoreUse(removed)) messages.send(UiMessage("Can't undo: the list has changed since"))
                     },
                 ),
             )

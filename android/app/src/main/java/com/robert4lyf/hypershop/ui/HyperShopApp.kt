@@ -155,7 +155,16 @@ private fun AppShell(
                 ScaffoldDefaults.contentWindowInsets
             },
         snackbarHost = {
-            SnackbarHost(snackbar, if (reviewing) Modifier.navigationBarsPadding().padding(bottom = 80.dp) else Modifier)
+            // Above a screen's own bottom action (the review's Add, the plan's Add / Start shopping), never over it:
+            // an Undo up for its few seconds must not stand between a shopper and the next step.
+            SnackbarHost(
+                snackbar,
+                when {
+                    reviewing -> Modifier.navigationBarsPadding().padding(bottom = 80.dp)
+                    route == Routes.MEALS -> Modifier.padding(bottom = 80.dp)
+                    else -> Modifier
+                },
+            )
         },
         bottomBar = {
             if (route != Routes.REVIEW) {
@@ -188,7 +197,9 @@ private fun AppShell(
             popEnterTransition = { fadeIn(tween(150)) },
             popExitTransition = { fadeOut(tween(100)) },
         ) {
-            composable(Routes.LIST) { ListRoute(container, snackbar, onReview = openReview) }
+            composable(Routes.LIST) {
+                ListRoute(container, snackbar, onReview = openReview, onPlan = { nav.navigate(Routes.MEALS) { launchSingleTop = true } })
+            }
             composable(Routes.RECIPES) {
                 RecipesRoute(
                     container,
@@ -202,13 +213,10 @@ private fun AppShell(
                     container,
                     snackbar,
                     onBack = { nav.popBackStack() },
-                    onList = {
-                        nav.navigate(Routes.LIST) {
-                            popUpTo(Routes.LIST) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
+                    // Back to the list itself. Navigating to it with saved state restored the List tab's own
+                    // stack, which held this screen when it was opened from the list, so Start shopping
+                    // went nowhere. The list is the root of every stack.
+                    onList = { nav.popBackStack(Routes.LIST, inclusive = false) },
                 )
             }
             composable(Routes.SETTINGS) {

@@ -182,6 +182,49 @@ class PerformanceProbeTest {
         report("search: the match alone, again", timed { RecipeSearch.search(index, listOf("cumin")) }.second)
     }
 
+    /**
+     * Release B at scale: 300 saved recipes, twelve weeks of plans, the full 26
+     * trips of 60 items each. What a shopper waits for: the week's preview, the
+     * week onto the list, another week, Buy again and the At home check.
+     */
+    @Test
+    fun planningAndHistoryAtScale() {
+        assumeTrue("run on request only", enabled)
+        val c = DeviceContainer.create()
+        val lines =
+            listOf(
+                "2 onions", "500g beef mince", "1 tin chopped tomatoes", "2 garlic cloves", "1 tsp cumin", "1 red pepper", "200g rice",
+                "1 lime", "coriander", "soured cream", "cheddar", "tortillas", "1 avocado", "1 tsp paprika", "salt",
+            )
+        val keys =
+            (1..300).map { i ->
+                val id = c.saveRecipe("Recipe $i", *lines.map { l -> if (i % 3 == 0) "$l $i" else l }.toTypedArray())
+                runBlocking { c.db.dao().recipe(id)!!.libraryKey!! }
+            }
+        val week = c.planner.currentWeek()
+        runBlocking {
+            for (w in 1..12) for (k in keys.shuffled(java.util.Random(w.toLong())).take(5)) c.planner.plan(week - w, k)
+            for (t in 1..com.robert4lyf.hypershop.data.ListRepository.MAX_TRIPS) {
+                for (n in 1..60) {
+                    c.repository.manualAdd("thing ${(n * 7 + t) % 90}", QtyBase.of(Rational.ONE, null, UnitLocale.METRIC), null)
+                }
+                for (i in c.repository.snapshot().liveItems) c.repository.tick(i.id)
+                c.repository.finish()
+            }
+            for (k in keys.take(6)) c.planner.plan(week, k)
+        }
+        val (_, preview) = timed { runBlocking { c.planner.previewWeek(week) } }
+        budget("plan: preview of 6 meals to add", preview, 300.0)
+        val (_, add) = timed { runBlocking { c.planner.addWeekToList(week) } }
+        budget("plan: 6 meals onto the list (one transaction)", add, 1300.0)
+        val (_, other) = timed { runBlocking { c.planner.week(week - 3) } }
+        budget("plan: another week's meals", other, 150.0)
+        val (_, buy) = timed { runBlocking { c.buyAgain.view() } }
+        budget("buy again: suggestions from 26 trips", buy, 150.0)
+        val (_, home) = timed { runBlocking { c.homeCheck.view(c.repository.snapshot()) } }
+        budget("at home check over the week's list", home, 150.0)
+    }
+
     @Test
     fun theShopScreenAt150ItemsOnTheMainThread() {
         assumeTrue("run on request only", enabled)

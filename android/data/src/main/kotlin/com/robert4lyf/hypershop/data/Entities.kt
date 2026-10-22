@@ -311,3 +311,75 @@ data class LineCount(
     val recipeId: Long,
     val n: Int,
 )
+
+/**
+ * A meal planned for a week (docs/design/release-b.md): only the intent. Its
+ * ingredients come from the saved recipe ([libraryKey], its latest copy) and its
+ * shopping from the use it was put on the list as ([useId]), never copied here.
+ * [useId] is null until "Add to the list", and again if that use is removed.
+ */
+@Serializable
+@Entity(
+    tableName = "PlannedMeal",
+    foreignKeys = [
+        ForeignKey(entity = RecipeUseEntity::class, parentColumns = ["id"], childColumns = ["useId"], onDelete = ForeignKey.SET_NULL),
+    ],
+    indices = [Index("weekStart"), Index("useId"), Index("libraryKey")],
+)
+data class PlannedMealEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /** The week's Monday as an epoch day ([com.robert4lyf.hypershop.core.plan.Week]). */
+    val weekStart: Long,
+    val libraryKey: String,
+    /** Null: the recipe's own servings. */
+    val servings: Int?,
+    val position: Int,
+    val useId: Long?,
+    val addedAt: Long,
+)
+
+/** A finished shopping trip: when "Finish shopping" was pressed. Its items are [TripItemEntity]. */
+@Serializable
+@Entity(tableName = "Trip")
+data class TripEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val finishedAt: Long,
+)
+
+/**
+ * One item bought on a trip, once however many recipes wanted it. [byHand]: some
+ * of it was typed or added from Buy again, which is what makes it a household
+ * purchase rather than a recipe's; [qty] is that hand-added amount (QtyBase JSON).
+ */
+@Serializable
+@Entity(
+    tableName = "TripItem",
+    primaryKeys = ["tripId", "mergeKey"],
+    foreignKeys = [
+        ForeignKey(
+            entity = TripEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["tripId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("mergeKey")],
+)
+data class TripItemEntity(
+    val tripId: Long,
+    val mergeKey: String,
+    val displayName: String,
+    val aisleCode: String,
+    val byHand: Boolean,
+    val qty: String?,
+    val unitHint: String?,
+)
+
+/** A Buy again preference: [pinned] always offered, or not, hidden from suggestions. */
+@Serializable
+@Entity(tableName = "Regular")
+data class RegularEntity(
+    @PrimaryKey val mergeKey: String,
+    val displayName: String,
+    val pinned: Boolean,
+)

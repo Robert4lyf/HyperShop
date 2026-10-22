@@ -149,6 +149,8 @@ data class SettingsActions(
     val onRestore: () -> Unit = {},
     val onConfirmRestore: () -> Unit = {},
     val onCancelRestore: () -> Unit = {},
+    /** Data › Clear shopping history: past trips behind Buy again. */
+    val onClearHistory: () -> Unit = {},
 )
 
 @Composable
@@ -198,6 +200,7 @@ fun SettingsRoute(
             onRestore = { openBackup.launch(arrayOf("application/json", "application/octet-stream", "text/plain", "*/*")) },
             onConfirmRestore = vm::confirmRestore,
             onCancelRestore = vm::cancelRestore,
+            onClearHistory = vm::clearHistory,
         ),
         snackbar = own.takeIf { snackbar == null },
     )
@@ -476,6 +479,24 @@ private fun DataGroup(
             modifier = Modifier.testTag("backup"),
         ) { Text("Back up to a file") }
         OutlinedButton(onClick = actions.onRestore, enabled = !ui.dataBusy, modifier = Modifier.testTag("restore")) { Text("Restore") }
+    }
+    EdgeDivider()
+    var confirmClear by rememberSaveable { mutableStateOf(false) }
+    Hint("Buy again learns from the trips you finish. They stay on this phone and go in your backups, nowhere else.")
+    TextButton(onClick = { confirmClear = true }, modifier = Modifier.testTag("clear-history")) { Text("Clear shopping history") }
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text("Clear shopping history?") },
+            text = { Text("Buy again forgets your past trips and the items you asked it not to suggest. Items you pinned stay pinned.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmClear = false
+                    actions.onClearHistory()
+                }, modifier = Modifier.testTag("clear-history-confirm")) { Text("Clear") }
+            },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
+        )
     }
 }
 

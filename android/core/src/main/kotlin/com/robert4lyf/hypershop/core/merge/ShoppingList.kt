@@ -279,7 +279,14 @@ data class ShoppingList(
      */
     fun undoDelete(stamp: Long): ShoppingList {
         val liveKeys = liveItems.map { it.mergeKey }.toSet()
-        val back = items.values.filter { it.deletedAt == stamp && it.mergeKey !in liveKeys }.map { it.id }.toSet()
+        // One row per key: two operations stamped in the same millisecond can each have deleted a row
+        // with the same key, and only one of them may come back (keys are unique among live rows).
+        val back =
+            items.values
+                .filter { it.deletedAt == stamp && it.mergeKey !in liveKeys }
+                .groupBy { it.mergeKey }
+                .map { (_, rows) -> rows.maxOf { it.id } }
+                .toSet()
         // "Finish shopping" also archived uses with the same stamp.
         return copy(
             items = items.mapValues { (id, i) -> if (id in back) i.copy(deletedAt = null) else i },
@@ -503,6 +510,53 @@ data class ShoppingList(
         return l.bumped(touched)
     }
 
+    /**
+     * Takes back contributions not bought yet ([ids]; a covered one stays, so a
+     * purchase is never undone by this): the Undo of Buy again, and "Have it" in
+     * the At home check. A row left with nothing on it goes, as [removeUse] does.
+     * Null when none of [ids] could go.
+     */
+    fun withdraw(ids: Set<Long>): ShoppingList? = withdrawKeeping(ids)?.first
+
+    /** [withdraw], also returning what went, so [reinstate] can put it back (Undo). */
+    fun withdrawKeeping(ids: Set<Long>): Pair<ShoppingList, Withdrawn>? {
+        val gone = contributions.filter { it.id in ids && it.coveredBy == null }
+        if (gone.isEmpty()) return null
+        val goneIds = gone.map { it.id }.toSet()
+        val rest = contributions.filter { it.id !in goneIds }
+        val affected = gone.map { it.itemId }.toSet()
+        val empty = affected.filter { id -> rest.none { it.itemId == id } }.toSet()
+        return copy(
+            items = items - empty,
+            contributions = rest,
+            ticks = ticks.filter { it.itemId !in empty },
+        ).bumped(affected - empty) to Withdrawn(gone, empty.mapNotNull { items[it] })
+    }
+
+    /**
+     * Undo of [withdrawKeeping]: the shares come back unbought; a row that went
+     * with them comes back too, unless its key is live again, when they join that
+     * row. Shares of a use that has gone since are dropped (there is nothing to
+     * need them). Null when nothing could come back.
+     */
+    fun reinstate(w: Withdrawn): ShoppingList? {
+        var l = this
+        val redirect = HashMap<Long, Long>()
+        for (i in w.items) {
+            if (i.id in l.items) continue
+            val live = l.itemByKey(i.mergeKey)
+            if (live != null) redirect[i.id] = live.id else l = l.copy(items = l.items + (i.id to i))
+        }
+        val have = l.contributions.map { it.id }.toSet()
+        val back =
+            w.contributions
+                .filter { it.id !in have && it.useId in l.uses }
+                .map { c -> (redirect[c.itemId]?.let { c.copy(itemId = it) } ?: c).copy(coveredBy = null) }
+                .filter { it.itemId in l.items }
+        if (back.isEmpty()) return null
+        return l.copy(contributions = l.contributions + back).bumped(back.map { it.itemId }.toSet())
+    }
+
     // ---- manual changes ---------------------------------------------------------
 
     /** The single MANUAL use, created on first need. */
@@ -668,6 +722,12 @@ data class ShoppingList(
 }
 
 enum class WatchTickResult { OK, NOOP, PARTIAL, STILL_DONE }
+
+/** What [ShoppingList.withdrawKeeping] took off: unbought shares, and rows they emptied. */
+data class Withdrawn(
+    val contributions: List<Contribution>,
+    val items: List<ListItem>,
+)
 
 /** What [ShoppingList.removeUseKeeping] took off the list, for Undo. */
 data class RemovedUse(
