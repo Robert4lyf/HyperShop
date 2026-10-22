@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
@@ -74,13 +75,19 @@ class WeeklyShopScenariosTest {
     /** Scrolls the Plan screen to [tag] (counted apart: a swipe, not a decision). */
     private fun scrollTo(tag: String) {
         waitFor { has("meals") }
-        // Not while the last tap's change is still being laid out (a scroll then measured mid-layout).
+        // Not while the last tap's change is still being laid out (a scroll then measured mid-layout),
+        // and not before the row is in the list at all (the saved recipes load after the screen opens).
         compose.waitForIdle()
-        compose.onNodeWithTag("meals").performScrollToNode(hasTestTag(tag))
+        val inList = hasTestTag(tag)
+        waitFor { runCatching { compose.onNodeWithTag("meals").performScrollToNode(inList) }.isSuccess }
         scrolls++
     }
 
     private fun type(line: String) {
+        // The field focused and its input session up before typing, as a person taps it first.
+        waitFor { has("add-item") }
+        compose.onNodeWithTag("add-item").performClick()
+        compose.waitForIdle()
         compose.onNodeWithTag("add-item").performTextInput(line)
         compose.onNodeWithTag("add-item").performImeAction()
         typed++
@@ -135,7 +142,7 @@ class WeeklyShopScenariosTest {
     fun a_firstTimeShoppingNeedsNoPlanning() {
         val c = DeviceContainer.create()
         show(c)
-        assertTrue(has("empty"))
+        waitFor { has("empty") }
         assertTrue(!has("plan-card") && !has("empty-plan"))
         for (line in listOf("milk", "bread", "6 eggs")) type(line)
         waitFor { c.items().size == 3 }

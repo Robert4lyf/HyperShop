@@ -76,6 +76,11 @@ class DeviceScenariosTest {
             val items = runBlocking { c.repository.snapshot() }.liveItems.map { it.displayName }
             transcript.append("$what -> field='$field' items=$items\n")
         }
+        // The field focused and its input session up before typing, as a person taps it first: typing into a
+        // field still being composed failed with "Failed to perform text input".
+        waitFor { compose.onAllNodesWithTag("add-item").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("add-item").performClick()
+        compose.waitForIdle()
         for (line in listOf("milk", "6 eggs", "bread", "2 onions")) {
             compose.onNodeWithTag("add-item").performTextInput(line)
             note("typed '$line'")
