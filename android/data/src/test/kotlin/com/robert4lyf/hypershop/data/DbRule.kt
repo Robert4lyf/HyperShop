@@ -27,7 +27,7 @@ class DbRule : ExternalResource() {
         val tables =
             listOf(
                 "Item", "ItemAlias", "Recipe", "RecipeLine", "RecipeUse", "Contribution", "Tick", "LineDecision", "Staple",
-                "CategoryOverride",
+                "CategoryOverride", "PlannedMeal", "Trip", "TripItem", "Regular",
             )
         return tables.joinToString("\n") { t ->
             val cur = c.query("SELECT * FROM $t ORDER BY 1")

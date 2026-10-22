@@ -53,6 +53,9 @@ class PlannerTest {
 
     private suspend fun meals(w: Week = week) = planner.week(w)
 
+    /** The list's tables alone: what a plan-only change must leave as it was. */
+    private fun listDump() = r.dump().lines().filterNot { it.startsWith("PlannedMeal") }.joinToString("\n")
+
     @Test
     fun aRecipeImportedOntoTheListIsOneOfThisWeeksMeals() =
         runBlocking {
@@ -179,10 +182,10 @@ class PlannerTest {
             planner.plan(week, r.save("Chilli", "2 onions"))
             planner.addWeekToList(week)
             r.repo.tick(r.repo.snapshot().itemByKey("cat:onion")!!.id)
-            val before = r.dump()
+            val before = listDump()
             val removal = planner.unplan(meals().single().id)!!
             assertNull(removal.use)
-            assertEquals(before, r.dump())
+            assertEquals(before, listDump())
         }
 
     @Test
@@ -249,9 +252,9 @@ class PlannerTest {
         runBlocking {
             r.import("2 onions")
             val chilli = r.save("Chilli", "1 courgette")
-            val before = r.dump()
+            val before = listDump()
             planner.plan(week + 1, chilli)
-            assertEquals(before, r.dump())
+            assertEquals(before, listDump())
             assertEquals(1, meals().size)
             assertEquals(1, planner.week(week + 1).size)
         }

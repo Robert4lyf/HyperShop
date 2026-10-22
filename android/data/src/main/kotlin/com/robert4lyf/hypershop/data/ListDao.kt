@@ -495,6 +495,9 @@ interface ListDao {
     @Query("SELECT * FROM Regular")
     suspend fun regulars(): List<RegularEntity>
 
+    @Query("SELECT * FROM Regular")
+    fun observeRegulars(): Flow<List<RegularEntity>>
+
     @Upsert
     suspend fun putRegular(r: RegularEntity)
 

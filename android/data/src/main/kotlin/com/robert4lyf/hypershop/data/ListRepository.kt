@@ -447,9 +447,12 @@ class ListRepository(
      */
     suspend fun inStockOnList(l: ShoppingList): List<InStockLine> {
         val live = l.liveItems.map { it.id }.toSet()
+        // A recipe with something on the list, or with nothing on it at all because every line is at home
+        // (the At home check can set them all aside): its lines are still there to put back.
         val uses =
             l.uses.values.filter { u ->
-                u.archivedAt == null && u.recipeId != null && l.contributionsOfUse(u.id).any { it.itemId in live }
+                u.archivedAt == null && u.recipeId != null &&
+                    l.contributionsOfUse(u.id).let { cs -> cs.isEmpty() || cs.any { it.itemId in live } }
             }
         if (uses.isEmpty()) return emptyList()
         val inStock =
@@ -488,18 +491,25 @@ class ListRepository(
      * "Need it": every in-stock line for [mergeKey] goes on the list, under its
      * recipe, and stops counting as in stock. One transaction. The number of lines added.
      */
-    suspend fun needAfterAll(mergeKey: String): Int =
+    suspend fun needAfterAll(mergeKey: String): Int = needLines { it.target.mergeKey == mergeKey }.size
+
+    /**
+     * [needAfterAll] for every in-stock line [which] picks, in one transaction: the
+     * At home check's "Need" for several ingredients at once. The lines put back on
+     * the list, as (use, line) pairs, for Undo.
+     */
+    suspend fun needLines(which: (InStockLine) -> Boolean): List<Pair<Long, Long>> =
         db.withTransaction {
             val old = load()
-            val lines = inStockOnList(old).filter { it.target.mergeKey == mergeKey }
-            if (lines.isEmpty()) return@withTransaction 0
+            val lines = inStockOnList(old).filter(which)
+            if (lines.isEmpty()) return@withTransaction emptyList()
             var l = old
             for ((useId, ls) in lines.groupBy { it.useId }) {
                 l = l.addToUse(useId, ls.map { UseLineAdd(it.target, it.recipeLineId, it.qty, it.noScale, it.unitHint) }) ?: l
             }
             persist(old, l)
             dao.putDecisions(lines.map { LineDecisionEntity(it.useId, it.recipeLineId, LineStatus.ADDED.name) })
-            lines.size
+            lines.map { it.useId to it.recipeLineId }
         }
 
     // ---- the recipe library -------------------------------------------------------------
@@ -891,11 +901,49 @@ class ListRepository(
 
     suspend fun finishShopping(): Long = finish().stamp
 
-    /** "Finish shopping", with the number of ticked items it removed, counted inside the write. */
+    /**
+     * "Finish shopping", with the number of ticked items it removed, counted inside
+     * the write. What was bought is kept as a trip ([TripItemEntity]) in the same
+     * transaction, for Buy again; Undo ([undoDelete]) takes the trip back too.
+     */
     suspend fun finish(): Finished {
         val stamp = clock()
-        val removed = write { l -> l.finishShopping(stamp) to l.liveItems.count { l.isDone(it.id) } } ?: 0
-        return Finished(stamp, removed)
+        return db.withTransaction {
+            val old = load()
+            val done = old.liveItems.filter { old.isDone(it.id) }
+            persist(old, old.finishShopping(stamp))
+            recordTrip(old, done, stamp)
+            Finished(stamp, done.size)
+        }
+    }
+
+    /** One row per item bought, however many recipes wanted it; [TripItemEntity.byHand] if any of it was added by hand. */
+    private suspend fun recordTrip(
+        l: ShoppingList,
+        bought: List<com.robert4lyf.hypershop.core.merge.ListItem>,
+        stamp: Long,
+    ) {
+        if (bought.isEmpty()) return
+        val tripId = dao.insertTrip(TripEntity(finishedAt = stamp))
+        val manual = l.uses.values.filter { it.kind == UseKind.MANUAL }.map { it.id }.toSet()
+        dao.insertTripItems(
+            bought.map { item ->
+                val byHand = l.contributionsOf(item.id).filter { it.useId in manual }
+                TripItemEntity(
+                    tripId = tripId,
+                    mergeKey = item.mergeKey,
+                    displayName = item.displayName,
+                    aisleCode = item.aisle.name,
+                    byHand = byHand.isNotEmpty(),
+                    qty =
+                        byHand.takeIf { it.isNotEmpty() }?.map { it.qty }?.reduce { a, b -> a + b }?.let {
+                            json.encodeToString(QtyBase.serializer(), it)
+                        },
+                    unitHint = byHand.lastOrNull()?.unitHint?.serial,
+                )
+            },
+        )
+        dao.pruneTrips(MAX_TRIPS)
     }
 
     suspend fun clearAll(): Long {
@@ -904,7 +952,12 @@ class ListRepository(
         return stamp
     }
 
-    suspend fun undoDelete(stamp: Long) = write { it.undoDelete(stamp) to Unit }
+    suspend fun undoDelete(stamp: Long) =
+        db.withTransaction {
+            write { it.undoDelete(stamp) to Unit }
+            // Undo of "Finish shopping": the trip it kept was not a trip after all.
+            dao.deleteTripAt(stamp)
+        }
 
     /**
      * Swaps the item for [name] (an ingredient, or anything typed): it merges into
@@ -1170,6 +1223,11 @@ class ListRepository(
                 staples = dao.staples(),
                 usage = dao.usage(),
                 deleted = dao.allDeleted(),
+                planVersion = 1,
+                plannedMeals = dao.allPlannedMeals(),
+                trips = dao.trips(),
+                tripItems = dao.allTripItems(),
+                regulars = dao.regulars(),
             )
         }
 
@@ -1189,6 +1247,9 @@ class ListRepository(
         if (problems.isNotEmpty()) return problems
         val fresh = EpochMarker.newMarker()
         db.withTransaction {
+            dao.clearPlannedMeals()
+            dao.clearTrips()
+            dao.clearRegulars()
             dao.clearDecisions()
             dao.clearContributions()
             dao.clearTicks()
@@ -1229,6 +1290,12 @@ class ListRepository(
             dao.upsertTicks(b.ticks)
             dao.upsertContributions(b.contributions)
             dao.putDecisions(b.decisions)
+            dao.upsertPlannedMeals(b.plannedMeals)
+            b.trips.forEach { dao.insertTrip(it) }
+            dao.insertTripItems(b.tripItems)
+            dao.insertRegulars(b.regulars)
+            // A file from before the plan: its recipes on the list become planned meals, as the 4→5 migration did.
+            if (b.planVersion == 0) PlanSeed.fromUses(db.openHelper.writableDatabase)
             val meta = dao.meta()!!
             dao.putMeta(
                 meta.copy(
@@ -1252,6 +1319,9 @@ class ListRepository(
         const val RESULT_HISTORY = 64
         const val MAX_BOOK = 120
         const val MAX_PAGE = 20
+
+        /** Trips kept for Buy again: half a year of weekly shops. */
+        const val MAX_TRIPS = 26
 
         /** Below SQLite's 999 bound variables. */
         private const val MAX_ARGS = 500

@@ -39,6 +39,15 @@ data class BackupData(
     val staples: List<StapleEntity> = emptyList(),
     val usage: List<ClaudeUsageEntity> = emptyList(),
     val deleted: List<DeletedItemEntity> = emptyList(),
+    /**
+     * 1 from Release B on: the file carries the meal plan. 0 (an older file): the
+     * restore plans its recipes on the list as the 4→5 migration does ([PlanSeed]).
+     */
+    val planVersion: Int = 0,
+    val plannedMeals: List<PlannedMealEntity> = emptyList(),
+    val trips: List<TripEntity> = emptyList(),
+    val tripItems: List<TripItemEntity> = emptyList(),
+    val regulars: List<RegularEntity> = emptyList(),
 )
 
 /**
@@ -52,6 +61,11 @@ object BackupValidator {
     private const val MAX_TEXT = 2_000
     private const val MAX_JSON = 20_000
     private val json = Json { ignoreUnknownKeys = true }
+    private const val MAX_SERVINGS = 99
+
+    /** A plan week within about 270 years of 1970 either way: past that it is not a real week. */
+    private const val MIN_WEEK = -100_000L
+    private const val MAX_WEEK = 100_000L
 
     fun validate(b: BackupData): List<String> {
         val problems = ArrayList<String>()
@@ -187,6 +201,35 @@ object BackupValidator {
                 "usage ${u.date.take(10)}: a negative count",
             )
         }
+        for ((t, n) in listOf("planned meals" to b.plannedMeals.size, "trip items" to b.tripItems.size, "regulars" to b.regulars.size)) {
+            check(n <= MAX_ROWS, "$t: $n rows is more than a backup can hold")
+        }
+        check(b.planVersion in 0..1, "unknown plan version ${b.planVersion}")
+        val mealIds = b.plannedMeals.map { it.id }
+        check(mealIds.size == mealIds.toSet().size && mealIds.all { it >= 1 }, "planned meals: duplicate or bad ids")
+        for (m in b.plannedMeals) {
+            check(m.libraryKey.length in 1..MAX_TEXT, "planned meal ${m.id}: bad recipe key")
+            check(m.servings == null || m.servings in 1..MAX_SERVINGS, "planned meal ${m.id}: servings out of range")
+            check(m.useId == null || m.useId in uses, "planned meal ${m.id}: use ${m.useId} is missing")
+            check(m.weekStart in MIN_WEEK..MAX_WEEK, "planned meal ${m.id}: week out of range")
+        }
+        val tripIds = b.trips.map { it.id }
+        check(tripIds.size == tripIds.toSet().size && tripIds.all { it >= 1 }, "trips: duplicate or bad ids")
+        val trips = tripIds.toSet()
+        for (t in b.tripItems) {
+            check(t.tripId in trips, "trip item ${t.mergeKey.take(40)}: trip ${t.tripId} is missing")
+            check(t.aisleCode in aisleNames, "trip item ${t.mergeKey.take(40)}: unknown aisle")
+            check(t.mergeKey.length in 1..MAX_TEXT && t.displayName.length <= MAX_TEXT, "trip item: text too long")
+            check(
+                t.qty == null || (t.qty.length <= MAX_JSON && runCatching { json.decodeFromString(QtyBase.serializer(), t.qty) }.isSuccess),
+                "trip item ${t.mergeKey.take(40)}: unreadable amount",
+            )
+            check(t.unitHint == null || t.unitHint.length <= 20, "trip item ${t.mergeKey.take(40)}: bad unit")
+        }
+        val tripKeys = b.tripItems.map { it.tripId to it.mergeKey }
+        check(tripKeys.size == tripKeys.toSet().size, "duplicate trip items")
+        for (r in b.regulars) check(r.mergeKey.length in 1..MAX_TEXT && r.displayName.length <= MAX_TEXT, "regular: bad key")
+        check(b.regulars.map { it.mergeKey }.toSet().size == b.regulars.size, "duplicate regulars")
         check(b.catalogVersion.length <= MAX_TEXT, "the catalogue version is too long")
         check((b.manualTitle?.length ?: 0) <= MAX_TEXT, "the hand-added title is too long")
         return problems

@@ -503,6 +503,26 @@ data class ShoppingList(
         return l.bumped(touched)
     }
 
+    /**
+     * Takes back contributions not bought yet ([ids]; a covered one stays, so a
+     * purchase is never undone by this): the Undo of Buy again, and "Have it" in
+     * the At home check. A row left with nothing on it goes, as [removeUse] does.
+     * Null when none of [ids] could go.
+     */
+    fun withdraw(ids: Set<Long>): ShoppingList? {
+        val gone = contributions.filter { it.id in ids && it.coveredBy == null }
+        if (gone.isEmpty()) return null
+        val goneIds = gone.map { it.id }.toSet()
+        val rest = contributions.filter { it.id !in goneIds }
+        val affected = gone.map { it.itemId }.toSet()
+        val empty = affected.filter { id -> rest.none { it.itemId == id } }.toSet()
+        return copy(
+            items = items - empty,
+            contributions = rest,
+            ticks = ticks.filter { it.itemId !in empty },
+        ).bumped(affected - empty)
+    }
+
     // ---- manual changes ---------------------------------------------------------
 
     /** The single MANUAL use, created on first need. */
