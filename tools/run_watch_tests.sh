@@ -27,6 +27,12 @@ if [[ -z "${DISPLAY:-}" ]]; then
     export DISPLAY=:99
     sleep 2
 fi
+# Without a window manager, the simulator's Error dialog was mapped but never
+# painted (a blank capture), so nobody could read it. Any small one will do.
+if command -v openbox > /dev/null; then
+    openbox > /dev/null 2>&1 &
+    sleep 1
+fi
 SIM_LOG="${ROOT}/garmin/build/simulator.log"
 "${SDK_DIR}/bin/simulator" > "${SIM_LOG}" 2>&1 &
 sim=$!
@@ -76,7 +82,9 @@ for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
             done
         fi
         echo "Connect IQ files:" >&2
-        ls -la "${HOME}/.Garmin/ConnectIQ" "${HOME}/.Garmin/ConnectIQ/Devices" "${HOME}/.Garmin/ConnectIQ/Fonts" 2> /dev/null | head -30 >&2 || true
+        ls -la "${HOME}/.Garmin/ConnectIQ" 2> /dev/null >&2 || true
+        ls -laR "${HOME}/.Garmin/ConnectIQ/Devices" 2> /dev/null >&2 || true
+        echo "Fonts: $(ls "${HOME}/.Garmin/ConnectIQ/Fonts" 2> /dev/null | wc -l) files" >&2
         cat "${HOME}/.Garmin/ConnectIQ/simulator.ini" >&2 2> /dev/null || true
         exit 1
     fi
