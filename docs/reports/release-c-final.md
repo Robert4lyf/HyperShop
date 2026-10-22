@@ -114,7 +114,39 @@ The manual acceptance checklist is Hand-off G (docs/HANDOFF.md).
 
 ## 8. Adversarial review (C.8)
 
-ADVERSARIAL_PLACEHOLDER
+Reviewed, adversarially, the whole diff from 06e4126 (the areas: the review's
+`keepCorrections`, `setAmount`, `removeLine` and its Undo; the plan card's flow gated
+on the list mode and the "Add 1 more" message; the shop screen's lingering ticks; the
+six dialogs replaced by Undo; the parser's trailing amounts, lengths, decilitres and
+shared heads; `BuyAgain.view(list)`, `Planner.recipesByKeys`; `AmountField(initial)`).
+The review was begun by a second reader, which the session's rate limit stopped; it
+was finished by hand, tracing each path.
+
+Found and fixed:
+
+1. **A typed amount left an "unknown unit" flag standing** (`ReviewViewModel.setAmount`,
+   medium): the flag was cleared only for reasons containing the word "amount", so
+   "2 handfuls of spinach" set to "100 g" stayed "to check". Now any amount-shaped
+   reason (an unknown unit, a count times a count, a range, a number left in the name)
+   is settled by a typed amount; a choice ("A or B") stays. Test: `aTypedAmountSettlesAnUnknownMeasure`.
+2. **A tick, untick, tick inside the moment folded the row early** (`ShopScreen`, low):
+   the first tick's timer removed the row at 2.5 s from the first tap, not the last.
+   Each tick now stamps its row and only the latest tick's timer lets it fold. Test:
+   the lingering-tick test's third sequence.
+
+Checked and found clean: a cancelled import's edits survive Undo (they are persisted
+with the job, so the removed dialog lost nothing); every path that lost a dialog has
+an Undo in its view model (Clear all, remove a meal, remove from the list, remove
+from the library, reset an entry); `keepCorrections` matches by the line as written
+and falls back to place only when the count is unchanged, and a removed line is also
+gone from what Claude reads; the plan card's flows restart when planning resumes;
+`BuyAgain.view(list)` is re-run on the next list emission so a stale list is
+transient; the planner's one query has at most a week's keys; the camera shot is
+deleted whether or not the save succeeded (privacy over a retry). Not changed by
+choice: a line ending in a bare number ("rice 2") reads as a count, which the spec
+now says (R3.7), and a duplicate raw line removed on review would also be dropped
+after Ask Claude when Claude's lines no longer align, a case that needs the same text
+twice in one recipe.
 
 ## 9. Verification evidence (C.9)
 
@@ -126,7 +158,9 @@ emulator. New tests this release: `ReleaseCEvalTest`, `RuleParserReleaseCTest` (
 `ReviewCorrectionsTest` (5) and `correctionsStandOverAskClaude`, `ContrastTest` (3),
 `NavBarTest`, `QueryBudgetTest`, `ReleaseCScenariosTest` (3), plus semantics and
 one-tap assertions in the screen tests; no test was weakened, and no golden line
-was edited.
+was edited. One timing-sensitive test (`stopWhileRetryingClearsTheSpinner`, a 5 s
+delayed mock reply) failed once in a docs-only gate run and passed three reruns in a
+row; the gate was run again green for the last commit.
 
 ## Scores
 

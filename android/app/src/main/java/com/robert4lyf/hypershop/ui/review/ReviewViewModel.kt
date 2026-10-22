@@ -857,14 +857,18 @@ class ReviewViewModel(
                     unit = probe.unit,
                     altQuantity = null,
                     altUnit = null,
-                    // An amount the user typed needs no checking for its amount.
-                    check = old.check && old.checkReason?.contains("amount") != true,
-                    checkReason = old.checkReason?.takeIf { !it.contains("amount") },
+                    // An amount the user typed settles any doubt about the amount (an unknown unit,
+                    // a count times a count, a range, a number left in the name); a choice ("A or B") stays.
+                    check = old.check && !aboutTheAmount(old.checkReason),
+                    checkReason = old.checkReason?.takeIf { !aboutTheAmount(it) },
                 )
             }
         }
         return true
     }
+
+    private fun aboutTheAmount(reason: String?): Boolean =
+        reason != null && listOf("amount", "unit", "count", "range").any { reason.contains(it) }
 
     /** Edit the source line; it is parsed again with the rule parser. [onKey] gets the row's new key. */
     fun editLine(

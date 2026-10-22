@@ -86,7 +86,10 @@ fun ShopScreen(
     actions: ListActions,
 ) {
     // A row just ticked stays where it is for a moment, tick filled, so a mis-tap is undone by tapping it again.
-    var lingering by remember { mutableStateOf(emptySet<Long>()) }
+    // Each tick stamps its row; only the latest tick's timer lets the row fold, so a tick, untick, tick
+    // within the moment keeps the full moment from the last tap.
+    var stamps by remember { mutableStateOf(emptyMap<Long, Int>()) }
+    val lingering = stamps.keys
     val groups = remember(ui.aisles, lingering) { groups(ui, lingering) }
     // Aisles whose bought rows are shown: kept across tab switches and rotation.
     var shownBought by rememberSaveable { mutableStateOf(emptyList<String>()) }
@@ -97,10 +100,11 @@ fun ShopScreen(
         remember(actions) {
             actions.copy(onToggle = { row ->
                 if (row.state != TickState.DONE) {
-                    lingering = lingering + row.id
+                    val stamp = (stamps[row.id] ?: 0) + 1
+                    stamps = stamps + (row.id to stamp)
                     scope.launch {
                         delay(LINGER_MS)
-                        lingering = lingering - row.id
+                        if (stamps[row.id] == stamp) stamps = stamps - row.id
                     }
                 }
                 actions.onToggle(row)

@@ -174,6 +174,16 @@ class ReviewCorrectionsTest {
     }
 
     @Test
+    fun aTypedAmountSettlesAnUnknownMeasure() {
+        val (_, vm) = vm("2 handfuls of spinach")
+        val key = (vm.state.value as ReviewState.Ready).ui.aisles.flatMap { it.second }.single().key
+        assertTrue(vm.sheet(key)!!.lines.single().checkReason!!.contains("unit"))
+        assertTrue(vm.setAmount(vm.sheet(key)!!.lines.single().id, "100 g"))
+        val ui = await(vm.state) { s -> s is ReviewState.Ready && s.ui().row(key, or = null)?.quantity == "100g" }.ui()
+        assertFalse(ui.row(key).check)
+    }
+
+    @Test
     fun aSwapOrARenameSettlesAFlaggedLine() {
         val (_, vm) = vm("4 tablespoons butter or margarine", "1 lemon or lime")
         assertTrue(vm.sheet("cat:butter")!!.lines.single().checkReason != null)

@@ -183,9 +183,16 @@ class ShopScreenTest {
         compose.mainClock.advanceTimeBy(LINGER_MS + 500)
         compose.onNodeWithTag("tick-4").assertExists()
         assertEquals(listOf("toggle 4", "toggle 4"), events)
-        // Left ticked: after the moment it folds into the aisle's "bought" row.
+        // Ticked, unticked and ticked again inside the moment: the moment runs from the last tap, and
+        // left ticked, the row then folds into the aisle's "bought" row.
         compose.onNodeWithTag("tick-4").performClick()
-        compose.mainClock.advanceTimeBy(LINGER_MS + 500)
+        compose.mainClock.advanceTimeBy(LINGER_MS - 1000)
+        compose.onNodeWithTag("tick-4").performClick()
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithTag("tick-4").performClick()
+        compose.mainClock.advanceTimeBy(LINGER_MS - 500)
+        compose.onNodeWithTag("tick-4").assertExists()
+        compose.mainClock.advanceTimeBy(1000)
         compose.onNodeWithTag("tick-4").assertDoesNotExist()
     }
 
