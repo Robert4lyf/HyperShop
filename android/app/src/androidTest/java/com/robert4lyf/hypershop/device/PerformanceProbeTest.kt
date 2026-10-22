@@ -18,6 +18,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
+import com.robert4lyf.hypershop.core.search.RecipeSearch
 import com.robert4lyf.hypershop.core.sync.WatchCodec
 import com.robert4lyf.hypershop.core.sync.WatchMessage
 import com.robert4lyf.hypershop.di.AppContainer
@@ -166,8 +167,19 @@ class PerformanceProbeTest {
                 runBlocking { withTimeout(30_000) { vm.ui.first { it.terms == listOf(text) } } }
             }.second
         // The first search builds the index (every line of every recipe); later ones reuse it.
-        budget("search 300 saved recipes: first search (builds the index)", search("avocado"), 8000.0)
-        budget("search 300 saved recipes: a second search", search("cumin"), 3700.0)
+        budget("search 300 saved recipes: first search (builds the index)", search("avocado"), 4000.0)
+        budget("search 300 saved recipes: a second search", search("cumin"), 250.0)
+        // Where the time goes (KNOWN_ISSUES #16): what the first search's index is built from, and the match alone.
+        val (lines300, read) = timed { runBlocking { c.repository.ingredientsOf(ids) } }
+        report("search: read and decode 300 recipes' lines", read)
+        val (_, keyed) = timed { lines300.values.flatten().forEach { c.repository.catalogEntry(it.name) } }
+        report("search: catalogue lookup for each line", keyed)
+        val index =
+            lines300.map { (id, ls) ->
+                RecipeSearch.Recipe(id, "Recipe $id", ls.map { RecipeSearch.Ingredient(it.name, listOf(it.name)) })
+            }
+        report("search: the match alone, first (words made)", timed { RecipeSearch.search(index, listOf("avocado")) }.second)
+        report("search: the match alone, again", timed { RecipeSearch.search(index, listOf("cumin")) }.second)
     }
 
     @Test

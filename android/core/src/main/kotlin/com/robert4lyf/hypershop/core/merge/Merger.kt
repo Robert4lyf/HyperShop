@@ -130,6 +130,15 @@ class Merger(
         )
     }
 
+    /**
+     * The catalogue entry [target] would file [name] under (after "Always use instead"),
+     * without its key and aisle: the recipe search needs only this, for every line it indexes.
+     */
+    fun catalogEntry(name: String): com.robert4lyf.hypershop.core.catalog.CatalogEntry? {
+        val found = normaliser.entry(name)
+        return found?.replaceWith?.let { catalog.byId[it] } ?: found
+    }
+
     /** Pre-ticked "in stock" rows: staples, and rows whose lines are all optional or garnish. */
     fun defaultDecisions(
         incoming: Incoming,

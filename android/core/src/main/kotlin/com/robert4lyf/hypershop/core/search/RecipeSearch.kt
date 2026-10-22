@@ -16,13 +16,18 @@ object RecipeSearch {
     data class Ingredient(
         val display: String,
         val names: List<String>,
-    )
+    ) {
+        /** [names] as words, made once: normalising them was most of each search's time. */
+        internal val nameWords by lazy(LazyThreadSafetyMode.PUBLICATION) { names.map(::words) }
+    }
 
     data class Recipe(
         val id: Long,
         val title: String,
         val ingredients: List<Ingredient>,
-    )
+    ) {
+        internal val titleWords by lazy(LazyThreadSafetyMode.PUBLICATION) { words(title) }
+    }
 
     data class Hit(
         val id: Long,
@@ -45,8 +50,8 @@ object RecipeSearch {
         if (queries.isEmpty()) return emptyList()
         return recipes
             .mapNotNull { r ->
-                val title = words(r.title)
-                val names = r.ingredients.map { i -> i to i.names.map(::words) }
+                val title = r.titleWords
+                val names = r.ingredients.map { i -> i to i.nameWords }
                 var matched = 0
                 var inTitle = false
                 val uses = LinkedHashSet<String>()
