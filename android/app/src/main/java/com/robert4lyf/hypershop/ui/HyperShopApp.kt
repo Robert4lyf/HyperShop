@@ -7,11 +7,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -274,8 +276,12 @@ internal fun CompactNavBar(
             Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                // A minimum, not a fixed height: at 200 % font scale the label needs the room.
+                // As tall as its tallest tab on one line and at least 60 dp: at 200 % font scale the label needs
+                // the room. Intrinsic, not a bare minimum: Scaffold offers the bar the whole screen as its maximum
+                // and the tabs fill the bar's height, so a bare minimum made the bar fill the screen on a device.
+                // (The max intrinsic, not the min: the min lets a label wrap letter by letter.)
                 .heightIn(min = 60.dp)
+                .height(IntrinsicSize.Max)
                 .selectableGroup(),
             verticalAlignment = Alignment.CenterVertically,
         ) {

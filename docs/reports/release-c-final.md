@@ -160,7 +160,11 @@ emulator. New tests this release: `ReleaseCEvalTest`, `RuleParserReleaseCTest` (
 one-tap assertions in the screen tests; no test was weakened, and no golden line
 was edited. One timing-sensitive test (`stopWhileRetryingClearsTheSpinner`, a 5 s
 delayed mock reply) failed once in a docs-only gate run and passed three reruns in a
-row; the gate was run again green for the last commit.
+row; the gate was run again green for the last commit. CI's device job (the
+emulator) then caught what Robolectric had not: the nav bar's new minimum height
+let it fill the screen under Scaffold, so every full-app scenario timed out on its
+first wait; fixed with an intrinsic height and a test that measures the bar inside a
+full-height parent (§ 5 stands: the bar still grows at 200 % font scale).
 
 ## Scores
 
