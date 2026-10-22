@@ -50,8 +50,6 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          build-root-directory: android
 
       # One invocation rather than five: Gradle re-configures the whole build
       # on each, and the failure is identical either way.
@@ -104,7 +102,8 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          build-root-directory: android
+          # The build job saves the Gradle cache; this one only reads it (another ~600 MB per run otherwise).
+          cache-read-only: true
 
       # The hosted runner has KVM; the emulator needs it opened to the runner's user.
       - name: Enable KVM
@@ -125,6 +124,7 @@ jobs:
           script: |
             for i in $(seq 1 ${{ inputs.device_repeats || 1 }}); do echo "device run $i"; ./gradlew --max-workers=2 :app:connectedDebugAndroidTest || exit 1; done
             ../tools/device_process_death.sh
+            ../tools/device_perf.sh
 
       # The report is HTML in an artifact; the failures themselves belong in the log.
       - name: Show failing device tests
