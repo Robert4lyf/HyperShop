@@ -198,6 +198,17 @@ class LibraryViewModel(
                 c.catalog.lookup(n) ?: return "No ingredient called \"$n\" — add it to the library first"
             }
         if (replacement != null && replacement.id == f.id) return "It can't be used instead of itself"
+        // Following "use instead" must end somewhere: A instead of B instead of A would never settle (and a backup refuses it).
+        if (replacement != null && f.id.isNotBlank()) {
+            var at: String? = replacement.id
+            val seen = HashSet<String>()
+            while (at != null && at != f.id && seen.add(at)) at = c.catalog.byId[at]?.replaceWith
+            if (at == f.id) return "\"${replacement.name}\" already uses this instead — they can't swap both ways"
+        }
+        // The same caps a backup holds a library edit to.
+        if (f.name.trim().length > MAX_NAME || f.plural.trim().length > MAX_NAME) return "The name is too long"
+        if (f.synonyms.split(',', '\n').any { it.trim().length > MAX_NAME }) return "A synonym is too long"
+        if (f.packNote.trim().length > MAX_NOTE) return "The pack note is too long"
         val edit =
             EntryEdit(
                 id = f.id,
@@ -261,5 +272,9 @@ class LibraryViewModel(
 
     private companion object {
         const val SUGGESTIONS = 5
+
+        /** What a backup allows an ingredient's name, plural or synonym (`BackupFileValidator`). */
+        const val MAX_NAME = 200
+        const val MAX_NOTE = 300
     }
 }

@@ -234,6 +234,52 @@ class PlannerTest {
         }
 
     @Test
+    fun aMealTakenOffUnboughtThatGoesOnFromElsewhereIsThatMealNotASecond() =
+        runBlocking {
+            val key = r.save("Chilli", "2 onions")
+            planner.plan(week, key)
+            planner.addWeekToList(week)
+            r.repo.clearAll()
+            assertEquals(MealShopping.TAKEN_OFF, meals().single().shopping)
+            // "Add to list" on the saved recipe (the Recipes tab, or a share of the same page).
+            r.repo.addSavedRecipe(r.db.dao().recipesByKey(key).maxOf { it.id })
+            assertEquals(listOf(MealShopping.TO_BUY), meals().map { it.shopping })
+            assertNull(planner.addWeekToList(week))
+            assertEquals(Rational.of(2), onions())
+        }
+
+    @Test
+    fun undoOfAnImportThatWentOnAsAPlannedMealLeavesTheMealPlanned() =
+        runBlocking {
+            val key = r.save("Chilli", "2 onions")
+            val id = planner.plan(week, key)
+            r.now += 60_000
+            // Sharing the same page: the review's "Add" is that meal going on.
+            val a = r.import("2 onions", url = key)
+            assertEquals(a.useId, meals().single().useId)
+            r.repo.undoImport(a.useId)
+            val m = meals().single()
+            assertEquals(id, m.id)
+            assertNull(m.useId)
+            assertEquals(MealShopping.NOT_ON_LIST, m.shopping)
+            assertNull(onions())
+        }
+
+    @Test
+    fun undoOfAnImportKeepsWhatWasBoughtMeanwhile() =
+        runBlocking {
+            val a = r.import("2 onions", "200 ml milk")
+            val l = r.repo.snapshot()
+            r.repo.tick(l.itemByKey("cat:onion")!!.id)
+            r.repo.undoImport(a.useId)
+            val after = r.repo.snapshot()
+            assertEquals(Rational.of(2), onions())
+            assertTrue(after.isDone(after.itemByKey("cat:onion")!!.id))
+            assertNull(after.itemByKey("cat:milk"))
+            assertEquals(MealShopping.BOUGHT, meals().single().shopping)
+        }
+
+    @Test
     fun removingAMealAlreadyBoughtLeavesTheListAlone() =
         runBlocking {
             planner.plan(week, r.save("Chilli", "2 onions"))

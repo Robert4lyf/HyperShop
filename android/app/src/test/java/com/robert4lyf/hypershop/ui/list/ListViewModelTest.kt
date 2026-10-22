@@ -312,6 +312,22 @@ class ListViewModelTest {
     }
 
     @Test
+    fun shopModeEndsHoweverTheListWasEmptied() {
+        // Not only "Finish shopping": the last row deleted by hand (or a meal removed, an add undone)
+        // must leave planning on, so the next item typed has a field to land in.
+        val c = TestContainer.create()
+        c.add("2 onions")
+        val vm = tracked(ListViewModel(c))
+        var ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
+        vm.setMode(ListMode.SHOP)
+        ui = await(vm.ui) { it.shopping }
+        vm.delete(ui.row("onion").id, "onion")
+        await(vm.ui) { it.isEmpty && it.mode == ListMode.PLAN }
+        vm.addTyped("milk")
+        assertTrue(!await(vm.ui) { it.aisles.isNotEmpty() }.shopping)
+    }
+
+    @Test
     fun shopModeIsASettingAndKeepsEveryTick() {
         val c = TestContainer.create()
         c.add("2 onions", "1 carrot", "500g beef mince")

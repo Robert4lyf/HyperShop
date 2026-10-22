@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.core.merge
 
+import com.robert4lyf.hypershop.core.model.BaseKey
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.QtyUnit
 import com.robert4lyf.hypershop.core.model.Rational
@@ -76,6 +77,25 @@ class RegressionTest {
         assertEquals(WatchTickResult.PARTIAL, r)
         assertEquals(g(100), ticked!!.uncovered(id))
         assertEquals(g(200), ticked.covered(id))
+    }
+
+    @Test
+    fun moreServingsAreNotCoveredByAStaleWatchTick() {
+        var (l, useId) = add(ShoppingList(), listOf("2 onions"))
+        val id = l.itemByKey("cat:onion")!!.id
+        val seen = l.listRev
+        l = l.rescaleUse(useId, 8)
+        assertEquals(Rational.of(4), l.total(id)[BaseKey.ITEMS])
+        // The watch saw 2; the row now asks for 4 and is a new requirement: the stale tick covers none of it
+        // (a line is never open twice on a row, so the increase is not split off to be covered apart).
+        val (ticked, r) = l.watchTick(id, seen, 3, installId = 1, seq = 1)
+        assertEquals(WatchTickResult.PARTIAL, r)
+        assertNull(ticked)
+        assertEquals(Rational.of(4), l.uncovered(id)[BaseKey.ITEMS])
+        // Fewer servings again: the smaller amount, still to buy.
+        val back = l.rescaleUse(useId, 4)
+        assertEquals(Rational.of(2), back.total(id)[BaseKey.ITEMS])
+        assertFalse(back.isDone(id))
     }
 
     @Test

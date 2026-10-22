@@ -423,6 +423,17 @@ data class ShoppingList(
         val replaced = HashMap<Long, Contribution?>()
         val added = ArrayList<Contribution>()
         val created = LinkedHashMap<Long, ListItem>()
+
+        // An open share that grows is a share created now: a watch tick made before the change
+        // then covers none of it, never the extra (as [editQuantity]'s new share). A line is never
+        // open twice on one row, so the increase is not split off; a share that shrinks is smaller.
+        fun resized(
+            c: Contribution,
+            to: QtyBase,
+        ) {
+            val grows = !to.isPresence && to.parts.all { (k, v) -> v >= (c.qty.parts[k] ?: Rational.ZERO) } && to != c.qty
+            replaced[c.id] = if (c.coveredBy == null && grows) c.copy(qty = to, createdListRev = rev) else c.copy(qty = to)
+        }
         // By recipe line, not by row: after a finished trip a line's bought part stays on the finished
         // (deleted) row and its extra lives on a new one, and the two have to be scaled as one amount.
         for (group in scaled.groupBy { it.recipeLineId ?: -it.itemId }.values) {
@@ -431,7 +442,7 @@ data class ShoppingList(
             val target = group.fold(QtyBase.PRESENCE) { acc, c -> acc + c.qty }.times(f)
             val bought = covered.fold(QtyBase.PRESENCE) { acc, c -> acc + c.qty }
             when {
-                covered.isEmpty() || target.isPresence -> group.forEach { replaced[it.id] = it.copy(qty = it.qty.times(f)) }
+                covered.isEmpty() || target.isPresence -> group.forEach { resized(it, it.qty.times(f)) }
                 // What was bought stays bought, and only the difference is still needed: a
                 // tick covers the amount there was when it was made, never an amount added later.
                 bought.parts.all { (k, v) -> (target.parts[k] ?: Rational.ZERO) >= v } -> {
@@ -440,7 +451,7 @@ data class ShoppingList(
                     if (!rest.isPresence) {
                         val first = open.firstOrNull()
                         if (first != null) {
-                            replaced[first.id] = first.copy(qty = rest)
+                            resized(first, rest)
                         } else {
                             // Bought and finished: the extra goes back on the list, onto the live row for it if
                             // there is one, else a new row. The finished row stays finished with what was bought:

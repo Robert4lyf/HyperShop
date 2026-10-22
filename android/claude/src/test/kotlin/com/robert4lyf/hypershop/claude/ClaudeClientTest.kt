@@ -3,6 +3,7 @@ package com.robert4lyf.hypershop.claude
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.QtyUnit
 import com.robert4lyf.hypershop.core.model.Rational
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -372,6 +373,33 @@ class ClaudeClientTest {
         val r = runBlocking { withTimeout(20_000) { c.parse(input, ClaudeModel.HAIKU) } } as ClaudeResult.Failed
         assertEquals(ClaudeResult.Reason.TIMEOUT, r.reason, log.snapshot().joinToString("\n"))
         assertEquals(1200, recorded.single().second.inputTokens)
+    }
+
+    @Test
+    fun aCallCancelledAfterTheAnswerStartedStillRecordsItsUsage() {
+        // The first event (the input tokens) arrives, then the stream stalls and the caller leaves
+        // ("Paste the ingredients", the review closed): the generation is billed, so the meter gets it.
+        val body = sse(padding = 64 * 1024)
+        val firstEvent = body.indexOf("event: content_block_start").toLong()
+        server.enqueue(stream(body).throttleBody(firstEvent, 30, TimeUnit.SECONDS))
+        val c =
+            ClaudeClient(
+                apiKey = { key },
+                baseUrl = server.url("").toString().trimEnd('/'),
+                usageSink = { m, u -> synchronized(recorded) { recorded += m to u } },
+                log = log,
+            )
+        runBlocking {
+            val job = launch { c.parse(input, ClaudeModel.HAIKU) }
+            server.takeRequest(5, TimeUnit.SECONDS)
+            delay(1_500)
+            job.cancel()
+            withTimeout(5_000) { job.join() }
+            withTimeout(5_000) { while (synchronized(recorded) { recorded.isEmpty() }) delay(50) }
+        }
+        val (model, usage) = synchronized(recorded) { recorded.single() }
+        assertEquals("claude-haiku-5-5", model)
+        assertEquals(1200, usage.inputTokens)
     }
 
     @Test

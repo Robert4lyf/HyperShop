@@ -42,6 +42,42 @@ class BackupPlanTest {
     }
 
     @Test
+    fun aRecipeServingAHundredPassesItsOwnBackup() =
+        runBlocking {
+            // The extractors accept "Serves 100"; the plan copies it, and the file the app writes must restore.
+            val planner = Planner(r.repo)
+            planner.plan(planner.currentWeek(), r.save("Paella for the street", "2 onions", servings = 100))
+            val b = r.repo.exportBackup()
+            assertEquals(100, b.plannedMeals.single().servings)
+            val fresh = DbRule().also { it.open() }
+            try {
+                assertEquals(emptyList<String>(), fresh.repo.restoreBackup(b, marker()))
+            } finally {
+                fresh.close()
+            }
+        }
+
+    @Test
+    fun aFileFromBeforeThePlanMayNotCarryPlanRowsAndAMealIsARecipes() =
+        runBlocking {
+            val b = populate()
+            val fresh = DbRule().also { it.open() }
+            try {
+                // Plan rows under planVersion 0 would be planned twice (the restore seeds the plan itself).
+                assertTrue(fresh.repo.restoreBackup(b.copy(planVersion = 0), marker()).isNotEmpty())
+                // A meal linked to the hand-added use: "Remove" would take the household list off.
+                val manual = b.uses.single { it.kind == "MANUAL" }.id
+                val linked = b.plannedMeals.map { it.copy(useId = manual) }
+                assertTrue(fresh.repo.restoreBackup(b.copy(plannedMeals = linked), marker()).isNotEmpty())
+                // A store list without store 1 would leave the walking order with no parent.
+                val stores = b.stores.map { it.copy(id = 2) }
+                assertTrue(fresh.repo.restoreBackup(b.copy(stores = stores), marker()).isNotEmpty())
+            } finally {
+                fresh.close()
+            }
+        }
+
+    @Test
     fun planTripsAndRegularsRoundTrip() =
         runBlocking {
             val b = json.decodeFromString(BackupData.serializer(), json.encodeToString(BackupData.serializer(), populate()))

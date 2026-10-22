@@ -17,6 +17,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.SQLiteMode
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 /** Step 5.3 worker tests: Claude is called only while the review screen is in the foreground. */
 @RunWith(AndroidJUnit4::class)
@@ -95,6 +96,30 @@ class ImportWorkerTest {
             assertEquals(listOf("caster sugar"), r.lines.map { it.name })
             assertEquals(1, claude.requestCount)
             assertEquals(1, c.usageHistory().single().calls)
+        }
+
+    @Test
+    fun aReviewClosedDuringTheFetchMeansNoClaudeCall() =
+        runBlocking {
+            // The share arrives with the review open, the page takes its time, the user leaves: the gate
+            // is read when Claude would be called, not when the share arrived, so nothing is spent.
+            val c = TestContainer.create(pages, claude, key = "sk-ant-test")
+            c.reviewGate.acquire()
+            pages.enqueue(
+                MockResponse().setHeader("Content-Type", "text/html").setBodyDelay(1500, TimeUnit.MILLISECONDS).setBody(
+                    """<html><head><title>Lemon drizzle</title><script type="application/ld+json">{"@context":"https://schema.org",""" +
+                        """"@type":"Recipe","name":"Lemon drizzle","recipeIngredient":["200g golden caster sugar","juice of 1 lemon"]}""" +
+                        """</script></head><body></body></html>""",
+                ),
+            )
+            claude.enqueue(MockResponse().setBody(CLAUDE_OK))
+            val id = c.importJobs.enqueue(ImportInput(pages.url("/r").toString()))
+            pages.takeRequest(5, TimeUnit.SECONDS)
+            c.reviewGate.release()
+            val r = c.awaitJob(id).result!!
+            assertEquals(0, claude.requestCount)
+            assertTrue(r.claudePending)
+            assertEquals(ParsedBy.RULES, r.parsedBy)
         }
 
     @Test

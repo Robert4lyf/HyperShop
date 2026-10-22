@@ -38,6 +38,20 @@ class SafeFetcherTest {
         ).setBody(body)
 
     @Test
+    fun aPageDeclaringItsCharsetOnlyInItsHeadIsDecodedWithIt() {
+        // An older blog: no charset in the header, windows-1252 bytes, the charset in a meta tag.
+        val page = "<html><head><meta charset=\"windows-1252\"><title>ok</title></head><body>\u00bd cup cr\u00e8me</body></html>"
+        val bytes = page.toByteArray(charset("windows-1252"))
+        server.enqueue(MockResponse().setHeader("Content-Type", "text/html").setBody(okio.Buffer().write(bytes)))
+        val r = runBlocking { fetcher.fetch(server.url("/old").toString()) } as FetchResult.Ok
+        assertTrue(r.body.contains("\u00bd cup cr\u00e8me"), r.body)
+        // The header still wins when it says.
+        val declared = "<meta charset=\"windows-1252\">\u00bd"
+        server.enqueue(MockResponse().setHeader("Content-Type", "text/html; charset=utf-8").setBody(declared))
+        assertEquals(declared, (runBlocking { fetcher.fetch(server.url("/new").toString()) } as FetchResult.Ok).body)
+    }
+
+    @Test
     fun fetchesHtml() {
         server.enqueue(html())
         val r = runBlocking { fetcher.fetch(server.url("/r").toString()) } as FetchResult.Ok

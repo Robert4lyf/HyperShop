@@ -60,7 +60,12 @@ class Importer(
     suspend fun fromUrl(
         url: String,
         fallbackTitle: String?,
-        allowClaude: Boolean,
+        /**
+         * Whether Claude may be called, asked *after* the fetch: the review screen must
+         * be in the foreground at the moment of the call, not when the share arrived
+         * (a fetch can take 30 s, and the user may have left meanwhile).
+         */
+        allowClaude: () -> Boolean,
         model: ClaudeModel,
     ): ImportResult {
         val locale = localeFor(url, emptyList())
@@ -89,7 +94,7 @@ class Importer(
                 rawLines = raw,
                 pageText = e.pageText,
             )
-        return parse(base, allowClaude, model)
+        return parse(base, allowClaude(), model)
     }
 
     /** Lines typed or pasted (the "Add item" field never comes here; it skips review). */

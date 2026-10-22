@@ -50,6 +50,27 @@ class LibraryViewModelTest {
     }
 
     @Test
+    fun useInsteadMayNotGoRoundInACircle() {
+        // A backup refuses replacements that never settle, so the library must not save one.
+        val c = TestContainer.create()
+        val vm = LibraryViewModel(c)
+        runBlocking {
+            assertNull(vm.save(EntryForm(name = "zorbleberry", plural = "zorbleberries", aisle = AisleCode.NUTS_DRIED_FRUIT)))
+            val nuts = AisleCode.NUTS_DRIED_FRUIT
+            assertNull(vm.save(EntryForm(name = "fnordberry", plural = "fnordberries", aisle = nuts, replaceWith = "zorbleberry")))
+            val zorble = vm.form("user_zorbleberry")
+            val error = vm.save(zorble.copy(replaceWith = "fnordberry"))
+            assertTrue(error.toString(), error != null && error.contains("both ways"))
+            // Three in a ring are caught too.
+            assertNull(vm.save(EntryForm(name = "glorpberry", plural = "glorpberries", aisle = nuts, replaceWith = "fnordberry")))
+            assertTrue(vm.save(zorble.copy(replaceWith = "glorpberry")) != null)
+            // Resetting an ingredient others use instead forgets those references, so the library stays whole.
+            c.library.reset("user_zorbleberry")
+            assertEquals(null, c.library.edits.value.getValue("user_fnordberry").replaceWith)
+        }
+    }
+
+    @Test
     fun searchKeepsWhatYouTypedAndFilters() {
         val c = TestContainer.create()
         val vm = LibraryViewModel(c)

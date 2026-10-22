@@ -22,6 +22,7 @@ import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.common.webLink
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.ensureActive
@@ -30,7 +31,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -167,6 +170,7 @@ data class RecipeSection(
 }
 
 /** The shopping list (PLAN §3.5): grouped by aisle in store order, DONE rows sink within their aisle. */
+@OptIn(ExperimentalCoroutinesApi::class)
 class ListViewModel(
     private val c: AppContainer,
 ) : ViewModel() {
@@ -218,7 +222,9 @@ class ListViewModel(
      */
     val prep: StateFlow<PlanPrep> =
         combine(
-            c.planner.observeWeek(c.planner.currentWeek()),
+            // The week is read again with every change to the list, so a card left open over Sunday
+            // midnight shows the new week (this view model lives as long as the app).
+            c.repository.list.map { c.planner.currentWeek() }.distinctUntilChanged().flatMapLatest { c.planner.observeWeek(it) },
             c.buyAgain.observe(),
             c.homeCheck.observe(),
             c.repository.observeLibrary().map { it.isNotEmpty() },
@@ -399,6 +405,15 @@ class ListViewModel(
     /** "Shop" / "Plan": the mode is a setting, so it survives a restart mid-shop. Nothing on the list changes. */
     fun setMode(m: ListMode) = viewModelScope.launch { c.settings.setListMode(m) }
 
+    init {
+        // A shop that took everything ends in planning, however the list was emptied (Finish shopping,
+        // Clear all, a meal removed, Undo of an add): the next item typed must not land in the shop
+        // screen, where there is no field to type into.
+        viewModelScope.launch {
+            ui.collect { if (it.mode == ListMode.SHOP && it.isEmpty) c.settings.setListMode(ListMode.PLAN) }
+        }
+    }
+
     /** The round tick: tick, or untick a DONE row. */
     fun toggle(row: ListRow) = toggle(row.id)
 
@@ -420,18 +435,9 @@ class ListViewModel(
         viewModelScope.launch {
             // Counted inside the write: a tick still on its way to the screen is included.
             val (stamp, n) = c.repository.finish()
-            planIfEmpty()
             val text = if (n == 1) "Finished: 1 bought item removed" else "Finished: $n bought items removed"
             messages.send(UiMessage(text, undo = { c.repository.undoDelete(stamp) }))
         }
-
-    /**
-     * A trip that took everything ends in planning: the next item typed must not
-     * land in the shop screen (where there is no field to type into).
-     */
-    private suspend fun planIfEmpty() {
-        if (c.repository.snapshot().liveItems.isEmpty()) c.settings.setListMode(ListMode.PLAN)
-    }
 
     // ---- the item sheet (5.7) ---------------------------------------------------------------
 
@@ -628,7 +634,6 @@ class ListViewModel(
     fun clearAll() =
         viewModelScope.launch {
             val stamp = c.repository.clearAll()
-            planIfEmpty()
             messages.send(UiMessage("List cleared", undo = { c.repository.undoDelete(stamp) }))
         }
 
