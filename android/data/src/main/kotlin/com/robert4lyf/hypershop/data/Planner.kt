@@ -61,7 +61,9 @@ data class MealRemoval(
 
 /** "Add to the list" for a week: what was put on, for the summary and Undo. */
 data class WeekAdded(
+    /** (meal, the use it went on the list as). */
     val meals: List<Pair<Long, Long>>,
+    /** List rows the meals need, each once. */
     val items: Int,
 )
 
@@ -303,7 +305,6 @@ class Planner(
             val meals = pending(week, repo.load())
             if (meals.isEmpty()) return@withTransaction null
             val added = ArrayList<Pair<Long, Long>>()
-            var items = 0
             for (m in meals) {
                 val src = source(m) ?: continue
                 val r = src.recipe
@@ -327,9 +328,11 @@ class Planner(
                 if (result !is ApplyResult.Applied) error("A week's add went stale inside its own transaction")
                 dao.linkMeal(m.id, result.useId)
                 added += m.id to result.useId
-                items += result.added
             }
-            if (added.isEmpty()) null else WeekAdded(added, items)
+            if (added.isEmpty()) return@withTransaction null
+            // Rows, each once: two meals wanting onions put one onion row on the list.
+            val uses = added.map { it.second }.toSet()
+            WeekAdded(added, repo.load().contributions.filter { it.useId in uses }.map { it.itemId }.toSet().size)
         }
 
     /** Undo of [addWeekToList]: each use it made comes off, and its meal is planned but not on the list again. */

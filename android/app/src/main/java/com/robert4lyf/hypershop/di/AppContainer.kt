@@ -96,6 +96,11 @@ class AppContainer(
     /** The list epoch's restore guard (never backed up); [startUp] checks it, a backup restore rewrites it. */
     val epochMarker: EpochMarker = EpochMarker(context.noBackupFilesDir)
     val repository = ListRepository(db, catalog, clock)
+
+    /** The weekly meal plan, Buy again and the At home check (Release B): all writes through [repository]. */
+    val planner = com.robert4lyf.hypershop.data.Planner(repository)
+    val buyAgain = com.robert4lyf.hypershop.data.BuyAgain(repository)
+    val homeCheck = com.robert4lyf.hypershop.data.HomeCheck(repository)
     val settings = Settings(dataStore)
     val log = RingLog()
     val reviewGate = ReviewGate()

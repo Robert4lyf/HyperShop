@@ -125,6 +125,37 @@ data class ListUi(
     val doneCount: Int get() = aisles.sumOf { (_, r) -> r.count { it.state == TickState.DONE } }
 }
 
+/** The "This week" card: how far the week's shop is prepared (docs/design/release-b.md). */
+data class PlanPrep(
+    val loaded: Boolean = false,
+    val meals: Int = 0,
+    /** Meals planned and not on the list yet. */
+    val pending: Int = 0,
+    /** Buy again suggestions not on the list. */
+    val buyAgain: Int = 0,
+    /** Last trip's hand-added items not on the list. */
+    val lastShop: Int = 0,
+    /** Cupboard ingredients still to buy that may be at home. */
+    val toCheck: Int = 0,
+    /** Has saved recipes or a finished trip: someone who has shopped here before. */
+    val returning: Boolean = false,
+) {
+    /** "2 meals · 1 not on the list · 5 to buy again · 3 to check at home". */
+    fun summary(): String =
+        listOfNotNull(
+            if (meals == 0) {
+                "No meals planned"
+            } else if (meals == 1) {
+                "1 meal"
+            } else {
+                "$meals meals"
+            },
+            pending.takeIf { it > 0 }?.let { "$it not on the list" },
+            buyAgain.takeIf { it > 0 }?.let { "$it to buy again" },
+            toCheck.takeIf { it > 0 }?.let { "$it to check at home" },
+        ).joinToString(" · ")
+}
+
 /** One card of the recipe view: a recipe's items, or those several recipes share, or those added by hand. */
 data class RecipeSection(
     val key: String,
@@ -180,6 +211,39 @@ class ListViewModel(
             ).copy(readyJobs = ready.map { it.id }, plusOne = p, inStock = inStockRows(lines, units), mode = m)
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.Eagerly, ListUi())
+
+    /**
+     * The "This week" card above the list: how far this week's shop is prepared.
+     * Its own flow, so the list's main one (the one a tick waits on) carries none of it.
+     */
+    val prep: StateFlow<PlanPrep> =
+        combine(
+            c.planner.observeWeek(c.planner.currentWeek()),
+            c.buyAgain.observe(),
+            c.homeCheck.observe(),
+            c.repository.observeLibrary().map { it.isNotEmpty() },
+        ) { meals, buy, home, saved ->
+            PlanPrep(
+                loaded = true,
+                meals = meals.size,
+                pending = meals.count { it.shopping.pending },
+                buyAgain = buy.regulars.count { !it.onList },
+                lastShop = buy.lastShop.size,
+                toCheck = home.count { !it.have },
+                returning = saved || buy.hasHistory,
+            )
+        }.flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlanPrep())
+
+    /** "Add the rest of last shop" from the empty list: the last trip's hand-added items, never doubled. */
+    fun addLastShop() =
+        viewModelScope.launch {
+            val items = c.buyAgain.view().lastShop
+            val added = c.buyAgain.add(items)
+            if (added.isNotEmpty()) {
+                messages.send(UiMessage("Added ${added.size} from last shop", undo = { c.buyAgain.undo(added) }))
+            }
+        }
 
     /** Which uses put each live item on the list, and every use's title: one query. */
     private suspend fun sources(list: ShoppingList): Sources {

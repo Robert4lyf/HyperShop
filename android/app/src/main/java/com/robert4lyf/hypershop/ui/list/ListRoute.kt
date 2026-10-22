@@ -28,14 +28,17 @@ fun ListRoute(
     container: AppContainer,
     snackbar: SnackbarHostState,
     onReview: (Long) -> Unit,
+    /** "Plan this week's shop": the Plan screen. */
+    onPlan: () -> Unit = {},
 ) {
     val vm: ListViewModel = viewModel(factory = factoryFor { ListViewModel(container) })
     val ui by vm.ui.collectAsStateWithLifecycle()
+    val prep by vm.prep.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
     val context = LocalContext.current
     // Built once per view model: a new object on every recomposition would recompose the whole header.
     val header =
-        remember(vm, context, onReview) {
+        remember(vm, context, onReview, onPlan) {
             HeaderActions(
                 onAdd = vm::addTyped,
                 suggestions = vm::suggestions,
@@ -49,6 +52,8 @@ fun ListRoute(
                     val text = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
                     container.applicationScope.launch { container.importShared(text, null) }
                 },
+                onPlan = onPlan,
+                onLastShop = vm::addLastShop,
             )
         }
     ListScreen(
@@ -69,8 +74,8 @@ fun ListRoute(
                 context.startActivity(Intent.createChooser(send, "Share list"))
             },
         ),
-        header = { listHeader(ui, header) },
-        empty = { EmptyState(header.onSample, header.onPasteLink) },
+        header = { listHeader(ui, header, prep) },
+        empty = { EmptyState(header.onSample, header.onPasteLink, prep, header.onPlan, header.onLastShop) },
     )
     val sheet by vm.sheet.collectAsStateWithLifecycle()
     sheet?.let { s ->

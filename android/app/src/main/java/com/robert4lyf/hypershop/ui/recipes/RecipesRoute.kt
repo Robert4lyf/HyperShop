@@ -245,7 +245,7 @@ fun RecipesScreen(
                                 HeroButton(onClick = onMeals, modifier = Modifier.testTag("open-meals")) {
                                     Icon(Icons.Rounded.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
                                     Spacer(Modifier.size(6.dp))
-                                    Text("This week")
+                                    Text("Plan the week")
                                 }
                             }
                         },

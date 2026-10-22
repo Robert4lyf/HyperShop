@@ -317,6 +317,13 @@ class SettingsViewModel(
 
     // ---- Watch -----------------------------------------------------------------------------
 
+    /** Data › Clear shopping history. */
+    fun clearHistory() =
+        viewModelScope.launch {
+            c.buyAgain.clearHistory()
+            messages.send(UiMessage("Shopping history cleared"))
+        }
+
     fun setWatchVibrate(on: Boolean) = viewModelScope.launch { c.settings.setWatchVibrate(on) }
 
     /** "Try again": the link starts over from wherever it stopped. */

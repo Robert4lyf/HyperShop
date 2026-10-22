@@ -188,7 +188,9 @@ private fun AppShell(
             popEnterTransition = { fadeIn(tween(150)) },
             popExitTransition = { fadeOut(tween(100)) },
         ) {
-            composable(Routes.LIST) { ListRoute(container, snackbar, onReview = openReview) }
+            composable(Routes.LIST) {
+                ListRoute(container, snackbar, onReview = openReview, onPlan = { nav.navigate(Routes.MEALS) { launchSingleTop = true } })
+            }
             composable(Routes.RECIPES) {
                 RecipesRoute(
                     container,
