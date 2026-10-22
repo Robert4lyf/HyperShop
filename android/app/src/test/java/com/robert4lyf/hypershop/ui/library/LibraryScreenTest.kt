@@ -3,6 +3,7 @@ package com.robert4lyf.hypershop.ui.library
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -13,6 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.robert4lyf.hypershop.core.catalog.DisplayPolicy
@@ -103,6 +105,7 @@ class LibraryScreenTest {
         compose.onNodeWithText(AisleCode.WORLD_FOODS.displayName).performScrollTo().performClick()
         compose.onNodeWithText("Always at home").performScrollTo().performClick()
         compose.onNodeWithText("Always at home").assertIsOn()
+        compose.onNodeWithText("Always at home").assertHeightIsAtLeast(48.dp)
         compose.onNodeWithText("Always at home").performClick()
         // The rarely-needed fields wait under "Advanced" for a new ingredient.
         compose.onNodeWithText("Weight").assertDoesNotExist()

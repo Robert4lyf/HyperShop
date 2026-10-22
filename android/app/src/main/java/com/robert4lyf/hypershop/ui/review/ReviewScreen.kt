@@ -268,7 +268,7 @@ private fun Hero(
                 .padding(start = 16.dp, end = 16.dp, top = 4.dp)
                 .clip(RoundedCornerShape(24.dp))
                 // The recipe's own mosaic, the same as its card on the Recipes tab.
-                .lowPoly(ui.title, end = HEADER_END)
+                .lowPoly(ui.title, end = HEADER_END, scrim = true)
                 .padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -315,7 +315,12 @@ private fun Hero(
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f, fill = false)) {
-                    Text(ui.title, style = MaterialTheme.typography.headlineMedium, color = Brand.OnHero)
+                    Text(
+                        ui.title,
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = Brand.OnHero,
+                        modifier = Modifier.semantics { heading() },
+                    )
                     if (ui.summary.isNotEmpty()) {
                         Text(ui.summary, Modifier.testTag("summary"), style = MaterialTheme.typography.bodyMedium, color = Brand.OnHero)
                     }

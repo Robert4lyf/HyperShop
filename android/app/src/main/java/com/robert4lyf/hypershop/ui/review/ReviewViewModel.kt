@@ -141,6 +141,8 @@ data class ReviewUi(
     private val summaryForList: String
         get() =
             listOfNotNull(
+                // Said here in full contrast, not only by the disabled button at the bottom.
+                "Nothing to add".takeIf { addCount == 0 && rows.isNotEmpty() && !editing },
                 addCount.takeIf { it > 0 }?.let { "$it to add" },
                 inStockCount.takeIf { it > 0 }?.let { "$it at home" },
                 checkCount.takeIf { it > 0 }?.let { "$it to check" },

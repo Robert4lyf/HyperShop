@@ -3,12 +3,16 @@ package com.robert4lyf.hypershop.ui.list
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -186,6 +190,14 @@ class ShopScreenTest {
     }
 
     @Test
+    fun whatIsLeftIsAHeadingAndALiveRegionAndBoughtRowsAreFullTargets() {
+        show()
+        compose.onNodeWithTag("shop-left").assert(isHeading())
+        compose.onNodeWithTag("shop-left").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        compose.onNode(hasTestTagStarting("shop-bought-")).assertHeightIsAtLeast(48.dp)
+    }
+
+    @Test
     fun finishIsAlwaysInTheBarButLiveOnlyOnceSomethingIsBought() {
         val nothingBought = shop.copy(aisles = shop.aisles.map { (a, rows) -> a to rows.map { it.copy(state = TickState.OPEN) } })
         show(nothingBought)
@@ -283,3 +295,7 @@ class ShopScreenTest {
         assertTrue("$texts contains $text", texts.any { it.contains(text) })
     }
 }
+
+/** Nodes whose test tag starts with [prefix] (the bought row carries its aisle's key). */
+internal fun hasTestTagStarting(prefix: String) =
+    SemanticsMatcher("testTag starts with $prefix") { it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith(prefix) == true }

@@ -8,6 +8,8 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -136,6 +138,12 @@ class ListScreenTest {
         compose.onNodeWithContentDescription("More").performClick()
         compose.onNodeWithText("Clear all").performClick()
         assertEquals(listOf("clear"), events)
+    }
+
+    @Test
+    fun theCountIsAHeading() {
+        show()
+        compose.onNode(hasText("5 left") and isHeading()).assertExists()
     }
 
     @Test

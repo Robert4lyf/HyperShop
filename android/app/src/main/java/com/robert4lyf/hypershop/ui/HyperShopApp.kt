@@ -84,7 +84,7 @@ object Routes {
 
 private val TABS = setOf(Routes.LIST, Routes.RECIPES, Routes.SETTINGS)
 
-private data class Tab(
+internal data class Tab(
     val route: String,
     val label: String,
     val on: androidx.compose.ui.graphics.vector.ImageVector,
@@ -264,7 +264,7 @@ private fun AppShell(
  * selected icon. Each tab is one TalkBack node (a selected tab and its label).
  */
 @Composable
-private fun CompactNavBar(
+internal fun CompactNavBar(
     tabs: List<Tab>,
     route: String?,
     onSelect: (String) -> Unit,

@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.ui.review
 
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -8,6 +9,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.robert4lyf.hypershop.core.model.AisleCode
@@ -279,6 +281,7 @@ class ReviewRowSheetScreenTest {
         compose.onNodeWithText("Just this time").performClick()
         compose.onNodeWithText("Chilled").performScrollTo().performClick()
         compose.onNodeWithText("Always").performClick()
+        compose.onNodeWithTag("switch-At home").assertHeightIsAtLeast(48.dp)
         compose.onNodeWithTag("switch-At home").performClick()
         compose.onNodeWithTag("rename").performTextReplacement("Oat milk")
         compose.onNodeWithTag("rename-preview").assertTextEquals("preview:Oat milk")

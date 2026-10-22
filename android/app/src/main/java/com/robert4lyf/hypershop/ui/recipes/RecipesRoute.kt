@@ -78,6 +78,7 @@ import com.robert4lyf.hypershop.core.merge.UseState
 import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.EmptyHero
+import com.robert4lyf.hypershop.ui.common.HEADER_END
 import com.robert4lyf.hypershop.ui.common.HeroButton
 import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.PillShape
@@ -528,7 +529,8 @@ private fun UseCard(
         val hue = Brand.recipeHue(use.title)
         Column {
             // The recipe's own colour band: the same hue as its review screen.
-            Box(Modifier.fillMaxWidth().lowPoly(use.title)) {
+            // Short of the brightest end, with the scrim, so the white title and menu stay legible.
+            Box(Modifier.fillMaxWidth().lowPoly(use.title, end = HEADER_END, scrim = true)) {
                 Column(
                     Modifier.padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),

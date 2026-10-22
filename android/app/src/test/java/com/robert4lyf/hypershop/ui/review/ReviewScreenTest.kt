@@ -3,9 +3,13 @@ package com.robert4lyf.hypershop.ui.review
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -14,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.robert4lyf.hypershop.core.model.AisleCode
@@ -136,10 +141,19 @@ class ReviewScreenTest {
     }
 
     @Test
+    fun theTitleIsAHeadingAndServingsIsAFullTarget() {
+        show()
+        compose.onNode(hasText(SAMPLE_REVIEW.title) and isHeading()).assertExists()
+        compose.onNodeWithTag("servings").assertHeightIsAtLeast(48.dp)
+    }
+
+    @Test
     fun nothingToAddKeepsTheButtonButDisabled() {
         val all = SAMPLE_REVIEW.aisles.map { (a, rows) -> a to rows.map { it.copy(inStock = true) } }
         show(SAMPLE_REVIEW.copy(aisles = all, servings = 6))
         compose.onNodeWithText("Nothing to add — all at home").assertIsNotEnabled()
+        // Also said in the hero, in full contrast: the disabled button is not the only statement.
+        compose.onNodeWithTag("summary").assertTextContains("Nothing to add", substring = true)
         compose.onNodeWithTag("servings-original").assertTextEquals("(recipe: 4)")
         compose.onNodeWithText("Already on your list").assertDoesNotExist()
     }
