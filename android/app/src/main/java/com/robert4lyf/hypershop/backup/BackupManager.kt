@@ -226,6 +226,8 @@ class BackupManager(
      */
     suspend fun restore(f: BackupFile): RestoreOutcome =
         lock.withLock {
+            // Checked here too, not only by inspect(): nothing destructive starts on a file that would be refused.
+            BackupFileValidator.validate(f).takeIf { it.isNotEmpty() }?.let { return@withLock RestoreOutcome.Refused(it) }
             val before = snapshot()
             journal.begin(f, before)
             val problems =
@@ -260,6 +262,9 @@ class BackupManager(
             journal.end()
             outcome
         }
+
+    /** The user chose to keep the data as it is after a restore that could not be finished. */
+    suspend fun abandonInterruptedRestore() = lock.withLock { journal.end() }
 
     private suspend fun tryApply(f: BackupFile): Boolean =
         runCatching { apply(f).isEmpty() }.onFailure { Timber.e(it, "Restore recovery failed") }.getOrDefault(false)

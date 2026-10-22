@@ -58,6 +58,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.di.ShareOutcome
+import com.robert4lyf.hypershop.di.Startup
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.library.LibraryRoute
 import com.robert4lyf.hypershop.ui.list.ListRoute
@@ -96,6 +97,25 @@ fun HyperShopApp(
     container: AppContainer,
     nav: NavHostController = rememberNavController(),
     debugScreen: (@Composable (AppContainer) -> Unit)? = null,
+) {
+    // Nothing that can read or write the list is composed until start-up has finished.
+    val startup by container.startup.collectAsState()
+    if (startup != Startup.Ready) {
+        StartupScreen(
+            startup,
+            onRetry = { container.retryStartUp() },
+            onKeep = { container.abandonStuckRestore() },
+        )
+        return
+    }
+    AppShell(container, nav, debugScreen)
+}
+
+@Composable
+private fun AppShell(
+    container: AppContainer,
+    nav: NavHostController,
+    debugScreen: (@Composable (AppContainer) -> Unit)?,
 ) {
     val snackbar = remember { SnackbarHostState() }
     val entry by nav.currentBackStackEntryAsState()

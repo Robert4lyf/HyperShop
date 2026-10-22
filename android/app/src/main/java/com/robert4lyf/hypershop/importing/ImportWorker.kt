@@ -25,6 +25,8 @@ class ImportWorker(
     override suspend fun doWork(): Result {
         val jobId = inputData.getLong(KEY_JOB, -1)
         if (jobId < 0) return Result.failure()
+        // WorkManager can start this before the app has finished starting up (after a restore the process died in).
+        container.awaitReady()
         val jobs = container.importJobs
         val job = jobs.get(jobId) ?: return Result.failure()
         // Only a waiting job runs: a WorkManager re-run of one already reviewed or ready

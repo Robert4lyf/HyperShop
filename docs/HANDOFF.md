@@ -1,5 +1,32 @@
 # Hand-off notes
 
+## Status: Release A (verified and dependable) — ⏸ Hand-off E
+
+Release A is on branch `claude/release-a-verified` (PROGRESS.md › Release A). What CI's emulator verified and what it cannot is in docs/design/release-a.md. These checks need your phone and your watch. **Back up first** (Settings › Data › Back up to a file).
+
+## ⏸ Hand-off E — your checks (yes/no)
+
+**Phone**
+1. **Start-up.** Open HyperShop from cold. Does the list appear with no visible wait (no "Starting…" screen)?
+2. **Servings after a finished trip.** Add a recipe needing onions, tick them, Finish shopping. On Meals raise its servings: is one extra onion back on the list as a plain "1 onion"? Lower the servings again: is the onion gone from the list (not shown as bought)?
+3. **Meals headline.** Two meals sharing onions, nothing bought: does "N items still needed" at the top of Meals match the number of rows on the list?
+4. **Undo after the list moved on.** Add two recipes sharing onions. Remove the first (don't tap Undo yet), then remove the second, then tap Undo on the first's message if it is still showing, or use "Add again". No crash, and the first recipe's onions are back?
+5. **Ticking speed.** With about 60 items (Debug tools › Load sample, twice), go to Shop and tick ten items quickly, one after another. Does every tick show within a moment, and none undo another?
+6. **Backup to Google Drive.** Settings › Data › Back up to a file, choose Google Drive. Then Restore from that Drive file. Does it restore, with your Claude key still saved?
+7. **Backup to Downloads.** The same with "Downloads" on the phone.
+
+**Watch (Forerunner 245)**
+8. **Snapshot.** Open the watch app with the phone nearby: is the list the phone's, in aisle order?
+9. **Offline ticks and a new recipe.** Turn the phone's Bluetooth off. Tick three items on the watch, and untick one of them again. On the phone, add a recipe that also needs one of the ticked items. Bluetooth back on: within a few seconds, do the phone and watch agree, with the shared item showing "1 more…" (the new recipe's share still needed) and the unticked item not bought?
+10. **Rapid ticks.** Tick five items as fast as the watch allows: all five bought on the phone, none twice?
+11. **Restore with the watch open.** With the watch app open, restore a backup on the phone. Does the watch switch to the restored list within a few seconds, with none of its old ticks applied to it?
+12. **Phone restart.** Force-stop HyperShop on the phone (App info › Force stop) while the watch app is open, tick an item on the watch, then open HyperShop. Does the tick arrive?
+
+**What the emulator and simulator cannot tell us**
+- The Connect IQ simulator job still does not run the Monkey C tests (an "Error" dialog blocks it; KNOWN_ISSUES #12). The watch's sync logic is covered by the Kotlin model and its replayed traces, and the phone side by WatchAcceptanceTest, but nothing has run the watch's own code except your watch.
+- Real Bluetooth timing, Garmin Connect's message delivery, and the 245's memory limits.
+- Cloud document providers (Drive): only MediaStore's local Downloads provider is automated.
+
 ## Status: Run 4 (fourth pass) — ⏸ Hand-off D
 
 Steps 9.1–9.6 are on `main` (PROGRESS.md). Everything below was tested on the JVM (Robolectric) and the device scenarios were compiled, but **none of it has been run on a phone or a watch here**: the container has no emulator. Each check takes a minute or two.

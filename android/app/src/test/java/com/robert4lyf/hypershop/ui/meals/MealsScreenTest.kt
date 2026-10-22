@@ -39,6 +39,7 @@ class MealsScreenTest {
                     Pick(12, "k3", "Fish pie", 11, false, null),
                 ),
             hasLibrary = true,
+            itemsLeft = 6,
         )
     private val actions =
         MealsActions(

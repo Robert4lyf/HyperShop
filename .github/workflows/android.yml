@@ -7,6 +7,11 @@ on:
   # The repository has no long-lived integration branch yet, so this is the only
   # way to run the build on demand until one exists.
   workflow_dispatch:
+    inputs:
+      device_repeats:
+        description: "Runs of the device scenarios, each on a fresh install (flakiness check)"
+        required: false
+        default: "1"
 
 # Nothing here writes to the repository.
 permissions:
@@ -45,8 +50,6 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          build-root-directory: android
 
       # One invocation rather than five: Gradle re-configures the whole build
       # on each, and the failure is identical either way.
@@ -73,12 +76,11 @@ jobs:
           retention-days: 1
 
   # The device scenarios (app/src/androidTest) on an emulator: the real
-  # composables, SQLite and files. Non-blocking until it has passed on a run
-  # of PRs (KNOWN_ISSUES #15); tools/verify.sh compiles them either way.
+  # composables, SQLite and files, then a real process death mid-restore and
+  # the performance probe. Blocking since Release A (KNOWN_ISSUES #15).
   device-tests:
     name: Device scenarios (emulator)
     runs-on: ubuntu-latest
-    continue-on-error: true
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -99,7 +101,8 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          build-root-directory: android
+          # The build job saves the Gradle cache; this one only reads it (another ~600 MB per run otherwise).
+          cache-read-only: true
 
       # The hosted runner has KVM; the emulator needs it opened to the runner's user.
       - name: Enable KVM
@@ -116,7 +119,11 @@ jobs:
           target: google_apis
           disable-animations: true
           working-directory: android
-          script: ./gradlew --max-workers=2 :app:connectedDebugAndroidTest
+          # A manual run can repeat the suite to look for flakiness; every repeat must pass.
+          script: |
+            for i in $(seq 1 ${{ inputs.device_repeats || 1 }}); do echo "device run $i"; ./gradlew --max-workers=2 :app:connectedDebugAndroidTest || exit 1; done
+            ../tools/device_process_death.sh
+            ../tools/device_perf.sh
 
       # The report is HTML in an artifact; the failures themselves belong in the log.
       - name: Show failing device tests
@@ -128,6 +135,10 @@ jobs:
           import sys, xml.etree.ElementTree as ET
           for case in ET.parse(sys.argv[1]).getroot().iter("testcase"):
               for bad in list(case.findall("failure")) + list(case.findall("error")):
+                  text = bad.text or bad.get("message") or ""
+                  # A test skipped on purpose (run on request only) is not a failure.
+                  if "AssumptionViolatedException" in text:
+                      continue
                   print(f"::error::{case.get('classname')}.{case.get('name')}")
                   print((bad.text or bad.get("message") or "")[:3000])
           PY

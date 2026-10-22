@@ -51,6 +51,21 @@ for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
         cat "${LOG}" >&2
         echo "The simulator's log:" >&2
         cat "${SIM_LOG}" >&2
+        # A dialog nobody can click under Xvfb would hold the run here; name what is on screen.
+        if command -v xdotool > /dev/null; then
+            echo "Windows on the virtual display:" >&2
+            for w in $(xdotool search --onlyvisible --name '.' 2> /dev/null); do
+                echo "  $(xdotool getwindowname "$w" 2> /dev/null) ($(xdotool getwindowgeometry "$w" 2> /dev/null | tr '\n' ' '))" >&2
+            done
+        fi
+        # The dialog's words, read off the screen (its text is not reachable through X).
+        if command -v import > /dev/null && command -v tesseract > /dev/null; then
+            import -window root /tmp/simulator-screen.png 2> /dev/null &&
+                { echo "Text on the virtual display:" >&2; tesseract /tmp/simulator-screen.png - 2> /dev/null | grep -v '^\s*$' >&2; } || true
+        fi
+        echo "Connect IQ files:" >&2
+        ls -la "${HOME}/.Garmin/ConnectIQ" "${HOME}/.Garmin/ConnectIQ/Devices" "${HOME}/.Garmin/ConnectIQ/Fonts" 2> /dev/null | head -30 >&2 || true
+        cat "${HOME}/.Garmin/ConnectIQ/simulator.ini" >&2 2> /dev/null || true
         exit 1
     fi
     if [[ ${status} -eq 0 ]]; then

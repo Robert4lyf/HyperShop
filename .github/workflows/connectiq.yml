@@ -23,6 +23,7 @@ on:
       - 'tools/build_watch.sh'
       - 'tools/package_watch.sh'
       - 'tools/device_facts.py'
+      - 'tools/run_watch_tests.sh'
   workflow_dispatch:
 
 # The one place the pinned version is written for both the script and the
@@ -107,7 +108,8 @@ jobs:
           name: hypershop-prg
           path: garmin/build/hypershop.prg
           if-no-files-found: error
-          retention-days: 3
+          # A device-independent build: it proves the compile, nobody installs it.
+          retention-days: 1
 
   # The one build that targets the real watch. It needs the device definitions,
   # which sit behind a Garmin login, so it runs only where the three secrets
@@ -206,7 +208,9 @@ jobs:
             garmin/build/hypershop-fr245.prg
             garmin/build/hypershop-fr245-debug.prg
           if-no-files-found: error
-          retention-days: 14
+          # For sideloading a pull request's build before it merges; once merged, release.yml
+          # attaches the same files to the rolling release, so a long retention only duplicates them.
+          retention-days: 3
 
   # Runs the Monkey C tests (garmin/test: the sync traces generated from the
   # Kotlin model, and the rest). The simulator links webkit2gtk-4.0, which
@@ -251,7 +255,7 @@ jobs:
         if: steps.secrets.outputs.ready == 'true'
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb libwebkit2gtk-4.0-37 libsecret-1-0 libsoup2.4-1 > /dev/null
+          sudo apt-get install -y -qq xvfb xdotool imagemagick tesseract-ocr libwebkit2gtk-4.0-37 libsecret-1-0 libsoup2.4-1 > /dev/null
 
       - name: Download the device definitions
         if: steps.secrets.outputs.ready == 'true'
@@ -265,7 +269,9 @@ jobs:
           connect-iq-sdk-manager agreement view > /dev/null
           connect-iq-sdk-manager agreement accept
           connect-iq-sdk-manager login
-          connect-iq-sdk-manager device download --manifest garmin/manifest.xml
+          # The simulator needs the devices' fonts as well; an older CLI without the flag gets the devices alone.
+          connect-iq-sdk-manager device download --manifest garmin/manifest.xml --include-fonts ||
+            connect-iq-sdk-manager device download --manifest garmin/manifest.xml
 
       - name: Run the tests
         if: steps.secrets.outputs.ready == 'true'

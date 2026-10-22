@@ -8,6 +8,7 @@ import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.parse.RuleParser
 import com.robert4lyf.hypershop.data.HyperShopDatabase
 import com.robert4lyf.hypershop.di.AppContainer
+import com.robert4lyf.hypershop.di.Startup
 import com.robert4lyf.hypershop.secrets.InMemoryApiKeyStore
 import com.robert4lyf.hypershop.watch.FakeWatchLink
 import kotlinx.coroutines.runBlocking
@@ -23,7 +24,10 @@ import java.io.File
 object DeviceContainer {
     val context: Context get() = InstrumentationRegistry.getInstrumentation().targetContext
 
-    fun create(key: String? = null): AppContainer {
+    fun create(
+        key: String? = null,
+        ready: Boolean = true,
+    ): AppContainer {
         val ctx = context
         File(ctx.filesDir, "library").deleteRecursively()
         File(ctx.noBackupFilesDir, "restore").deleteRecursively()
@@ -34,7 +38,7 @@ object DeviceContainer {
             dataStore = PreferenceDataStoreFactory.create { File(dir, "settings.preferences_pb") },
             apiKeyStore = InMemoryApiKeyStore(key),
             watchLink = FakeWatchLink(),
-        )
+        ).also { if (ready) it.startup.value = Startup.Ready }
     }
 }
 

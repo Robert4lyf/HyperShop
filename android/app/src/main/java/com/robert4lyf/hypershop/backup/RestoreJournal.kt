@@ -1,5 +1,7 @@
 package com.robert4lyf.hypershop.backup
 
+import android.system.Os
+import android.system.OsConstants
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import timber.log.Timber
@@ -42,6 +44,9 @@ class RestoreJournal(
     /** The restore is over, done or rolled back: the journal goes first, then the copies. */
     fun end() {
         journal.delete()
+        // Flushed before anything else happens: a journal that came back after a power cut
+        // would replay this restore over everything done since.
+        syncDir()
         target.delete()
         previous.delete()
     }
@@ -88,6 +93,23 @@ class RestoreJournal(
         if (!tmp.renameTo(f)) {
             f.delete()
             if (!tmp.renameTo(f)) throw IOException("could not write ${f.name}")
+        }
+        syncDir()
+    }
+
+    /**
+     * The rename is a change to the directory: flushed, so that after a power cut the
+     * journal is not present without its copies, or the copies without their names.
+     * Best effort: a file system that refuses fsync on a directory has nothing to flush.
+     */
+    private fun syncDir() {
+        runCatching {
+            val fd = Os.open(dir.path, OsConstants.O_RDONLY, 0)
+            try {
+                Os.fsync(fd)
+            } finally {
+                Os.close(fd)
+            }
         }
     }
 
