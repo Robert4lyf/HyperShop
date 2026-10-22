@@ -13,6 +13,7 @@ import com.robert4lyf.hypershop.core.parse.RuleParser
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -173,6 +174,34 @@ class UsesTest {
             assertTrue(l.isDone(l.itemByKey("cat:carrot")!!.id))
             // Restoring twice does nothing.
             assertTrue(!r.repo.restoreUse(removed))
+        }
+
+    @Test
+    fun removeFromListKeepsWhatWasBoughtAndUndoPutsTheRestBack() =
+        runBlocking {
+            val a = r.import("2 onions", "1 carrot")
+            val l0 = r.repo.snapshot()
+            r.repo.tick(l0.itemByKey("cat:carrot")!!.id)
+            val before = r.dump()
+            // Something bought: only the onions (still needed) come off; the bought carrot stays on the
+            // list, ticked, for Finish shopping to record, and the recipe leaves the Recipes tab.
+            val removed = r.repo.removeFromList(a.useId)!!
+            assertNull(removed.use)
+            var l = r.repo.snapshot()
+            assertNull(l.itemByKey("cat:onion"))
+            assertTrue(l.isDone(l.itemByKey("cat:carrot")!!.id))
+            assertTrue(r.repo.usesOnList().isEmpty())
+            assertTrue(r.repo.undoRemoveFromList(removed))
+            assertEquals(before, r.dump())
+            assertEquals(UseState.STILL_NEEDED, r.repo.usesOnList().single().progress.state)
+            // Nothing bought: the whole use goes, as before.
+            r.repo.untick(l0.itemByKey("cat:carrot")!!.id)
+            val whole = r.repo.removeFromList(a.useId)!!
+            assertTrue(whole.use != null)
+            assertTrue(r.repo.snapshot().liveItems.isEmpty())
+            assertTrue(r.repo.undoRemoveFromList(whole))
+            l = r.repo.snapshot()
+            assertEquals(2, l.liveItems.size)
         }
 
     @Test

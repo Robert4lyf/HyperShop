@@ -170,11 +170,29 @@ class IngredientLibrary(
             write(next)
         }
 
-    /** Back to the bundled version, or gone if you added it. */
+    /**
+     * Back to the bundled version, or gone if you added it. An ingredient you added
+     * that other edits swap for or use instead is forgotten by them too: a backup
+     * must not name an ingredient that is no longer there.
+     */
     suspend fun reset(id: String) =
         lock.withLock {
             if (id !in _edits.value) return@withLock
-            write(_edits.value - id)
+            val rest = _edits.value - id
+            val gone = !isBundled(id)
+            write(
+                if (!gone) {
+                    rest
+                } else {
+                    rest.mapValues { (_, e) ->
+                        if (id !in e.swaps && e.replaceWith != id) {
+                            e
+                        } else {
+                            e.copy(swaps = e.swaps - id, replaceWith = e.replaceWith?.takeIf { it != id })
+                        }
+                    }
+                },
+            )
         }
 
     private suspend fun write(next: Map<String, EntryEdit>) {

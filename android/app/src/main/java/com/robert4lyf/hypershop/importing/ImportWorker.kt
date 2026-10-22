@@ -38,7 +38,7 @@ class ImportWorker(
                 container.importer.fromUrl(
                     url = input.url,
                     fallbackTitle = input.subject,
-                    allowClaude = container.reviewGate.visible.value,
+                    allowClaude = { container.reviewGate.visible.value },
                     model = container.settings.model.first(),
                 )
             } catch (e: CancellationException) {

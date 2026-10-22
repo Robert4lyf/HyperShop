@@ -142,7 +142,7 @@ class SafeFetcher(
                     while (source.read(buf, 64 * 1024) != -1L) {
                         if (buf.size > MAX_BYTES) return FetchResult.TooLarge
                     }
-                    val charset = body.contentType()?.charset() ?: Charsets.UTF_8
+                    val charset = body.contentType()?.charset() ?: sniffCharset(buf) ?: Charsets.UTF_8
                     return FetchResult.Ok(current.toString(), ct, buf.readString(charset))
                 }
             } catch (e: BlockedAddress) {
@@ -194,7 +194,24 @@ class SafeFetcher(
         }
     }
 
+    /**
+     * A page served without a charset in its header may still declare one in its
+     * head (`<meta charset>` or `http-equiv`), as older recipe blogs do; decoding
+     * such a page as UTF-8 turns every "½" and "é" into a replacement character.
+     * Looked for in the first 1024 bytes, as browsers do; an unknown name is ignored.
+     */
+    private fun sniffCharset(buf: okio.Buffer): java.nio.charset.Charset? {
+        val head = buf.copy().readString(minOf(buf.size, 1024L), Charsets.ISO_8859_1)
+        val name = META_CHARSET.find(head)?.groupValues?.drop(1)?.firstOrNull { it.isNotEmpty() } ?: return null
+        return runCatching { java.nio.charset.Charset.forName(name) }.getOrNull()
+    }
+
     companion object {
+        private val META_CHARSET =
+            Regex(
+                """<meta[^>]+charset\s*=\s*["']?([A-Za-z0-9_\-:.]+)|<meta[^>]+content\s*=\s*["'][^"']*charset=([A-Za-z0-9_\-:.]+)""",
+                RegexOption.IGNORE_CASE,
+            )
         const val MAX_REDIRECTS = 5
         const val CALL_TIMEOUT_S = 30L
         const val MAX_BYTES = 3L * 1024 * 1024

@@ -309,11 +309,7 @@ class Planner(
     private suspend fun pending(
         week: Week,
         l: ShoppingList,
-    ): List<PlannedMealEntity> =
-        dao.plannedMeals(week.startEpochDay).filter { m ->
-            val use = m.useId?.let { l.uses[it] }
-            use == null || l.progress(use.id).state == UseState.DROPPED
-        }
+    ): List<PlannedMealEntity> = dao.plannedMeals(week.startEpochDay).filter { it.pendingOn(l) }
 
     /**
      * "Add to the list": every pending meal of [week] goes on as the review would
@@ -376,4 +372,14 @@ class Planner(
                 if (dao.usesOfRecipe(recipeId) == 0) repo.discardRecipe(recipeId)
             }
         }
+}
+
+/**
+ * "Add to the list" would put this meal on: nothing of it is on the list — never
+ * linked, its use gone, or its items taken off unbought ("Clear all"). The one
+ * rule for the planner and for a recipe going on from elsewhere ([ListRepository.apply]).
+ */
+internal fun PlannedMealEntity.pendingOn(l: ShoppingList): Boolean {
+    val use = useId?.let { l.uses[it] } ?: return true
+    return l.progress(use.id).state == UseState.DROPPED
 }

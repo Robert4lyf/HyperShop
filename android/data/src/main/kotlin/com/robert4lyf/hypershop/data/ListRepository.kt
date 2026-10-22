@@ -19,6 +19,7 @@ import com.robert4lyf.hypershop.core.merge.UseLineAdd
 import com.robert4lyf.hypershop.core.merge.UseProgress
 import com.robert4lyf.hypershop.core.merge.UseState
 import com.robert4lyf.hypershop.core.merge.WatchTickResult
+import com.robert4lyf.hypershop.core.merge.Withdrawn
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.ParsedIngredient
@@ -99,6 +100,16 @@ data class UseSummary(
 data class UseLink(
     val title: String,
     val url: String?,
+)
+
+/**
+ * What [ListRepository.removeFromList] did: the whole use went, or only its unbought
+ * shares, with the use archived (its bought rows kept).
+ */
+data class ListRemoval(
+    val use: UseRemoval? = null,
+    val withdrawn: Withdrawn? = null,
+    val archived: Long? = null,
 )
 
 /** What "Remove from list" took off, for Undo: the list rows and the use's review decisions. */
@@ -782,9 +793,10 @@ class ListRepository(
         if (replacedMeals.isNotEmpty() || !planNew) return
         val week = Week.of(clock()).startEpochDay
         val key = recipe.libraryKey ?: recipe.url ?: "r:${recipe.id}"
-        // Already planned this week and not on the list yet: this is that meal going on, not a second one.
-        val live = load().uses.keys
-        dao.plannedMeals(week).firstOrNull { it.libraryKey == key && (it.useId == null || it.useId !in live) }?.let {
+        // Already planned this week and not on the list (never added, or taken off unbought
+        // since): this is that meal going on, not a second one — the planner's own rule.
+        val l = load()
+        dao.plannedMeals(week).firstOrNull { it.libraryKey == key && it.pendingOn(l) }?.let {
             dao.linkMeal(it.id, useId)
             dao.setMealServings(it.id, servings)
             return
@@ -801,13 +813,26 @@ class ListRepository(
         )
     }
 
-    /** Undo of an import: the use and everything that cascades, and the recipe if nothing else uses it. */
+    /**
+     * Undo of an import: the use and everything that cascades, and the recipe if nothing
+     * else uses it. Something of it bought meanwhile (a tick on the phone or the watch
+     * while the snackbar showed) stays bought: then only what is still needed comes off.
+     */
     suspend fun undoImport(useId: Long) {
         db.withTransaction {
             val old = load()
-            val recipeId = old.uses[useId]?.recipeId
-            // The meal the import planned goes with it; it was never planned otherwise.
-            dao.mealsOfUse(useId).map { it.id }.takeIf { it.isNotEmpty() }?.let { dao.deletePlannedMeals(it) }
+            val cs = old.contributionsOfUse(useId)
+            if (cs.any { it.coveredBy != null }) {
+                old.withdraw(cs.filter { it.coveredBy == null }.map { it.id }.toSet())?.let { persist(old, it) }
+                return@withTransaction
+            }
+            val use = old.uses[useId]
+            val recipeId = use?.recipeId
+            // The meal the import planned goes with it; one planned before the import, which
+            // the import went on as, stays planned and is not on the list again.
+            val (planned, linked) = dao.mealsOfUse(useId).partition { use == null || it.addedAt >= use.addedAt }
+            planned.map { it.id }.takeIf { it.isNotEmpty() }?.let { dao.deletePlannedMeals(it) }
+            for (m in linked) dao.linkMeal(m.id, null)
             persist(old, old.removeUse(useId))
             if (recipeId != null && dao.uses().none { it.recipeId == recipeId }) {
                 db.openHelper.writableDatabase.execSQL("DELETE FROM Recipe WHERE id = ?", arrayOf(recipeId))
@@ -826,6 +851,43 @@ class ListRepository(
             val meals = dao.mealsOfUse(useId).map { it.id }
             persist(old, next)
             UseRemoval(removed, decisions, meals)
+        }
+
+    /**
+     * "Remove from list" as the Recipes tab offers it: the use and its items when nothing
+     * of it was bought. Else a purchase is never undone: only its unbought shares come
+     * off, its bought rows stay as they are (the trip records them on Finish shopping),
+     * and the use is archived so the recipe leaves the Recipes tab. Null when there was
+     * no such use.
+     */
+    suspend fun removeFromList(useId: Long): ListRemoval? =
+        db.withTransaction {
+            val l = load()
+            val use = l.uses[useId] ?: return@withTransaction null
+            val cs = l.contributionsOfUse(useId)
+            if (cs.none { it.coveredBy != null }) return@withTransaction removeUse(useId)?.let { ListRemoval(use = it) }
+            val w = l.withdrawKeeping(cs.filter { it.coveredBy == null }.map { it.id }.toSet())
+            val kept = w?.first ?: l
+            val next = kept.copy(uses = kept.uses + (useId to use.copy(archivedAt = clock())), listRev = kept.listRev + 1)
+            persist(l, next)
+            ListRemoval(withdrawn = w?.second, archived = if (use.archivedAt == null) useId else null)
+        }
+
+    /** Undo of [removeFromList]. False when nothing could come back (see [restoreUse]). */
+    suspend fun undoRemoveFromList(r: ListRemoval): Boolean =
+        db.withTransaction {
+            r.use?.let { return@withTransaction restoreUse(it) }
+            val old = load()
+            var next = old
+            r.archived?.let { id ->
+                old.uses[id]?.takeIf { it.archivedAt != null }?.let {
+                    next = next.copy(uses = next.uses + (id to it.copy(archivedAt = null)), listRev = next.listRev + 1)
+                }
+            }
+            r.withdrawn?.let { w -> next.reinstate(w)?.let { next = it } }
+            if (next === old) return@withTransaction false
+            persist(old, next)
+            true
         }
 
     /**
@@ -1012,7 +1074,10 @@ class ListRepository(
             val ids = dao.deletedBefore(before)
             val old = load()
             val gone = ids.toSet()
-            val purged = old.copy(items = old.items - gone, contributions = old.contributions.filter { it.itemId !in gone })
+            // A purge changes what the uses' progress says (a bought row gone), so the list is re-read.
+            val purged =
+                old.copy(items = old.items - gone, contributions = old.contributions.filter { it.itemId !in gone })
+                    .let { if (ids.isEmpty()) it else it.copy(listRev = it.listRev + 1) }
             // A recipe left with nothing on the list a week after it was added (its bought
             // items purged, or every line at home) is archived, as "Finish shopping" would
             // have done: it is not the week's reminder any more, and not "on your list".
@@ -1309,6 +1374,7 @@ class ListRepository(
             dao.upsertPlannedMeals(b.plannedMeals)
             b.trips.forEach { dao.insertTrip(it) }
             dao.insertTripItems(b.tripItems)
+            dao.pruneTrips(MAX_TRIPS)
             dao.insertRegulars(b.regulars)
             // A file from before the plan: its recipes on the list become planned meals, as the 4→5 migration did.
             if (b.planVersion == 0) PlanSeed.fromUses(db.openHelper.writableDatabase)

@@ -342,7 +342,8 @@ class MealsViewModel(
     fun hide(r: Regular) =
         viewModelScope.launch {
             c.buyAgain.hide(r)
-            messages.send(UiMessage("Won't suggest ${r.name}", undo = { c.buyAgain.reset(r) }))
+            // Undo gives back what there was: a pin, or the plain rules.
+            messages.send(UiMessage("Won't suggest ${r.name}", undo = { if (r.pinned) c.buyAgain.pin(r) else c.buyAgain.reset(r) }))
         }
 
     /** At home check: "Have" (off the list for this shop) or "Need" (back on it), for one or several. */

@@ -38,6 +38,10 @@ class BackupManagerTest {
         assertEquals(Inspection.NotABackup, m.inspectText("milk, eggs"))
         assertEquals(Inspection.NotABackup, m.inspectText("""{"format":"something-else","version":1}"""))
         assertEquals(Inspection.Newer(2), m.inspectText("""{"format":"hypershop-backup","version":2}"""))
+        // A header field of the wrong shape is not a backup, and not a crash.
+        assertEquals(Inspection.NotABackup, m.inspectText("""{"format":{},"version":1}"""))
+        assertEquals(Inspection.NotABackup, m.inspectText("""{"format":"hypershop-backup","version":[1]}"""))
+        assertEquals(Inspection.NotABackup, m.inspectText("""{"format":"hypershop-backup","version":null}"""))
         assertTrue(m.inspectText("""{"format":"hypershop-backup","version":1}""") is Inspection.Broken)
         // The key never travels.
         assertTrue(!file.readText().contains("sk-ant"))

@@ -400,9 +400,13 @@ class ReviewViewModel(
             val claude = c.reviewGate.visible.value && c.apiKeyStore.get() != null
             _state.value = ReviewState.Loading(if (claude) STAGE_CLAUDE else STAGE_LINES)
             val from = failedFrom
+            // In the app's scope, as [parseWithClaude]: Back mid-call must not drop a billed answer's usage.
             val r =
-                c.importer
-                    .fromLines(picked, from?.title, allowClaude = c.reviewGate.visible.value, model = c.settings.model.first())
+                c
+                    .claudeParse(jobId) {
+                        val allow = c.reviewGate.visible.value
+                        c.importer.fromLines(picked, from?.title, allowClaude = allow, model = c.settings.model.first())
+                    }.await()
                     .copy(url = from?.url?.takeIf { it.isNotEmpty() })
             if (r.lines.isEmpty()) return@act fail(ImportError.NO_RECIPE, picked)
             result = r

@@ -61,7 +61,9 @@ object BackupValidator {
     private const val MAX_TEXT = 2_000
     private const val MAX_JSON = 20_000
     private val json = Json { ignoreUnknownKeys = true }
-    private const val MAX_SERVINGS = 99
+
+    /** What a page or Claude may say a recipe serves (the extractors keep 1..100). */
+    private const val MAX_SERVINGS = 100
 
     /** A plan week within about 270 years of 1970 either way: past that it is not a real week. */
     private const val MIN_WEEK = -100_000L
@@ -182,6 +184,8 @@ object BackupValidator {
         for (a in b.aisles) check(a.code in aisleNames && a.name.length <= MAX_TEXT, "aisle ${a.code}: unknown or too long")
         check(b.aisles.map { it.code }.toSet().size == b.aisles.size, "duplicate aisles")
         val storeIds = b.stores.map { it.id }.toSet()
+        // The restore fills in the walking order for store 1; without that store the rows would have no parent.
+        check(b.stores.isEmpty() || 1L in storeIds, "stores: store 1 is missing")
         for (o in b.aisleOrder) check(
             o.aisleCode in aisleNames && o.storeId in storeIds,
             "aisle order ${o.aisleCode}: unknown aisle or store",
@@ -210,12 +214,19 @@ object BackupValidator {
             check(n <= MAX_ROWS, "$t: $n rows is more than a backup can hold")
         }
         check(b.planVersion in 0..1, "unknown plan version ${b.planVersion}")
+        // A file from before the plan has none: the restore plans its recipes itself, and must not plan them twice.
+        check(
+            b.planVersion > 0 || (b.plannedMeals.isEmpty() && b.trips.isEmpty() && b.tripItems.isEmpty() && b.regulars.isEmpty()),
+            "a file without a plan has plan rows",
+        )
+        // A meal is a recipe's: linked to the hand-added use, "Remove" would take the household list off.
+        val recipeUses = b.uses.filter { it.kind == UseKind.RECIPE.name }.map { it.id }.toSet()
         val mealIds = b.plannedMeals.map { it.id }
         check(mealIds.size == mealIds.toSet().size && mealIds.all { it >= 1 }, "planned meals: duplicate or bad ids")
         for (m in b.plannedMeals) {
             check(m.libraryKey.length in 1..MAX_TEXT, "planned meal ${m.id}: bad recipe key")
             check(m.servings == null || m.servings in 1..MAX_SERVINGS, "planned meal ${m.id}: servings out of range")
-            check(m.useId == null || m.useId in uses, "planned meal ${m.id}: use ${m.useId} is missing")
+            check(m.useId == null || m.useId in recipeUses, "planned meal ${m.id}: use ${m.useId} is missing or not a recipe's")
             check(m.weekStart in MIN_WEEK..MAX_WEEK, "planned meal ${m.id}: week out of range")
         }
         val tripIds = b.trips.map { it.id }

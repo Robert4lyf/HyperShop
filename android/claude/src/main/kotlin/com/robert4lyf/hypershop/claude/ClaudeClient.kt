@@ -1,9 +1,12 @@
 package com.robert4lyf.hypershop.claude
 
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -61,6 +64,9 @@ class ClaudeClient(
     private val io: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val strict = Json { ignoreUnknownKeys = false }
+
+    /** Records the usage of a call whose caller was cancelled mid-answer (see [send]). */
+    private val spill = CoroutineScope(SupervisorJob() + io)
     private val lenient = Json { ignoreUnknownKeys = true }
 
     suspend fun parse(
@@ -171,6 +177,16 @@ class ClaudeClient(
         val call = http.newCall(req)
         return suspendCancellableCoroutine { cont ->
             cont.invokeOnCancellation { call.cancel() }
+
+            // The caller gone (the review left, "Paste the ingredients" instead) after the
+            // answer started: the generation is billed all the same, so the meter still gets
+            // it, here, since a resume of a cancelled continuation reaches no one.
+            fun deliver(outcome: Outcome) {
+                if (cont.isCancelled && outcome is Outcome.Interrupted && outcome.usage != null) {
+                    spill.launch { usageSink.record(outcome.model ?: model.id, outcome.usage) }
+                }
+                cont.resume(outcome)
+            }
             call.enqueue(
                 object : Callback {
                     override fun onFailure(
@@ -179,7 +195,7 @@ class ClaudeClient(
                     ) {
                         if (!call.isCanceled()) log.log("POST ${req.url} failed: ${e.javaClass.simpleName}")
                         // After a cancellation the continuation is already done; this is then a no-op.
-                        cont.resume(Outcome.Offline)
+                        deliver(Outcome.Offline)
                     }
 
                     override fun onResponse(
@@ -198,7 +214,8 @@ class ClaudeClient(
                                     if (r.code == 200 && streamed) {
                                         readStream(r)
                                     } else {
-                                        Outcome.Http(r.code, r.body?.string().orEmpty(), retryAfter)
+                                        // A plain reply is read up to a cap: a body with no end must not fill memory.
+                                        Outcome.Http(r.code, r.peekBody(MAX_BODY_BYTES).string(), retryAfter)
                                     }
                                 }
                             } catch (e: IOException) {
@@ -209,7 +226,7 @@ class ClaudeClient(
                                 log.log("POST ${req.url} reply unreadable: ${e.javaClass.simpleName}")
                                 Outcome.Http(200, "", null)
                             }
-                        cont.resume(outcome)
+                        deliver(outcome)
                     }
                 },
             )
@@ -238,7 +255,19 @@ class ClaudeClient(
         var event: String? = null
         try {
             while (true) {
-                val line = source.readUtf8Line() ?: break
+                // A line, or a text, with no end in sight is not an answer: read up to a cap, then give up.
+                val line =
+                    try {
+                        source.readUtf8LineStrict(MAX_LINE_BYTES)
+                    } catch (e: java.io.EOFException) {
+                        if (source.exhausted()) break
+                        log.log("stream line over ${MAX_LINE_BYTES} bytes")
+                        return Outcome.Http(200, "", null)
+                    }
+                if (text.length > MAX_TEXT_CHARS) {
+                    log.log("stream text over ${MAX_TEXT_CHARS} chars")
+                    return Outcome.Http(200, "", null)
+                }
                 when {
                     line.startsWith("event:") -> event = line.removePrefix("event:").trim()
                     line.startsWith("data:") -> {
@@ -388,6 +417,10 @@ class ClaudeClient(
     }
 
     companion object {
+        /** A reply line (one SSE event) or a plain body longer than this is not an answer. A full reply is about 64 KB. */
+        const val MAX_LINE_BYTES = 2L * 1024 * 1024
+        const val MAX_BODY_BYTES = 2L * 1024 * 1024
+        const val MAX_TEXT_CHARS = 2 * 1024 * 1024
         private val JSON = "application/json".toMediaType()
         private const val MAX_BACKOFFS = 2
         private val BACKOFF_S = longArrayOf(2, 8)

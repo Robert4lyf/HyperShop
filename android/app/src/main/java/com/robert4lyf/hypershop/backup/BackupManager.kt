@@ -17,8 +17,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import timber.log.Timber
 import java.io.File
 import java.io.IOException
@@ -202,8 +203,9 @@ class BackupManager(
             } catch (e: IllegalArgumentException) {
                 return Inspection.NotABackup
             }
-        if (head["format"]?.jsonPrimitive?.content != BackupFile.FORMAT) return Inspection.NotABackup
-        val version = head["version"]?.jsonPrimitive?.content?.toIntOrNull() ?: return Inspection.NotABackup
+        // A header field of the wrong shape ({"format": {}}) is not a backup, not a crash.
+        if ((head["format"] as? JsonPrimitive)?.contentOrNull != BackupFile.FORMAT) return Inspection.NotABackup
+        val version = (head["version"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: return Inspection.NotABackup
         if (version > BackupFile.VERSION) return Inspection.Newer(version)
         val file =
             try {

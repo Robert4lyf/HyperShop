@@ -289,16 +289,19 @@ class RecipesViewModel(
     /** Job ids to open on the review screen. */
     val openReview: Flow<Long> = reviews.receiveAsFlow()
 
-    /** "Remove from list"; Undo puts the use and its items back as they were. */
+    /**
+     * "Remove from list"; Undo puts back what it took. What was bought stays bought:
+     * then only what is still needed comes off, and the bought rows stay on the list.
+     */
     fun remove(use: UseSummary) =
         viewModelScope.launch {
-            val removed = c.repository.removeUse(use.useId) ?: return@launch
+            val removed = c.repository.removeFromList(use.useId) ?: return@launch
             messages.send(
                 UiMessage(
                     "Removed ${use.title} from the list",
                     undo = {
                         // The recipe copy can go meanwhile (the start-up purge); the use can't come back without it.
-                        if (!c.repository.restoreUse(removed)) messages.send(UiMessage("Can't undo: the list has changed since"))
+                        if (!c.repository.undoRemoveFromList(removed)) messages.send(UiMessage("Can't undo: the list has changed since"))
                     },
                 ),
             )
