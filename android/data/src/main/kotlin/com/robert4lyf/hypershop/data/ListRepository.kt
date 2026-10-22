@@ -750,9 +750,11 @@ class ListRepository(
             val replacedMeals = replacing?.let { dao.mealsOfUse(it) }.orEmpty()
             val oldRecipe = replacing?.let { old.uses[it]?.recipeId }
             val kind = if (manual) UseKind.MANUAL else UseKind.RECIPE
-            when (val r = merger.apply(without(old, replacing), preview, clock(), kind)) {
+            // An edit replaces the use; what was bought for it follows the new one (KNOWN_ISSUES #20).
+            val (base, replaced) = replacing?.takeIf { it in old.uses }?.let { old.removeUseKeeping(it) } ?: (old to null)
+            when (val r = merger.apply(base, preview, clock(), kind)) {
                 is ApplyResult.Applied -> {
-                    persist(old, r.list)
+                    persist(old, replaced?.let { r.list.inheritPurchases(it, r.useId) } ?: r.list)
                     jobId?.let { dao.setJobState(it, "DONE") }
                     if (manual) {
                         // The review's stored copy was only there to be reviewed.

@@ -35,7 +35,7 @@ and Map cross the wire.
 
 | `t` | Keys |
 |---|---|
-| `snap` | `lr`, `at` ackedThrough, `ax` `[[seq, result]…]` for acked seqs whose result is not `ok`, `pg`, `pgs`, `ai` `[base, [code, name, left, hidden]…]`, `it` `[[id, name, sub, aisleIdx, done, rev]…]`, `mo` items left off |
+| `snap` | `lr`, `at` ackedThrough, `ax` `[[seq, result]…]` for acked seqs whose result is not `ok`, `pg`, `pgs`, `ai` `[base, [code, name, left, hidden]…]`, `it` `[[id, name, sub, aisleIdx, done, rev]…]`, `mo` items left off, `bn` the build the page came from (pages of one `lr` are assembled from one build only) |
 
 **Payload probe** (debug watch builds; additive, so no version bump)
 
@@ -104,7 +104,11 @@ Every change bumps `listRev` and the item's `rev`.
 - **Snapshots.** Pages are kept per `lr` until pages `0 … pgs−1` are all there;
   then the snapshot replaces the cache. Pages with a lower `lr` than the cache
   are ignored (their acks are still processed). An ack-only page whose `lr` is
-  newer than the cache sets `helloDue`.
+  newer than the cache sets `helloDue`. A page's slice depends on more than the
+  list (the acks it carries, when it was built), so each page names its build
+  (`bn`, 0 or absent: not said) and a page from another build of the same `lr`
+  throws away the pages held so far: pages of two builds are never assembled
+  into one list.
 - **Epoch.** A page with a different `ep`: drop the outbox ("N watch ticks
   discarded (list replaced)"), clear the cache, keep `nextSeq`, set
   `ackedThrough = nextSeq − 1` and `helloDue`. That hello voids the discarded

@@ -91,6 +91,10 @@ class CodecTest {
     fun pageRoundTrips() {
         val p = page()
         assertEquals(p, WatchCodec.decodePage(WatchCodec.encodePage(p)))
+        // The build rides along when said; unsaid (older phones, the vectors) reads as 0.
+        val built = p.copy(build = 77)
+        assertEquals(built, WatchCodec.decodePage(WatchCodec.encodePage(built)))
+        assertEquals(0, WatchCodec.decodePage(WatchCodec.encodePage(p) - WatchProtocol.Key.BUILD)!!.build)
     }
 
     @Test

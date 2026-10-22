@@ -205,6 +205,33 @@ class UsesTest {
         }
 
     @Test
+    fun anEditKeepsWhatWasBoughtAndItsMeal() =
+        runBlocking {
+            // KNOWN_ISSUES #20: the recipe is edited after the onions were bought.
+            val a = r.import("2 onions", "1 carrot")
+            r.repo.tick(r.repo.snapshot().itemByKey("cat:onion")!!.id)
+            val recipe = r.db.dao().recipe(r.repo.snapshot().uses.getValue(a.useId).recipeId!!)!!
+            val stored =
+                r.repo.storeRecipe(
+                    recipe.url, recipe.title, 4, UnitLocale.METRIC, "WEB", ParsedBy.RULES, null, false,
+                    listOf("4 onions", "1 carrot").map { parser.parse(it) }, recipe.libraryKey ?: recipe.url,
+                )
+            val edited = r.repo.apply(r.repo.preview(stored, 4, replacing = a.useId), replacing = a.useId) as ApplyResult.Applied
+            val l = r.repo.snapshot()
+            assertNull(l.uses[a.useId])
+            val onion = l.itemByKey("cat:onion")!!.id
+            assertEquals(Rational.of(2), l.covered(onion)[BaseKey.ITEMS])
+            assertEquals(Rational.of(2), l.uncovered(onion)[BaseKey.ITEMS])
+            assertTrue(l.isPartial(onion))
+            assertEquals(1, l.ticks.size)
+            // Its meal follows the new use, and the Recipes tab shows one recipe, partly bought.
+            assertEquals(edited.useId, r.db.dao().allPlannedMeals().single().useId)
+            val shown = r.repo.usesOnList().single()
+            assertEquals(edited.useId, shown.useId)
+            assertEquals(1, shown.progress.partlyBought)
+        }
+
+    @Test
     fun restoreJoinsAnItemReAddedMeanwhile() =
         runBlocking {
             val a = r.import("2 onions")

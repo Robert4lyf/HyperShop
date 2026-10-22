@@ -298,6 +298,15 @@ class WatchSync {
             return true;
         }
         var held = _assembling.get(pageRev);
+        // Pages of one lr from another build slice the list differently: start over with this build's.
+        if (held != null && (held as Lang.Dictionary).size() > 0) {
+            var heldPages = (held as Lang.Dictionary).values() as Lang.Array;
+            var first = heldPages[0] as Lang.Dictionary;
+            if (buildOf(first) != buildOf(payload)) {
+                _assembling.remove(pageRev);
+                held = null;
+            }
+        }
         if (held == null) {
             if (_assembling.size() >= MAX_ASSEMBLING) {
                 dropOldestAssembling();
@@ -313,6 +322,15 @@ class WatchSync {
         }
         adoptSnapshot(pageRev, pages, held as Lang.Dictionary<Lang.Number, Lang.Dictionary>);
         return true;
+    }
+
+    //! The build a page says it came from; absent or malformed is 0 ("not said").
+    private function buildOf(payload as Lang.Dictionary) as Lang.Number {
+        var bn = payload.get(Protocol.KEY_BUILD);
+        if (bn instanceof Lang.Number) {
+            return bn as Lang.Number;
+        }
+        return 0;
     }
 
     //! `ax` as seq → result, or null when it is malformed. Absent is empty.

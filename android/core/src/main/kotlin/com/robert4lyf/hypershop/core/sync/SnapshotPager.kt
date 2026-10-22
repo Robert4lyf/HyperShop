@@ -35,6 +35,12 @@ data class SnapshotInput(
     val nowMs: Long,
     /** The aisle the watch was last ticking in, if known. Its DONE items are kept. */
     val currentAisle: String? = null,
+    /**
+     * A number this build alone carries (never 0 from the app): a page's slice depends
+     * on the acks and the moment as well as the list, so the watch assembles pages of
+     * one `lr` only from one build. 0 leaves it unsaid (the test vectors).
+     */
+    val build: Int = 0,
 )
 
 /**
@@ -164,7 +170,10 @@ object SnapshotPager {
         while (ai < aisles.size || ii < snapItems.size || pages.isEmpty()) {
             if (pages.size >= cap.maxPages) return null
             var page =
-                SnapshotPage(input.epoch, input.listRev, input.ackedThrough, ax, pages.size, 0, emptyList(), ai, emptyList(), more)
+                SnapshotPage(
+                    input.epoch, input.listRev, input.ackedThrough, ax, pages.size, 0, emptyList(), ai, emptyList(), more,
+                    build = input.build,
+                )
             if (size(page) > cap.bytes) return null
             while (ai < aisles.size) {
                 val next = page.copy(aisles = page.aisles + aisles[ai])

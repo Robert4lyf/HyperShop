@@ -409,6 +409,74 @@ data class ShoppingList(
         ).bumped(cs.map { it.itemId }.toSet())
     }
 
+    /**
+     * An edit: the new use [useId] inherits what was bought for the use it replaces
+     * ([r], as [removeUseKeeping] returned it), so no purchase is undone by editing a
+     * recipe. Per ingredient (merge key): what was bought stays bought, on the row it
+     * was bought on (a finished row stays finished, its extra on the live row), and the
+     * new amount is still needed only beyond it; fewer than were bought leaves the
+     * bought amount at the new one; an ingredient the edit dropped keeps its bought
+     * share with no line. A row the removal emptied comes back for its purchase, and
+     * so do the ticks that covered only this use.
+     */
+    fun inheritPurchases(
+        r: RemovedUse,
+        useId: Long,
+    ): ShoppingList {
+        val bought = r.contributions.filter { it.coveredBy != null }
+        if (bought.isEmpty() || useId !in uses) return this
+        val rev = listRev + 1
+        var nextId = nextId
+        var items = this.items
+        var ticks = this.ticks
+        var contributions = this.contributions
+        val touched = HashSet<Long>()
+        val oldItems = r.items.associateBy { it.id }
+        val carried = r.ticks.associateBy { it.id }
+        val mine = contributions.filter { it.useId == useId }.groupBy { items.getValue(it.itemId).mergeKey }
+        for ((oldItemId, cs) in bought.groupBy { it.itemId }) {
+            val oldItem = oldItems[oldItemId] ?: continue
+            val boughtQty = cs.fold(QtyBase.PRESENCE) { a, c -> a + c.qty }
+            // Where the purchase stays: its row if still there or finished; else the live row for the key; else its row back.
+            val row = items[oldItemId] ?: if (oldItem.deletedAt != null) oldItem else (itemByKey(oldItem.mergeKey) ?: oldItem)
+            if (row.id !in items) items = items + (row.id to row)
+            for (t in cs.mapNotNull { carried[it.coveredBy] }.distinctBy { it.id }) {
+                if (ticks.none { it.id == t.id }) ticks = ticks + t.copy(itemId = row.id)
+            }
+            val coveredBy = cs.first().coveredBy!!.takeIf { id -> ticks.any { it.id == id } } ?: continue
+            val news = mine[oldItem.mergeKey].orEmpty()
+            val target = news.fold(QtyBase.PRESENCE) { a, c -> a + c.qty }
+            val keep =
+                when {
+                    news.isEmpty() -> boughtQty
+                    target.isPresence || boughtQty.isPresence -> boughtQty
+                    boughtQty.parts.all { (k, v) -> (target.parts[k] ?: Rational.ZERO) >= v } -> boughtQty
+                    else -> target
+                }
+            // The new shares are still needed only beyond what is kept bought.
+            var remaining = keep
+            for (c in news) {
+                val left = c.qty.minusClamped(remaining)
+                remaining = remaining.minusClamped(c.qty)
+                contributions =
+                    if (left.isPresence) {
+                        contributions.filter { it.id != c.id }
+                    } else {
+                        contributions.map { if (it.id == c.id) it.copy(qty = left) else it }
+                    }
+                touched += c.itemId
+            }
+            val first = cs.first()
+            contributions = contributions +
+                Contribution(
+                    nextId++, useId, news.firstOrNull()?.recipeLineId, row.id, keep, first.noScale, rev,
+                    coveredBy = coveredBy, unitHint = news.firstOrNull()?.unitHint ?: first.unitHint,
+                )
+            touched += row.id
+        }
+        return copy(items = items, contributions = contributions, ticks = ticks, nextId = nextId).bumped(touched)
+    }
+
     /** Rescales a recipe use to new servings; `noScale` contributions stay. */
     fun rescaleUse(
         useId: Long,
