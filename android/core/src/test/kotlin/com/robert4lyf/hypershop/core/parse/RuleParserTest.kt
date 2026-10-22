@@ -348,3 +348,212 @@ class RuleParserTest {
         assertNull(p.parse("2 onions").checkReason)
     }
 }
+
+/** Release C (docs/design/release-c.md, X1–X12): confidently wrong readings found on the independent set. */
+class RuleParserReleaseCTest {
+    private val p = RuleParser()
+    private val norm = Normaliser()
+
+    /** The same ingredient as far as the catalogue is concerned ("fresh ginger" is ginger). */
+    private fun assertSame(
+        want: String,
+        got: String,
+    ) = assertEquals(norm.compareKey(want), norm.compareKey(got), "$got is not $want")
+
+    @Test
+    fun anAmountWrittenAfterTheNameIsRead() {
+        val eggs = p.parse("Eggs 2")
+        assertEquals("eggs", eggs.name)
+        assertEquals(Rational.of(2), eggs.quantity)
+        assertNull(eggs.unit)
+        assertFalse(Uncertainty.uncertain(eggs))
+        val mince = p.parse("mince 500g")
+        assertEquals("mince", mince.name)
+        assertEquals(Rational.of(500), mince.quantity)
+        assertEquals(QtyUnit.G, mince.unit)
+        val bananas = p.parse("bananas x6")
+        assertEquals("bananas", bananas.name)
+        assertEquals(Rational.of(6), bananas.quantity)
+        val dashed = p.parse("Eggs - 6, large")
+        assertEquals("eggs", dashed.name)
+        assertEquals(Rational.of(6), dashed.quantity)
+        val cups = p.parse("Tomato purée 1 ¼ cup")
+        assertEquals("tomato purée", cups.name)
+        assertEquals(Rational.of(5, 4), cups.quantity)
+        assertEquals(QtyUnit.CUP, cups.unit)
+        val beef = p.parse("Beef (minced, coarsely ground and mixed) 10.6 oz")
+        assertEquals("beef", beef.name)
+        assertEquals(QtyUnit.OZ, beef.unit)
+        assertEquals("minced, coarsely ground and mixed", beef.note)
+        val spinach = p.parse("Spinach 8.8 oz")
+        assertEquals(Rational.fromDouble(8.8), spinach.quantity)
+        // Still flagged: a measure the shop does not sell by.
+        val punnets = p.parse("strawbs 2 punnets")
+        assertEquals(Rational.of(2), punnets.quantity)
+        assertEquals(QtyUnit.OTHER, punnets.unit)
+        assertTrue(punnets.check)
+        // A number that is not an amount at the end is left alone.
+        assertEquals("type 00 flour", p.parse("Type 00 flour 1.3 cups").name)
+        assertNull(p.parse("salt and pepper").quantity)
+    }
+
+    @Test
+    fun aLengthIsASizeNotACount() {
+        val ginger = p.parse("5cm piece of ginger, grated")
+        assertSame("ginger", ginger.name)
+        assertEquals(Rational.ONE, ginger.quantity)
+        assertEquals(QtyUnit.PIECE, ginger.unit)
+        assertEquals("5cm, grated", ginger.note)
+        val stick = p.parse("2cm cinnamon stick")
+        assertEquals("cinnamon stick", stick.name)
+        assertEquals(Rational.ONE, stick.quantity)
+        val sized = p.parse("1 2cm piece ginger")
+        assertEquals(Rational.ONE, sized.quantity)
+        assertSame("ginger", sized.name)
+        val inch = p.parse("2 inch piece fresh ginger")
+        assertSame("ginger", inch.name)
+        assertEquals(QtyUnit.PIECE, inch.unit)
+    }
+
+    @Test
+    fun anArticleAfterTheAmountIsNotTheName() {
+        val bunch = p.parse("½ a bunch of fresh coriander")
+        assertSame("coriander", bunch.name)
+        assertEquals(Rational.of(1, 2), bunch.quantity)
+        assertEquals(QtyUnit.BUNCH, bunch.unit)
+        val onion = p.parse("½ an onion")
+        assertEquals("onion", onion.name)
+        assertEquals(Rational.of(1, 2), onion.quantity)
+    }
+
+    @Test
+    fun aShapeWordAfterASizeIsANote() {
+        val ball = p.parse("125g ball mozzarella roughly torn")
+        assertEquals("mozzarella", ball.name)
+        assertEquals(Rational.of(125), ball.quantity)
+        assertEquals(QtyUnit.G, ball.unit)
+        assertTrue(ball.note!!.contains("ball"))
+        assertFalse(ball.check)
+        val tub = p.parse("250g tub mascarpone")
+        assertEquals("mascarpone", tub.name)
+        assertEquals(Rational.of(250), tub.quantity)
+        // Without a size the shape is a unit the shop does not sell by: flagged, as "1 bag spinach" is.
+        assertTrue(p.parse("1 block halloumi").check)
+    }
+
+    @Test
+    fun sizeWordsBeforeAUnitAndPrepVerbsWithoutACommaLeaveTheName() {
+        val garlic = p.parse("2 fat cloves garlic, peeled and grated into a paste")
+        assertEquals("garlic", garlic.name)
+        assertEquals(QtyUnit.CLOVE, garlic.unit)
+        val fenugreek = p.parse("1 rounded tsp dried fenugreek leaves, crushed to a powder (optional)")
+        assertEquals("dried fenugreek leaves", fenugreek.name)
+        assertEquals(QtyUnit.TSP, fenugreek.unit)
+        assertTrue(fenugreek.optional)
+        val chicken = p.parse("8 boneless, skinless chicken breasts cut into 2.5cm cubes")
+        assertEquals("boneless skinless chicken breasts", chicken.name)
+        assertEquals(Rational.of(8), chicken.quantity)
+        val whites = p.parse("2 large egg whites")
+        assertEquals("egg whites", whites.name)
+        val sugar = p.parse("3/4 cup packed light brown sugar")
+        assertEquals("light brown sugar", sugar.name)
+        val ginger = p.parse("1/2 teaspoon grated fresh ginger root")
+        assertEquals("ginger root", ginger.name)
+        // A catalogue phrase that ends the name keeps its qualifier.
+        assertEquals("fresh coriander", p.parse("1 bunch fresh coriander, leaves picked").name)
+        assertEquals("toasted sesame oil", p.parse("1 tsp toasted sesame oil").name)
+    }
+
+    @Test
+    fun decilitresAreMillilitres() {
+        val water = p.parse("8 dl water")
+        assertEquals("water", water.name)
+        assertEquals(Rational.of(800), water.quantity)
+        assertEquals(QtyUnit.ML, water.unit)
+        assertFalse(water.check)
+    }
+
+    @Test
+    fun eachAndASpacedDashAreNotPartOfTheName() {
+        val salt = p.parse("1 tsp each salt, cumin, ground coriander, paprika (sweet, normal or smokey)")
+        assertEquals("salt", salt.name)
+        assertEquals(QtyUnit.TSP, salt.unit)
+        val cheddar = p.parse("cheddar - big block")
+        assertEquals("cheddar", cheddar.name)
+        assertEquals("big block", cheddar.note)
+        // A hyphen inside a word or a range is untouched.
+        assertEquals("half-fat crème fraîche", p.parse("200ml half-fat crème fraîche").name)
+        assertEquals(Rational.of(2), p.parse("1-2 tbsp oil").quantityMax)
+    }
+
+    @Test
+    fun aUnitAfterAParentheticalThatIsNoAmountIsStillRead() {
+        val noodles = p.parse("1 (1o-oz.) package lasagna noodles")
+        assertEquals("lasagna noodles", noodles.name)
+        assertEquals(QtyUnit.PACKET, noodles.unit)
+        assertEquals(Rational.ONE, noodles.quantity)
+        val ginger = p.parse("1 (2-inch) piece ginger")
+        assertEquals("ginger", ginger.name)
+        assertEquals(QtyUnit.PIECE, ginger.unit)
+    }
+
+    @Test
+    fun aMetricAmountInsideAPhraseIsNotTheAmount() {
+        val butter = p.parse("3 tbsp butter (from a 250g block)")
+        assertEquals(QtyUnit.TBSP, butter.shopUnit)
+        val milk = p.parse("2 cups milk (500ml)")
+        assertEquals(QtyUnit.ML, milk.shopUnit)
+        val flour = p.parse("2 tbsp flour (plus 50g for dusting)")
+        assertEquals(QtyUnit.TBSP, flour.shopUnit)
+    }
+
+    @Test
+    fun anAlternativeWithASharedHeadKeepsTheHead() {
+        val stock = p.parse("2 cups chicken or vegetable stock")
+        assertEquals("chicken stock", stock.name)
+        assertEquals("or vegetable stock", stock.note)
+        assertTrue(stock.check)
+        val mince = p.parse("500g beef or lamb mince")
+        assertEquals("beef mince", mince.name)
+        // "safflower or peanut oil" worked before and still does.
+        assertEquals("safflower oil", p.parse("4 tablespoons safflower or peanut oil").name)
+    }
+
+    @Test
+    fun aCountedPepperIsTheVegetable() {
+        assertEquals("bell pepper", p.parse("1 pepper, sliced").name)
+        assertEquals("bell pepper", p.parse("3 x peppers").name)
+        assertEquals("salt and pepper", p.parse("salt and pepper").name)
+    }
+
+    @Test
+    fun superscriptFractionsAreFractions() {
+        val flour = p.parse("2 ¹⁄₂ cups flour")
+        assertEquals(Rational.of(5, 2), flour.quantity)
+        assertEquals(QtyUnit.CUP, flour.unit)
+        assertEquals("flour", flour.name)
+        assertFalse(flour.check)
+    }
+
+    @Test
+    fun aMeasureWithNoAmountIsPresenceNotACountOrAFlag() {
+        val oil = p.parse("a drizzle of olive oil")
+        assertEquals("olive oil", oil.name)
+        assertNull(oil.quantity)
+        assertEquals("a drizzle", oil.note)
+        assertFalse(oil.check)
+        val butter = p.parse("a knob of butter")
+        assertEquals("butter", butter.name)
+        assertNull(butter.quantity)
+        assertFalse(butter.check)
+    }
+
+    @Test
+    fun severalItemsOnOneLineAreFlagged() {
+        val toppings = p.parse("Toppings of choice: shredded cheddar cheese, avocado, shredded lettuce")
+        assertTrue(toppings.check)
+        assertEquals("several items on one line", toppings.checkReason)
+        // A plain colon ("Note: optional") with one item is not.
+        assertFalse(p.parse("2 tbsp olive oil (note: any oil)").check)
+    }
+}

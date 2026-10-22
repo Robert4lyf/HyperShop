@@ -114,6 +114,9 @@ bitters,bitters
 bittersweet chocolate,dark_chocolate
 black bean,black_beans
 black beans,black_beans
+black cardamom,black_cardamom
+black cardamom pod,black_cardamom
+black cardamom pods,black_cardamom
 black kale,cavolo_nero
 black lentil,black_lentils
 black lentils,black_lentils
@@ -121,6 +124,7 @@ black mustard seeds,mustard_seed
 black olive,olive
 black olives,olive
 black pepper,black_pepper
+black peppercorn,black_pepper
 black peppercorns,black_pepper
 black tea,tea
 black treacle,molasses
@@ -132,6 +136,7 @@ blood oranges,blood_orange
 blue cheese,blue_cheese
 blueberries,blueberry
 blueberry,blueberry
+bog roll,toilet_roll
 boiling water,water
 bok choy,pak_choi
 boneless chicken breast,chicken_breast
@@ -211,6 +216,7 @@ caraway seed,caraway
 caraway seeds,caraway
 carbonated water,soda_water
 cardamom,cardamom
+cardamom pod,cardamom
 cardamom pods,cardamom
 carnaroli rice,risotto_rice
 carrot,carrot
@@ -333,6 +339,7 @@ cod,cod
 cod fillet,cod
 cod loin,cod
 coffee,coffee
+coffee granules,coffee
 cognac,brandy
 cointreau,orange_liqueur
 cold butter,butter
@@ -436,8 +443,11 @@ dried breadcrumbs,breadcrumbs
 dried ceps,porcini
 dried cranberries,dried_cranberry
 dried currants,currant
+dried fenugreek leaves,dried_fenugreek_leaves
 dried figs,dried_fig
+dried lasagne sheets,lasagne_sheets
 dried lentils,lentils
+dried methi,dried_fenugreek_leaves
 dried mixed herbs,dried_mixed_herbs
 dried mushroom,dried_mushroom
 dried mushrooms,dried_mushroom
@@ -471,6 +481,7 @@ eating apple,apple
 edamame,edamame
 edamame beans,edamame
 egg,egg
+egg lasagne sheets,lasagne_sheets
 egg noodles,egg_noodles
 egg white,egg
 egg whites,egg
@@ -490,6 +501,7 @@ english mustard powder,mustard_powder
 eschalot,shallot
 espresso,coffee
 evaporated milk,evaporated_milk
+extra mature cheddar,cheddar
 extra virgin olive oil,evoo
 extra-virgin olive oil,evoo
 farfalle,farfalle
@@ -501,6 +513,7 @@ fennel,fennel
 fennel bulb,fennel
 fennel seed,fennel_seed
 fennel seeds,fennel_seed
+fenugreek leaves,dried_fenugreek_leaves
 feta,feta
 feta cheese,feta
 fettuccine,fettuccine
@@ -523,7 +536,10 @@ flaky sea salt,salt
 flank steak,steak
 flat mushroom,portobello
 flat-leaf parsley,parsley
+flax seed,flaxseed
+flax seeds,flaxseed
 flaxseed,flaxseed
+flaxseeds,flaxseed
 fleur de sel,salt
 florence fennel,fennel
 flour,flour
@@ -542,11 +558,13 @@ french stick,baguette
 fresh basil,basil
 fresh breadcrumbs,breadcrumbs
 fresh chilli,chilli
+fresh chillies,chilli
 fresh coconut,coconut_fresh
 fresh coriander,coriander
 fresh dill,dill
 fresh fig,fig
 fresh ginger,ginger
+fresh green chilli,chilli
 fresh herbs,mixed_herbs_fresh
 fresh horseradish,horseradish_root
 fresh lasagne sheets,fresh_pasta
@@ -555,6 +573,7 @@ fresh mozzarella,mozzarella
 fresh orange juice,orange_juice
 fresh oregano,oregano_fresh
 fresh pasta,fresh_pasta
+fresh red chilli,chilli
 fresh rosemary,rosemary
 fresh sage,sage
 fresh spinach,spinach
@@ -624,6 +643,7 @@ grapefruit,grapefruit
 grapefruits,grapefruit
 grapes,grape
 grapeseed oil,vegetable_oil
+grated cheddar,cheddar
 grated cheese,cheese
 gravy,gravy_granules
 gravy granules,gravy_granules
@@ -635,6 +655,10 @@ green beans,green_beans
 green bell pepper,bell_pepper
 green cabbage,cabbage
 green cardamom,cardamom
+green cardamom pod,cardamom
+green cardamom pods,cardamom
+green chilli,chilli
+green chillies,chilli
 green curry paste,green_curry_paste
 green grapes,grape
 green lentil,green_lentils
@@ -711,6 +735,7 @@ honeydew,melon
 horseradish,horseradish
 horseradish root,horseradish_root
 horseradish sauce,horseradish
+hot chilli powder,chilli_powder
 hot curry powder,curry_powder
 hot pepper sauce,hot_sauce
 hot red pepper flake,chilli_flakes
@@ -728,6 +753,7 @@ iceberg lettuce,iceberg
 iceberg lettuces,iceberg
 icing sugar,icing_sugar
 instant coffee,coffee
+instant coffee granules,coffee
 instant yeast,yeast
 iodized salt,salt
 italian bread,ciabatta
@@ -750,6 +776,9 @@ kalamata,kalamata_olive
 kalamata olive,kalamata_olive
 kalamata olives,kalamata_olive
 kale,kale
+kashmiri chilli powder,chilli_powder
+kasoori methi,dried_fenugreek_leaves
+kasuri methi,dried_fenugreek_leaves
 ketchup,ketchup
 kidney beans,kidney_beans
 king prawns,prawn
@@ -776,7 +805,9 @@ lardons,pancetta
 large egg,egg
 large shrimp,prawn
 lasagna noodles,lasagne_sheets
+lasagna sheets,lasagne_sheets
 lasagne,lasagne_sheets
+lasagne noodles,lasagne_sheets
 lasagne sheets,lasagne_sheets
 le puy lentils,puy_lentils
 leek,leek
@@ -816,6 +847,7 @@ limes,lime
 linguine,linguine
 linguini,linguine
 linseed,flaxseed
+linseeds,flaxseed
 little gem,little_gem
 little gem lettuce,little_gem
 little gem lettuces,little_gem
@@ -825,7 +857,10 @@ loaf,bread
 lobster,lobster
 lobsters,lobster
 long grain rice,rice
+long-grain brown rice,brown_rice
 long-grain rice,rice
+loo roll,toilet_roll
+loo rolls,toilet_roll
 low-fat milk,milk
 low-sodium chicken broth,chicken_stock
 lump crabmeat,crab
@@ -851,12 +886,16 @@ marsala wine,marsala
 mascarpone,mascarpone
 masoor dal,red_lentils
 mature cheddar,cheddar
+mature cheddar cheese,cheddar
 mayo,mayonnaise
 mayonnaise,mayonnaise
 medjool dates,date
 melon,melon
 melons,melon
 mesclun,salad_leaves
+mild cheddar,cheddar
+mild cheddar cheese,cheddar
+mild chilli powder,chilli_powder
 mild curry powder,curry_powder
 mild honey,honey
 milk,milk
@@ -875,6 +914,7 @@ miso,miso
 miso paste,miso
 mixed greens,salad_leaves
 mixed herbs,mixed_herbs_fresh
+mixed peppers,bell_pepper
 mixed salad,salad_leaves
 molasses,molasses
 morel,morel
@@ -882,6 +922,8 @@ morel mushroom,morel
 morel mushrooms,morel
 morels,morel
 mozzarella,mozzarella
+mozzarella ball,mozzarella
+mozzarella balls,mozzarella
 mozzarella cheese,mozzarella
 muffin,english_muffin
 mung bean sprouts,beansprouts
@@ -933,6 +975,7 @@ orange flower water,orange_blossom_water
 orange juice,orange_juice
 orange liqueur,orange_liqueur
 orange peel,orange
+orange pepper,bell_pepper
 orange rind,orange
 orange zest,orange
 oranges,orange
@@ -957,6 +1000,7 @@ panko breadcrumbs,panko
 paper towels,kitchen_roll
 pappardelle,pappardelle
 paprika,paprika
+paprika powder,paprika
 parchment,baking_paper
 parchment paper,baking_paper
 parma ham,prosciutto
@@ -994,6 +1038,7 @@ pecorino romano cheese,pecorino
 penne,penne
 pepitas,pumpkin_seed
 pepper,black_pepper
+peppercorn,black_pepper
 peppercorns,black_pepper
 peppered smoked mackerel,smoked_mackerel
 peppers,bell_pepper
@@ -1092,7 +1137,9 @@ red bell pepper,bell_pepper
 red cabbage,red_cabbage
 red cabbages,red_cabbage
 red chile,chilli
+red chili powder,chilli_powder
 red chilli,chilli
+red chilli powder,chilli_powder
 red chillies,chilli
 red curry paste,red_curry_paste
 red food coloring,food_colouring
@@ -1145,6 +1192,7 @@ rose water,rosewater
 rosemary,rosemary
 rosemary leaves,rosemary
 rosewater,rosewater
+round lettuce,lettuce
 rum,rum
 runner beans,runner_beans
 runny honey,honey
@@ -1208,6 +1256,7 @@ shiitake,shiitake
 shiitake mushroom,shiitake
 shiitake mushrooms,shiitake
 short pasta,pasta
+short-grain brown rice,brown_rice
 shortcrust pastry,shortcrust_pastry
 shoyu,soy_sauce
 shredded coconut,coconut_flakes
@@ -1354,10 +1403,15 @@ toasted almonds,almond
 toasted sesame oil,sesame_oil
 toasted sesame seeds,sesame_seed
 tofu,tofu
+toilet paper,toilet_roll
+toilet roll,toilet_roll
+toilet rolls,toilet_roll
+toilet tissue,toilet_roll
 tomatillo,tomatillo
 tomatillos,tomatillo
 tomato,tomato
 tomato ketchup,ketchup
+tomato passata,passata
 tomato paste,tomato_puree
 tomato puree,tomato_puree
 tomato sauce,passata
@@ -1389,6 +1443,7 @@ unsweetened coconut milk,coconut_milk
 unsweetened shredded coconut,coconut_flakes
 vanilla,vanilla_extract
 vanilla bean,vanilla_pod
+vanilla bean paste,vanilla_extract
 vanilla beans,vanilla_pod
 vanilla essence,vanilla_extract
 vanilla extract,vanilla_extract
@@ -1405,6 +1460,7 @@ vermicelli rice noodles,rice_noodles
 vermouth,vermouth
 vine tomato,tomato
 vinegar,white_vinegar
+vintage cheddar,cheddar
 vodka,vodka
 walnut,walnut
 walnut halves,walnut
@@ -1444,6 +1500,7 @@ white vinegar,white_vinegar
 white wine,white_wine
 white wine vinegar,white_wine_vinegar
 white-wine vinegar,white_wine_vinegar
+whole black peppercorns,black_pepper
 whole chicken,chicken
 whole cloves,clove_spice
 whole coriander seeds,coriander_seed
@@ -1458,6 +1515,7 @@ whole-milk yogurt,yogurt
 whole-wheat bread,wholemeal_bread
 whole-wheat flour,wholemeal_flour
 wholegrain mustard,wholegrain_mustard
+wholegrain rice,brown_rice
 wholemeal bread,wholemeal_bread
 wholemeal flour,wholemeal_flour
 wholewheat flour,wholemeal_flour

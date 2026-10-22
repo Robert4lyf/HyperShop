@@ -133,6 +133,9 @@ class Catalog(
                 }
             }
 
+        /** The same keys with hyphens as spaces: "self raising flour" is "self-raising flour". */
+        val byLooseKey: Map<String, CatalogEntry> = byKey.entries.associate { (k, e) -> k.replace('-', ' ') to e }
+
         /** Per aisle, its groups in the order they first appear. */
         val groups: Map<AisleCode, List<String>> =
             entries.filter { it.group != null }.groupBy { it.aisle }.mapValues { (_, es) -> es.mapNotNull { it.group }.distinct() }
@@ -158,8 +161,11 @@ class Catalog(
         return if (i >= 0) i else known.size
     }
 
-    /** The entry whose name, plural or synonym has this name's key. */
-    fun lookup(name: String): CatalogEntry? = s.byKey[CatalogKey.of(name)]
+    /** The entry whose name, plural or synonym has this name's key; "self raising flour" finds "self-raising flour" too. */
+    fun lookup(name: String): CatalogEntry? {
+        val k = CatalogKey.of(name)
+        return s.byKey[k] ?: s.byLooseKey[k.replace('-', ' ')]
+    }
 
     fun containsKey(key: String): Boolean = s.byKey.containsKey(key)
 

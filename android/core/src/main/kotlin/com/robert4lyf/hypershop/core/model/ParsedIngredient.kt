@@ -48,8 +48,9 @@ data class ParsedIngredient(
             if (quantity == null || u.dimension == Dimension.COUNT || u in METRIC) return null
             val accepts = if (u == QtyUnit.TSP || u == QtyUnit.TBSP) GRAMS else METRIC
             if (altQuantity != null && altUnit in accepts) return altQuantity to altUnit!!
-            // The rule parser moves a trailing "(500ml)" into the note as "500ml" (R4.3).
-            val m = METRIC_IN_NOTE.find(note.orEmpty()) ?: return null
+            // The rule parser moves a trailing "(500ml)" into the note as "500ml" (R4.3). Only a note that
+            // *is* an amount counts: "from a 250g block" or "plus 50g for dusting" describe something else.
+            val m = note.orEmpty().split(", ").firstNotNullOfOrNull { METRIC_IN_NOTE.matchEntire(it.trim()) } ?: return null
             val v = m.groupValues[1].replace(',', '.').toDoubleOrNull() ?: return null
             val mu = QtyUnit.entries.firstOrNull { it.serial == m.groupValues[2].lowercase() }?.takeIf { it in accepts } ?: return null
             return Rational.fromDouble(v) to mu
@@ -77,7 +78,8 @@ data class ParsedIngredient(
         private val GRAMS = setOf(QtyUnit.G, QtyUnit.KG)
 
         // Digits bounded as in the tokeniser: a 320-digit "amount" in a note would parse to Infinity and crash fromDouble.
-        private val METRIC_IN_NOTE = Regex("""(?<![\d.,])(\d{1,9}(?:[.,]\d{1,4})?)(?!\d)\s*(ml|g|kg|l)\b""", RegexOption.IGNORE_CASE)
+        private val METRIC_IN_NOTE =
+            Regex("""(?:about |approx\.? |approximately )?(\d{1,9}(?:[.,]\d{1,4})?)\s*(ml|g|kg|l)\.?""", RegexOption.IGNORE_CASE)
     }
 }
 

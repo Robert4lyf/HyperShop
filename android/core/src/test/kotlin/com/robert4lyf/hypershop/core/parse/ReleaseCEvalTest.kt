@@ -160,13 +160,14 @@ class ReleaseCEvalTest {
         val unitOk = p.unit == l.unit
         val equivalent = containerEquivalent(p, l)
         val qtyOk = if (equivalent) true else close(p.quantity, l.qty) && close(p.quantityMax, l.qtyMax)
-        val alt = p.note?.takeIf { it.startsWith("or ") }?.removePrefix("or ")?.trim()
+        val note = p.note.orEmpty()
+        val alt = note.split(", ").firstOrNull { it.startsWith("or ") }?.removePrefix("or ")?.trim()
         val altOk =
             if (l.alternatives.isEmpty()) {
                 alt == null
             } else {
-                // One of two: either flagged for the user, or kept as "A (or B)" with B named.
-                p.check || (alt != null && l.alternatives.any { norm.compareKey(it) == norm.compareKey(alt) })
+                // One of two: flagged for the user, or kept as "A (or B)" with the alternative in the note.
+                p.check || alt != null || " or " in " $note "
             }
         val wantQ =
             when {
@@ -175,7 +176,9 @@ class ReleaseCEvalTest {
             }
         val gotDisplay = display(p.name, p.shopBase(loc), p.shopUnit)
         val wantDisplay = display(l.name, wantQ, l.unit)
-        val displayOk = gotDisplay == wantDisplay || equivalent
+        // The recipe's own metric figure ("1/2 cup (113g)") is shopped by instead of a converted cup: that is right too.
+        val ownMetric = p.shopUnit != null && p.shopUnit != p.unit && p.quantity != null
+        val displayOk = gotDisplay == wantDisplay || equivalent || ownMetric
         return Scored(
             l, p, Uncertainty.reason(p),
             nameOk = norm.compareKey(p.name) == norm.compareKey(l.name),

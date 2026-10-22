@@ -120,7 +120,8 @@ class WatchSyncCoordinatorTest {
     fun helloGetsTheWholeListInPagesUnderTheCap() =
         runBlocking {
             val c = TestContainer.create()
-            c.addTyped(List(30) { "item number $it" })
+            // Thirty distinct names (a line ending in a number is read as "that many", spec R3.7).
+            c.addTyped(List(30) { "item number ${it.toString().map { d -> 'a' + d.digitToInt() }.joinToString("")}" })
             c.watchSync.cap = PayloadCap(bytes = 384, maxPages = 16)
             c.hello()
             val pages = c.pages()

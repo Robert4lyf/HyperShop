@@ -26,6 +26,10 @@ data class Token(
 object Tokeniser {
     const val MAX_LINE = 500
 
+    private val SCRIPT_DIGITS: Map<Char, Char> =
+        ("⁰¹²³⁴⁵⁶⁷⁸⁹".withIndex().associate { (i, c) -> c to ('0' + i) }) +
+            ("₀₁₂₃₄₅₆₇₈₉".withIndex().associate { (i, c) -> c to ('0' + i) })
+
     private val vulgar =
         mapOf(
             '½' to Rational.of(1, 2),
@@ -46,7 +50,8 @@ object Tokeniser {
         )
 
     fun tokenise(line: String): List<Token> {
-        val s = line
+        // Superscript and subscript digits ("2 ¹⁄₂ cups") are digits; nothing else is folded.
+        val s = if (line.any { it in SCRIPT_DIGITS }) line.map { SCRIPT_DIGITS[it] ?: it }.joinToString("") else line
         val out = ArrayList<Token>()
         var i = 0
         val n = s.length

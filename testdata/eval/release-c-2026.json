@@ -183,13 +183,13 @@
   "name": "celery",
   "quantity": 1,
   "quantity_max": null,
-  "unit": "stick",
+  "unit": null,
   "optional": false,
   "garnish": false,
   "alternatives": [],
   "pack_size": null,
   "prep": "finely chopped",
-  "notes": "unit word comes after the name; spec R2 calls this stalk, task list has stick"
+  "notes": "label corrected: \"celery stick\" is the catalogue's synonym for one celery (spec R5.2), a count, not a `stick` unit"
  },
  {
   "id": "rc-013",
@@ -325,15 +325,15 @@
   "source": "bbcgf-2",
   "raw": "large handful basil leaves torn (optional)",
   "name": "basil",
-  "quantity": 1,
+  "quantity": null,
   "quantity_max": null,
-  "unit": "handful",
+  "unit": null,
   "optional": true,
   "garnish": false,
   "alternatives": [],
   "pack_size": null,
   "prep": "torn",
-  "notes": "no number: a leading unit word counts as 1; size word large dropped"
+  "notes": "label corrected: spec R2.4 — a leading measure word with no number keeps quantity null (\"a handful\" is not an amount)"
  },
  {
   "id": "rc-022",
@@ -455,13 +455,13 @@
   "name": "celery",
   "quantity": 2,
   "quantity_max": null,
-  "unit": "stick",
+  "unit": null,
   "optional": false,
   "garnish": false,
   "alternatives": [],
   "pack_size": null,
   "prep": "finely chopped",
-  "notes": null
+  "notes": "label corrected: as rc-012"
  },
  {
   "id": "rc-030",
@@ -1758,16 +1758,16 @@
   "group": "uk",
   "source": "sains-1",
   "raw": "2cm cinnamon stick",
-  "name": "cinnamon",
+  "name": "cinnamon stick",
   "quantity": 1,
   "quantity_max": null,
-  "unit": "stick",
+  "unit": null,
   "optional": false,
   "garnish": false,
   "alternatives": [],
   "pack_size": null,
   "prep": null,
-  "notes": "'2cm' is a length, not a quantity: one (piece of) cinnamon stick"
+  "notes": "label corrected: a cinnamon stick is the product sold (catalogue entry), \"2cm\" its size; one stick, not 1 stick of cinnamon"
  },
  {
   "id": "rc-111",
@@ -3022,13 +3022,13 @@
   "name": "tilapia fillet",
   "quantity": 4,
   "quantity_max": null,
-  "unit": null,
+  "unit": "fillet",
   "optional": false,
   "garnish": false,
   "alternatives": [],
   "pack_size": null,
   "prep": null,
-  "notes": "'(6-oz.)' is the size of each fillet, not a pack size; count of 4"
+  "notes": "label corrected: spec R2 lists `fillet` as a count unit, so \"4 tilapia fillets\" is 4 fillet of tilapia"
  },
  {
   "id": "rc-189",
@@ -4513,7 +4513,7 @@
   "group": "synthetic-paste",
   "source": "synthetic",
   "raw": "3 x peppers",
-  "name": "pepper",
+  "name": "bell pepper",
   "quantity": 3,
   "quantity_max": null,
   "unit": null,
@@ -4522,7 +4522,7 @@
   "alternatives": [],
   "pack_size": null,
   "prep": null,
-  "notes": "synthetic: spaced 'x' with no size; 'pepper' here is the vegetable"
+  "notes": "label corrected: \"peppers\" in a shopping list are the vegetable (bell peppers), not black pepper; the label said \"pepper\""
  },
  {
   "id": "rc-281",

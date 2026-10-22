@@ -105,3 +105,19 @@ Fetched total: 267 lines from 32 pages.
 | NYT Cooking | https://cooking.nytimes.com/recipes/1017089-roasted-chicken-provencal | HTTP 404 |
 | Sainsbury's Magazine (2nd page), Inspired Taste | 200 but no JSON-LD recipe block; not used | — |
 | Various guessed slugs (Olive, BBC Food, Epicurious, Bon Appétit, Jamie Oliver, GialloZafferano, Arla, Love & Lemons, Natasha's Kitchen, German recipe sites) | — | HTTP 404; replaced by the pages listed above |
+
+## Label corrections after the baseline (Release C, step C.1)
+
+The baseline report (docs/reports/release-c-extraction-baseline.md) was scored on the
+labels as first written. Six labels were then corrected where they contradicted
+docs/parser-spec.md or the catalogue's own reading, each with the reason in the
+entry's `notes`; nothing else was changed, and no label was changed to match a
+parser output:
+
+| id | was | now | why |
+|---|---|---|---|
+| rc-012, rc-029 | unit `stick` | no unit (a count) | "celery stick" is the catalogue's synonym for one celery (R5.2) |
+| rc-021 | quantity 1 `other` | no quantity | R2.4: a leading measure word with no number is not an amount |
+| rc-110 | name `cinnamon`, unit `stick` | name `cinnamon stick`, no unit | a cinnamon stick is the product sold; "2cm" is its size |
+| rc-188 | no unit | unit `fillet` | R2 lists `fillet` as a count unit |
+| rc-280 | name `pepper` | name `bell pepper` | "peppers" on a shopping list are the vegetable |

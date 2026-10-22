@@ -51,7 +51,7 @@ Serialised lower case (Claude's enum and the golden JSON use these strings).
 
 - **R2.1 Case-sensitive spoons.** `T` and `Tbsp`-like capital T alone = tbsp; lower-case `t` alone = tsp. All other unit words are case-insensitive.
 - **R2.2 Locale factors** (for `QtyBase`, PLAN §3.3): cup = 240 ml (US) or 250 ml (metric); pint = 473 ml (US) or 568 ml (UK); quart = 946 ml (US) or 1137 ml (UK); fl oz = 29.57 ml (US) or 28.41 ml (UK); tbsp = 15 ml; tsp = 5 ml; oz = 28.35 g; lb = 453.6 g. A recipe's `unitLocale` is `US` unless it uses metric masses/volumes (g, kg, ml, l), or the source is a UK site, in which case `METRIC`/`UK`.
-- **R2.4 Other units (rule parser):** ear, leaf/leaves, bag, strip, rectangle, handful, bottle, jar, sheet, drop, loaf, bulb, splash, cube, square, wedge, stem, branch, pod, punnet, knob, rasher, sachet-like containers not in R2. Size words between the number and the unit go to `note` ("2 medium cloves garlic" → 2 clove, note medium). With no number, a leading unit word (and a following "of") goes to `note` and the quantity stays `null` — except R3.3's pinch, dash, bunch, sprig and head.
+- **R2.4 Other units (rule parser):** ear, leaf/leaves, bag, strip, rectangle, handful, bottle, jar, sheet, drop, loaf, bulb, splash, cube, square, wedge, stem, branch, pod, punnet, knob, rasher, box, carton, tub, pot, block, bar, ball, slab, tray, drizzle, glug, squeeze, dollop, sprinkle(ing), scattering, sachet-like containers not in R2. Size words between the number and the unit go to `note` ("2 medium cloves garlic" → 2 clove, note medium; also fat, rounded, plump, juicy, thumb-sized, organic, each). With no number, a leading unit word (and a following "of") goes to `note` and the quantity stays `null` — except R3.3's pinch, dash, bunch, sprig and head. `a <other unit> of X` ("a drizzle of olive oil", "a knob of butter") is R6 presence with the measure in `note`, not a count and not flagged. After a size, an R2.4 word is a shape, not a unit: `125g ball mozzarella` → 125 g, note "ball"; `250g tub mascarpone` → 250 g.
 - **R2.3 Dimensions.** `MASS` (base g), `VOLUME` (base ml), `COUNT` (base: one of the unit, or one item when `unit == null`). Pinch and dash are `COUNT` (never converted).
 
 ## R3 — Quantities
@@ -62,13 +62,20 @@ Serialised lower case (Claude's enum and the golden JSON use these strings).
 - **R3.4 Parenthetical alternatives**: a parenthesised amount with a unit right after the primary amount/unit (`2 cups (300g)`, `1 (14-ounce) tin`) is `alt_quantity`/`alt_unit`. For "`N (size-unit) container`" the container is the unit and the size goes to alt: `1 (400g) tin tomatoes` → qty 1 tin, alt 400 g.
 - **R3.5** `x` multipliers (`2 x 400g tins`) → qty 2, unit tin, alt 400 g. With no container (`4 x 150g salmon fillets`) → qty 4, no unit (a count), alt 150 g, name `salmon fillets`.
 - **R3.6** "plus 2 tbsp", "and 1 tsp" after the first amount → the extra amount goes into `note` (not added).
+- **R3.7 An amount after the name** (Release C): when the line starts with no amount and ends with one — `Eggs 2`, `Eggs - 6, large`, `mince 500g`, `bananas x6`, `Spinach 8.8 oz`, `Tomato purée 1 ¼ cup`, `Beef (minced) 10.6 oz` — the trailing number (with its unit, and a `x` or dash before it) is the amount and what precedes it is the name; a note after a comma stays a note. `quantity_text` is the trailing text.
+- **R3.8 Lengths are sizes.** A number followed by `cm`, `mm`, `inch`/`inches` (`5cm piece of ginger`, `2cm cinnamon stick`, `1 2cm piece ginger`, `a 3cm piece`) goes to `note`; the quantity is 1 (of the unit that follows, e.g. `piece`), never the length.
+- **R3.9 Decilitres.** `dl`, `decilitre(s)` → `ml` × 100 (`2 dl` → 200 ml).
+- **R3.10** `a`/`an` straight after a number is skipped (`½ a bunch`, `½ an onion`).
 
 ## R4 — Name vs note
 
 - **R4.1 Prep words go to `note`.** Verbs/participles and their adverbs: chopped, diced, minced, sliced, grated, shredded, crushed, sifted, peeled, cored, seeded, deseeded, pitted, halved, quartered, cubed, trimmed, rinsed, drained, beaten, whisked, melted, softened, room-temperature, cooked, toasted (when describing prep of a bought item: "toasted almonds" stays — see R4.2), thawed, defrosted, julienned, torn, squeezed, zested, finely, roughly, coarsely, thinly, lightly, freshly, divided. Sizes: small, medium, large, extra-large, medium-size, big, thick, thin. Qualifiers: fresh (when the dried form is not meant), about, approximately, heaped, heaping, level, scant, good, good-quality, high-quality, generous, ripe, plus more. Everything after the first top-level comma is `note`, except a comma that follows only adjectives such as boneless, skinless, ripe, fresh, large (and no catalogue name): "boneless, skinless chicken breasts" reads as one name.
 - **R4.2 Identity words stay in `name`.** They change what you buy: ground, smoked, red, green, yellow, white, black, brown, dried, dry (wine), tinned, canned, frozen, powder/powdered, unsalted, salted, low-fat, whole (milk), skimmed, semi-skimmed, double, single (cream), plain, self-raising, strong (flour), caster, icing, granulated, light/dark (sugar, soy), sweet, hot, extra-virgin, virgin, toasted (sesame oil), roasted (peppers in a jar), baby (spinach), spring (onion), boneless, skinless, free-range, kosher (salt, folded per R5.3), sea (salt).
-- **R4.3** A parenthetical that is not an amount (R3.4) goes to `note`: `1 onion (about 200 g)` → note "about 200 g". Exception: `(optional)` sets `optional` and is dropped.
-- **R4.4** "or" between two ingredients ("butter or margarine") keeps one ingredient: `name` is the first, `note` gets "or margarine". Rule parser: R7.
+- **R4.3** A parenthetical that is not an amount (R3.4) goes to `note`: `1 onion (about 200 g)` → note "about 200 g". Exception: `(optional)` sets `optional` and is dropped. A unit after such a parenthetical is still read (`1 (1o-oz.) package noodles` → 1 packet). A metric figure in a note is the amount to shop by only when the note *is* that figure ("500ml", "about 500 ml"), never when it sits inside a phrase ("from a 250g block", "plus 50g for dusting").
+- **R4.4** "or" between two ingredients ("butter or margarine") keeps one ingredient: `name` is the first, `note` gets "or margarine". A lone word before "or" borrows the head of what follows when the pair is a product ("safflower or peanut oil" → safflower oil; "chicken or vegetable stock" → chicken stock, even though "chicken" is an ingredient on its own). Rule parser: R7.
+- **R4.6 A spaced dash separates** like a comma ("cheddar - big block" → name cheddar, note "big block"); a hyphen inside a word or a range does not. "1 tsp each salt, …" drops "each". Prep words without a comma end the name ("chicken breasts cut into cubes"; R4.1 now includes packed, firmly, loosely, pressed, cut, split, broken, shaved, scored, pounded, bruised, bashed, deveined, butterflied, spatchcocked, deboned, scaled, gutted, shucked, flattened, sieved, strained, reserved, separated, removed, discarded).
+- **R4.7** A qualifier is kept only when the catalogue phrase it starts runs to the end of the name: "fresh coriander" stays, but "fresh ginger root" reads as ginger root (the catalogue's "fresh ginger" does not end the name).
+- **R4.8** A counted "pepper"/"peppers" is a bell pepper; "salt and pepper" is still black pepper.
 - **R4.5** "of" after a unit is dropped: "a pinch of salt" → unit pinch, name salt.
 
 ## R5 — Normalising (`:core` normaliser, shared by both parsers)
@@ -89,7 +96,12 @@ The rule parser does **not** split "X and Y", resolve "A or B", or parse
 "juice of 1 lemon"/"zest of". It marks those lines `check = true` and does its
 best: for "juice of N lemon(s)" it returns name "lemon", quantity N, note
 "juice". Claude splits "X and Y" into two ingredients (except fixed phrases
-such as "salt and pepper" → two, "mac and cheese" → one).
+such as "salt and pepper" → two, "mac and cheese" → one). Also flagged
+(Release C): a line with a colon and two or more commas ("Toppings of choice:
+cheese, avocado, lettuce" — several items on one line), and a number left
+inside the name ("2 1 2 cups flour" — an amount not read whole). A measure the
+shop does not sell by ("2 rashers", "a small handful") stays flagged as "an
+unknown unit"; the reading is usually right, and the review shows it.
 
 ## R8 — Section headers
 

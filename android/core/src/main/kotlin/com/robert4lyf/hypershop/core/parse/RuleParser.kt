@@ -65,6 +65,59 @@ class RuleParser(
         var optional = false
         val notes = ArrayList<String>()
 
+        /** Where the name stops: the end, or where an amount written after it starts. */
+        var limit = toks.size
+        var trailingText: String? = null
+
+        /**
+         * An amount at the end of the line, after the name: "Eggs 2", "Eggs - 6", "mince 500g",
+         * "bananas x6", "Tomato purée 1 ¼ cup", "Beef (minced) 10.6 oz". Null when the line's
+         * tail is not an amount, or when nothing would be left for the name.
+         */
+        fun trailingAmount(): Trailing? {
+            // "Eggs - 6, large": the amount may sit before a trailing note.
+            trailingAmount(toks.size)?.let { return it }
+            val comma = toks.indexOfLast { it.kind == Kind.COMMA }
+            if (comma <= 0) return null
+            return trailingAmount(comma)?.also { notes += span(comma + 1, toks.size) }
+        }
+
+        fun trailingAmount(end: Int): Trailing? {
+            // The last number, with everything after it a unit (or nothing).
+            var j = end - 1
+            while (j >= 0 && (toks[j].kind == Kind.PERIOD || toks[j].kind == Kind.OTHER)) j--
+            var unitAtEnd: QtyUnit? = null
+            var unitLen = 0
+            if (j >= 0 && toks[j].kind == Kind.WORD) {
+                val u = unitAt(j) ?: unitAt(j - 1)?.takeIf { it.second == 2 }
+                if (u != null) {
+                    unitAtEnd = u.first
+                    unitLen = u.second
+                    j -= unitLen
+                } else if (word(j) in Lexicon.otherUnits) {
+                    unitAtEnd = QtyUnit.OTHER
+                    unitLen = 1
+                    j--
+                } else {
+                    return null
+                }
+            }
+            if (j < 0 || toks[j].kind != Kind.NUM) return null
+            // "1 ¼": a whole number before a fraction belongs to it.
+            var from = j
+            var value = toks[j].value!!
+            if (j >= 1 && toks[j - 1].kind == Kind.NUM && value < Rational.ONE && toks[j - 1].value!!.isWhole) {
+                from = j - 1
+                value += toks[j - 1].value!!
+            }
+            // "x6": a multiplier, "Eggs - 6": a dash; both belong to the amount.
+            if (from >= 1 && (word(from - 1) == "x" || toks[from - 1].kind == Kind.DASH)) from--
+            // Nothing before it that could be a name, or the number is the first token (a leading amount read already).
+            if (from == 0 || (0 until from).none { toks[it].kind == Kind.WORD }) return null
+            if (unitAtEnd == QtyUnit.OTHER) flag("an unknown unit")
+            return Trailing(from, value, null, unitAtEnd, null, null)
+        }
+
         /** R7: the line needs a look; the first reason is the one shown. */
         fun flag(reason: String) {
             check = true
@@ -91,6 +144,20 @@ class RuleParser(
             if (qty == null && qtyStart > 0) {
                 i = 0 // no amount after all: "about" stays where it was
                 notes.clear()
+            }
+            if (qty != null) {
+                // "½ a bunch", "½ an onion": the article after the amount is not the name.
+                if (word(i) == "a" || word(i) == "an") i++
+                // A length is a size, not a count: "5cm piece of ginger" is one piece (R4.3).
+                if (word(i) in Lexicon.lengths) {
+                    notes += span(qtyStart, i + 1)
+                    i++
+                    qty = Rational.ONE
+                    qtyMax = null
+                } else if (kind(i) == Kind.NUM && word(i + 1) in Lexicon.lengths) {
+                    notes += span(i, i + 2) // "1 2cm piece", "a 3cm piece"
+                    i += 2
+                }
             }
             val qtyEnd = i
             var unit: QtyUnit? = null
@@ -128,7 +195,15 @@ class RuleParser(
                     i++
                     unit = readUnit()
                 } else {
-                    unit = readUnit()
+                    if (word(i) in Lexicon.decilitres) {
+                        // "2 dl water": a decilitre is 100 ml.
+                        i++
+                        unit = QtyUnit.ML
+                        qty = qty!! * DECILITRE
+                        qtyMax = qtyMax?.times(DECILITRE)
+                    } else {
+                        unit = readUnit()
+                    }
                     // R3.4: 2 cups (300g) … / 1 (14-ounce) tin
                     if (kind(i) == Kind.LPAREN) {
                         val close = matching(i)
@@ -138,6 +213,11 @@ class RuleParser(
                             altUnit = alt.second
                             i = close + 1
                             if (unit == null) unit = readUnit()
+                        } else if (unit == null && close > i && unitAt(close + 1) != null) {
+                            // "1 (1o-oz.) package noodles": a parenthetical that is no amount, then the unit.
+                            notes += span(i + 1, close)
+                            i = close + 1
+                            unit = readUnit()
                         }
                     }
                     // R3.4: 400g tin chopped tomatoes
@@ -149,6 +229,9 @@ class RuleParser(
                             altUnit = unit
                             qty = Rational.ONE
                             unit = container
+                        } else if (container == QtyUnit.OTHER) {
+                            // "125g ball mozzarella", "250g tub mascarpone": the amount stands, the shape is a note.
+                            notes += toks[i - 1].text.lowercase()
                         } else {
                             i = save
                         }
@@ -190,9 +273,24 @@ class RuleParser(
                     i += u.second
                     qty = Rational.ONE
                     unit = u.first
+                } else if ((word(i) == "a" || word(i) == "an") && (word(i + 1) in Lexicon.otherUnits) && word(i + 2) == "of") {
+                    // R6: "a drizzle of olive oil", "a knob of butter": no amount, the measure is a note.
+                    notes += "${word(i)} ${word(i + 1)}"
+                    i += 2
                 } else if (u != null || word(i) in Lexicon.otherUnits) {
                     notes += toks[i].text.lowercase()
                     i += u?.second ?: 1
+                }
+                // "Eggs 2", "mince 500g", "bananas x6", "Spinach 8.8 oz": the amount written after the name.
+                val trailing = trailingAmount()
+                if (trailing != null) {
+                    qty = trailing.qty
+                    qtyMax = trailing.qtyMax
+                    unit = trailing.unit
+                    altQty = trailing.altQty
+                    altUnit = trailing.altUnit
+                    limit = trailing.from
+                    trailingText = span(trailing.from, toks.size).trim().trimStart('-', '–', 'x', 'X', ' ')
                 }
             }
             if (word(i) == "of") i++ // R4.5
@@ -203,7 +301,9 @@ class RuleParser(
             if (unit == QtyUnit.OTHER) flag("an unknown unit")
 
             if ("optional" in lower || "if desired" in lower || "if you like" in lower) optional = true
-            val quantityText = if (qtyEnd > qtyStart) span(qtyStart, qtyEnd).trim() else null
+            // Several things on one line ("Toppings: cheese, avocado, lettuce"): one of them would be wrong.
+            if (toks.any { it.kind == Kind.COLON } && toks.count { it.kind == Kind.COMMA } >= 2) flag("several items on one line")
+            val quantityText = trailingText ?: if (qtyEnd > qtyStart) span(qtyStart, qtyEnd).trim() else null
             return ParsedIngredient(
                 raw = text,
                 name = name,
@@ -266,8 +366,10 @@ class RuleParser(
             }
             val w = word(i) ?: return null
             val n = Lexicon.numberWords[w] ?: return null
-            // "a"/"an" count before a unit or a name ("a pinch of salt", "an egg"), not "a few".
+            // "a"/"an" count before a unit or a name ("a pinch of salt", "an egg"), not "a few",
+            // and not "a drizzle of": a measure the shop does not sell by is a note, not a count (R6).
             if ((w == "a" || w == "an") && (kind(i + 1) !in ARTICLE_BEFORE || word(i + 1) in VAGUE)) return null
+            if ((w == "a" || w == "an") && word(i + 1) in Lexicon.otherUnits && word(i + 2) == "of") return null
             i++
             if (w == "half" && (word(i) == "a" || word(i) == "an")) i++
             return n
@@ -345,16 +447,25 @@ class RuleParser(
          * The rest of the line: name up to the first top-level comma, then note.
          * Returns the name and, for "2 garlic cloves", the count unit that trailed it.
          */
-        fun nameAndNote(mayTrailUnit: Boolean): Triple<String, QtyUnit?, Rational?> {
+        fun nameAndNote(
+            mayTrailUnit: Boolean,
+            impliedCount: Boolean = mayTrailUnit,
+        ): Triple<String, QtyUnit?, Rational?> {
             val head = ArrayList<Token>()
             var depth = 0
             var k = i
-            var cut = toks.size
-            while (k < toks.size) {
+            var cut = limit
+            while (k < limit) {
                 val t = toks[k]
                 when (t.kind) {
+                    Kind.DASH ->
+                        if (depth == 0 && spacedDash(k)) {
+                            // "cheddar - big block": a dash with spaces round it separates like a comma.
+                            cut = k
+                            break
+                        }
                     Kind.LPAREN -> {
-                        val close = matching(k).takeIf { it > k } ?: toks.size // unclosed: to the end
+                        val close = matching(k).takeIf { it > k } ?: limit // unclosed: to the end
                         val inner = span(k + 1, close).trim()
                         if (inner.lowercase() == "optional") {
                             optional = true
@@ -379,7 +490,7 @@ class RuleParser(
                 head += t
                 k++
             }
-            if (cut < toks.size) notes += span(cut + 1, toks.size)
+            if (cut < limit) notes += span(cut + 1, limit)
 
             // Words of the name: prep words and qualifiers to the note (R4.1) unless
             // they start a catalogue name (R4.2); a postnominal phrase ends the name.
@@ -408,6 +519,8 @@ class RuleParser(
 
             var name = joinWords(kept).lowercase().trim()
             name = name.removePrefix("of ").trim()
+            // "1 pepper", "3 x peppers": a counted pepper is the vegetable (black pepper is never counted).
+            if ((name == "pepper" || name == "peppers") && impliedCount) name = "bell pepper"
 
             // R7: juice/zest of N lemons.
             var implied: Rational? = null
@@ -425,11 +538,17 @@ class RuleParser(
                 val b = name.substring(minOf(name.length, orAt + 3)).trim()
                 val bWords = b.split(' ')
                 // A lone modifier before "or" borrows B's head noun.
-                val sharesHead = !a.contains(' ') && bWords.size >= 2 && catalog.lookup(a) == null
+                val sharesHead =
+                    !a.contains(' ') && bWords.size >= 2 &&
+                        (catalog.lookup(a) == null || catalog.lookup("$a ${bWords.last()}") != null)
                 name = if (sharesHead) "$a ${bWords.drop(1).joinToString(" ")}" else a
                 notes.add(0, "or $b")
             } else if (" and " in " $name " || " & " in " $name ") {
                 flag("\"X and Y\": may be two items") // R7: Claude's to split
+            }
+            // A number inside what is left ("2 1 2 cups flour") means an amount was not read whole.
+            if (kept.size > 1 && kept.any { it.kind == Kind.NUM } && catalog.lookup(joinWords(kept)) == null) {
+                flag("an amount left in the name")
             }
 
             var trailing: QtyUnit? = null
@@ -457,9 +576,18 @@ class RuleParser(
             // No catalogue name is longer than MAX_KEY_WORDS words, so longer phrases need no lookup.
             for (end in minOf(words.size, idx + MAX_KEY_WORDS) downTo idx + 2) {
                 val phrase = words.subList(idx, end).joinToString(" ") { it.text }
-                if (catalog.lookup(phrase) != null) return true
+                // "fresh ginger" is a catalogue name, but "fresh ginger root" is not: the phrase must end
+                // the name (or be followed by what would end it anyway) for "fresh" to stay.
+                val next = words.getOrNull(end)?.text?.lowercase()
+                if (catalog.lookup(phrase) != null && (next == null || next in Lexicon.nameEnders || next in Lexicon.prep)) return true
             }
             return false
+        }
+
+        /** A dash with whitespace on both sides. */
+        fun spacedDash(at: Int): Boolean {
+            val t = toks[at]
+            return t.start > 0 && text[t.start - 1].isWhitespace() && t.end < text.length && text[t.end].isWhitespace()
         }
 
         // ---- helpers ---------------------------------------------------------------
@@ -530,6 +658,7 @@ class RuleParser(
         val LEADING_QUALIFIERS = setOf("about", "approx", "approximately", "around", "roughly")
 
         val DOZEN: Rational = Rational.of(12)
+        val DECILITRE: Rational = Rational.of(100)
 
         /** What "a"/"an" must come before to mean one. */
         val ARTICLE_BEFORE = setOf(Kind.WORD, Kind.NUM)
@@ -556,6 +685,16 @@ class RuleParser(
             )
     }
 }
+
+/** An amount written after the name ("Eggs 2"): where it starts, and what it says. */
+private class Trailing(
+    val from: Int,
+    val qty: Rational,
+    val qtyMax: Rational?,
+    val unit: QtyUnit?,
+    val altQty: Rational?,
+    val altUnit: QtyUnit?,
+)
 
 /** Small hand-written matchers (no regex backtracking on untrusted lines). */
 internal object Regexless {

@@ -14,7 +14,7 @@ class CatalogTest {
 
     @Test
     fun loadsAndHasAboutFourHundredRows() {
-        assertTrue(catalog.entries.size in 350..500, "rows: ${catalog.entries.size}")
+        assertTrue(catalog.entries.size in 350..600, "rows: ${catalog.entries.size}")
         assertEquals(12, catalog.version.length)
     }
 
