@@ -246,8 +246,12 @@ class PerformanceProbeTest {
                 compose.waitUntil(30_000) { compose.onAllNodesWithTag("shop").fetchSemanticsNodes().isNotEmpty() }
             }
         budget("shop screen: first frame with 150 items", first, 4000.0)
+        // The ticks still to buy: a row just ticked stays in place for a moment (Release C).
         val ticks =
-            SemanticsMatcher("a tick") { it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("tick-") == true }
+            SemanticsMatcher("an open tick") {
+                it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("tick-") == true &&
+                    it.config.getOrNull(SemanticsProperties.StateDescription) == "Still needed"
+            }
         val each =
             (1..10).map { i ->
                 timed {

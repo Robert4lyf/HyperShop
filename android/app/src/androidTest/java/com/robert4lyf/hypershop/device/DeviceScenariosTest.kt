@@ -61,6 +61,15 @@ class DeviceScenariosTest {
             },
         )
 
+    /** The ticks of rows still to buy: a row just ticked stays in place for a moment (Release C), so "the first tick" may be it. */
+    private fun openTicks() =
+        compose.onAllNodes(
+            SemanticsMatcher("an open tick") {
+                it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("tick-") == true &&
+                    it.config.getOrNull(SemanticsProperties.StateDescription) == "Still needed"
+            },
+        )
+
     private fun waitFor(what: () -> Boolean) = compose.waitUntil(10_000) { runCatching(what).getOrDefault(false) }
 
     /** A: typed items, into the shop, every one bought, finished — and Undo is still offered. */
@@ -92,13 +101,13 @@ class DeviceScenariosTest {
         assertTrue("Four typed items did not all land:\n$transcript", four.isSuccess)
         compose.onNodeWithTag("start-shopping").performClick()
         waitFor { compose.onAllNodesWithTag("shop").fetchSemanticsNodes().isNotEmpty() }
-        // Ticked rows fold away under "N bought", so the first tick is the next item to buy, once the
-        // last tap has landed. waitForIdle does not wait for the database, so each tap waits for its own
-        // effect, as a shopper looks before the next tap; tapping on would hit the same row again.
+        // A ticked row stays in place for a moment and then folds away under "N bought", so the next item
+        // to buy is the first tick still "Still needed", once the last tap has landed. waitForIdle does not
+        // wait for the database, so each tap waits for its own effect, as a shopper looks before the next tap.
         val bought = { runBlocking { c.repository.snapshot() }.let { l -> l.liveItems.count { l.isDone(it.id) } } }
         repeat(4) { i ->
-            waitFor { ticks().fetchSemanticsNodes().isNotEmpty() }
-            ticks()[0].performClick()
+            waitFor { openTicks().fetchSemanticsNodes().isNotEmpty() }
+            openTicks()[0].performClick()
             waitFor { bought() == i + 1 }
             waitFor { compose.onAllNodesWithText("${i + 1} of 4 bought", substring = true).fetchSemanticsNodes().isNotEmpty() }
         }
