@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -210,6 +211,14 @@ class ListViewModel(
      * Its own flow, so the list's main one (the one a tick waits on) carries none of it.
      */
     val prep: StateFlow<PlanPrep> =
+        c.settings.listMode
+            .flatMapLatest { mode ->
+                // The shop screen draws no card: a tick there reads nothing for it (QueryBudgetTest).
+                if (mode == ListMode.SHOP) flowOf(PlanPrep()) else prepFlow()
+            }.flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlanPrep())
+
+    private fun prepFlow(): Flow<PlanPrep> =
         combine(
             // The week is read again with every change to the list, so a card left open over Sunday
             // midnight shows the new week (this view model lives as long as the app).
@@ -227,8 +236,7 @@ class ListViewModel(
                 toCheck = home.count { !it.have },
                 returning = saved || buy.hasHistory,
             )
-        }.flowOn(Dispatchers.Default)
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlanPrep())
+        }
 
     /** "Add the rest of last shop" from the empty list: the last trip's hand-added items, never doubled. */
     fun addLastShop() =

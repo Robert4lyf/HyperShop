@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.File
 
 data class RecipesUi(
     val uses: List<UseSummary> = emptyList(),
@@ -381,6 +382,8 @@ class RecipesViewModel(
         page: String = "",
     ) = viewModelScope.launch {
         val file = PhotoStore.save(c.context, uri)
+        // The camera's own copy (a photo of someone's cookbook) is not left in the cache.
+        File(File(c.context.cacheDir, "camera"), "shot.jpg").delete()
         if (file == null) {
             messages.send(UiMessage("Couldn't open that photo"))
             return@launch
