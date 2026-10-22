@@ -80,6 +80,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -710,10 +711,21 @@ private fun ReviewRowItem(
             }
             if (row.check && !row.inStock) {
                 Text(
-                    row.checkReason?.let { "Check: $it" } ?: "Check this line",
+                    row.checkReason?.let { "Check: ${ReviewViewModel.plainReason(it)}" } ?: "Check this line",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.tertiary,
                 )
+                // The line as the recipe wrote it, so the reading can be judged without opening the sheet.
+                row.raw?.let {
+                    Text(
+                        "“$it”",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontStyle = FontStyle.Italic,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
         onInStock?.let { toggle -> InStockPill(row.inStock, name) { toggle(row.key, it) } }

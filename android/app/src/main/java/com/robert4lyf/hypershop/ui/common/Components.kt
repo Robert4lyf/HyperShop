@@ -361,10 +361,12 @@ fun AmountField(
     button: String,
     tag: String,
     onSubmit: (String) -> Boolean,
+    /** What the field starts with (the amount as read), so a correction edits rather than retypes. */
+    initial: String = "",
 ) {
-    var amount by remember { mutableStateOf("") }
+    var amount by remember(initial) { mutableStateOf(initial) }
     var bad by remember { mutableStateOf(false) }
-    val submit = { if (amount.isNotBlank()) bad = !onSubmit(amount) }
+    val submit = { if (amount.isNotBlank() && amount != initial) bad = !onSubmit(amount) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionLabel(heading)
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -385,7 +387,7 @@ fun AmountField(
             )
             FilledTonalButton(
                 onClick = submit,
-                enabled = amount.isNotBlank(),
+                enabled = amount.isNotBlank() && amount != initial,
                 modifier = Modifier.padding(top = 8.dp),
             ) { Text(button) }
         }

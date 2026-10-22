@@ -56,6 +56,8 @@ data class ReviewRow(
     val adds: Boolean = true,
     /** Why [check] is set ("\"A or B\": one of two"). */
     val checkReason: String? = null,
+    /** The line as the recipe wrote it, shown with the reason when [check] is set. */
+    val raw: String? = null,
 )
 
 enum class Badge { CLAUDE, CLAUDE_PENDING, RULES }
@@ -69,6 +71,8 @@ data class SheetLine(
     val alternative: String?,
     /** Why the line is flagged to check, when it is. */
     val checkReason: String? = null,
+    /** The amount as read ("2 tbsp"), to start the Amount field from. */
+    val amount: String? = null,
 )
 
 /** The review row's detail sheet (PLAN §3.1). */
@@ -202,6 +206,13 @@ class ReviewViewModel(
 
     /** Set by every change made here; Cancel asks before discarding it. */
     private var changed = false
+
+    /**
+     * Lines the user corrected (by the line as the recipe wrote it) and lines removed:
+     * "Ask Claude" reads the recipe again, and these stand over whatever it says.
+     */
+    private val pinned = LinkedHashMap<String, ParsedIngredient>()
+    private val removedRaw = HashSet<String>()
 
     /**
      * Applying or retrying with Claude. [recompute] carries it into the UI, so a
@@ -501,6 +512,7 @@ class ReviewViewModel(
             aisle = r.target.aisle,
             adds = preview!!.contributions.any { it.mergeKey == r.target.mergeKey },
             checkReason = check?.parsed?.checkReason,
+            raw = check?.parsed?.raw,
         )
     }
 
@@ -572,8 +584,9 @@ class ReviewViewModel(
                 (state.value as? ReviewState.Ready)?.let { _state.value = it.copy(ui = it.ui.copy(busy = true, retrying = true)) }
                 try {
                     val again = parseWithClaude(r.copy(claudePending = true, askClaude = true)) { it.parsedBy == ParsedBy.CLAUDE }
-                    store(again)
-                    result = again
+                    val kept = keepCorrections(again, r)
+                    store(kept)
+                    result = kept
                 } finally {
                     busy = false
                     retrying = false
@@ -581,6 +594,26 @@ class ReviewViewModel(
                 // Why it didn't work shows under the badge (ReviewUi.claudeNote).
                 recompute()
             }
+    }
+
+    /**
+     * Claude's reading with the user's corrections laid over it: a line the user edited,
+     * renamed or swapped keeps their reading (matched by the line as written, else by its
+     * place when the count is the same), and a line they removed stays removed.
+     */
+    private fun keepCorrections(
+        again: ImportResult,
+        before: ImportResult,
+    ): ImportResult {
+        if (pinned.isEmpty() && removedRaw.isEmpty()) return again
+        val sameShape = again.lines.size == before.lines.size
+        val lines =
+            again.lines.mapIndexedNotNull { i, l ->
+                val was = before.lines.getOrNull(i)?.takeIf { sameShape }
+                if (l.raw in removedRaw || was?.raw in removedRaw) return@mapIndexedNotNull null
+                pinned[l.raw] ?: was?.let { pinned[it.raw] } ?: l
+            }
+        return again.copy(lines = lines)
     }
 
     /** "Stop" while asking Claude. An answer that still arrives is kept on the job for next time. */
@@ -704,6 +737,13 @@ class ReviewViewModel(
                     summary(l.parsed),
                     l.parsed.note?.takeIf { it.startsWith("or ") }?.removePrefix("or ")?.trim(),
                     l.parsed.checkReason?.takeIf { l.parsed.check },
+                    amount =
+                        l.parsed.quantity?.let { q ->
+                            listOfNotNull(
+                                Display.fraction(q) + (l.parsed.quantityMax?.let { "–" + Display.fraction(it) } ?: ""),
+                                l.parsed.unit?.serial?.replace('_', ' '),
+                            ).joinToString(" ")
+                        },
                 )
             }
         return RowSheet(
@@ -754,6 +794,8 @@ class ReviewViewModel(
         aisle: AisleCode,
         always: Boolean,
     ) = act {
+        val name = preview?.rows?.firstOrNull { it.target.mergeKey == key }?.let { displayName(it.target) } ?: "It"
+        val wasMoved = aisleMoves[key]
         if (always) {
             aisleMoves.remove(key)
             c.repository.setOverride(key, aisle)
@@ -762,6 +804,24 @@ class ReviewViewModel(
         }
         changed = true
         recompute()
+        // The sheet closes on a move and the row may leave the screen: say where it went.
+        val text = "${name.replaceFirstChar { it.uppercase() }} moved to ${aisle.displayName}" + if (always) ", from now on" else ""
+        _events.send(
+            UiMessage(
+                text,
+                undo =
+                    if (always) {
+                        null
+                    } else {
+                        {
+                            act {
+                                if (wasMoved == null) aisleMoves.remove(key) else aisleMoves[key] = wasMoved
+                                recompute()
+                            }
+                        }
+                    },
+            ),
+        )
     }
 
     /** "A or B" swap: the line becomes B, with "or A" in its note. [onKey] gets the row's new key. */
@@ -771,8 +831,37 @@ class ReviewViewModel(
     ) = act {
         replaceLine(lineId) { p ->
             val alt = p.note?.takeIf { it.startsWith("or ") }?.removePrefix("or ")?.trim() ?: return@replaceLine p
-            p.copy(name = alt.lowercase(), note = "or ${p.name}", unit = p.unit)
+            // Decided: the line no longer needs checking.
+            p.copy(name = alt.lowercase(), note = "or ${p.name}", unit = p.unit, check = false, checkReason = null)
         }?.let(onKey)
+    }
+
+    /**
+     * "Amount" on the sheet: the line's quantity and unit from [text] ("2 tbsp", "500 g",
+     * "3"), its name and note unchanged. False when [text] holds no amount.
+     */
+    fun setAmount(
+        lineId: Long,
+        text: String,
+    ): Boolean {
+        val probe = c.ruleParser.parse("${text.trim()} item")
+        if (probe.quantity == null) return false
+        act {
+            replaceLine(lineId) { old ->
+                old.copy(
+                    quantity = probe.quantity,
+                    quantityMax = probe.quantityMax,
+                    quantityText = text.trim(),
+                    unit = probe.unit,
+                    altQuantity = null,
+                    altUnit = null,
+                    // An amount the user typed needs no checking for its amount.
+                    check = old.check && old.checkReason?.contains("amount") != true,
+                    checkReason = old.checkReason?.takeIf { !it.contains("amount") },
+                )
+            }
+        }
+        return true
     }
 
     /** Edit the source line; it is parsed again with the rule parser. [onKey] gets the row's new key. */
@@ -805,8 +894,8 @@ class ReviewViewModel(
             decisions.remove(key)?.let { decisions.putIfAbsent(to, it) }
             aisleMoves.remove(key)?.let { aisleMoves.putIfAbsent(to, it) }
         }
-        // Claude's aisle was for the old name.
-        replaceLines(ids) { it.copy(name = n, aisleSuggestion = null) }?.let(onKey)
+        // Claude's aisle was for the old name; and a named line needs no more checking.
+        replaceLines(ids) { it.copy(name = n, aisleSuggestion = null, check = false, checkReason = null) }?.let(onKey)
     }
 
     private suspend fun replaceLine(
@@ -824,8 +913,16 @@ class ReviewViewModel(
         val lines = r.lines.toMutableList()
         val indices = s.lines.indices.filter { s.lines[it].first.id in lineIds && it in lines.indices }
         if (indices.isEmpty()) return null
-        for (i in indices) lines[i] = f(lines[i])
-        val edited = r.copy(lines = lines)
+        val raws = r.rawLines.toMutableList()
+        for (i in indices) {
+            val was = lines[i]
+            lines[i] = f(was)
+            pinned.remove(was.raw)
+            pinned[lines[i].raw] = lines[i]
+            // An edited line is what Claude should read too.
+            if (raws.size == lines.size && raws[i] == was.raw) raws[i] = lines[i].raw
+        }
+        val edited = r.copy(lines = lines, rawLines = raws)
         store(edited)
         result = edited
         changed = true
@@ -869,6 +966,7 @@ class ReviewViewModel(
             val t = text.trim()
             val r = result ?: return@act
             if (t.isEmpty()) return@act
+            removedRaw -= t
             val edited = r.copy(lines = r.lines + c.ruleParser.parse(t), rawLines = r.rawLines + t)
             store(edited)
             result = edited
@@ -881,19 +979,56 @@ class ReviewViewModel(
 
     private fun displayName(t: NewItem): String = c.catalog.byId[t.catalogId ?: ""]?.name ?: t.displayName
 
-    /** "Remove from recipe": the line goes from this recipe (the last one stays). */
+    /** "Remove from recipe": the line goes from this recipe (the last one stays), with Undo. */
     fun removeLine(lineId: Long) =
         act {
             val s = stored ?: return@act
             val r = result ?: return@act
             val index = s.lines.indexOfFirst { it.first.id == lineId }
             if (index !in r.lines.indices || r.lines.size < 2) return@act
-            val edited = r.copy(lines = r.lines.filterIndexed { i, _ -> i != index })
+            val line = r.lines[index]
+            val aligned = r.rawLines.size == r.lines.size
+            val edited =
+                r.copy(
+                    lines = r.lines.filterIndexed { i, _ -> i != index },
+                    rawLines = if (aligned) r.rawLines.filterIndexed { i, _ -> i != index } else r.rawLines,
+                )
+            removedRaw += line.raw
             store(edited)
             result = edited
             changed = true
             recompute()
+            val name = c.catalog.byId[c.repository.target(line.name).catalogId ?: ""]?.name ?: line.name
+            _events.send(
+                UiMessage(
+                    "Removed ${name.replaceFirstChar { it.uppercase() }} from this recipe",
+                    undo = { restoreLine(index, line, if (aligned) r.rawLines[index] else null) },
+                ),
+            )
         }
+
+    /** Undo of [removeLine]: the line back where it was. */
+    private fun restoreLine(
+        index: Int,
+        line: ParsedIngredient,
+        raw: String?,
+    ) = act {
+        val r = result ?: return@act
+        val at = index.coerceIn(0, r.lines.size)
+        val lines = r.lines.toMutableList().also { it.add(at, line) }
+        val raws =
+            if (raw != null && r.rawLines.size == r.lines.size) {
+                r.rawLines.toMutableList().also { it.add(at, raw) }
+            } else {
+                r.rawLines
+            }
+        removedRaw -= line.raw
+        val edited = r.copy(lines = lines, rawLines = raws)
+        store(edited)
+        result = edited
+        changed = true
+        recompute()
+    }
 
     /** The row's parse. */
     fun previewRow(key: String): PreviewRow? = preview?.rows?.firstOrNull { it.target.mergeKey == key }
@@ -901,6 +1036,25 @@ class ReviewViewModel(
     internal fun currentPreview(): Preview? = preview
 
     companion object {
+        /**
+         * The parser's reason in plain words, with what to do about it. Reasons it
+         * doesn't know (Claude's, or a new one) are shown as they are.
+         */
+        fun plainReason(reason: String): String =
+            when {
+                reason.startsWith("\"A or B\"") -> "the recipe offers a choice: swap to the other on the sheet if you'd rather"
+                reason.startsWith("\"X and Y\"") -> "this may be two ingredients: edit the line to split them"
+                reason == "an unknown unit" -> "a measure the app doesn't know, so the amount may be off: set it on the sheet"
+                reason == "an amount left in the name" -> "a number stayed in the name: check the amount"
+                reason == "a count times a count" -> "two counts multiplied (like 2 x 400 g): check the total"
+                reason == "a range that goes down" -> "the range reads backwards: check the amount"
+                reason == "several items on one line" -> "several items on one line: add each as its own line"
+                reason == "no ingredient name" -> "no ingredient name was found: edit the line"
+                reason == "an amount it couldn't read" -> "an amount it couldn't read: set it on the sheet"
+                reason == "a name that reads like a sentence" -> "the name reads like a sentence: edit the line"
+                else -> reason
+            }
+
         const val STAGE_OPENING = "Opening…"
         const val STAGE_FETCHING = "Fetching the page…"
         const val STAGE_CLAUDE = "Reading with Claude…"
