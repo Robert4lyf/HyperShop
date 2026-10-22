@@ -255,7 +255,7 @@ jobs:
         if: steps.secrets.outputs.ready == 'true'
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb xdotool libwebkit2gtk-4.0-37 libsecret-1-0 libsoup2.4-1 > /dev/null
+          sudo apt-get install -y -qq xvfb xdotool imagemagick tesseract-ocr libwebkit2gtk-4.0-37 libsecret-1-0 libsoup2.4-1 > /dev/null
 
       - name: Download the device definitions
         if: steps.secrets.outputs.ready == 'true'
@@ -269,7 +269,9 @@ jobs:
           connect-iq-sdk-manager agreement view > /dev/null
           connect-iq-sdk-manager agreement accept
           connect-iq-sdk-manager login
-          connect-iq-sdk-manager device download --manifest garmin/manifest.xml
+          # The simulator needs the devices' fonts as well; an older CLI without the flag gets the devices alone.
+          connect-iq-sdk-manager device download --manifest garmin/manifest.xml --include-fonts ||
+            connect-iq-sdk-manager device download --manifest garmin/manifest.xml
 
       - name: Run the tests
         if: steps.secrets.outputs.ready == 'true'

@@ -3,6 +3,7 @@ package com.robert4lyf.hypershop.device
 import android.os.Debug
 import android.os.StrictMode
 import android.util.Log
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
@@ -29,6 +30,7 @@ import com.robert4lyf.hypershop.watch.FakeWatchLink
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
@@ -51,8 +53,23 @@ class PerformanceProbeTest {
 
     private fun report(
         what: String,
+        value: Double,
+        unit: String = "ms",
+    ) = Log.i(TAG, "%-50s %9.1f %s".format(what, value, unit))
+
+    /**
+     * A budget: about three times the first CI emulator baseline (API 34, software
+     * rendering, docs/reports/performance.md), so it fails on a regression of that
+     * order and not on a slow runner.
+     */
+    private fun budget(
+        what: String,
         ms: Double,
-    ) = Log.i(TAG, "%-44s %8.1f ms".format(what, ms))
+        max: Double,
+    ) {
+        report(what, ms)
+        assertTrue("$what took ${"%.0f".format(ms)} ms; the budget is ${"%.0f".format(max)} ms", ms <= max)
+    }
 
     private inline fun <T> timed(block: () -> T): Pair<T, Double> {
         val t0 = System.nanoTime()
@@ -96,7 +113,7 @@ class PerformanceProbeTest {
                         }
                     }
                 }
-            report("list: first full state, $n items", load)
+            budget("list: first full state, $n items", load, 250.0)
             // A tick, from the call to the state that shows it: the median of 15.
             val rows = vm.ui.value.aisles.flatMap { it.second }.take(15)
             val each =
@@ -113,7 +130,7 @@ class PerformanceProbeTest {
                         }
                     }.second
                 }.sorted()
-            report("tick to state, $n items (median of 15)", each[each.size / 2])
+            budget("tick to state, $n items (median of 15)", each[each.size / 2], 200.0)
             report("tick to state, $n items (worst of 15)", each.last())
             val (_, watch) =
                 timed {
@@ -121,8 +138,8 @@ class PerformanceProbeTest {
                         c.watchSync.handle(WatchCodec.encode(WatchMessage.Hello(c.repository.listEpoch().toInt(), 7, 0, 1_760_000_000, 0)))
                     }
                 }
-            report("watch: hello to snapshot sent, $n items", watch)
-            report("watch: pages for $n items", (c.watchLink as FakeWatchLink).sent.size.toDouble())
+            budget("watch: hello to snapshot sent, $n items", watch, 300.0)
+            report("watch: pages for $n items", (c.watchLink as FakeWatchLink).sent.size.toDouble(), "pages")
         }
     }
 
@@ -137,15 +154,18 @@ class PerformanceProbeTest {
             )
         val ids = (1..300).map { c.saveRecipe("Recipe $it", *lines.toTypedArray()) }
         val (_, add) = timed { runBlocking { c.repository.addSavedRecipe(ids.first()) } }
-        report("a 15-line saved recipe onto the list", add)
+        budget("a 15-line saved recipe onto the list", add, 150.0)
         val vm = RecipesViewModel(c)
         runBlocking { withTimeout(30_000) { vm.ui.first { it.library.size == 300 } } }
         val (_, search) =
             timed {
                 vm.onSearchText("avocado")
+                // The search box is Compose state; with no frame running here, apply it as a frame would.
+                Snapshot.sendApplyNotifications()
                 runBlocking { withTimeout(30_000) { vm.ui.first { it.terms.isNotEmpty() } } }
             }
-        report("search 300 saved recipes for an ingredient", search)
+        // No baseline yet when this budget was set (the first run could not search): generous until there is one.
+        budget("search 300 saved recipes for an ingredient", search, 2000.0)
     }
 
     @Test
@@ -168,7 +188,7 @@ class PerformanceProbeTest {
                 compose.setContent { HyperShopTheme { HyperShopApp(c) } }
                 compose.waitUntil(30_000) { compose.onAllNodesWithTag("shop").fetchSemanticsNodes().isNotEmpty() }
             }
-        report("shop screen: first frame with 150 items", first)
+        budget("shop screen: first frame with 150 items", first, 4000.0)
         val ticks =
             SemanticsMatcher("a tick") { it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("tick-") == true }
         val each =
@@ -180,7 +200,7 @@ class PerformanceProbeTest {
                     ) { compose.onAllNodesWithText("$i of 150 bought", substring = true).fetchSemanticsNodes().isNotEmpty() }
                 }.second
             }.sorted()
-        report("shop: tap to \"N of 150 bought\" (median of 10)", each[each.size / 2])
+        budget("shop: tap to \"N of 150 bought\" (median of 10)", each[each.size / 2], 750.0)
         report("shop: tap to \"N of 150 bought\" (worst of 10)", each.last())
         val (_, scroll) =
             timed {
@@ -192,9 +212,10 @@ class PerformanceProbeTest {
         report("shop: scroll to the end", scroll)
         InstrumentationRegistry.getInstrumentation().runOnMainSync { StrictMode.setThreadPolicy(StrictMode.ThreadPolicy.LAX) }
         val mem = Debug.MemoryInfo().also { Debug.getMemoryInfo(it) }
-        report("memory: total PSS after the shop session (KB)", mem.totalPss.toDouble())
-        report("main-thread disk violations during the shop session", violations.size.toDouble())
+        report("memory: total PSS after the shop session", mem.totalPss / 1024.0, "MB")
+        report("main-thread disk violations during the shop session", violations.size.toDouble(), "")
         violations.distinct().take(5).forEach { Log.i(TAG, "  violation: $it") }
+        assertTrue("database or file work on the main thread: ${violations.distinct().take(3)}", violations.isEmpty())
     }
 
     private companion object {

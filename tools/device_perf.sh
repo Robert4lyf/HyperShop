@@ -16,5 +16,9 @@ adb logcat -c
 out=$(adb shell am instrument -w -e perf true -e class com.robert4lyf.hypershop.device.PerformanceProbeTest "$RUNNER")
 echo "== measurements"
 adb logcat -d -s HyperShopPerf:I | sed -n 's/.*HyperShopPerf: //p'
-echo "$out" | tail -5
-grep -q "^OK (" <<< "$out"
+if grep -q "^OK (" <<< "$out"; then
+  echo "$out" | tail -3
+else
+  echo "$out"
+  exit 1
+fi

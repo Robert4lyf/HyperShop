@@ -136,6 +136,10 @@ jobs:
           import sys, xml.etree.ElementTree as ET
           for case in ET.parse(sys.argv[1]).getroot().iter("testcase"):
               for bad in list(case.findall("failure")) + list(case.findall("error")):
+                  text = bad.text or bad.get("message") or ""
+                  # A test skipped on purpose (run on request only) is not a failure.
+                  if "AssumptionViolatedException" in text:
+                      continue
                   print(f"::error::{case.get('classname')}.{case.get('name')}")
                   print((bad.text or bad.get("message") or "")[:3000])
           PY
