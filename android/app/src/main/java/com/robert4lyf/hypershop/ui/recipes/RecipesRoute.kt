@@ -530,7 +530,7 @@ private fun LibraryCard(
             }
             var menu by remember { mutableStateOf(false) }
             Box {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
+                IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More for ${row.title}") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(text = { Text("Rename") }, modifier = Modifier.testTag("lib-rename-${row.key}"), onClick = {
                         menu = false
@@ -587,7 +587,7 @@ private fun UseCard(
                         var menu by remember { mutableStateOf(false) }
                         Box {
                             IconButton(onClick = { menu = true }, modifier = Modifier.testTag("more-${use.useId}")) {
-                                Icon(Icons.Rounded.MoreVert, contentDescription = "More", tint = Brand.OnHero)
+                                Icon(Icons.Rounded.MoreVert, contentDescription = "More for ${use.title}", tint = Brand.OnHero)
                             }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                                 if (url != null) {

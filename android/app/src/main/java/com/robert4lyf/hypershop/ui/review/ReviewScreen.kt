@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -536,6 +537,8 @@ private fun Servings(
                     Modifier
                         .clip(RoundedCornerShape(50))
                         .clickable(onClickLabel = "Type the servings") { typing = true }
+                        .heightIn(min = 48.dp)
+                        .wrapContentHeight()
                         .padding(horizontal = 6.dp, vertical = 8.dp)
                         .testTag("servings"),
                     style = MaterialTheme.typography.titleSmall,
@@ -675,9 +678,10 @@ private fun ReviewRowItem(
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (row.check) {
+                    // Decorative: the "Check: …" line below says it, so the row is not read twice.
                     Icon(
                         Icons.Rounded.ReportProblem,
-                        contentDescription = "Check this line",
+                        contentDescription = null,
                         tint = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.size(18.dp),
                     )

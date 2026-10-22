@@ -65,8 +65,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -392,7 +394,10 @@ fun EntryEditor(
             }
         }
         Row(
-            Modifier.fillMaxWidth().toggleable(value = f.alwaysInStock, role = Role.Switch) { edit(f.copy(alwaysInStock = it)) },
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .toggleable(value = f.alwaysInStock, role = Role.Switch) { edit(f.copy(alwaysInStock = it)) },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Always at home", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
@@ -440,11 +445,12 @@ fun EntryEditor(
             }
         }
         error?.let {
+            // Spoken when it appears: Save keeps the focus, so TalkBack would otherwise say nothing.
             Text(
                 it,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.testTag("entry-error"),
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }.testTag("entry-error"),
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {

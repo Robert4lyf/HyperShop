@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -166,6 +167,7 @@ private fun SwitchRow(
     Row(
         Modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .toggleable(value = on, role = Role.Switch, onValueChange = onChange)
             .padding(vertical = 4.dp)
             .testTag("switch-$label"),

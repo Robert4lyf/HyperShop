@@ -52,6 +52,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
@@ -151,7 +153,12 @@ fun SectionLabel(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
 ) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    // A heading, so TalkBack's "headings" navigation jumps from section to section.
+    Row(
+        modifier.semantics(mergeDescendants = true) { heading() },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         icon?.let { Icon(it, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) }
         Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -186,7 +193,12 @@ fun ScreenHeader(
                             // Soft white, not citrus: citrus only clears 3:1 on the brighter hero.
                             Text(it.uppercase(), style = MaterialTheme.typography.labelMedium, color = Brand.OnHeroSoft)
                         }
-                        Text(title, style = MaterialTheme.typography.headlineLarge, color = Brand.OnHero)
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = Brand.OnHero,
+                            modifier = Modifier.semantics { heading() },
+                        )
                         subtitle?.let {
                             Text(it, style = MaterialTheme.typography.bodyMedium, color = Brand.OnHeroSoft)
                         }
@@ -330,7 +342,7 @@ fun SheetHeader(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         AisleBadge(aisle, size = 48.dp)
-        Column {
+        Column(Modifier.semantics(mergeDescendants = true) { heading() }) {
             Text(name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.headlineSmall)
             Text(aisle.displayName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

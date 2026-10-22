@@ -66,6 +66,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
@@ -469,7 +470,8 @@ private fun ListTop(
                 Spacer(Modifier.height(12.dp))
                 LinearProgressIndicator(
                     progress = { if (total == 0) 0f else ui.doneCount / total.toFloat() },
-                    modifier = Modifier.fillMaxWidth().height(8.dp),
+                    // The subtitle already says "N of M bought"; the bar is not read out as well.
+                    modifier = Modifier.fillMaxWidth().height(8.dp).clearAndSetSemantics {},
                     strokeCap = StrokeCap.Round,
                     gapSize = 4.dp,
                     drawStopIndicator = {},

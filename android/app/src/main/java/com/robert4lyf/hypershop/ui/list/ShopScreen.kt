@@ -45,9 +45,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
@@ -167,7 +170,13 @@ private fun ShopTop(
                             "${ui.left} left"
                         },
                         style = MaterialTheme.typography.headlineSmall,
-                        modifier = Modifier.semantics { heading() }.testTag("shop-left"),
+                        // A polite live region: a bought row leaves the list, so this is what TalkBack says about a tick.
+                        modifier =
+                            Modifier
+                                .semantics {
+                                    heading()
+                                    liveRegion = LiveRegionMode.Polite
+                                }.testTag("shop-left"),
                     )
                     Text(
                         listOfNotNull("${ui.doneCount} of $total bought", now?.let { "Now: ${it.title}" }).joinToString(" · "),
@@ -184,7 +193,8 @@ private fun ShopTop(
             Spacer(Modifier.height(6.dp))
             LinearProgressIndicator(
                 progress = { if (total == 0) 0f else ui.doneCount / total.toFloat() },
-                modifier = Modifier.fillMaxWidth().padding(end = 12.dp).height(6.dp),
+                // The text above already says "N of M bought"; the bar is not read out as well.
+                modifier = Modifier.fillMaxWidth().padding(end = 12.dp).height(6.dp).clearAndSetSemantics {},
                 strokeCap = StrokeCap.Round,
                 gapSize = 4.dp,
                 drawStopIndicator = {},
@@ -346,7 +356,7 @@ private fun BoughtRow(
         tile
             .background(MaterialTheme.colorScheme.card)
             .fillMaxWidth()
-            .heightIn(min = 44.dp)
+            .heightIn(min = 48.dp)
             .clickable(onClickLabel = if (cell.shown) "Hide bought" else "Show bought", role = Role.Button, onClick = onToggle)
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .semantics(mergeDescendants = true) { stateDescription = if (cell.shown) "Expanded" else "Collapsed" }

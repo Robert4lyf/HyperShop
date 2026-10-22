@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
@@ -274,7 +274,8 @@ private fun CompactNavBar(
             Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .height(60.dp)
+                // A minimum, not a fixed height: at 200 % font scale the label needs the room.
+                .heightIn(min = 60.dp)
                 .selectableGroup(),
             verticalAlignment = Alignment.CenterVertically,
         ) {

@@ -320,19 +320,22 @@ private fun MealCard(
         Row(Modifier.padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).lowPoly(m.title))
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Text(m.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                val bits = listOfNotNull(mealState(m), m.source, "No longer saved".takeIf { !m.saved })
-                Text(
-                    bits.joinToString(" · "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color =
-                        if (m.shopping.pending && !past) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    modifier = Modifier.testTag("meal-state-${m.id}"),
-                )
+                // The title and its state read as one TalkBack node; the servings controls stay their own.
+                Column(Modifier.semantics(mergeDescendants = true) {}) {
+                    Text(m.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    val bits = listOfNotNull(mealState(m), m.source, "No longer saved".takeIf { !m.saved })
+                    Text(
+                        bits.joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color =
+                            if (m.shopping.pending && !past) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        modifier = Modifier.testTag("meal-state-${m.id}"),
+                    )
+                }
                 m.servings?.takeIf { !past }?.let { s ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -413,7 +416,7 @@ private fun RegularChip(
     Box {
         Row(
             Modifier
-                .heightIn(min = 40.dp)
+                .heightIn(min = 48.dp)
                 .clip(PillShape)
                 .background(if (r.onList) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.card)
                 .combinedClickable(
@@ -495,7 +498,8 @@ private fun HomeRowItem(
             .testTag("home-${r.mergeKey}"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f)) {
+        // One TalkBack node for the name and what it is for; the button stays its own.
+        Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}) {
             Text(r.name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleSmall)
             Text(
                 listOfNotNull("for ${r.from.joinToString(", ")}", "usually at home".takeIf { r.usual }).joinToString(" · "),
