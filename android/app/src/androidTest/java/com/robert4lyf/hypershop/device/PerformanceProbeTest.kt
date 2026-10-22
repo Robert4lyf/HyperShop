@@ -157,15 +157,17 @@ class PerformanceProbeTest {
         budget("a 15-line saved recipe onto the list", add, 150.0)
         val vm = RecipesViewModel(c)
         runBlocking { withTimeout(30_000) { vm.ui.first { it.library.size == 300 } } }
-        val (_, search) =
+
+        // The search box is Compose state; with no frame running here, apply it as a frame would.
+        fun search(text: String) =
             timed {
-                vm.onSearchText("avocado")
-                // The search box is Compose state; with no frame running here, apply it as a frame would.
+                vm.onSearchText(text)
                 Snapshot.sendApplyNotifications()
-                runBlocking { withTimeout(30_000) { vm.ui.first { it.terms.isNotEmpty() } } }
-            }
-        // No baseline yet when this budget was set (the first run could not search): generous until there is one.
-        budget("search 300 saved recipes for an ingredient", search, 2000.0)
+                runBlocking { withTimeout(30_000) { vm.ui.first { it.terms == listOf(text) } } }
+            }.second
+        // The first search builds the index (every line of every recipe); later ones reuse it.
+        budget("search 300 saved recipes: first search (builds the index)", search("avocado"), 8000.0)
+        budget("search 300 saved recipes: a second search", search("cumin"), 2000.0)
     }
 
     @Test

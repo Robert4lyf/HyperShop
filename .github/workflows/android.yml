@@ -76,12 +76,11 @@ jobs:
           retention-days: 1
 
   # The device scenarios (app/src/androidTest) on an emulator: the real
-  # composables, SQLite and files. Non-blocking until it has passed on a run
-  # of PRs (KNOWN_ISSUES #15); tools/verify.sh compiles them either way.
+  # composables, SQLite and files, then a real process death mid-restore and
+  # the performance probe. Blocking since Release A (KNOWN_ISSUES #15).
   device-tests:
     name: Device scenarios (emulator)
     runs-on: ubuntu-latest
-    continue-on-error: true
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
