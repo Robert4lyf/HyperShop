@@ -1,11 +1,17 @@
 package com.robert4lyf.hypershop.data
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.robert4lyf.hypershop.core.merge.ApplyResult
 import com.robert4lyf.hypershop.core.merge.ShoppingList
 import com.robert4lyf.hypershop.core.merge.UseKind
+import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
+import com.robert4lyf.hypershop.core.parse.RuleParser
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -25,6 +31,8 @@ import kotlin.random.Random
 @Config(sdk = [34])
 class ListInvariantsTest {
     @get:Rule val r = DbRule()
+
+    private val parser = RuleParser()
 
     private val recipes =
         listOf(
@@ -139,5 +147,58 @@ class ListInvariantsTest {
             run(seed)
         }
         assertTrue(true)
+    }
+
+    /**
+     * An import that raced another write is refused as Stale (the review re-checks and
+     * asks again); a second try is what the review screen's confirm does.
+     */
+    private suspend fun importRacing(
+        lines: List<String>,
+        url: String,
+    ) {
+        repeat(2) {
+            val stored =
+                r.repo.storeRecipe(url, "Recipe", 4, UnitLocale.METRIC, "WEB", ParsedBy.RULES, null, false, lines.map { parser.parse(it) })
+            if (r.repo.apply(r.repo.preview(stored, 4, null)) is ApplyResult.Applied) return
+        }
+    }
+
+    /**
+     * The same rules with four shoppers at once: ticks, servings changes, clear-all and
+     * finishes racing each other. Each write is one transaction, so every interleaving
+     * must still leave a list that keeps them.
+     */
+    @Test
+    fun opsRacingEachOtherKeepTheListsRules() {
+        for (seed in 1..6) {
+            r.close()
+            r.open()
+            runBlocking {
+                repeat(3) { r.import(*recipes[it].toTypedArray(), url = "https://example.com/start-$it") }
+                coroutineScope {
+                    repeat(4) { worker ->
+                        launch(Dispatchers.Default) {
+                            val rnd = Random(seed * 10 + worker)
+                            repeat(40) { n ->
+                                val l = r.repo.snapshot()
+                                when (rnd.nextInt(7)) {
+                                    0 -> importRacing(recipes[rnd.nextInt(recipes.size)], "https://example.com/$worker-$n")
+                                    1, 2 -> l.liveItems.randomOrNull(rnd)?.let { r.repo.toggle(it.id) }
+                                    3 ->
+                                        l.uses.values.filter { it.kind == UseKind.RECIPE }.randomOrNull(rnd)?.let {
+                                            r.repo.rescaleUse(it.id, 1 + rnd.nextInt(10))
+                                        }
+                                    4 -> r.repo.finishShopping()
+                                    5 -> if (rnd.nextInt(4) == 0) r.repo.clearAll()
+                                    else -> r.repo.manualAdd("bread", QtyBase.of(Rational.ONE, null, UnitLocale.METRIC), null)
+                                }
+                            }
+                        }
+                    }
+                }
+                check(r.repo.snapshot(), "racing workers, seed $seed")
+            }
+        }
     }
 }
