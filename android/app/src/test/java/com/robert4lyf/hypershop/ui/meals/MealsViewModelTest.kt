@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.ui.meals
 
+import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.robert4lyf.hypershop.core.model.BaseKey
 import com.robert4lyf.hypershop.core.model.ParsedBy
@@ -42,9 +43,15 @@ class MealsViewModelTest {
 
     private fun container() = TestContainer.create().also { made += it }
 
+    private val models = ArrayList<MealsViewModel>()
+
     @After
     fun stop() {
         collectors.cancel()
+        // The view model's own flows outlive their last collector by a few seconds (WhileSubscribed):
+        // stop them, and let a read already in flight finish, before the database goes.
+        for (vm in models) vm.viewModelScope.cancel()
+        Thread.sleep(300)
         for (c in made) {
             c.applicationScope.cancel()
             c.db.close()
@@ -52,6 +59,7 @@ class MealsViewModelTest {
     }
 
     private fun MealsViewModel.shown(): MealsViewModel {
+        models += this
         collectors.launch { ui.collect {} }
         return this
     }

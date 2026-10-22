@@ -15,6 +15,7 @@ import com.robert4lyf.hypershop.core.sync.WatchMessage
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.di.Startup
 import com.robert4lyf.hypershop.testutil.TestContainer
+import com.robert4lyf.hypershop.testutil.awaitJob
 import com.robert4lyf.hypershop.testutil.awaitTrue
 import com.robert4lyf.hypershop.ui.HyperShopApp
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
@@ -128,6 +129,8 @@ class StartupTest {
         val id = runBlocking { withTimeout(5_000) { share.await() } }
         assertTrue(runBlocking { c.importJobs.get(id!!) } != null)
         assertEquals("A restore was interrupted; it has been finished", c.notice.value)
+        // The import it queued runs to its end inside this test, not into the next one.
+        runBlocking { c.awaitJob(id!!) }
     }
 
     @Test

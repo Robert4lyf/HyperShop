@@ -1,6 +1,7 @@
 package com.robert4lyf.hypershop.ui.list
 
 import android.os.Looper
+import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.di.AppContainer
@@ -14,6 +15,7 @@ import com.robert4lyf.hypershop.ui.review.ReviewState
 import com.robert4lyf.hypershop.ui.review.ReviewViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -37,6 +39,17 @@ internal fun AppContainer.add(vararg lines: String) {
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34])
 class ListViewModelTest {
+    private val models = java.util.concurrent.CopyOnWriteArrayList<androidx.lifecycle.ViewModel>()
+
+    private fun <T : androidx.lifecycle.ViewModel> tracked(vm: T): T = vm.also { models += it }
+
+    /** A view model's flows run on after a test (Eagerly); stop them, and let a read in flight finish, before the next. */
+    @org.junit.After
+    fun stopModels() {
+        for (vm in models) vm.viewModelScope.cancel()
+        Thread.sleep(300)
+    }
+
     private fun ListUi.row(name: String) = aisles.flatMap { it.second }.first { it.name == name }
 
     private fun nextMessage(vm: ListViewModel): UiMessage {
@@ -55,7 +68,7 @@ class ListViewModelTest {
     fun categorisedGroupsRowsWithinTheAisle() {
         val c = TestContainer.create()
         c.add("1 lemon", "2 onions", "1 bunch basil", "1 carrot")
-        val vm = ListViewModel(c)
+        val vm = tracked(ListViewModel(c))
         val standard = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
         assertEquals(listOf("lemon", "onion", "basil", "carrot"), standard.aisles.single().second.map { it.name })
         vm.setView(ListView.TYPE)
@@ -72,7 +85,7 @@ class ListViewModelTest {
         await(dal.state) { it is ReviewState.Ready }
         dal.confirm()
         await(dal.state) { it is ReviewState.Added }
-        val vm = ListViewModel(c)
+        val vm = tracked(ListViewModel(c))
         vm.addTyped("milk")
         await(vm.ui) { u -> u.aisles.flatMap { it.second }.any { it.name == "milk" } }
         vm.setView(ListView.RECIPE)
@@ -103,7 +116,7 @@ class ListViewModelTest {
         await(review.state) { it is ReviewState.Ready && it.ui.addCount == 1 }
         review.confirm()
         await(review.state) { it is ReviewState.Added }
-        val vm = ListViewModel(c)
+        val vm = tracked(ListViewModel(c))
         val ui = await(vm.ui) { it.loaded && it.inStock.isNotEmpty() }
         assertEquals("olive oil", ui.inStock.single().main)
         assertTrue(ui.aisles.flatMap { it.second }.none { it.name == "olive oil" })
@@ -116,7 +129,7 @@ class ListViewModelTest {
     fun groupedByAisleInStoreOrderAndDoneSinks() {
         val c = TestContainer.create()
         c.add("2 onions", "1 carrot", "500g beef mince", "1 tsp ground cumin")
-        val vm = ListViewModel(c)
+        val vm = tracked(ListViewModel(c))
         var ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
         assertEquals(listOf(AisleCode.PRODUCE, AisleCode.MEAT_FISH, AisleCode.SPICES_CONDIMENTS), ui.aisles.map { it.first })
         assertEquals(listOf("onion", "carrot"), ui.aisles.first().second.map { it.name })
@@ -133,7 +146,7 @@ class ListViewModelTest {
     fun tickUndoAndPartial() {
         val c = TestContainer.create()
         c.add("2 onions")
-        val vm = ListViewModel(c)
+        val vm = tracked(ListViewModel(c))
         val ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
         // A tick is quiet; tapping again is the undo.
         vm.toggle(ui.row("onion"))
@@ -152,7 +165,7 @@ class ListViewModelTest {
     fun deleteFinishAndClearAllUndo() {
         val c = TestContainer.create()
         c.add("2 onions", "1 carrot")
-        val vm = ListViewModel(c)
+        val vm = tracked(ListViewModel(c))
         var ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
         ui.row("carrot").let { vm.delete(it.id, it.name) }
         var m = nextMessage(vm)
@@ -176,7 +189,7 @@ class ListViewModelTest {
     @Test
     fun typedItemsMultiLinePasteAndPlusOne() {
         val c = TestContainer.create()
-        val vm = ListViewModel(c)
+        val vm = tracked(ListViewModel(c))
         await(vm.ui) { it.isEmpty }
         vm.addTyped("2 onions")
         await(vm.ui) { it.aisles.isNotEmpty() && it.row("onion").main == "2 onions" }
@@ -200,7 +213,7 @@ class ListViewModelTest {
     @Test
     fun suggestionsSkipTheAmountAndKeepItWhenPicked() {
         val c = TestContainer.create()
-        val vm = ListViewModel(c)
+        val vm = tracked(ListViewModel(c))
         await(vm.ui) { it.isEmpty }
         assertTrue(vm.suggestions("2 oni").contains("onion"))
         assertTrue(vm.suggestions("200 g oni").contains("onion"))
@@ -213,7 +226,7 @@ class ListViewModelTest {
     @Test
     fun suggestionsSampleAndShareText() {
         val c = TestContainer.create()
-        val vm = ListViewModel(c)
+        val vm = tracked(ListViewModel(c))
         await(vm.ui) { it.isEmpty }
         assertTrue(vm.suggestions("o").isEmpty())
         assertTrue(vm.suggestions("oni").contains("onion"))
@@ -231,7 +244,7 @@ class ListViewModelTest {
     fun itemSheetTotalsSourcesEditAndMove() {
         val c = TestContainer.create()
         c.add("2 onions", "200g onions")
-        val vm = ListViewModel(c)
+        val vm = tracked(ListViewModel(c))
         val ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
         vm.openItem(ui.row("onion").id)
         val sheet = await(vm.sheet) { it != null }!!
@@ -250,7 +263,7 @@ class ListViewModelTest {
     fun theSheetShowsATickTheListHasNotDrawnYet() {
         val c = TestContainer.create()
         c.add("2 onions")
-        val vm = ListViewModel(c)
+        val vm = tracked(ListViewModel(c))
         val ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
         // Ticked straight in the repository: the list on screen still shows the row open.
         runBlocking { c.repository.tick(ui.row("onion").id) }
@@ -262,7 +275,7 @@ class ListViewModelTest {
     fun finishCountsATickNotYetOnScreen() {
         val c = TestContainer.create()
         c.add("2 onions", "1 carrot")
-        val vm = ListViewModel(c)
+        val vm = tracked(ListViewModel(c))
         val ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
         // Straight after the tick: the screen may not show it yet; the count comes from the write.
         runBlocking { c.repository.tick(ui.row("onion").id) }
@@ -274,7 +287,7 @@ class ListViewModelTest {
     fun theLastItemOpenedWinsAndCloseStaysClosed() {
         val c = TestContainer.create()
         c.add("2 onions", "1 carrot")
-        val vm = ListViewModel(c)
+        val vm = tracked(ListViewModel(c))
         val ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
         val onion = ui.row("onion").id
         val carrot = ui.row("carrot").id
@@ -302,7 +315,7 @@ class ListViewModelTest {
     fun shopModeIsASettingAndKeepsEveryTick() {
         val c = TestContainer.create()
         c.add("2 onions", "1 carrot", "500g beef mince")
-        val vm = ListViewModel(c)
+        val vm = tracked(ListViewModel(c))
         var ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
         assertEquals(ListMode.PLAN, ui.mode)
         assertTrue(!ui.shopping)
@@ -319,7 +332,7 @@ class ListViewModelTest {
         // A new view model (the process came back) reads the mode from the setting.
         vm.setMode(ListMode.SHOP)
         await(vm.ui) { it.shopping }
-        val again = ListViewModel(c)
+        val again = tracked(ListViewModel(c))
         assertTrue(await(again.ui) { it.loaded && it.aisles.isNotEmpty() }.shopping)
         // Finishing takes the bought rows away and, with nothing left, the shop screen with them.
         again.finishShopping()

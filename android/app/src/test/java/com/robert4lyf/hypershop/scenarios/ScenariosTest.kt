@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.scenarios
 
+import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.robert4lyf.hypershop.core.model.BaseKey
 import com.robert4lyf.hypershop.core.model.Rational
@@ -20,6 +21,7 @@ import com.robert4lyf.hypershop.ui.review.ReviewState
 import com.robert4lyf.hypershop.ui.review.ReviewViewModel
 import com.robert4lyf.hypershop.watch.FakeWatchLink
 import com.robert4lyf.hypershop.watch.WatchLinkState
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -38,6 +40,17 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34])
 class ScenariosTest {
+    private val models = java.util.concurrent.CopyOnWriteArrayList<androidx.lifecycle.ViewModel>()
+
+    private fun <T : androidx.lifecycle.ViewModel> tracked(vm: T): T = vm.also { models += it }
+
+    /** A view model's flows run on after a test (Eagerly); stop them, and let a read in flight finish, before the next. */
+    @org.junit.After
+    fun stopModels() {
+        for (vm in models) vm.viewModelScope.cancel()
+        Thread.sleep(300)
+    }
+
     private fun ListUi.row(name: String) = aisles.flatMap { it.second }.first { it.name == name }
 
     private fun AppContainer.fake() = watchLink as FakeWatchLink
@@ -60,7 +73,7 @@ class ScenariosTest {
     @Test
     fun scenarioA_quickShopFromTypedItemsToFinished() {
         val c = TestContainer.create()
-        val vm = ListViewModel(c)
+        val vm = tracked(ListViewModel(c))
         await(vm.ui) { it.isEmpty }
         for (l in listOf("milk", "6 eggs", "bread", "2 onions")) vm.addTyped(l)
         var ui = await(vm.ui) { u -> u.aisles.flatMap { it.second }.size == 4 }
@@ -82,7 +95,7 @@ class ScenariosTest {
     fun rapidTicksOnOneItemAlwaysLandOnTheLastTap() {
         val c = TestContainer.create()
         c.add("2 onions", "1 carrot")
-        val vm = ListViewModel(c)
+        val vm = tracked(ListViewModel(c))
         val ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
         val onion = ui.row("onion")
         // Seven taps before the screen can redraw: an odd number ends ticked, and only one tick is left behind.
@@ -116,7 +129,7 @@ class ScenariosTest {
         await(second.state) { it is ReviewState.Ready }
         second.confirm()
         await(second.state) { it is ReviewState.Added }
-        val vm = ListViewModel(c)
+        val vm = tracked(ListViewModel(c))
         val ui = await(vm.ui) { it.loaded && it.inStock.isNotEmpty() }
         assertEquals("3 onions", ui.row("onion").main)
         assertEquals(listOf("olive oil"), ui.inStock.map { it.name })
@@ -147,7 +160,7 @@ class ScenariosTest {
             c.fake().setState(WatchLinkState.DISCONNECTED)
             // Meanwhile the phone adds a recipe that needs one more onion.
             c.add("1 onion", "200g red lentils")
-            val phone = ListViewModel(c)
+            val phone = tracked(ListViewModel(c))
             var ui = await(phone.ui) { it.loaded && it.row("onion").main == "3 onions" }
             assertEquals(4, ui.left)
 
