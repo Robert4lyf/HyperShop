@@ -4,6 +4,10 @@
 
 Release C is on branch `ccr-5923064f-985kmq` (PROGRESS.md › Release C, docs/design/release-c.md, the report in docs/reports/release-c-final.md). Everything below was driven on the JVM and CI's emulator; only you can say how it feels in a shop, with TalkBack, and with your own recipes. **Back up first** (Settings › Data › Back up to a file).
 
+## If this session stopped before the PR (continuing with another tool)
+
+State: commits C.0–C.7 are on `ccr-5923064f-985kmq` and pushed. Left to do, in order: C.8 the adversarial review of `git diff 06e4126..HEAD -- android` (areas: `ReviewViewModel.keepCorrections`/`setAmount`/`removeLine`+Undo; `ListViewModel.prep` gated on list mode and the "+1" snackbar; `ShopScreen` lingering ticks; the dialogs replaced by Undo; the parser's trailing amounts, lengths, decilitres, shared heads; `BuyAgain.view(list)`, `Planner.recipesByKeys`; `AmountField(initial)`), fixing what it finds, one `[C.8]` commit with the findings in docs/reports/release-c-final.md § 8; then C.9: fill § 8 of the report, commit `[C.9]`, `tools/verify.sh` green before each commit, and open the PR with the body in the final report's "Delivery" section (the draft PR text is the report's own summary). Rules: CLAUDE.md (gate before every commit, golden data never edited, PROGRESS.md in the same commit as its step).
+
 ## ⏸ Hand-off G — your checks (yes/no)
 
 1. **Three real recipes.** Share three recipes you actually cook (one from a UK site, one US, one blog with chatty lines). On each review: how many rows are wrong, and how many of those did the app flag ("Check: …")? Wrong and unflagged is what matters: ___ / ___ / ___.
