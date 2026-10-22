@@ -74,6 +74,8 @@ class WeeklyShopScenariosTest {
     /** Scrolls the Plan screen to [tag] (counted apart: a swipe, not a decision). */
     private fun scrollTo(tag: String) {
         waitFor { has("meals") }
+        // Not while the last tap's change is still being laid out (a scroll then measured mid-layout).
+        compose.waitForIdle()
         compose.onNodeWithTag("meals").performScrollToNode(hasTestTag(tag))
         scrolls++
     }

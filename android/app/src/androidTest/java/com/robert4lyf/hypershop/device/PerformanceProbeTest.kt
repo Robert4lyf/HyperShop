@@ -214,15 +214,15 @@ class PerformanceProbeTest {
             for (k in keys.take(6)) c.planner.plan(week, k)
         }
         val (_, preview) = timed { runBlocking { c.planner.previewWeek(week) } }
-        budget("plan: preview of 6 meals to add", preview, 3000.0)
+        budget("plan: preview of 6 meals to add", preview, 300.0)
         val (_, add) = timed { runBlocking { c.planner.addWeekToList(week) } }
-        budget("plan: 6 meals onto the list (one transaction)", add, 5000.0)
+        budget("plan: 6 meals onto the list (one transaction)", add, 1300.0)
         val (_, other) = timed { runBlocking { c.planner.week(week - 3) } }
-        budget("plan: another week's meals", other, 500.0)
+        budget("plan: another week's meals", other, 150.0)
         val (_, buy) = timed { runBlocking { c.buyAgain.view() } }
-        budget("buy again: suggestions from 26 trips", buy, 1500.0)
+        budget("buy again: suggestions from 26 trips", buy, 150.0)
         val (_, home) = timed { runBlocking { c.homeCheck.view(c.repository.snapshot()) } }
-        budget("at home check over the week's list", home, 1500.0)
+        budget("at home check over the week's list", home, 150.0)
     }
 
     @Test

@@ -25,15 +25,14 @@ else
   exit 1
 fi
 
-adb logcat -c
-out=$(adb shell am instrument -w -e class \
-  "com.robert4lyf.hypershop.device.WeeklyShopScenariosTest#b_returningWeeklyShopperTheQuickWay,com.robert4lyf.hypershop.device.WeeklyShopScenariosTest#b_returningWeeklyShopperItemByItem" \
-  "$RUNNER")
+# Each way through on its own instrumentation run: a fresh process, as a person opening the app.
 echo "== weekly shop effort"
-adb logcat -d -s HyperShopEffort:I | sed -n 's/.*HyperShopEffort: //p'
-if grep -q "^OK (" <<< "$out"; then
-  echo "$out" | tail -3
-else
-  echo "$out"
-  exit 1
-fi
+for t in b_returningWeeklyShopperTheQuickWay b_returningWeeklyShopperItemByItem; do
+  adb logcat -c
+  out=$(adb shell am instrument -w -e class "com.robert4lyf.hypershop.device.WeeklyShopScenariosTest#$t" "$RUNNER")
+  adb logcat -d -s HyperShopEffort:I | sed -n 's/.*HyperShopEffort: //p'
+  if ! grep -q "^OK (" <<< "$out"; then
+    echo "$out"
+    exit 1
+  fi
+done
