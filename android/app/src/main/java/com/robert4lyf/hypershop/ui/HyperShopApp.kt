@@ -213,13 +213,10 @@ private fun AppShell(
                     container,
                     snackbar,
                     onBack = { nav.popBackStack() },
-                    onList = {
-                        nav.navigate(Routes.LIST) {
-                            popUpTo(Routes.LIST) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
+                    // Back to the list itself. Navigating to it with saved state restored the List tab's own
+                    // stack, which held this screen when it was opened from the list, so Start shopping
+                    // went nowhere. The list is the root of every stack.
+                    onList = { nav.popBackStack(Routes.LIST, inclusive = false) },
                 )
             }
             composable(Routes.SETTINGS) {
