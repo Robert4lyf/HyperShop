@@ -68,11 +68,23 @@ class DeviceScenariosTest {
     fun a_quickShop() {
         val c = DeviceContainer.create()
         show(c)
+        // What the field and the list held after each step: the failure message, if it fails.
+        val transcript = StringBuilder()
+
+        fun note(what: String) {
+            val field = compose.onNodeWithTag("add-item").fetchSemanticsNode().config.getOrNull(SemanticsProperties.EditableText)
+            val items = runBlocking { c.repository.snapshot() }.liveItems.map { it.displayName }
+            transcript.append("$what -> field='$field' items=$items\n")
+        }
         for (line in listOf("milk", "6 eggs", "bread", "2 onions")) {
             compose.onNodeWithTag("add-item").performTextInput(line)
+            note("typed '$line'")
             compose.onNodeWithTag("add-item").performImeAction()
+            note("done")
         }
-        waitFor { runBlocking { c.repository.snapshot() }.liveItems.size == 4 }
+        val four = runCatching { waitFor { runBlocking { c.repository.snapshot() }.liveItems.size == 4 } }
+        note("after waiting")
+        assertTrue("Four typed items did not all land:\n$transcript", four.isSuccess)
         compose.onNodeWithTag("start-shopping").performClick()
         waitFor { compose.onAllNodesWithTag("shop").fetchSemanticsNodes().isNotEmpty() }
         // Ticked rows fold away under "N bought", so the first tick is always the next item.
