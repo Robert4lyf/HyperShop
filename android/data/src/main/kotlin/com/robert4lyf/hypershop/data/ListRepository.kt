@@ -828,6 +828,8 @@ class ListRepository(
 
     fun target(name: String): NewItem = merger.target(name)
 
+    fun catalogEntry(name: String) = merger.catalogEntry(name)
+
     suspend fun editQuantity(
         itemId: Long,
         total: QtyBase,

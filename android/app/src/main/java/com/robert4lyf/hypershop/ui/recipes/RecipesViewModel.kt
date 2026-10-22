@@ -148,7 +148,7 @@ class RecipesViewModel(
                     // The book's name too: "Ottolenghi" finds everything from it.
                     listOfNotNull(r.title, r.book).joinToString(" "),
                     lines[r.recipeId].orEmpty().map { p ->
-                        val entry = c.repository.target(p.name).catalogId?.let { c.catalog.byId[it] }
+                        val entry = c.repository.catalogEntry(p.name)
                         RecipeSearch.Ingredient(
                             entry?.name ?: p.name,
                             listOf(p.name) + listOfNotNull(entry?.name, entry?.plural) + entry?.synonyms.orEmpty(),

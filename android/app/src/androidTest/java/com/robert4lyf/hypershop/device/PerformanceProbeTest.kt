@@ -172,7 +172,7 @@ class PerformanceProbeTest {
         // Where the time goes (KNOWN_ISSUES #16): what the first search's index is built from, and the match alone.
         val (lines300, read) = timed { runBlocking { c.repository.ingredientsOf(ids) } }
         report("search: read and decode 300 recipes' lines", read)
-        val (_, keyed) = timed { lines300.values.flatten().forEach { c.repository.target(it.name) } }
+        val (_, keyed) = timed { lines300.values.flatten().forEach { c.repository.catalogEntry(it.name) } }
         report("search: catalogue lookup for each line", keyed)
         val index =
             lines300.map { (id, ls) ->
