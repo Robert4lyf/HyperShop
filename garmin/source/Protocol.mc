@@ -28,6 +28,8 @@ module Protocol {
     const KEY_ITEMS = "it";
     const KEY_AISLES = "ai";
     const KEY_MORE = "mo";
+    // The snapshot build a page belongs to: pages of one lr from different builds are never mixed.
+    const KEY_BUILD = "bn";
     const KEY_OPS = "op";
 
     // The payload probe (debug builds): padding, the size asked for or

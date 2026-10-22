@@ -215,8 +215,14 @@ class WatchSyncCoordinator(
             items = items,
             nowMs = clock(),
             currentAisle = current,
+            build = nextBuild(),
         )
     }
+
+    /** A number no other build of this process carries, never 0 (0 means "not said" on the wire). */
+    private fun nextBuild(): Int = builds.incrementAndGet().let { if (it == 0) builds.incrementAndGet() else it }
+
+    private val builds = java.util.concurrent.atomic.AtomicInteger(java.util.Random().nextInt())
 
     private companion object {
         const val INBOX = 64

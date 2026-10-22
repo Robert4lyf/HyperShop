@@ -130,6 +130,7 @@ object WatchCodec {
             }
             put(Key.ITEMS, p.items.map { listOf(it.id, it.name, it.sub, it.aisleIdx, it.done, it.rev) })
             if (p.more > 0) put(Key.MORE, p.more)
+            if (p.build != 0) put(Key.BUILD, p.build)
         }
 
     /** The watch's decoder for a page; also used by tests and the Run 2 fake device. */
@@ -173,6 +174,8 @@ object WatchCodec {
         if (pages > 0 && page >= pages) return null
         if (aisleBase < 0 || items.any { it.aisleIdx < 0 }) return null
         val more = if (Key.MORE in payload) int(payload[Key.MORE])?.takeIf { it >= 0 } ?: return null else 0
+        // An absent or malformed build is "not said": such pages are assembled as before.
+        val build = int(payload[Key.BUILD]) ?: 0
         return SnapshotPage(
             epoch = int(payload[Key.EPOCH]) ?: return null,
             listRev = int(payload[Key.LIST_REV])?.takeIf { it >= 0 } ?: return null,
@@ -184,6 +187,7 @@ object WatchCodec {
             aisleBase = aisleBase,
             items = items,
             more = more,
+            build = build,
         )
     }
 

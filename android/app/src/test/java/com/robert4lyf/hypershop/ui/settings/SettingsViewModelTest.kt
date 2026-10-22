@@ -254,6 +254,35 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun undoOfARestoreIsRefusedOnceTheListHasMovedOn() {
+        val c = TestContainer.create()
+        c.add("2 onions", "1 carrot")
+        val vm = SettingsViewModel(c)
+        val got = mutableListOf<UiMessage>()
+        val watching = CoroutineScope(Dispatchers.Main).launch { vm.events.collect { got += it } }
+        await(vm.ui) { it.loaded }
+        val file = File(c.context.cacheDir, "backup-${System.nanoTime()}.json")
+        vm.backupTo(Uri.fromFile(file))
+        await(vm.ui) { got.size == 1 }
+        runBlocking { c.repository.clearAll() }
+        shadowOf(c.context.contentResolver).registerInputStreamSupplier(Uri.fromFile(file)) { file.inputStream() }
+        vm.inspectRestore(Uri.fromFile(file))
+        await(vm.ui) { it.restorePrompt != null }
+        vm.confirmRestore()
+        await(vm.ui) { got.size == 2 }
+        // Something bought after the restore: Undo would take the purchase back, so it is refused.
+        val l = runBlocking { c.repository.snapshot() }
+        runBlocking { c.repository.tick(l.itemByKey("cat:onion")!!.id) }
+        runBlocking { got[1].undo!!.invoke() }
+        await(vm.ui) { got.size == 3 }
+        assertEquals("Can't undo: the list has changed since the restore", got[2].text)
+        val after = runBlocking { c.repository.snapshot() }
+        assertEquals(2, after.liveItems.size)
+        assertTrue(after.isDone(after.itemByKey("cat:onion")!!.id))
+        watching.cancel()
+    }
+
+    @Test
     fun aFileThatIsNotABackupIsRefusedWithoutChangingAnything() {
         val c = TestContainer.create()
         c.add("2 onions")

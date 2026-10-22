@@ -272,10 +272,19 @@ class SettingsViewModel(
             _ui.update { it.copy(dataBusy = false) }
             if (outcome !is RestoreOutcome.Restored) return@launch
             val s = backups.summary(file)
+            // Undo is a whole-database restore, so it is refused once the list has moved on (a tick
+            // on the phone or the watch, a finished trip): a purchase is never undone by it.
+            val restoredAt = c.repository.epochAndRev()
             messages.send(
                 UiMessage(
                     "Restored ${plural(s.recipes, "recipe")} and ${plural(s.itemsOnList, "item")}",
-                    undo = { restoreSafely(outcome.before) },
+                    undo = {
+                        if (c.repository.epochAndRev() == restoredAt) {
+                            restoreSafely(outcome.before)
+                        } else {
+                            messages.send(UiMessage("Can't undo: the list has changed since the restore"))
+                        }
+                    },
                 ),
             )
         }

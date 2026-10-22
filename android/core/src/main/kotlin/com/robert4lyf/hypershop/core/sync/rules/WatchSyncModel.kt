@@ -150,6 +150,8 @@ class WatchSyncModel(
         }
         if (page.listRev < listRev) return
         val pages = assembling.getOrPut(page.listRev) { HashMap() }
+        // Pages of one lr from another build slice the list differently: start over with this build's.
+        if (pages.values.any { it.build != page.build }) pages.clear()
         pages[page.page] = page
         if ((0 until page.pages).all { it in pages }) {
             val all = (0 until page.pages).map { pages.getValue(it) }

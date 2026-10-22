@@ -93,6 +93,12 @@ data class SnapshotPage(
     val items: List<SnapItem>,
     /** Items left off the snapshot entirely ("+N on phone"). */
     val more: Int,
+    /**
+     * The build this page came from (0: not said). A page's slice depends on more
+     * than the list (the acks it carries, when it was built), so the watch assembles
+     * only pages of one `lr` *and* one build.
+     */
+    val build: Int = 0,
 )
 
 /**

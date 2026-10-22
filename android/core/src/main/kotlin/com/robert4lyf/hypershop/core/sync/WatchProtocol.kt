@@ -33,6 +33,9 @@ object WatchProtocol {
         const val ITEMS = "it"
         const val AISLES = "ai"
         const val MORE = "mo"
+
+        /** The snapshot build a page belongs to: pages of one `lr` from different builds are never mixed. */
+        const val BUILD = "bn"
         const val OPS = "op"
 
         /** Payload probe (debug): padding, a size asked for or measured, the reply's own size. */
