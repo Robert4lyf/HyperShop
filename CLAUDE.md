@@ -49,6 +49,11 @@ and retry; `verify.sh` already does.
 
 - **Every write goes through the repository** in `:data`. ViewModels never
   touch a DAO.
+- **Nothing touches the list before start-up is `Ready`** (`AppContainer.startup`).
+  A restore the process died in is finished first, then the watch epoch and
+  the catalogue re-key. The UI shows `StartupScreen`, the watch coordinator
+  holds its inbox, and shares and import workers `awaitReady()`. New
+  background entry points must wait the same way.
 - **Room enums are stored by name**, never ordinal.
 - **An item's amount is the sum of its contributions.** Never store a total.
   A row marked in stock on review adds nothing.

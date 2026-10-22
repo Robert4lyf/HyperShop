@@ -30,6 +30,7 @@ object TestContainer {
         claude: MockWebServer? = null,
         key: String? = null,
         clock: () -> Long = ticking(),
+        ready: Boolean = true,
     ): AppContainer {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val dir = File(context.cacheDir, "ds-${System.nanoTime()}").apply { mkdirs() }
@@ -52,6 +53,8 @@ object TestContainer {
                 .setWorkerFactory(container.workerFactory)
                 .build()
         WorkManagerTestInitHelper.initializeTestWorkManager(context, config)
+        // Tests that do not go through startUp start ready; StartupTest covers the barrier itself.
+        if (ready) container.startup.value = com.robert4lyf.hypershop.di.Startup.Ready
         return container
     }
 }

@@ -51,6 +51,9 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
+/** Start-up, as the UI and the background work wait on it ([AppContainer.startup]). */
+enum class Startup { Starting, Recovering, Ready, Stuck }
+
 sealed interface ShareOutcome {
     data class Review(
         val jobId: Long,
@@ -137,6 +140,7 @@ class AppContainer(
             log = log::log,
             clock = clock,
             cap = PayloadCap(bytes = PayloadCap.FR245_BYTES),
+            ready = { awaitReady() },
         )
 
     /**
@@ -208,6 +212,8 @@ class AppContainer(
         text: String?,
         subject: String?,
     ): Long? {
+        // A share that opens the app lands before start-up has finished: it waits, never writes into a restore.
+        awaitReady()
         val input = SharedText.parse(text, subject)
         val id =
             if (input != null) {
@@ -246,29 +252,76 @@ class AppContainer(
             UsageRecord(LocalDate.parse(it.date), it.model, Usage(it.inputTokens, it.outputTokens, it.cacheWrite, it.cacheRead), it.calls)
         }
 
-    /** Start-up housekeeping: the epoch marker, a catalogue re-key, the 7-day purge. */
+    /**
+     * Where start-up is. Nothing reads or writes the list before [Startup.Ready]:
+     * the UI shows a holding screen, the watch's messages wait in its inbox, and
+     * shares and import workers wait in [awaitReady].
+     */
+    val startup = MutableStateFlow<Startup>(Startup.Starting)
+
+    /** Suspends until start-up has finished; a stuck recovery keeps it waiting until the user decides. */
+    suspend fun awaitReady() {
+        startup.first { it == Startup.Ready }
+    }
+
     fun startUp(marker: EpochMarker = epochMarker) {
         // The first frame waits for the theme setting; start reading the settings file now,
         // while the activity is still being created, rather than when it first asks.
         applicationScope.launch { settings.theme.first() }
-        applicationScope.launch {
-            // First: a restore the process died in decides what everything after reads.
+        // The receiver first, so nothing the link hears is missed; it holds what it hears until ready.
+        watchSync.start()
+        watchLink.start()
+        applicationScope.launch { prepare(marker) }
+    }
+
+    /**
+     * In order: a restore the process died in (it decides what everything after
+     * reads), the watch epoch the restore may have replaced, then the catalogue
+     * re-key. Only then is the app ready; the tidying after it can run alongside use.
+     */
+    private suspend fun prepare(marker: EpochMarker) {
+        try {
+            startup.value = Startup.Recovering
             when (backups.recover()) {
                 BackupManager.Recovery.FINISHED -> notice.value = "A restore was interrupted; it has been finished"
                 BackupManager.Recovery.ROLLED_BACK -> notice.value = "A restore was interrupted; your data is as it was before it"
-                BackupManager.Recovery.STUCK -> notice.value = "A restore was interrupted and couldn't be finished. Restore the file again."
+                BackupManager.Recovery.STUCK -> {
+                    startup.value = Startup.Stuck
+                    return
+                }
                 null -> Unit
             }
             repository.checkEpoch(marker)
             repository.rekeyIfCatalogChanged()
-            repository.purgeDeleted()
-            importJobs.finishDiscards()
-            importJobs.finishThrowaways()
-            repository.purgeOldJobs(clock() - JOB_KEEP_MS)
+        } catch (e: Exception) {
+            Timber.e(e, "Start-up failed")
+            startup.value = Startup.Stuck
+            return
         }
-        // The receiver first, so nothing the link hears is missed.
-        watchSync.start()
-        watchLink.start()
+        startup.value = Startup.Ready
+        repository.purgeDeleted()
+        importJobs.finishDiscards()
+        importJobs.finishThrowaways()
+        repository.purgeOldJobs(clock() - JOB_KEEP_MS)
+    }
+
+    /** "Try again" on the stuck screen. */
+    fun retryStartUp(marker: EpochMarker = epochMarker) {
+        if (startup.value != Startup.Stuck) return
+        applicationScope.launch { prepare(marker) }
+    }
+
+    /**
+     * "Keep my data as it is": the interrupted restore is given up and the app
+     * starts on what is there. The database was restored in one transaction, so
+     * it is whole; only settings or ingredient edits may be from the other side.
+     */
+    fun abandonStuckRestore(marker: EpochMarker = epochMarker) {
+        if (startup.value != Startup.Stuck) return
+        applicationScope.launch {
+            backups.abandonInterruptedRestore()
+            prepare(marker)
+        }
     }
 
     companion object {

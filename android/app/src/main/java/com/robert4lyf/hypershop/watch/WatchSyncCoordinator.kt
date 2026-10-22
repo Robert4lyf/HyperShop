@@ -52,6 +52,11 @@ class WatchSyncCoordinator(
     private val clock: () -> Long = System::currentTimeMillis,
     /** Raised from the probe's measurement at Hand-off B. */
     var cap: PayloadCap = PayloadCap(),
+    /**
+     * Returns once the app's data is safe to read and write ([AppContainer.awaitReady]):
+     * a restore the process died in is finished first. Messages wait in the inbox until then.
+     */
+    private val ready: suspend () -> Unit = {},
 ) {
     private val inbox = Channel<Map<*, *>>(INBOX)
     private val sending = Mutex()
@@ -73,6 +78,7 @@ class WatchSyncCoordinator(
             }
         }
         scope.launch {
+            ready()
             for (p in inbox) {
                 try {
                     handle(p)
@@ -133,6 +139,7 @@ class WatchSyncCoordinator(
      * is ready and the push is due.
      */
     suspend fun push(force: Boolean) {
+        ready()
         if (link.state.value != WatchLinkState.APP_READY) return
         val to = install ?: repository.lastInstall()?.also { install = it } ?: return
         if (!force && repository.epochAndRev().second.toInt() == sentRev) return

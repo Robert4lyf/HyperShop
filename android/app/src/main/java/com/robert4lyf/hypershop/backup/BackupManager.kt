@@ -261,6 +261,9 @@ class BackupManager(
             outcome
         }
 
+    /** The user chose to keep the data as it is after a restore that could not be finished. */
+    suspend fun abandonInterruptedRestore() = lock.withLock { journal.end() }
+
     private suspend fun tryApply(f: BackupFile): Boolean =
         runCatching { apply(f).isEmpty() }.onFailure { Timber.e(it, "Restore recovery failed") }.getOrDefault(false)
 
