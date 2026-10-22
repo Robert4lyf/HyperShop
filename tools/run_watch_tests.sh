@@ -41,13 +41,13 @@ for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
         cat "${SIM_LOG}" >&2
         exit 1
     fi
-    # Ten minutes is far longer than the suite takes; past it, monkeydo has hung
-    # after connecting (seen in CI: connected on attempt 3, then silence), and
-    # the simulator's own log is the only account of why.
+    # Three minutes is far longer than the suite takes; past it, monkeydo has hung
+    # after connecting (seen in CI: a dialog over the device window, then silence),
+    # and the simulator's own log is the only account of why.
     status=0
-    timeout 600 "${SDK_DIR}/bin/monkeydo" "${OUT}" "${DEVICE}" -t > "${LOG}" 2>&1 || status=$?
+    timeout 180 "${SDK_DIR}/bin/monkeydo" "${OUT}" "${DEVICE}" -t > "${LOG}" 2>&1 || status=$?
     if [[ ${status} -eq 124 ]]; then
-        echo "monkeydo connected but never finished (10 min). Its output:" >&2
+        echo "monkeydo connected but never finished (3 min). Its output:" >&2
         cat "${LOG}" >&2
         echo "The simulator's log:" >&2
         cat "${SIM_LOG}" >&2
@@ -58,10 +58,22 @@ for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
                 echo "  $(xdotool getwindowname "$w" 2> /dev/null) ($(xdotool getwindowgeometry "$w" 2> /dev/null | tr '\n' ' '))" >&2
             done
         fi
-        # The dialog's words, read off the screen (its text is not reachable through X).
-        if command -v import > /dev/null && command -v tesseract > /dev/null; then
-            import -window root /tmp/simulator-screen.png 2> /dev/null &&
-                { echo "Text on the virtual display:" >&2; tesseract /tmp/simulator-screen.png - 2> /dev/null | grep -v '^\s*$' >&2; } || true
+        # Each window on its own, enlarged: read off the whole screen, the dialog's small
+        # text was lost (only the menu bar came through). The pictures are kept for the
+        # job's artifact as well, so a person can read what OCR cannot.
+        SHOTS="${ROOT}/garmin/build/simulator-screens"
+        mkdir -p "${SHOTS}"
+        if command -v import > /dev/null; then
+            import -window root "${SHOTS}/screen.png" 2> /dev/null || true
+            for w in $(xdotool search --onlyvisible --name '.' 2> /dev/null); do
+                import -window "$w" "${SHOTS}/window-$w.png" 2> /dev/null || continue
+                if command -v tesseract > /dev/null; then
+                    echo "Text in window $w ($(xdotool getwindowname "$w" 2> /dev/null)):" >&2
+                    convert "${SHOTS}/window-$w.png" -resize 300% -colorspace Gray "${SHOTS}/ocr-$w.png" 2> /dev/null &&
+                        tesseract "${SHOTS}/ocr-$w.png" - 2> /dev/null | grep -v '^\s*$' >&2 || true
+                    rm -f "${SHOTS}/ocr-$w.png"
+                fi
+            done
         fi
         echo "Connect IQ files:" >&2
         ls -la "${HOME}/.Garmin/ConnectIQ" "${HOME}/.Garmin/ConnectIQ/Devices" "${HOME}/.Garmin/ConnectIQ/Fonts" 2> /dev/null | head -30 >&2 || true

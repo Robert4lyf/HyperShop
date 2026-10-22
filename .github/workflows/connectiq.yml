@@ -276,3 +276,13 @@ jobs:
       - name: Run the tests
         if: steps.secrets.outputs.ready == 'true'
         run: tools/run_watch_tests.sh
+
+      # What was on the virtual display when the simulator hung (KNOWN_ISSUES #12).
+      - name: Keep the simulator's screen
+        if: failure() && steps.secrets.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulator-screens
+          path: garmin/build/simulator-screens/
+          retention-days: 1
+          if-no-files-found: ignore
