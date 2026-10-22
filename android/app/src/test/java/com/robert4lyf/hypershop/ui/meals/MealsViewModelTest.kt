@@ -147,8 +147,10 @@ class MealsViewModelTest {
         vm.add(await(vm.ui) { it.loaded && it.picks.size == 1 }.picks.single())
         await(vm.ui) { it.meals.size == 1 && got.size == 1 }
         // Four taps inside one frame: each counts from the last, not from the list's stale 4.
-        repeat(4) { vm.stepServings(vm.ui.value.meals.single(), 1) }
-        assertEquals(8, vm.ui.value.meals.single().servings)
+        val meal = vm.ui.value.meals.single()
+        repeat(4) { vm.stepServings(meal, 1) }
+        // The screen's state is combined off the main thread: it shows 8 a moment later, not 5.
+        await(vm.ui) { it.meals.single().servings == 8 }
         awaitTrue { got.size == 2 }
         assertEquals("Weeknight chilli serves 8", got[1].text)
         val onion = { runBlocking { c.repository.snapshot() }.let { l -> l.total(l.itemByKey("cat:onion")!!.id)[BaseKey.ITEMS] } }
@@ -157,8 +159,9 @@ class MealsViewModelTest {
         runBlocking { got[1].undo!!.invoke() }
         assertEquals(Rational.of(2), onion())
         assertEquals(4, await(vm.ui) { it.meals.single().servings == 4 }.meals.single().servings)
-        repeat(10) { vm.stepServings(vm.ui.value.meals.single(), -1) }
-        assertEquals(1, vm.ui.value.meals.single().servings)
+        val back = vm.ui.value.meals.single()
+        repeat(10) { vm.stepServings(back, -1) }
+        await(vm.ui) { it.meals.single().servings == 1 }
     }
 
     @Test

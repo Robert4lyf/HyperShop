@@ -122,7 +122,9 @@ jobs:
           disable-animations: true
           working-directory: android
           # A manual run can repeat the suite to look for flakiness; every repeat must pass.
-          script: for i in $(seq 1 ${{ inputs.device_repeats || 1 }}); do echo "device run $i"; ./gradlew --max-workers=2 :app:connectedDebugAndroidTest || exit 1; done
+          script: |
+            for i in $(seq 1 ${{ inputs.device_repeats || 1 }}); do echo "device run $i"; ./gradlew --max-workers=2 :app:connectedDebugAndroidTest || exit 1; done
+            ../tools/device_process_death.sh
 
       # The report is HTML in an artifact; the failures themselves belong in the log.
       - name: Show failing device tests

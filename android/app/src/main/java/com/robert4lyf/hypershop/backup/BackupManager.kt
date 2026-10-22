@@ -226,6 +226,8 @@ class BackupManager(
      */
     suspend fun restore(f: BackupFile): RestoreOutcome =
         lock.withLock {
+            // Checked here too, not only by inspect(): nothing destructive starts on a file that would be refused.
+            BackupFileValidator.validate(f).takeIf { it.isNotEmpty() }?.let { return@withLock RestoreOutcome.Refused(it) }
             val before = snapshot()
             journal.begin(f, before)
             val problems =
