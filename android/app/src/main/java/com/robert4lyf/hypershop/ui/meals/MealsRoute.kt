@@ -228,7 +228,9 @@ private fun WeekHeader(
     actions: MealsActions,
 ) {
     Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = actions.onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") }
+        IconButton(onClick = actions.onBack, modifier = Modifier.testTag("back")) {
+            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+        }
         Column(Modifier.weight(1f)) {
             Text(
                 ui.weekName.ifEmpty { "This week" },

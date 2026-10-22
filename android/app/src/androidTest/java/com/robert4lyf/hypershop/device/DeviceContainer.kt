@@ -27,14 +27,18 @@ object DeviceContainer {
     fun create(
         key: String? = null,
         ready: Boolean = true,
+        /** A database already in use: the same data under a new container, as after the app restarts. */
+        db: HyperShopDatabase? = null,
     ): AppContainer {
         val ctx = context
-        File(ctx.filesDir, "library").deleteRecursively()
-        File(ctx.noBackupFilesDir, "restore").deleteRecursively()
+        if (db == null) {
+            File(ctx.filesDir, "library").deleteRecursively()
+            File(ctx.noBackupFilesDir, "restore").deleteRecursively()
+        }
         val dir = File(ctx.cacheDir, "device-${System.nanoTime()}").apply { mkdirs() }
         return AppContainer(
             context = ctx,
-            db = HyperShopDatabase.inMemory(ctx),
+            db = db ?: HyperShopDatabase.inMemory(ctx),
             dataStore = PreferenceDataStoreFactory.create { File(dir, "settings.preferences_pb") },
             apiKeyStore = InMemoryApiKeyStore(key),
             watchLink = FakeWatchLink(),
@@ -54,7 +58,9 @@ fun AppContainer.saveRecipe(
                 "https://example.com/${title.lowercase().replace(' ', '-')}", title, 4, UnitLocale.METRIC, "WEB",
                 ParsedBy.RULES, null, false, lines.map { parser.parse(it) },
             )
-        val applied = repository.apply(repository.preview(stored, 4, null)) as com.robert4lyf.hypershop.core.merge.ApplyResult.Applied
+        // Through the review's path (it joins the library), not planned: a saved recipe, nothing more.
+        val applied =
+            repository.apply(repository.preview(stored, 4, null), plan = false) as com.robert4lyf.hypershop.core.merge.ApplyResult.Applied
         repository.removeUse(applied.useId)
         stored.recipe.id
     }
