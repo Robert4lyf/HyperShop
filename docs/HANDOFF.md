@@ -1,5 +1,23 @@
 # Hand-off notes
 
+## Status: Release B (make weekly shopping effortless) — ⏸ Hand-off F
+
+Release B is on branch `claude/release-b` (PROGRESS.md › Release B, docs/design/release-b.md). The emulator drives every flow; only you can say whether a real week is quicker. **Back up first** (Settings › Data › Back up to a file): the update migrates your database, and your recipes on the list become this week's planned meals.
+
+## ⏸ Hand-off F — your checks (yes/no, and two times)
+
+1. **The upgrade.** After installing, open Recipes › Plan the week. Are the recipes that were on your list there as this week's meals, each saying how much is still to buy? Nothing added twice to the list?
+2. **Stopwatch, the first week.** Plan next week's shop as you normally would on the Plan screen (meals, then the items you always buy, then Already at home?), and press Start shopping. Time it from opening the app to the shop screen, leaving out time spent deciding what to cook. ___ min ___ s
+3. **Stopwatch, the week after.** Finish that trip in the shop. The following week, open the app: List › Plan this week › Same as last week? › Add N meals to the list › Buy again's Add all › Already at home? (tick what you have, or Have all) › Start shopping. ___ min ___ s. Under two minutes? Faster than check 2?
+4. **Buy again.** Are the chips things you really buy each week, and nothing a recipe asked for? Long-press one: do "Always offer" and "Don't suggest" do what they say?
+5. **Already at home?** Is the list of cupboard things short and about this week's meals only? Does "Have it" take an item off the list and "Need it" put exactly that amount back?
+6. **Removing a meal.** Remove a meal you have already bought part of. Does the dialog say what comes off, and do the things you bought stay ticked?
+7. **Next week.** Plan next week (› arrow) while this week's list is out. Is the list unchanged?
+8. **Quick list.** On an empty list, type "milk, bread" and shop. Is it just as quick as before (no planning step in the way)?
+9. **The watch.** After Add N meals to the list, does the watch show the new items, merged (one onion row for two recipes)?
+10. **Backup.** Back up, then restore that file: is the week's plan still there, and does Buy again still know your regulars?
+
+
 ## Status: Release A (verified and dependable) — ⏸ Hand-off E
 
 Release A is on branch `claude/release-a-verified` (PROGRESS.md › Release A). What CI's emulator verified and what it cannot is in docs/design/release-a.md. These checks need your phone and your watch. **Back up first** (Settings › Data › Back up to a file).

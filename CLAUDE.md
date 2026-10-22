@@ -54,6 +54,16 @@ and retry; `verify.sh` already does.
   the catalogue re-key. The UI shows `StartupScreen`, the watch coordinator
   holds its inbox, and shares and import workers `awaitReady()`. New
   background entry points must wait the same way.
+- **A planned meal is not a recipe use.** `PlannedMeal` is the plan; its
+  shopping is the use it is linked to (`useId`). Only `Planner` puts a meal on
+  the list, through the review's own `apply`, linking it in the same
+  transaction. A finished trip leaves the plan alone. An import plans itself
+  for this week, and an edit relinks: keep `apply`'s `plan` and `replacing`
+  paths doing that.
+- **Nothing in Release B undoes a purchase.** Removing a meal, Undo of a week's
+  add, Buy again's Undo and "Have it" take back only unbought shares
+  (`ShoppingList.withdraw`). Never call `removeUse` on a use with a covered
+  contribution to "remove a meal".
 - **Room enums are stored by name**, never ordinal.
 - **An item's amount is the sum of its contributions.** Never store a total.
   A row marked in stock on review adds nothing.
