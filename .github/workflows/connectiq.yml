@@ -255,7 +255,7 @@ jobs:
         if: steps.secrets.outputs.ready == 'true'
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb openbox xdotool imagemagick tesseract-ocr libwebkit2gtk-4.0-37 libsecret-1-0 libsoup2.4-1 > /dev/null
+          sudo apt-get install -y -qq xvfb openbox libgl1-mesa-dri xdotool imagemagick tesseract-ocr libwebkit2gtk-4.0-37 libsecret-1-0 libsoup2.4-1 > /dev/null
 
       - name: Download the device definitions
         if: steps.secrets.outputs.ready == 'true'

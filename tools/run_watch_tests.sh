@@ -34,7 +34,11 @@ if command -v openbox > /dev/null; then
     sleep 1
 fi
 SIM_LOG="${ROOT}/garmin/build/simulator.log"
-"${SDK_DIR}/bin/simulator" > "${SIM_LOG}" 2>&1 &
+# With openbox the Error dialog got its frame but its contents stayed transparent,
+# and the device screen blank: GTK/WebKit drawing through GL that Xvfb does not
+# provide. Software rendering and no compositing are the usual cure.
+LIBGL_ALWAYS_SOFTWARE=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 GDK_BACKEND=x11 \
+    "${SDK_DIR}/bin/simulator" > "${SIM_LOG}" 2>&1 &
 sim=$!
 trap 'kill ${sim} 2>/dev/null || true' EXIT
 
@@ -82,8 +86,8 @@ for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
             done
         fi
         echo "Connect IQ files:" >&2
-        ls -la "${HOME}/.Garmin/ConnectIQ" 2> /dev/null >&2 || true
-        ls -laR "${HOME}/.Garmin/ConnectIQ/Devices" 2> /dev/null >&2 || true
+        ls -la "${HOME}/.Garmin/ConnectIQ" >&2 2> /dev/null || true
+        ls -laR "${HOME}/.Garmin/ConnectIQ/Devices" >&2 2> /dev/null || true
         echo "Fonts: $(ls "${HOME}/.Garmin/ConnectIQ/Fonts" 2> /dev/null | wc -l) files" >&2
         cat "${HOME}/.Garmin/ConnectIQ/simulator.ini" >&2 2> /dev/null || true
         exit 1
