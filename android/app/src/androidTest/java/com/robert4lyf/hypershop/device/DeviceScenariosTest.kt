@@ -87,13 +87,16 @@ class DeviceScenariosTest {
         assertTrue("Four typed items did not all land:\n$transcript", four.isSuccess)
         compose.onNodeWithTag("start-shopping").performClick()
         waitFor { compose.onAllNodesWithTag("shop").fetchSemanticsNodes().isNotEmpty() }
-        // Ticked rows fold away under "N bought", so the first tick is always the next item.
-        repeat(4) {
+        // Ticked rows fold away under "N bought", so the first tick is the next item to buy, once the
+        // last tap has landed. waitForIdle does not wait for the database, so each tap waits for its own
+        // effect, as a shopper looks before the next tap; tapping on would hit the same row again.
+        val bought = { runBlocking { c.repository.snapshot() }.let { l -> l.liveItems.count { l.isDone(it.id) } } }
+        repeat(4) { i ->
             waitFor { ticks().fetchSemanticsNodes().isNotEmpty() }
             ticks()[0].performClick()
-            compose.waitForIdle()
+            waitFor { bought() == i + 1 }
+            waitFor { compose.onAllNodesWithText("${i + 1} of 4 bought", substring = true).fetchSemanticsNodes().isNotEmpty() }
         }
-        waitFor { runBlocking { c.repository.snapshot() }.let { l -> l.liveItems.all { l.isDone(it.id) } } }
         waitFor { compose.onNodeWithTag("shop-left").fetchSemanticsNode().config.toString().contains("All bought") }
         compose.onNodeWithTag("finish").performClick()
         waitFor { runBlocking { c.repository.snapshot() }.liveItems.isEmpty() }

@@ -7,6 +7,11 @@ on:
   # The repository has no long-lived integration branch yet, so this is the only
   # way to run the build on demand until one exists.
   workflow_dispatch:
+    inputs:
+      device_repeats:
+        description: "Runs of the device scenarios, each on a fresh install (flakiness check)"
+        required: false
+        default: "1"
 
 # Nothing here writes to the repository.
 permissions:
@@ -116,7 +121,8 @@ jobs:
           target: google_apis
           disable-animations: true
           working-directory: android
-          script: ./gradlew --max-workers=2 :app:connectedDebugAndroidTest
+          # A manual run can repeat the suite to look for flakiness; every repeat must pass.
+          script: for i in $(seq 1 ${{ inputs.device_repeats || 1 }}); do echo "device run $i"; ./gradlew --max-workers=2 :app:connectedDebugAndroidTest || exit 1; done
 
       # The report is HTML in an artifact; the failures themselves belong in the log.
       - name: Show failing device tests
