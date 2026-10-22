@@ -30,4 +30,16 @@ class WithdrawTest {
         assertNull(bought.withdraw(bought.contributionsOfUse(a).map { it.id }.toSet()))
         assertNull(bought.withdraw(setOf(999L)))
     }
+
+    @Test
+    fun undoOfTwoDeletionsInOneMillisecondBringsBackOneRowPerKey() {
+        val (l1, _) = add(ShoppingList(), listOf("2 onions"))
+        val first = l1.itemByKey("cat:onion")!!.id
+        val l2 = l1.clearAll(7)
+        val (l3, _) = add(l2, listOf("1 onion"))
+        val l4 = l3.clearAll(7)
+        val back = l4.undoDelete(7)
+        assertEquals(1, back.liveItems.count { it.mergeKey == "cat:onion" })
+        assertTrue(back.liveItems.single().id != first)
+    }
 }

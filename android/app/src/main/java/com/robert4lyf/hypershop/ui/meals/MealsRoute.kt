@@ -161,6 +161,7 @@ fun MealsScreen(
     actions: MealsActions,
 ) {
     var removing by rememberSaveable { mutableStateOf<Long?>(null) }
+    var allPicks by rememberSaveable { mutableStateOf(false) }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().imePadding()) {
             WeekHeader(ui, actions)
@@ -192,7 +193,7 @@ fun MealsScreen(
                         )
                     }
                 }
-                if (ui.hasLibrary && !ui.isPast) pickSection(ui, actions)
+                if (ui.hasLibrary && !ui.isPast) pickSection(ui, actions, allPicks) { allPicks = true }
             }
             BottomBar(ui, actions)
         }
@@ -520,10 +521,17 @@ private fun HomeRowItem(
     }
 }
 
+/**
+ * The saved recipes to plan: the most recently added first, a handful of them
+ * until a search or "Show all", so a long library never buries the screen.
+ */
 private fun androidx.compose.foundation.lazy.LazyListScope.pickSection(
     ui: MealsUi,
     actions: MealsActions,
+    all: Boolean,
+    onAll: () -> Unit,
 ) {
+    val shown = if (all || ui.query.isNotBlank()) ui.picks else ui.picks.takeLast(PICKS_SHOWN).reversed()
     item(key = "pick") {
         Column(Modifier.padding(horizontal = 20.dp).padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionLabel(if (ui.meals.isEmpty()) "Choose meals" else "Add a meal")
@@ -547,8 +555,18 @@ private fun androidx.compose.foundation.lazy.LazyListScope.pickSection(
             }
         }
     }
-    items(ui.picks, key = { "pick-${it.key}" }) { p -> PickRow(p, onAdd = { actions.onPlan(p) }) }
+    items(shown, key = { "pick-${it.key}" }) { p -> PickRow(p, onAdd = { actions.onPlan(p) }) }
+    if (shown.size < ui.picks.size) {
+        item(key = "picks-all") {
+            TextButton(onClick = onAll, modifier = Modifier.padding(horizontal = 20.dp).testTag("picks-all")) {
+                Text("Show all ${ui.picks.size} recipes")
+            }
+        }
+    }
 }
+
+/** Recent recipes shown before a search: about a screenful. */
+private const val PICKS_SHOWN = 8
 
 @Composable
 private fun PickRow(

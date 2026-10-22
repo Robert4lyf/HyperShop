@@ -279,7 +279,14 @@ data class ShoppingList(
      */
     fun undoDelete(stamp: Long): ShoppingList {
         val liveKeys = liveItems.map { it.mergeKey }.toSet()
-        val back = items.values.filter { it.deletedAt == stamp && it.mergeKey !in liveKeys }.map { it.id }.toSet()
+        // One row per key: two operations stamped in the same millisecond can each have deleted a row
+        // with the same key, and only one of them may come back (keys are unique among live rows).
+        val back =
+            items.values
+                .filter { it.deletedAt == stamp && it.mergeKey !in liveKeys }
+                .groupBy { it.mergeKey }
+                .map { (_, rows) -> rows.maxOf { it.id } }
+                .toSet()
         // "Finish shopping" also archived uses with the same stamp.
         return copy(
             items = items.mapValues { (id, i) -> if (id in back) i.copy(deletedAt = null) else i },
