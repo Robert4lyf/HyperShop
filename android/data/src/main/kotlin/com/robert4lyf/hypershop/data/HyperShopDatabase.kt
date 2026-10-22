@@ -168,11 +168,14 @@ abstract class HyperShopDatabase : RoomDatabase() {
         fun inMemory(
             context: Context,
             queryExecutor: java.util.concurrent.Executor? = null,
+            /** Every SQL statement as it runs, for tests that count what a change costs. */
+            onQuery: ((String) -> Unit)? = null,
         ): HyperShopDatabase =
             Room.inMemoryDatabaseBuilder(context, HyperShopDatabase::class.java)
                 .addCallback(CALLBACK)
                 .allowMainThreadQueries()
                 .apply { queryExecutor?.let { setQueryExecutor(it) } }
+                .apply { onQuery?.let { cb -> setQueryCallback({ sql, _ -> cb(sql) }, java.util.concurrent.Executor { it.run() }) } }
                 .build()
     }
 }

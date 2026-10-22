@@ -8,4 +8,6 @@ data class UiMessage(
     val text: String,
     val undo: (suspend () -> Unit)? = null,
     val seconds: Int = if (undo != null) 10 else 4,
+    /** The action's label: "Undo", or what else a tap does ("Add 1 more"). */
+    val action: String = "Undo",
 )

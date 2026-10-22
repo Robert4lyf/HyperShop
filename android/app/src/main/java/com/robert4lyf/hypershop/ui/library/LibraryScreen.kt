@@ -30,7 +30,6 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -65,8 +64,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -363,7 +364,6 @@ fun EntryEditor(
     var error by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
     var advanced by rememberSaveable(start) { mutableStateOf(start.hasAdvanced) }
-    var confirmReset by rememberSaveable { mutableStateOf(false) }
     // Only awaits [onSave]'s answer and closes the sheet; the save itself runs in the view model.
     val scope = rememberCoroutineScope()
     // Any edit clears the last save's complaint: it was about the form as it was.
@@ -392,7 +392,10 @@ fun EntryEditor(
             }
         }
         Row(
-            Modifier.fillMaxWidth().toggleable(value = f.alwaysInStock, role = Role.Switch) { edit(f.copy(alwaysInStock = it)) },
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .toggleable(value = f.alwaysInStock, role = Role.Switch) { edit(f.copy(alwaysInStock = it)) },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Always at home", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
@@ -440,11 +443,12 @@ fun EntryEditor(
             }
         }
         error?.let {
+            // Spoken when it appears: Save keeps the focus, so TalkBack would otherwise say nothing.
             Text(
                 it,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.testTag("entry-error"),
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }.testTag("entry-error"),
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -463,24 +467,10 @@ fun EntryEditor(
         }
         if (start.edited || start.custom) {
             OutlinedButton(
-                onClick = { confirmReset = true },
+                onClick = onReset,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("entry-reset"),
             ) { Text(if (start.custom) "Delete" else "Reset to default") }
         }
-    }
-    if (confirmReset) {
-        val name = start.name.replaceFirstChar { it.uppercase() }
-        AlertDialog(
-            onDismissRequest = { confirmReset = false },
-            title = { Text(if (start.custom) "Delete $name?" else "Reset $name to default?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmReset = false
-                    onReset()
-                }, modifier = Modifier.testTag("entry-reset-confirm")) { Text(if (start.custom) "Delete" else "Reset") }
-            },
-            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Keep") } },
-        )
     }
 }
 

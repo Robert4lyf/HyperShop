@@ -3,11 +3,16 @@ package com.robert4lyf.hypershop.ui.list
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -148,6 +153,65 @@ class ShopScreenTest {
     }
 
     @Test
+    fun aTickedRowStaysAMomentSoTappingAgainUndoesIt() {
+        var ui by mutableStateOf(shop)
+        val live =
+            actions.copy(onToggle = { r ->
+                events += "toggle ${r.id}"
+                ui =
+                    ui.copy(
+                        aisles =
+                            ui.aisles.map { (a, rows) ->
+                                a to
+                                    rows.map {
+                                        when {
+                                            it.id != r.id -> it
+                                            it.state == TickState.DONE -> it.copy(state = TickState.OPEN)
+                                            else -> it.copy(state = TickState.DONE)
+                                        }
+                                    }
+                            },
+                    )
+            })
+        compose.mainClock.autoAdvance = false
+        compose.setContent { HyperShopTheme(dark = false, dynamicColor = false) { ListScreen(ui, live) } }
+        compose.onNodeWithTag("tick-4").performClick()
+        compose.mainClock.advanceTimeBy(300)
+        // Still in place, read as bought: a second tap unticks it.
+        compose.onNodeWithTag("tick-4").assertExists()
+        compose.onNodeWithTag("tick-4").performClick()
+        compose.mainClock.advanceTimeBy(LINGER_MS + 500)
+        compose.onNodeWithTag("tick-4").assertExists()
+        assertEquals(listOf("toggle 4", "toggle 4"), events)
+        // Ticked, unticked and ticked again inside the moment: the moment runs from the last tap, and
+        // left ticked, the row then folds into the aisle's "bought" row.
+        compose.onNodeWithTag("tick-4").performClick()
+        compose.mainClock.advanceTimeBy(LINGER_MS - 1000)
+        compose.onNodeWithTag("tick-4").performClick()
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithTag("tick-4").performClick()
+        compose.mainClock.advanceTimeBy(LINGER_MS - 500)
+        compose.onNodeWithTag("tick-4").assertExists()
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithTag("tick-4").assertDoesNotExist()
+    }
+
+    @Test
+    fun whatIsLeftIsAHeadingAndALiveRegionAndBoughtRowsAreFullTargets() {
+        show()
+        compose.onNodeWithTag("shop-left").assert(isHeading())
+        compose.onNodeWithTag("shop-left").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        compose.onNode(hasTestTagStarting("shop-bought-")).assertHeightIsAtLeast(48.dp)
+    }
+
+    @Test
+    fun finishIsAlwaysInTheBarButLiveOnlyOnceSomethingIsBought() {
+        val nothingBought = shop.copy(aisles = shop.aisles.map { (a, rows) -> a to rows.map { it.copy(state = TickState.OPEN) } })
+        show(nothingBought)
+        compose.onNodeWithTag("finish").assertIsNotEnabled()
+    }
+
+    @Test
     fun allBoughtShowsFinishAndNoNext() {
         val allDone = shop.copy(aisles = shop.aisles.map { (a, rows) -> a to rows.map { it.copy(state = TickState.DONE) } })
         show(allDone)
@@ -238,3 +302,7 @@ class ShopScreenTest {
         assertTrue("$texts contains $text", texts.any { it.contains(text) })
     }
 }
+
+/** Nodes whose test tag starts with [prefix] (the bought row carries its aisle's key). */
+internal fun hasTestTagStarting(prefix: String) =
+    SemanticsMatcher("testTag starts with $prefix") { it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith(prefix) == true }

@@ -21,7 +21,6 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.History
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -288,25 +287,7 @@ fun EmptyState(
     }
 }
 
-/** "Onion is already on the list": the button says what goes on ("Add 200 g", or "Add" for one more). */
-@Composable
-fun PlusOneDialog(
-    p: PlusOne,
-    onYes: () -> Unit,
-    onNo: () -> Unit,
-) {
-    val amount = p.amount
-    AlertDialog(
-        onDismissRequest = onNo,
-        icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
-        title = { Text("${p.name.replaceFirstChar { it.uppercase() }} is already on the list") },
-        text = { Text(if (amount == null) "Add one more ${p.name} to it?" else "Add $amount more ${p.name} to it?") },
-        confirmButton = { TextButton(onClick = onYes) { Text(if (amount == null) "Add" else "Add $amount") } },
-        dismissButton = { TextButton(onClick = onNo) { Text("No") } },
-    )
-}
-
-/** The header block of the list: field, ready card, the week's plan card, empty state, "+1?" dialog. */
+/** The header block of the list: field, ready card, the week's plan card, empty state. */
 fun androidx.compose.foundation.lazy.LazyListScope.listHeader(
     ui: ListUi,
     actions: HeaderActions,

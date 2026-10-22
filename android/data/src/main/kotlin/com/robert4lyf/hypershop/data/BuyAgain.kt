@@ -1,6 +1,7 @@
 package com.robert4lyf.hypershop.data
 
 import androidx.room.withTransaction
+import com.robert4lyf.hypershop.core.merge.ShoppingList
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.QtyUnit
 import kotlinx.coroutines.flow.Flow
@@ -44,9 +45,10 @@ class BuyAgain(
     private val db = repo.db
     private val dao = repo.dao
 
-    fun observe(): Flow<BuyAgainView> = combine(dao.observeTripCount(), dao.observeRegulars(), repo.list) { _, _, _ -> view() }
+    fun observe(): Flow<BuyAgainView> = combine(dao.observeTripCount(), dao.observeRegulars(), repo.list) { _, _, l -> view(l) }
 
-    suspend fun view(): BuyAgainView =
+    /** The view, given the list as already read ([observe] has it from the repository's flow). */
+    suspend fun view(list: ShoppingList? = null): BuyAgainView =
         db.withTransaction {
             val trips = dao.trips()
             if (trips.isEmpty() && dao.regulars().none { it.pinned }) return@withTransaction BuyAgainView()
@@ -58,7 +60,7 @@ class BuyAgain(
             // The latest hand-added purchase of each key, for its name and amount.
             val latest = byHand.distinctBy { it.mergeKey }.associateBy { it.mergeKey }
             val prefs = dao.regulars().associateBy { it.mergeKey }
-            val l = repo.load()
+            val l = list ?: repo.load()
             val live = l.liveItems.map { it.mergeKey }.toSet()
 
             fun regular(

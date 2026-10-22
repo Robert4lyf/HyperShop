@@ -105,7 +105,9 @@ class Planner(
         l: ShoppingList,
     ): List<PlannedMeal> {
         if (rows.isEmpty()) return emptyList()
-        val copies = rows.map { it.libraryKey }.distinct().associateWith { latestCopy(it) }
+        // One query for every meal's recipe, not one per meal.
+        val byKey = dao.recipesByKeys(rows.map { it.libraryKey }.distinct()).groupBy { it.libraryKey }
+        val copies = byKey.mapValues { (_, cs) -> latestOf(cs) }
         return rows.map { m ->
             val r = copies[m.libraryKey]
             val use = m.useId?.let { l.uses[it] }
@@ -136,11 +138,11 @@ class Planner(
         }
 
     /** The library entry's current copy: the latest added, else (forgotten) the newest stored. */
-    private suspend fun latestCopy(key: String): RecipeEntity? =
-        dao.recipesByKey(key).let { cs ->
-            cs.filter { it.lastAddedAt != null }.maxWithOrNull(compareBy<RecipeEntity> { it.lastAddedAt }.thenBy { it.id })
-                ?: cs.maxByOrNull { it.id }
-        }
+    private suspend fun latestCopy(key: String): RecipeEntity? = latestOf(dao.recipesByKey(key))
+
+    private fun latestOf(cs: List<RecipeEntity>): RecipeEntity? =
+        cs.filter { it.lastAddedAt != null }.maxWithOrNull(compareBy<RecipeEntity> { it.lastAddedAt }.thenBy { it.id })
+            ?: cs.maxByOrNull { it.id }
 
     /** Plans a saved recipe for [week], after its other meals. Twice is twice: a second chilli is a choice. */
     suspend fun plan(

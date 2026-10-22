@@ -45,12 +45,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -65,6 +69,7 @@ import com.robert4lyf.hypershop.ui.common.sectionPosition
 import com.robert4lyf.hypershop.ui.theme.AisleStyle
 import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.theme.style
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -73,19 +78,38 @@ import kotlinx.coroutines.launch
  * laid out for one hand in a supermarket: a slim pinned bar with what is left
  * and the progress, compact rows with a large tick, bought rows hidden under
  * one "N bought" row per aisle, "Next aisle" in thumb's reach, and nothing to
- * add, review or edit (that is what "Plan" goes back to).
+ * add, review or edit (that is what "Edit list" goes back to).
  */
 @Composable
 fun ShopScreen(
     ui: ListUi,
     actions: ListActions,
 ) {
-    val groups = remember(ui.aisles) { groups(ui) }
+    // A row just ticked stays where it is for a moment, tick filled, so a mis-tap is undone by tapping it again.
+    // Each tick stamps its row; only the latest tick's timer lets the row fold, so a tick, untick, tick
+    // within the moment keeps the full moment from the last tap.
+    var stamps by remember { mutableStateOf(emptyMap<Long, Int>()) }
+    val lingering = stamps.keys
+    val groups = remember(ui.aisles, lingering) { groups(ui, lingering) }
     // Aisles whose bought rows are shown: kept across tab switches and rotation.
     var shownBought by rememberSaveable { mutableStateOf(emptyList<String>()) }
     val cells = remember(groups, shownBought) { cells(groups, shownBought.toSet()) }
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val shopActions =
+        remember(actions) {
+            actions.copy(onToggle = { row ->
+                if (row.state != TickState.DONE) {
+                    val stamp = (stamps[row.id] ?: 0) + 1
+                    stamps = stamps + (row.id to stamp)
+                    scope.launch {
+                        delay(LINGER_MS)
+                        if (stamps[row.id] == stamp) stamps = stamps - row.id
+                    }
+                }
+                actions.onToggle(row)
+            })
+        }
     // Both read the aisle at the top of the screen, so "Now" and "Next" never disagree; recomputed only
     // when that aisle changes, not on every scrolled pixel.
     val nowState = remember(cells) { derivedStateOf { nowAisle(cells, list.firstVisibleItemIndex) } }
@@ -104,7 +128,7 @@ fun ShopScreen(
                     val tile = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).sectionItem(cell.position, card)
                     when (cell) {
                         is ShopCell.Header -> GroupHeader(cell, now = cell.group.key == current?.key, tile)
-                        is ShopCell.Item -> ShopRow(cell.row, actions, tile)
+                        is ShopCell.Item -> ShopRow(cell.row, shopActions, tile)
                         is ShopCell.Bought ->
                             BoughtRow(cell, tile) {
                                 shownBought = if (cell.shown) shownBought - cell.group.key else shownBought + cell.group.key
@@ -126,20 +150,24 @@ fun ShopScreen(
                         // The label gives way to a long aisle name, never the arrow.
                         Text(
                             "Next: ${next.cell.group.title}",
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
                             modifier = Modifier.weight(1f, fill = false),
                         )
                         Spacer(Modifier.size(6.dp))
                         Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
                     }
                 }
-                if (ui.doneCount > 0) {
-                    Button(onClick = actions.onFinish, modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("finish")) {
-                        Icon(Icons.Rounded.DoneAll, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.size(8.dp))
-                        Text(if (ui.left == 0) "Finish" else "Finish shopping", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
+                // Always there, so the bar doesn't jump on the first tick; live once something is bought.
+                Button(
+                    onClick = actions.onFinish,
+                    enabled = ui.doneCount > 0,
+                    modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("finish"),
+                ) {
+                    Icon(Icons.Rounded.DoneAll, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.size(8.dp))
+                    Text(if (ui.left == 0) "Finish" else "Finish shopping", maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -167,7 +195,13 @@ private fun ShopTop(
                             "${ui.left} left"
                         },
                         style = MaterialTheme.typography.headlineSmall,
-                        modifier = Modifier.semantics { heading() }.testTag("shop-left"),
+                        // A polite live region: a bought row leaves the list, so this is what TalkBack says about a tick.
+                        modifier =
+                            Modifier
+                                .semantics {
+                                    heading()
+                                    liveRegion = LiveRegionMode.Polite
+                                }.testTag("shop-left"),
                     )
                     Text(
                         listOfNotNull("${ui.doneCount} of $total bought", now?.let { "Now: ${it.title}" }).joinToString(" · "),
@@ -175,16 +209,18 @@ private fun ShopTop(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                // Not "Plan": that is the week screen. This goes back to the list you can add to and edit.
                 TextButton(onClick = onPlan, modifier = Modifier.testTag("shop-plan")) {
                     Icon(Icons.Rounded.EditNote, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.size(6.dp))
-                    Text("Plan")
+                    Text("Edit list")
                 }
             }
             Spacer(Modifier.height(6.dp))
             LinearProgressIndicator(
                 progress = { if (total == 0) 0f else ui.doneCount / total.toFloat() },
-                modifier = Modifier.fillMaxWidth().padding(end = 12.dp).height(6.dp),
+                // The text above already says "N of M bought"; the bar is not read out as well.
+                modifier = Modifier.fillMaxWidth().padding(end = 12.dp).height(6.dp).clearAndSetSemantics {},
                 strokeCap = StrokeCap.Round,
                 gapSize = 4.dp,
                 drawStopIndicator = {},
@@ -205,12 +241,20 @@ internal data class ShopGroup(
     val title: String,
     val aisle: AisleCode,
     val rows: List<ListRow>,
+    /** Rows ticked a moment ago, still shown in place. */
+    val lingering: Set<Long> = emptySet(),
 ) {
-    val open: List<ListRow> get() = rows.filter { it.state != TickState.DONE }
-    val bought: List<ListRow> get() = rows.filter { it.state == TickState.DONE }
+    val open: List<ListRow> get() = rows.filter { it.state != TickState.DONE || it.id in lingering }
+    val bought: List<ListRow> get() = rows.filter { it.state == TickState.DONE && it.id !in lingering }
 }
 
-internal fun groups(ui: ListUi): List<ShopGroup> = ui.aisles.map { (a, rows) -> ShopGroup("aisle-${a.name}", a.displayName, a, rows) }
+internal fun groups(
+    ui: ListUi,
+    lingering: Set<Long> = emptySet(),
+): List<ShopGroup> = ui.aisles.map { (a, rows) -> ShopGroup("aisle-${a.name}", a.displayName, a, rows, lingering) }
+
+/** How long a ticked row stays in place before it folds into "N bought". */
+internal const val LINGER_MS = 2_500L
 
 /** One lazy item of the shop screen. The bought rows come after the open ones, under a toggle row. */
 internal sealed interface ShopCell {
@@ -346,7 +390,7 @@ private fun BoughtRow(
         tile
             .background(MaterialTheme.colorScheme.card)
             .fillMaxWidth()
-            .heightIn(min = 44.dp)
+            .heightIn(min = 48.dp)
             .clickable(onClickLabel = if (cell.shown) "Hide bought" else "Show bought", role = Role.Button, onClick = onToggle)
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .semantics(mergeDescendants = true) { stateDescription = if (cell.shown) "Expanded" else "Collapsed" }

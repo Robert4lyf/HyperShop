@@ -99,6 +99,9 @@ interface ListDao {
     @Query("SELECT * FROM Recipe WHERE libraryKey = :key")
     suspend fun recipesByKey(key: String): List<RecipeEntity>
 
+    @Query("SELECT * FROM Recipe WHERE libraryKey IN (:keys)")
+    suspend fun recipesByKeys(keys: List<String>): List<RecipeEntity>
+
     @Query("UPDATE Recipe SET lastAddedAt = :at, libraryKey = COALESCE(libraryKey, url, 'r:' || id) WHERE id = :id")
     suspend fun markAdded(
         id: Long,

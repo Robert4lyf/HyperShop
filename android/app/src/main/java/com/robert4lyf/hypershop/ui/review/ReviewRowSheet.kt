@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,12 +19,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.TrendingFlat
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Inventory
 import androidx.compose.material.icons.rounded.LocalMall
 import androidx.compose.material.icons.rounded.ReportProblem
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -55,6 +58,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.robert4lyf.hypershop.core.model.AisleCode
+import com.robert4lyf.hypershop.ui.common.AmountField
 import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.SectionLabel
 import com.robert4lyf.hypershop.ui.common.SheetHeader
@@ -72,6 +76,8 @@ data class SheetActions(
     val onRename: (String) -> Unit = {},
     /** "Remove from recipe": the line goes from this recipe. */
     val onRemoveLine: (Long) -> Unit = {},
+    /** The line's amount from typed text ("2 tbsp"); false when none can be read. */
+    val onSetAmount: (Long, String) -> Boolean = { _, _ -> false },
     /** The "In stock" switch. */
     val onInStock: (Boolean) -> Unit = {},
     /** Where a new name would go: "Joins maple syrup in Baking". */
@@ -115,6 +121,7 @@ internal fun ReviewRowSheetHost(
                 reparse = vm::reparse,
                 onRename = { vm.rename(key, it, onKey) },
                 onRemoveLine = vm::removeLine,
+                onSetAmount = vm::setAmount,
                 onInStock = { vm.setInStock(key, it) },
                 renamePreview = vm::renamePreview,
             ),
@@ -137,7 +144,7 @@ fun ReviewRowSheet(
             InfoBanner(sheet.effect, Icons.AutoMirrored.Rounded.TrendingFlat, Modifier.testTag("effect"), Tone.PRIMARY)
             sheet.packNote?.let { InfoBanner("Usually sold as $it", Icons.Rounded.LocalMall) }
             for (reason in sheet.lines.mapNotNull { it.checkReason }.distinct()) {
-                InfoBanner("Check: $reason", Icons.Rounded.ReportProblem, tone = Tone.WARNING)
+                InfoBanner("Check: ${ReviewViewModel.plainReason(reason)}", Icons.Rounded.ReportProblem, tone = Tone.WARNING)
             }
             SwitchRow("At home", sheet.inStock, actions.onInStock)
             key(sheet.key) { Rename(sheet.name, actions.onRename, actions.renamePreview) }
@@ -151,7 +158,8 @@ fun ReviewRowSheet(
                     Text("Always at home")
                 }
             }
-            MoveAisle(sheet.aisle, actions.onMoveAisle, immediate = true)
+            // Asks "always or just this time?" on the chip, like the list's sheet; the move is announced with Undo.
+            MoveAisle(sheet.aisle, actions.onMoveAisle)
         }
     }
 }
@@ -166,6 +174,7 @@ private fun SwitchRow(
     Row(
         Modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .toggleable(value = on, role = Role.Switch, onValueChange = onChange)
             .padding(vertical = 4.dp)
             .testTag("switch-$label"),
@@ -223,7 +232,7 @@ private fun LineEditor(
         OutlinedTextField(
             value = text,
             onValueChange = { text = it },
-            label = { Text("Source line") },
+            label = { Text("Line from the recipe") },
             singleLine = true,
             shape = RoundedCornerShape(16.dp),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -236,10 +245,24 @@ private fun LineEditor(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 4.dp),
         )
+        AmountField(
+            heading = "Amount",
+            label = "e.g. 2, 200 g or 1 tbsp",
+            button = "Set",
+            tag = "amount-${line.id}",
+            onSubmit = { actions.onSetAmount(line.id, it) },
+            initial = line.amount ?: "",
+        )
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (text != line.raw) Button(onClick = use) { Text("Use this line") }
             if (canRemove) {
-                TextButton(onClick = { actions.onRemoveLine(line.id) }, modifier = Modifier.testTag("remove-${line.id}")) {
+                TextButton(
+                    onClick = { actions.onRemoveLine(line.id) },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.testTag("remove-${line.id}"),
+                ) {
+                    Icon(Icons.Rounded.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.size(8.dp))
                     Text("Remove from recipe")
                 }
             }

@@ -16,9 +16,9 @@ celeriac,celeriac,celeriacs,celery root,PRODUCE,false,each,count,,,Vegetables,ag
 cucumber,cucumber,cucumbers,english cucumber,PRODUCE,false,each,count,,,Salad,agent-estimate
 courgette,courgette,courgettes,zucchini,PRODUCE,false,each,count,125,,Vegetables,agent-estimate
 aubergine,aubergine,aubergines,eggplant|miniature eggplant,PRODUCE,false,each,count,82,,Vegetables,agent-estimate
-bell_pepper,bell pepper,bell peppers,red bell pepper|green bell pepper|yellow bell pepper|red pepper|green pepper|yellow pepper|sweet red pepper|capsicum|peppers|sweet pepper|sweet peppers,PRODUCE,false,each,count,150,,Salad,agent-estimate
+bell_pepper,bell pepper,bell peppers,red bell pepper|green bell pepper|yellow bell pepper|red pepper|green pepper|yellow pepper|sweet red pepper|capsicum|peppers|sweet pepper|sweet peppers|orange pepper|mixed peppers,PRODUCE,false,each,count,150,,Salad,agent-estimate
 padron_pepper,padron pepper,padron peppers,pimientos de padron|padron,PRODUCE,false,pack,mass,,,Vegetables,agent-estimate
-chilli,red chilli,red chillies,chili pepper|chile|chili|chilli pepper|fresh chilli|red chile|chilies|chillies|chiles,PRODUCE,false,each,count,,,Vegetables,agent-estimate
+chilli,red chilli,red chillies,chili pepper|chile|chili|chilli pepper|fresh chilli|red chile|chilies|chillies|chiles|green chilli|green chillies|fresh chillies|red chillies|fresh red chilli|fresh green chilli,PRODUCE,false,each,count,,,Vegetables,agent-estimate
 jalapeno,jalapeño,jalapeños,jalapeno pepper|jalape o|jalape o pepper,PRODUCE,false,each,count,,,Vegetables,agent-estimate
 serrano_chilli,serrano chilli,serrano chillies,serrano chile|serrano,PRODUCE,false,each,count,,,Vegetables,agent-estimate
 mushroom,mushroom,mushrooms,button mushroom|white mushroom,PRODUCE,false,pack,mass,70,,Vegetables,agent-estimate
@@ -40,7 +40,7 @@ kale,kale,kale,,PRODUCE,false,bag,mass,67,,Vegetables,agent-estimate
 cavolo_nero,cavolo nero,cavolo nero,lacinato kale|tuscan kale|black kale,PRODUCE,false,bag,mass,67,,Vegetables,agent-estimate
 spinach,spinach,spinach,baby spinach|spinach leaves|fresh spinach,PRODUCE,false,bag,mass,30,1 × 250 g bag,Vegetables,agent-estimate
 chard,swiss chard,swiss chard,chard|rainbow chard,PRODUCE,false,bunch,count,,,Vegetables,agent-estimate
-lettuce,lettuce,lettuces,romaine lettuce|cos lettuce|romaine,PRODUCE,false,head,count,,,Salad,agent-estimate
+lettuce,lettuce,lettuces,romaine lettuce|cos lettuce|romaine|round lettuce,PRODUCE,false,head,count,,,Salad,agent-estimate
 iceberg,iceberg lettuce,iceberg lettuces,iceberg,PRODUCE,false,head,count,,,Salad,agent-estimate
 little_gem,little gem lettuce,little gem lettuces,little gem|little gems|baby gem|baby gem lettuce,PRODUCE,false,head,count,,,Salad,agent-estimate
 rocket,rocket,rocket,arugula,PRODUCE,false,bag,mass,20,,Salad,agent-estimate
@@ -195,11 +195,11 @@ sour_cream,soured cream,soured cream,sour cream,DAIRY_EGGS,false,pot,volume,,,Mi
 yogurt,natural yogurt,natural yogurt,yogurt|plain yogurt|yoghurt|whole-milk yogurt,DAIRY_EGGS,false,pot,volume,,,Yogurt,agent-estimate
 greek_yogurt,greek yogurt,greek yogurt,greek-style yogurt|strained yogurt,DAIRY_EGGS,false,pot,volume,,,Yogurt,agent-estimate
 buttermilk,buttermilk,buttermilk,,DAIRY_EGGS,false,carton,volume,,,Milk & cream,agent-estimate
-cheddar,cheddar,cheddar,cheddar cheese|mature cheddar|sharp cheddar,DAIRY_EGGS,false,block,mass,113,1 × 400 g block,Cheese,agent-estimate
+cheddar,cheddar,cheddar,cheddar cheese|mature cheddar|sharp cheddar|mature cheddar cheese|mild cheddar|mild cheddar cheese|extra mature cheddar|vintage cheddar|grated cheddar,DAIRY_EGGS,false,block,mass,113,1 × 400 g block,Cheese,agent-estimate
 parmesan,parmesan,parmesan,parmesan cheese|parmigiano-reggiano|parmigiano reggiano,DAIRY_EGGS,false,block,mass,100,,Cheese,agent-estimate
 grana_padano,grana padano,grana padano,grana padano cheese,DAIRY_EGGS,false,block,mass,100,,Cheese,agent-estimate
 pecorino,pecorino,pecorino,pecorino romano|pecorino cheese|pecorino romano cheese,DAIRY_EGGS,false,block,mass,100,,Cheese,agent-estimate
-mozzarella,mozzarella,mozzarella,fresh mozzarella|buffalo mozzarella|mozzarella cheese,DAIRY_EGGS,false,ball,count,113,,Cheese,agent-estimate
+mozzarella,mozzarella,mozzarella,fresh mozzarella|buffalo mozzarella|mozzarella cheese|mozzarella ball|mozzarella balls,DAIRY_EGGS,false,ball,count,113,,Cheese,agent-estimate
 feta,feta,feta,feta cheese,DAIRY_EGGS,false,pack,mass,150,,Cheese,agent-estimate
 goat_cheese,goats' cheese,goats' cheese,goat cheese|chevre|goat's cheese,DAIRY_EGGS,false,pack,mass,150,,Cheese,agent-estimate
 ricotta,ricotta,ricotta,ricotta cheese,DAIRY_EGGS,false,tub,mass,245,,Cheese,agent-estimate
@@ -232,7 +232,7 @@ broad_beans,broad beans,broad beans,fava beans|fava bean|broad bean,FROZEN,false
 ice_cream,ice cream,ice cream,vanilla ice cream,FROZEN,false,tub,count,,,,agent-estimate
 ice,ice,ice,ice cubes,FROZEN,false,bag,presence,,,,agent-estimate
 chopped_tomatoes,chopped tomatoes,chopped tomatoes,canned tomatoes|tinned tomatoes|diced tomatoes|crushed tomatoes|whole peeled tomatoes|canned plum tomatoes|plum tomatoes in juice,TINS_JARS,false,tin,count,,1 × 400 g tin,Tomatoes,agent-estimate
-passata,passata,passata,tomato sauce|strained tomatoes|sieved tomatoes,TINS_JARS,false,carton,volume,,,Tomatoes,agent-estimate
+passata,passata,passata,tomato sauce|strained tomatoes|sieved tomatoes|tomato passata,TINS_JARS,false,carton,volume,,,Tomatoes,agent-estimate
 tomato_puree,tomato purée,tomato purée,tomato paste|double concentrated tomato puree,TINS_JARS,false,tube,presence,,,Tomatoes,agent-estimate
 sundried_tomato,sun-dried tomatoes,sun-dried tomatoes,sundried tomatoes|sun dried tomatoes,TINS_JARS,false,jar,count,,,Tomatoes,agent-estimate
 chickpeas,chickpeas,chickpeas,chickpea|garbanzo beans|garbanzo bean|canned chickpeas,TINS_JARS,false,tin,count,,1 × 400 g tin,Beans & pulses,agent-estimate
@@ -284,14 +284,14 @@ orecchiette,orecchiette,orecchiette,,PASTA_RICE_GRAINS,false,bag,mass,100,,Pasta
 farfalle,farfalle,farfalle,bow-tie pasta|bow tie pasta,PASTA_RICE_GRAINS,false,bag,mass,100,,Pasta,agent-estimate
 conchiglie,conchiglie,conchiglie,pasta shells|shell pasta,PASTA_RICE_GRAINS,false,bag,mass,100,,Pasta,agent-estimate
 orzo,orzo,orzo,orzo pasta|risoni,PASTA_RICE_GRAINS,false,bag,mass,100,,Pasta,agent-estimate
-lasagne_sheets,lasagne sheets,lasagne sheets,lasagna noodles|lasagne,PASTA_RICE_GRAINS,false,box,count,,,Pasta,agent-estimate
+lasagne_sheets,lasagne sheets,lasagne sheets,lasagna noodles|lasagne|egg lasagne sheets|lasagna sheets|lasagne noodles|dried lasagne sheets,PASTA_RICE_GRAINS,false,box,count,,,Pasta,agent-estimate
 egg_noodles,egg noodles,egg noodles,noodles|noodle,WORLD_FOODS,false,pack,count,,,Asian,agent-estimate
 rice_noodles,rice noodles,rice noodles,vermicelli rice noodles|rice vermicelli,WORLD_FOODS,false,pack,count,,,Asian,agent-estimate
 rice,rice,rice,long-grain rice|white rice|long grain rice|cooked rice,PASTA_RICE_GRAINS,false,bag,mass,185,1 × 1 kg bag,Rice,agent-estimate
 basmati_rice,basmati rice,basmati rice,basmati,PASTA_RICE_GRAINS,false,bag,mass,185,,Rice,agent-estimate
 jasmine_rice,jasmine rice,jasmine rice,thai fragrant rice,PASTA_RICE_GRAINS,false,bag,mass,185,,Rice,agent-estimate
 risotto_rice,risotto rice,risotto rice,arborio rice|arborio|carnaroli rice,PASTA_RICE_GRAINS,false,bag,mass,200,,Rice,agent-estimate
-brown_rice,brown rice,brown rice,,PASTA_RICE_GRAINS,false,bag,mass,190,,Rice,agent-estimate
+brown_rice,brown rice,brown rice,long-grain brown rice|short-grain brown rice|wholegrain rice,PASTA_RICE_GRAINS,false,bag,mass,190,,Rice,agent-estimate
 couscous,couscous,couscous,,PASTA_RICE_GRAINS,false,bag,mass,175,,Grains,agent-estimate
 bulgur,bulgur wheat,bulgur wheat,bulgur|bulghur|cracked wheat,PASTA_RICE_GRAINS,false,bag,mass,140,,Grains,agent-estimate
 quinoa,quinoa,quinoa,,PASTA_RICE_GRAINS,false,bag,mass,170,,Grains,agent-estimate
@@ -348,7 +348,7 @@ baking_powder,baking powder,baking powder,,BAKING,false,tub,presence,,,Baking ai
 bicarb,bicarbonate of soda,bicarbonate of soda,baking soda|bicarb|sodium bicarbonate,BAKING,false,tub,presence,,,Baking aids,agent-estimate
 cream_of_tartar,cream of tartar,cream of tartar,,BAKING,false,tub,presence,,,Baking aids,agent-estimate
 yeast,fast-action dried yeast,fast-action dried yeast,yeast|dry yeast|active dry yeast|instant yeast|dried yeast,BAKING,false,pack,presence,,1 × pack of 7 g sachets,Baking aids,agent-estimate
-vanilla_extract,vanilla extract,vanilla extract,vanilla|pure vanilla extract|vanilla essence,BAKING,false,bottle,presence,,,Baking aids,agent-estimate
+vanilla_extract,vanilla extract,vanilla extract,vanilla|pure vanilla extract|vanilla essence|vanilla bean paste,BAKING,false,bottle,presence,,,Baking aids,agent-estimate
 vanilla_pod,vanilla pod,vanilla pods,vanilla bean|vanilla beans,BAKING,false,each,count,,,Baking aids,agent-estimate
 almond_extract,almond extract,almond extract,,BAKING,false,bottle,presence,,,Baking aids,agent-estimate
 cocoa,cocoa powder,cocoa powder,cocoa|unsweetened cocoa powder|dutch-process cocoa,BAKING,false,tub,presence,,,Chocolate & decorations,agent-estimate
@@ -375,7 +375,7 @@ sesame_seed,sesame seeds,sesame seeds,sesame seed|toasted sesame seeds,NUTS_DRIE
 sunflower_seed,sunflower seeds,sunflower seeds,,NUTS_DRIED_FRUIT,false,bag,mass,140,,Seeds,agent-estimate
 pumpkin_seed,pumpkin seeds,pumpkin seeds,pepitas,NUTS_DRIED_FRUIT,false,bag,mass,130,,Seeds,agent-estimate
 chia_seed,chia seeds,chia seeds,,NUTS_DRIED_FRUIT,false,bag,mass,160,,Seeds,agent-estimate
-flaxseed,linseed,linseed,flaxseed|ground flaxseed,NUTS_DRIED_FRUIT,false,bag,mass,150,,Seeds,agent-estimate
+flaxseed,linseed,linseed,flaxseed|ground flaxseed|linseeds|flax seed|flax seeds|flaxseeds,NUTS_DRIED_FRUIT,false,bag,mass,150,,Seeds,agent-estimate
 raisin,raisins,raisins,raisin|golden raisins|sultanas|sultana,NUTS_DRIED_FRUIT,false,bag,mass,150,,Dried fruit,agent-estimate
 currant,currants,currants,currant|dried currants,NUTS_DRIED_FRUIT,false,bag,mass,140,,Dried fruit,agent-estimate
 prune,prunes,prunes,prune|pitted prunes,NUTS_DRIED_FRUIT,false,bag,mass,170,,Dried fruit,agent-estimate
@@ -404,17 +404,17 @@ malt_vinegar,malt vinegar,malt vinegar,,OILS_VINEGARS,false,bottle,presence,,,Vi
 lard,lard,lard,,CHILLED,false,block,presence,,,,agent-estimate
 ghee,ghee,ghee,clarified butter,WORLD_FOODS,false,jar,presence,,,Middle Eastern & Indian,agent-estimate
 salt,salt,salt,kosher salt|sea salt|table salt|flaky sea salt|coarse salt|fine salt|fleur de sel|iodized salt|maldon salt,SPICES_CONDIMENTS,true,pack,presence,,,Salt & pepper,agent-estimate
-black_pepper,black pepper,black pepper,pepper|ground black pepper|freshly ground black pepper|black peppercorns|peppercorns|ground pepper,SPICES_CONDIMENTS,true,jar,presence,,,Salt & pepper,agent-estimate
+black_pepper,black pepper,black pepper,pepper|ground black pepper|freshly ground black pepper|black peppercorns|peppercorns|ground pepper|black peppercorn|peppercorn|whole black peppercorns,SPICES_CONDIMENTS,true,jar,presence,,,Salt & pepper,agent-estimate
 white_pepper,white pepper,white pepper,ground white pepper,SPICES_CONDIMENTS,false,jar,presence,,,Salt & pepper,agent-estimate
 cumin,ground cumin,ground cumin,cumin,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
 cumin_seed,cumin seeds,cumin seeds,cumin seed|whole cumin seeds,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
 coriander_ground,ground coriander,ground coriander,,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
 coriander_seed,coriander seeds,coriander seeds,coriander seed|whole coriander seeds,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
-paprika,paprika,paprika,sweet paprika|hungarian paprika,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
+paprika,paprika,paprika,sweet paprika|hungarian paprika|paprika powder,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
 smoked_paprika,smoked paprika,smoked paprika,pimenton|spanish smoked paprika,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
 cayenne,cayenne pepper,cayenne pepper,cayenne|ground red pepper,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
 chilli_flakes,chilli flakes,chilli flakes,red pepper flakes|red-pepper flakes|crushed red pepper|hot red pepper flake|chili flakes,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
-chilli_powder,chilli powder,chilli powder,chili powder|ancho chili powder,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
+chilli_powder,chilli powder,chilli powder,chili powder|ancho chili powder|red chili powder|red chilli powder|kashmiri chilli powder|hot chilli powder|mild chilli powder,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
 turmeric,ground turmeric,ground turmeric,turmeric,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
 cinnamon,ground cinnamon,ground cinnamon,cinnamon,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
 cinnamon_stick,cinnamon stick,cinnamon sticks,,SPICES_CONDIMENTS,false,jar,count,,,Herbs & spices,agent-estimate
@@ -422,7 +422,7 @@ nutmeg,nutmeg,nutmeg,ground nutmeg|whole nutmeg|freshly grated nutmeg,SPICES_CON
 ginger_ground,ground ginger,ground ginger,,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
 allspice,allspice,allspice,ground allspice|allspice berries|allspice berry,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
 clove_spice,cloves,cloves,clove|ground cloves|whole cloves,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
-cardamom,cardamom pods,cardamom pods,cardamom|green cardamom,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
+cardamom,cardamom pods,cardamom pods,cardamom|green cardamom|green cardamom pods|cardamom pod|green cardamom pod,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
 cardamom_ground,ground cardamom,ground cardamom,,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
 star_anise,star anise,star anise,,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
 fennel_seed,fennel seeds,fennel seeds,fennel seed,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
@@ -478,7 +478,7 @@ lemon_juice,lemon juice,lemon juice,bottled lemon juice,DRINKS,false,bottle,pres
 lime_juice,lime juice,lime juice,bottled lime juice,DRINKS,false,bottle,presence,,,Juice & soft drinks,agent-estimate
 tonic,tonic water,tonic water,,DRINKS,false,bottle,count,,,Juice & soft drinks,agent-estimate
 soda_water,soda water,soda water,sparkling water|club soda|carbonated water|seltzer,DRINKS,false,bottle,count,,,Juice & soft drinks,agent-estimate
-coffee,coffee,coffee,ground coffee|espresso|ground espresso|instant coffee|brewed coffee,DRINKS,false,pack,presence,,,Tea & coffee,agent-estimate
+coffee,coffee,coffee,ground coffee|espresso|ground espresso|instant coffee|brewed coffee|instant coffee granules|coffee granules,DRINKS,false,pack,presence,,,Tea & coffee,agent-estimate
 tea,tea bags,tea bags,tea|black tea|green tea,DRINKS,false,box,presence,,,Tea & coffee,agent-estimate
 coconut_water,coconut water,coconut water,,DRINKS,false,carton,volume,,,Juice & soft drinks,agent-estimate
 rosewater,rose water,rose water,rosewater,WORLD_FOODS,false,bottle,presence,,,Middle Eastern & Indian,agent-estimate
@@ -498,3 +498,6 @@ skewers,skewers,skewers,wooden skewers|bamboo skewers,HOUSEHOLD,false,pack,prese
 string,kitchen string,kitchen string,butcher's twine|kitchen twine,HOUSEHOLD,false,roll,presence,,,,agent-estimate
 washing_up,washing-up liquid,washing-up liquid,dish soap,HOUSEHOLD,false,bottle,presence,,,,agent-estimate
 bin_bags,bin bags,bin bags,,HOUSEHOLD,false,roll,presence,,,,agent-estimate
+black_cardamom,black cardamom,black cardamom pods,black cardamom pod|black cardamom pods,SPICES_CONDIMENTS,false,jar,presence,,,Spices,agent-estimate
+dried_fenugreek_leaves,dried fenugreek leaves,dried fenugreek leaves,kasoori methi|kasuri methi|fenugreek leaves|dried methi,SPICES_CONDIMENTS,false,jar,presence,,,Spices,agent-estimate
+toilet_roll,toilet roll,toilet rolls,loo roll|toilet paper|toilet tissue|bog roll|loo rolls,HOUSEHOLD,false,pack,count,,,Household,agent-estimate

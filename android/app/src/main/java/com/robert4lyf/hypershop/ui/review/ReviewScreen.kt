@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -79,6 +80,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -266,7 +268,7 @@ private fun Hero(
                 .padding(start = 16.dp, end = 16.dp, top = 4.dp)
                 .clip(RoundedCornerShape(24.dp))
                 // The recipe's own mosaic, the same as its card on the Recipes tab.
-                .lowPoly(ui.title, end = HEADER_END)
+                .lowPoly(ui.title, end = HEADER_END, scrim = true)
                 .padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -277,13 +279,13 @@ private fun Hero(
             ) {
                 val centred = Modifier.align(Alignment.CenterVertically)
                 when (ui.badge) {
-                    Badge.CLAUDE -> Badge("Parsed by Claude", Icons.Rounded.AutoAwesome, centred)
-                    Badge.CLAUDE_PENDING -> Badge("Claude pending", Icons.Rounded.HourglassTop, centred)
+                    Badge.CLAUDE -> Badge("Read by Claude", Icons.Rounded.AutoAwesome, centred)
+                    Badge.CLAUDE_PENDING -> Badge("Waiting for Claude", Icons.Rounded.HourglassTop, centred)
                     // Typed by hand: there is nothing for Claude to have read.
                     Badge.RULES ->
                         if (!ui.byHand) {
                             Badge(
-                                "Parsed offline",
+                                "Read offline",
                                 Icons.Rounded.CloudOff,
                                 centred,
                                 onClick = { explainOffline = true },
@@ -313,7 +315,12 @@ private fun Hero(
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f, fill = false)) {
-                    Text(ui.title, style = MaterialTheme.typography.headlineMedium, color = Brand.OnHero)
+                    Text(
+                        ui.title,
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = Brand.OnHero,
+                        modifier = Modifier.semantics { heading() },
+                    )
                     if (ui.summary.isNotEmpty()) {
                         Text(ui.summary, Modifier.testTag("summary"), style = MaterialTheme.typography.bodyMedium, color = Brand.OnHero)
                     }
@@ -536,6 +543,8 @@ private fun Servings(
                     Modifier
                         .clip(RoundedCornerShape(50))
                         .clickable(onClickLabel = "Type the servings") { typing = true }
+                        .heightIn(min = 48.dp)
+                        .wrapContentHeight()
                         .padding(horizontal = 6.dp, vertical = 8.dp)
                         .testTag("servings"),
                     style = MaterialTheme.typography.titleSmall,
@@ -675,9 +684,10 @@ private fun ReviewRowItem(
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (row.check) {
+                    // Decorative: the "Check: …" line below says it, so the row is not read twice.
                     Icon(
                         Icons.Rounded.ReportProblem,
-                        contentDescription = "Check this line",
+                        contentDescription = null,
                         tint = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.size(18.dp),
                     )
@@ -706,10 +716,21 @@ private fun ReviewRowItem(
             }
             if (row.check && !row.inStock) {
                 Text(
-                    row.checkReason?.let { "Check: $it" } ?: "Check this line",
+                    row.checkReason?.let { "Check: ${ReviewViewModel.plainReason(it)}" } ?: "Check this line",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.tertiary,
                 )
+                // The line as the recipe wrote it, so the reading can be judged without opening the sheet.
+                row.raw?.let {
+                    Text(
+                        "“$it”",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontStyle = FontStyle.Italic,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
         onInStock?.let { toggle -> InStockPill(row.inStock, name) { toggle(row.key, it) } }

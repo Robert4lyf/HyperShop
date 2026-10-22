@@ -7,12 +7,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
@@ -84,7 +86,7 @@ object Routes {
 
 private val TABS = setOf(Routes.LIST, Routes.RECIPES, Routes.SETTINGS)
 
-private data class Tab(
+internal data class Tab(
     val route: String,
     val label: String,
     val on: androidx.compose.ui.graphics.vector.ImageVector,
@@ -264,7 +266,7 @@ private fun AppShell(
  * selected icon. Each tab is one TalkBack node (a selected tab and its label).
  */
 @Composable
-private fun CompactNavBar(
+internal fun CompactNavBar(
     tabs: List<Tab>,
     route: String?,
     onSelect: (String) -> Unit,
@@ -274,16 +276,21 @@ private fun CompactNavBar(
             Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .height(60.dp)
+                // As tall as its tallest tab on one line and at least 60 dp: at 200 % font scale the label needs
+                // the room. Intrinsic, not a bare minimum: Scaffold offers the bar the whole screen as its maximum
+                // and the tabs fill the bar's height, so a bare minimum made the bar fill the screen on a device.
+                // (The max intrinsic, not the min: the min lets a label wrap letter by letter.)
+                .heightIn(min = 60.dp)
+                .height(IntrinsicSize.Max)
                 .selectableGroup(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             for ((r, label, on, off) in tabs) {
-                // The library and the voice test are part of Settings, and the meals of Recipes, so those tabs stay lit there.
+                // The library and the voice test are part of Settings, and the week's plan is about the list, so those tabs stay lit there.
                 val selected =
                     route == r ||
                         (r == Routes.SETTINGS && (route == Routes.LIBRARY || route == Routes.VOICE_TEST)) ||
-                        (r == Routes.RECIPES && route == Routes.MEALS)
+                        (r == Routes.LIST && route == Routes.MEALS)
                 Column(
                     Modifier
                         .weight(1f)

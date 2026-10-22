@@ -1,5 +1,28 @@
 # Hand-off notes
 
+## Status: Release C (exceptional polish and real-world quality) — ⏸ Hand-off G
+
+Release C is on branch `ccr-5923064f-985kmq` (PROGRESS.md › Release C, docs/design/release-c.md, the report in docs/reports/release-c-final.md). Everything below was driven on the JVM and CI's emulator; only you can say how it feels in a shop, with TalkBack, and with your own recipes. **Back up first** (Settings › Data › Back up to a file).
+
+## If this session stopped before the PR (continuing with another tool)
+
+State: commits C.0–C.7 are on `ccr-5923064f-985kmq` and pushed. Left to do, in order: C.8 the adversarial review of `git diff 06e4126..HEAD -- android` (areas: `ReviewViewModel.keepCorrections`/`setAmount`/`removeLine`+Undo; `ListViewModel.prep` gated on list mode and the "+1" snackbar; `ShopScreen` lingering ticks; the dialogs replaced by Undo; the parser's trailing amounts, lengths, decilitres, shared heads; `BuyAgain.view(list)`, `Planner.recipesByKeys`; `AmountField(initial)`), fixing what it finds, one `[C.8]` commit with the findings in docs/reports/release-c-final.md § 8; then C.9: fill § 8 of the report, commit `[C.9]`, `tools/verify.sh` green before each commit, and open the PR with the body in the final report's "Delivery" section (the draft PR text is the report's own summary). Rules: CLAUDE.md (gate before every commit, golden data never edited, PROGRESS.md in the same commit as its step).
+
+## ⏸ Hand-off G — your checks (yes/no)
+
+1. **Three real recipes.** Share three recipes you actually cook (one from a UK site, one US, one blog with chatty lines). On each review: how many rows are wrong, and how many of those did the app flag ("Check: …")? Wrong and unflagged is what matters: ___ / ___ / ___.
+2. **Correcting a line.** On a flagged row, open the sheet. Is the line as the recipe wrote it visible, and does the reason say what to do? Set the amount from the Amount field, rename the row, swap "A or B". Then tap Ask Claude: are your corrections still there afterwards?
+3. **Remove from recipe, Undo.** Remove a line on the sheet, then Undo from the snackbar. Is it back where it was?
+4. **The shop, one-handed.** In the shop, tick an item by mistake and tap it again within a couple of seconds. Does it untick without expanding "N bought"? Does the bottom bar stay still on the first tick?
+5. **Names.** On the shop screen, does "Edit list" make sense as the way back, and "Plan the week" on Recipes as the week screen? Does opening Plan from the List tab keep the List tab lit?
+6. **Undo in place of dialogs.** Clear all, remove a meal, remove a recipe from the list, remove a saved recipe, reset a library entry: each goes at once with Undo on the snackbar. Did any of them feel too easy to do by accident?
+7. **"Already on the list".** Type an item that is on the list. Does the message with "Add 1 more" let you keep typing, and does "Add 1 more" add exactly one?
+8. **TalkBack.** With TalkBack on: tick an item in the shop (does it say the new count?), swipe through the review (is the title a heading, is the outcome spoken before the button?), set font size to the largest (are the tab labels whole?).
+9. **Looks.** Light and dark: do the heroes' bright ends still look like HyperShop with the darker right half under the text? Any screen where the new scrim looks wrong: ___.
+10. **Edit after buying.** Buy part of a recipe, then edit the recipe to need more. Does the bought amount stay bought and only the extra show as needed?
+11. **Backup error text.** Restore a file that is not a backup. Is the message in plain words (no exception names)?
+12. **A week.** Plan next week on the Plan screen: is "Add a meal" where you expect it, right under the meals?
+
 ## Status: Release B (make weekly shopping effortless) — ⏸ Hand-off F
 
 Release B is on branch `claude/release-b` (PROGRESS.md › Release B, docs/design/release-b.md). The emulator drives every flow; only you can say whether a real week is quicker. **Back up first** (Settings › Data › Back up to a file): the update migrates your database, and your recipes on the list become this week's planned meals.

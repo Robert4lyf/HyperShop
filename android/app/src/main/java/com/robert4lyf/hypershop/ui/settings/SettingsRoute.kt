@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -85,10 +86,12 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
@@ -217,7 +220,8 @@ fun SettingsScreen(
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxSize()) {
             LazyColumn(
-                Modifier.fillMaxSize().testTag("settings"),
+                // The keyboard must not cover "Save and test" or a cap's "Set" button.
+                Modifier.fillMaxSize().imePadding().testTag("settings"),
                 contentPadding = PaddingValues(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
@@ -586,7 +590,7 @@ private fun KeySection(
                     KeyStatus.OFFLINE -> "Couldn't reach Anthropic"
                     KeyStatus.ERROR -> "Anthropic returned an error"
                 },
-                Modifier.testTag("key-status"),
+                Modifier.semantics { liveRegion = LiveRegionMode.Polite }.testTag("key-status"),
                 style = MaterialTheme.typography.titleSmall,
                 color =
                     when (it) {

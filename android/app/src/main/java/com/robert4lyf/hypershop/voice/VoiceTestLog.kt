@@ -17,6 +17,9 @@ import java.util.Locale
  */
 object VoiceTestLog {
     private const val MAX_LINES = 2000
+
+    /** Lines appended since the file was last rewritten from [_lines]. */
+    private var appended = 0
     private val time = SimpleDateFormat("HH:mm:ss", Locale.UK)
     private val _lines = MutableStateFlow<List<String>>(emptyList())
     val lines: StateFlow<List<String>> = _lines
@@ -27,14 +30,28 @@ object VoiceTestLog {
         if (file != null) return
         val f = File(context.noBackupFilesDir, "voice-test.log")
         file = f
-        if (f.exists()) _lines.value = f.readLines().takeLast(MAX_LINES)
+        if (f.exists()) {
+            val all = f.readLines()
+            _lines.value = all.takeLast(MAX_LINES)
+            // The file is capped like the lines: plain text in app storage must not grow without bound.
+            if (all.size > MAX_LINES) runCatching { f.writeText(_lines.value.joinToString("\n", postfix = "\n")) }
+        }
     }
 
     @Synchronized
     fun log(message: String) {
         val line = "${time.format(Date())} $message"
         _lines.update { (it + line).takeLast(MAX_LINES) }
-        runCatching { file?.appendText(line + "\n") }
+        appended++
+        runCatching {
+            if (appended >= MAX_LINES) {
+                // Rewritten from the capped lines now and then, so a long test session can't fill the disk.
+                appended = 0
+                file?.writeText(_lines.value.joinToString("\n", postfix = "\n"))
+            } else {
+                file?.appendText(line + "\n")
+            }
+        }
     }
 
     @Synchronized

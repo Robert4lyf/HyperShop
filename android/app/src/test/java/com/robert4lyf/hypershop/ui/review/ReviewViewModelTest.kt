@@ -12,6 +12,7 @@ import com.robert4lyf.hypershop.importing.PhotoStore
 import com.robert4lyf.hypershop.testutil.CHILLI
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.testutil.await
+import com.robert4lyf.hypershop.testutil.awaitTrue
 import com.robert4lyf.hypershop.testutil.readyJob
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import kotlinx.coroutines.CoroutineScope
@@ -129,6 +130,36 @@ class ReviewViewModelTest {
             // Left with Back and opened again from the card: Claude's parse was kept, not paid for twice.
             assertEquals(Badge.CLAUDE, ready(ReviewViewModel(c, job)).badge)
             assertEquals(1, claude.requestCount)
+        } finally {
+            claude.shutdown()
+        }
+    }
+
+    @Test
+    fun correctionsStandOverAskClaude() {
+        val claude = MockWebServer().apply { start() }
+        try {
+            val fixture = File("../../testdata/claude/synthetic-ok-cake.json").readText()
+            claude.enqueue(MockResponse().setBody(fixture))
+            claude.enqueue(MockResponse().setBody(fixture))
+            val c = TestContainer.create(claude = claude, key = "sk-ant-test")
+            // Read by the rules first; the line Claude answers with is the fixture's.
+            val vm = ReviewViewModel(c, runBlocking { c.readyJob("200g golden caster sugar") })
+            val key = ready(vm).aisles.flatMap { it.second }.single().key
+            // A rename for this recipe: Claude's answer (caster sugar) must not undo it.
+            vm.rename(key, "golden sugar")
+            await(vm.state) { it is ReviewState.Ready && it.ui.aisles.flatMap { it.second }.single().key == "name:golden sugar" }
+            vm.retryWithClaude()
+            var ui = (await(vm.state) { it is ReviewState.Ready && it.ui.badge == Badge.CLAUDE } as ReviewState.Ready).ui
+            assertEquals(1, claude.requestCount)
+            assertEquals("name:golden sugar", ui.aisles.flatMap { it.second }.single().key)
+            // An edited amount, matched by place when the line count is the same.
+            assertTrue(vm.setAmount(vm.sheet("name:golden sugar")!!.lines.single().id, "300 g"))
+            await(vm.state) { it is ReviewState.Ready && it.ui.aisles.flatMap { it.second }.single().quantity == "300g" }
+            vm.retryWithClaude()
+            awaitTrue { claude.requestCount == 2 }
+            ui = (await(vm.state) { it is ReviewState.Ready && !it.ui.busy && it.ui.badge == Badge.CLAUDE } as ReviewState.Ready).ui
+            assertEquals("300g", ui.aisles.flatMap { it.second }.single().quantity)
         } finally {
             claude.shutdown()
         }

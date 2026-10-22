@@ -46,7 +46,15 @@ internal object Lexicon {
             "loaf", "loaves", "bulb", "bulbs", "splash", "splashes", "cube", "cubes", "square", "squares",
             "wedge", "wedges", "stem", "stems", "branch", "branches", "pod", "pods", "punnet", "punnets",
             "knob", "knobs", "rasher", "rashers", "box", "boxes", "carton", "cartons", "tub", "tubs",
+            "pot", "pots", "block", "blocks", "bar", "bars", "ball", "balls", "slab", "slabs", "tray", "trays",
+            "drizzle", "glug", "squeeze", "dollop", "sprinkle", "sprinkling", "scattering",
         )
+
+    /** A length before a piece ("5cm piece of ginger", "2 inch stick"): a size, never a count. */
+    val lengths = setOf("cm", "mm", "inch", "inches")
+
+    /** "2 dl water": decilitres, read as 100 ml each. */
+    val decilitres = setOf("dl", "decilitre", "decilitres", "deciliter", "deciliters")
 
     /**
      * Words that end the name: what follows describes it ("parsley for
@@ -90,6 +98,9 @@ internal object Lexicon {
             "thinly", "lightly", "freshly", "divided", "snipped", "slivered", "smashed", "mashed", "picked",
             "washed", "scrubbed", "stemmed", "hulled", "shelled", "skinned", "boned", "cleaned", "toasted",
             "roasted", "blanched", "soaked", "warmed", "chilled", "cold", "warm", "very", "well", "crumbled",
+            "packed", "firmly", "loosely", "pressed", "cut", "split", "broken", "shaved", "scored", "pounded",
+            "bruised", "bashed", "deveined", "butterflied", "spatchcocked", "deboned", "scaled", "gutted",
+            "shucked", "flattened", "sieved", "strained", "reserved", "separated", "removed", "discarded",
         )
 
     /** R4.1 sizes and qualifiers. */
@@ -99,6 +110,7 @@ internal object Lexicon {
             "whole", "good-size", "good-sized", "miniature", "mini", "baby-size",
             "thick", "thin", "fresh", "about", "approximately", "approx", "heaped", "heaping", "level",
             "scant", "good", "good-quality", "high-quality", "best-quality", "generous", "ripe", "few",
+            "fat", "rounded", "plump", "juicy", "thumb-sized", "thumb-size", "each", "organic",
         )
 
     /**

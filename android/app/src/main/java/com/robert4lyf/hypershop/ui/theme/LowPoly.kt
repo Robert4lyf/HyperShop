@@ -3,6 +3,7 @@ package com.robert4lyf.hypershop.ui.theme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.lerp
@@ -29,6 +30,8 @@ import kotlin.random.Random
 fun Modifier.lowPoly(
     seed: String,
     end: Float = 1f,
+    /** Darkens the bright end a little under white text (see [scrimAlpha]); off for the small tiles. */
+    scrim: Boolean = false,
 ): Modifier =
     drawWithCache {
         val rnd = Random(seed.hashCode())
@@ -80,14 +83,35 @@ fun Modifier.lowPoly(
                 }
             }
         }
+        val scrimBrush =
+            if (scrim) {
+                Brush.horizontalGradient(
+                    0f to Color.Transparent,
+                    SCRIM_FROM to Color.Transparent,
+                    1f to Color.Black.copy(alpha = scrimAlpha(1f)),
+                )
+            } else {
+                null
+            }
         onDrawBehind {
             for ((path, colour) in facets) {
                 drawPath(path, colour)
                 // A hairline in the facet's own colour hides the seams anti-aliasing leaves.
                 drawPath(path, colour, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1f))
             }
+            if (scrimBrush != null) drawRect(scrimBrush)
         }
     }
+
+/** Where the scrim starts, as a fraction of the width: the dark half needs none. */
+internal const val SCRIM_FROM = 0.5f
+
+/**
+ * How much black lies over the mosaic at [x] (0..1 across) when [lowPoly]'s scrim is
+ * on: nothing up to [SCRIM_FROM], then rising to 0.42 at the right edge, which keeps
+ * white 14 sp text at 4.5:1 on every palette up to [HEADER_END] (ContrastTest).
+ */
+internal fun scrimAlpha(x: Float): Float = if (x <= SCRIM_FROM) 0f else 0.42f * (x - SCRIM_FROM) / (1f - SCRIM_FROM)
 
 /** One header palette: dark at 0 (under the title), bright at 1, and [hue] for the recipe's chips. */
 internal class LowPolyPalette(
@@ -105,7 +129,7 @@ private fun palette(
 }
 
 /** All in the style guide's manner: a deep base running into a warm or bright end. */
-private val PALETTES =
+internal val PALETTES =
     listOf(
         // The style guide: deep teal, sage, gold, orange.
         palette(184f, 0xFF0D3140, 0xFF15596A, 0xFF1F7E88, 0xFF3C9293, 0xFF8DAE7A, 0xFFE6B84C, 0xFFEE8540),
@@ -128,7 +152,7 @@ private val PALETTES =
 /** The palette for a recipe, picked by its title so it never changes. */
 internal fun lowPolyPalette(seed: String): LowPolyPalette = PALETTES[Math.floorMod(seed.hashCode() * 31 + 7, PALETTES.size)]
 
-private fun sample(
+internal fun sample(
     stops: List<Pair<Float, Color>>,
     t: Float,
 ): Color {

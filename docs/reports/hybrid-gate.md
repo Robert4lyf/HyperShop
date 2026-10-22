@@ -4,24 +4,21 @@ Uncertainty = the parser's `check` flag, no name, a digit with no amount read, o
 
 | set | lines | passed | passed name | passed qty | flagged | flagged name | flagged qty |
 |---|---|---|---|---|---|---|---|
-| frozen | 80 | 63 | 98% | 100% | 17 | 88% | 100% |
-| held-out-2026 | 45 | 38 | 95% | 95% | 7 | 71% | 71% |
-| held-out-2026b | 40 | 39 | 95% | 95% | 1 | 0% | 100% |
+| frozen | 80 | 63 | 100% | 100% | 17 | 94% | 100% |
+| held-out-2026 | 45 | 40 | 98% | 95% | 5 | 80% | 100% |
+| held-out-2026b | 40 | 39 | 97% | 95% | 1 | 100% | 100% |
 | synthetic-uk | 25 | 25 | 100% | 100% | 0 | — | — |
-| all | 190 | 165 | 97% | 98% | 25 | 80% | 92% |
+| all | 190 | 167 | 99% | 98% | 23 | 91% | 100% |
 
 ## Passed lines the rule parser still got wrong (what the gate would miss)
 
 | set | id | line | got | want |
 |---|---|---|---|---|
-| frozen | nyt-167028 | 1/2 teaspoon grated fresh ginger root | fresh ginger root | 1/2 tsp | ginger root / 0.5 tsp |
-| held-out-2026 | ho-13 | 3/4 cup packed light brown sugar | packed light brown sugar | 3/4 cup | light brown sugar / 0.75 cup |
 | held-out-2026 | ho-32 | 1 block (350g) extra-firm tofu, pressed | block extra-firm tofu | 1  | extra-firm tofu / 1.0 other |
 | held-out-2026 | ho-33 | 3 kaffir lime leaves | kaffir lime leaves | 3  | kaffir lime leaf / 3.0 other |
 | held-out-2026b | hob-03 | 400ml can coconut milk | coconut milk | 1 tin | coconut milk / 400.0 ml |
 | held-out-2026b | hob-07 | 500g pack beef mince (20% fat) | beef mince | 1 packet | beef mince / 500.0 g |
 | held-out-2026b | hob-10 | 2 cups shredded mozzarella cheese | mozzarella cheese | 2 cup | shredded mozzarella cheese / 2.0 cup |
-| held-out-2026b | hob-32 | Fresh mint leaves, to garnish | fresh mint leaves | null  | mint / null  |
 
 ## Flagged lines, with the reason
 
@@ -40,7 +37,7 @@ Uncertainty = the parser's `check` flag, no name, a digit with no amount read, o
 | frozen | nyt-112979 | Corn oil or canola oil for deep frying | "A or B": one of two | yes |
 | frozen | nyt-114955 | Finely grated zest of 2 limes | "zest of": the fruit is listed, not the zest | yes |
 | frozen | nyt-47079 | Snipped basil or Italian parsley to garnish | "A or B": one of two | yes |
-| frozen | nyt-135963 | Slivered fresh basil leaves or very small whole basil leaves for garnish | "A or B": one of two | no |
+| frozen | nyt-135963 | Slivered fresh basil leaves or very small whole basil leaves for garnish | "A or B": one of two | yes |
 | frozen | nyt-37849 | Ice cream or whipped cream (optional) | "A or B": one of two | yes |
 | frozen | nyt-36875 | Ground espresso (enough for 2 long shots, about 1/3 cup each) | an amount it couldn't read | yes |
 | frozen | nyt-57565 | Few sprigs parsley to yield 2 tablespoons chopped | an amount it couldn't read | yes |
@@ -49,9 +46,7 @@ Uncertainty = the parser's `check` flag, no name, a digit with no amount read, o
 | held-out-2026 | ho-24 | 200g Greek yoghurt or crème fraîche | "A or B": one of two | yes |
 | held-out-2026 | ho-27 | juice of 2 limes | "juice of": the fruit is listed, not the juice | yes |
 | held-out-2026 | ho-28 | zest and juice of 1 lemon | "juice of": the fruit is listed, not the juice | yes |
-| held-out-2026 | ho-36 | A handful of rocket, if you like | an unknown unit | no |
-| held-out-2026 | ho-39 | Eggs - 6, large | an amount it couldn't read | no |
-| held-out-2026b | hob-23 | 1 tbsp fresh thyme leaves or 1 tsp dried | "A or B": one of two | no |
+| held-out-2026b | hob-23 | 1 tbsp fresh thyme leaves or 1 tsp dried | "A or B": one of two | yes |
 
 ## Fourth pass (step 9.4): 40 more unseen lines
 

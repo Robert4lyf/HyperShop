@@ -31,6 +31,8 @@ object TestContainer {
         key: String? = null,
         clock: () -> Long = ticking(),
         ready: Boolean = true,
+        /** Every SQL statement as it runs (QueryBudgetTest). */
+        onQuery: ((String) -> Unit)? = null,
     ): AppContainer {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val dir = File(context.cacheDir, "ds-${System.nanoTime()}").apply { mkdirs() }
@@ -38,7 +40,7 @@ object TestContainer {
         container =
             AppContainer(
                 context = context,
-                db = HyperShopDatabase.inMemory(context) { it.run() },
+                db = HyperShopDatabase.inMemory(context, { it.run() }, onQuery),
                 dataStore = PreferenceDataStoreFactory.create { File(dir, "settings.preferences_pb") },
                 apiKeyStore = InMemoryApiKeyStore(key),
                 fetchPolicy = pages?.let { loopbackOnly(it.port) } ?: FetchPolicy.STRICT,

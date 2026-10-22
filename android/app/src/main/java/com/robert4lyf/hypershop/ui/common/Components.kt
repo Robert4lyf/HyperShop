@@ -52,6 +52,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
@@ -151,7 +153,12 @@ fun SectionLabel(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
 ) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    // A heading, so TalkBack's "headings" navigation jumps from section to section.
+    Row(
+        modifier.semantics(mergeDescendants = true) { heading() },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         icon?.let { Icon(it, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) }
         Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -166,6 +173,8 @@ fun SectionLabel(
 fun ScreenHeader(
     title: String,
     modifier: Modifier = Modifier,
+    /** What picks the mosaic; the title unless it changes as you go ("5 left"). */
+    seed: String = title,
     overline: String? = null,
     subtitle: String? = null,
     actions: @Composable RowScope.() -> Unit = {},
@@ -176,7 +185,7 @@ fun ScreenHeader(
             .fillMaxWidth()
             .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
             .clip(RoundedCornerShape(24.dp))
-            .lowPoly(title, end = HEADER_END),
+            .lowPoly(seed, end = HEADER_END, scrim = true),
     ) {
         CompositionLocalProvider(LocalContentColor provides Brand.OnHero) {
             Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 14.dp, bottom = 14.dp)) {
@@ -186,7 +195,12 @@ fun ScreenHeader(
                             // Soft white, not citrus: citrus only clears 3:1 on the brighter hero.
                             Text(it.uppercase(), style = MaterialTheme.typography.labelMedium, color = Brand.OnHeroSoft)
                         }
-                        Text(title, style = MaterialTheme.typography.headlineLarge, color = Brand.OnHero)
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = Brand.OnHero,
+                            modifier = Modifier.semantics { heading() },
+                        )
                         subtitle?.let {
                             Text(it, style = MaterialTheme.typography.bodyMedium, color = Brand.OnHeroSoft)
                         }
@@ -330,7 +344,7 @@ fun SheetHeader(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         AisleBadge(aisle, size = 48.dp)
-        Column {
+        Column(Modifier.semantics(mergeDescendants = true) { heading() }) {
             Text(name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.headlineSmall)
             Text(aisle.displayName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -349,10 +363,12 @@ fun AmountField(
     button: String,
     tag: String,
     onSubmit: (String) -> Boolean,
+    /** What the field starts with (the amount as read), so a correction edits rather than retypes. */
+    initial: String = "",
 ) {
-    var amount by remember { mutableStateOf("") }
+    var amount by remember(initial) { mutableStateOf(initial) }
     var bad by remember { mutableStateOf(false) }
-    val submit = { if (amount.isNotBlank()) bad = !onSubmit(amount) }
+    val submit = { if (amount.isNotBlank() && amount != initial) bad = !onSubmit(amount) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionLabel(heading)
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -373,7 +389,7 @@ fun AmountField(
             )
             FilledTonalButton(
                 onClick = submit,
-                enabled = amount.isNotBlank(),
+                enabled = amount.isNotBlank() && amount != initial,
                 modifier = Modifier.padding(top = 8.dp),
             ) { Text(button) }
         }

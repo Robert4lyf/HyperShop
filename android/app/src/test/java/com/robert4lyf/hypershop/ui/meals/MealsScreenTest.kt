@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.ui.meals
 
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -7,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.robert4lyf.hypershop.core.merge.UseProgress
@@ -111,23 +113,18 @@ class MealsScreenTest {
     }
 
     @Test
-    fun removingAMealOnTheListSaysWhatComesOff() {
+    fun removingAMealIsOneTapWithUndoOnTheMessage() {
         show()
         compose.onNodeWithTag("meal-remove-1").performClick()
-        compose
-            .onNodeWithText("6 items it still needs come off the list. Anything bought stays bought. The recipe stays saved.")
-            .assertExists()
-        compose.onNodeWithText("Keep").performClick()
         compose.onNodeWithTag("meal-remove-2").performClick()
-        compose.onNodeWithText("It comes off this week's plan. The list and the recipe stay as they are.").assertExists()
-        compose.onNodeWithTag("meals-remove-confirm").performClick()
-        assertEquals(listOf("remove 2"), events)
+        assertEquals(listOf("remove 1", "remove 2"), events)
     }
 
     @Test
     fun buyAgainChipsAndTheAtHomeCheck() {
         show()
         scrollTo("buy-again")
+        compose.onNodeWithTag("regular-cat:milk").assertHeightIsAtLeast(48.dp)
         compose.onNodeWithTag("regular-cat:milk").performClick()
         // On the list already: a tap does nothing.
         compose.onNodeWithTag("regular-cat:bread").performClick()

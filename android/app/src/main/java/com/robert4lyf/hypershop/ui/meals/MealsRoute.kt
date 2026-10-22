@@ -34,7 +34,6 @@ import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ShoppingCart
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -160,7 +159,6 @@ fun MealsScreen(
     ui: MealsUi,
     actions: MealsActions,
 ) {
-    var removing by rememberSaveable { mutableStateOf<Long?>(null) }
     var allPicks by rememberSaveable { mutableStateOf(false) }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().imePadding()) {
@@ -173,11 +171,13 @@ fun MealsScreen(
                 if (ui.meals.isNotEmpty()) {
                     item(key = "planned") { SectionLabel("Meals", Modifier.padding(horizontal = 20.dp)) }
                     items(ui.meals, key = { "meal-${it.id}" }) { m ->
-                        MealCard(m, past = ui.isPast, onServings = { actions.onServings(m, it) }, onRemove = { removing = m.id })
+                        MealCard(m, past = ui.isPast, onServings = { actions.onServings(m, it) }, onRemove = { actions.onRemove(m) })
                     }
                 } else if (ui.loaded && ui.repeatFrom != null && !ui.isPast) {
                     item(key = "repeat") { RepeatCard(ui, actions.onRepeat) }
                 }
+                // Choosing meals comes with the meals, before Buy again and the home check.
+                if (ui.hasLibrary && !ui.isPast) pickSection(ui, actions, allPicks) { allPicks = true }
                 if (ui.isCurrent && (ui.buyAgain.regulars.isNotEmpty() || ui.buyAgain.lastShop.isNotEmpty())) {
                     item(key = "buy-again") { BuyAgainSection(ui, actions) }
                 }
@@ -193,33 +193,9 @@ fun MealsScreen(
                         )
                     }
                 }
-                if (ui.hasLibrary && !ui.isPast) pickSection(ui, actions, allPicks) { allPicks = true }
             }
             BottomBar(ui, actions)
         }
-    }
-    removing?.let { id -> ui.meals.firstOrNull { it.id == id } }?.let { m ->
-        val toBuy = m.progress?.toBuy?.takeIf { m.shopping == MealShopping.TO_BUY } ?: 0
-        AlertDialog(
-            onDismissRequest = { removing = null },
-            title = { Text("Remove ${m.title}?") },
-            text = {
-                Text(
-                    if (toBuy > 0) {
-                        "${plural(toBuy, "item")} it still needs come off the list. Anything bought stays bought. The recipe stays saved."
-                    } else {
-                        "It comes off this week's plan. The list and the recipe stay as they are."
-                    },
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    removing = null
-                    actions.onRemove(m)
-                }, modifier = Modifier.testTag("meals-remove-confirm")) { Text("Remove") }
-            },
-            dismissButton = { TextButton(onClick = { removing = null }) { Text("Keep") } },
-        )
     }
 }
 
@@ -320,19 +296,22 @@ private fun MealCard(
         Row(Modifier.padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).lowPoly(m.title))
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Text(m.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                val bits = listOfNotNull(mealState(m), m.source, "No longer saved".takeIf { !m.saved })
-                Text(
-                    bits.joinToString(" · "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color =
-                        if (m.shopping.pending && !past) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    modifier = Modifier.testTag("meal-state-${m.id}"),
-                )
+                // The title and its state read as one TalkBack node; the servings controls stay their own.
+                Column(Modifier.semantics(mergeDescendants = true) {}) {
+                    Text(m.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    val bits = listOfNotNull(mealState(m), m.source, "No longer saved".takeIf { !m.saved })
+                    Text(
+                        bits.joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color =
+                            if (m.shopping.pending && !past) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        modifier = Modifier.testTag("meal-state-${m.id}"),
+                    )
+                }
                 m.servings?.takeIf { !past }?.let { s ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -413,7 +392,7 @@ private fun RegularChip(
     Box {
         Row(
             Modifier
-                .heightIn(min = 40.dp)
+                .heightIn(min = 48.dp)
                 .clip(PillShape)
                 .background(if (r.onList) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.card)
                 .combinedClickable(
@@ -495,7 +474,8 @@ private fun HomeRowItem(
             .testTag("home-${r.mergeKey}"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f)) {
+        // One TalkBack node for the name and what it is for; the button stays its own.
+        Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}) {
             Text(r.name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleSmall)
             Text(
                 listOfNotNull("for ${r.from.joinToString(", ")}", "usually at home".takeIf { r.usual }).joinToString(" · "),

@@ -33,7 +33,6 @@ import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.ShoppingCart
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -66,6 +65,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
@@ -403,8 +403,6 @@ private fun ListTop(
 ) {
     val shopping = ui.loaded && !ui.isEmpty
     val total = ui.left + ui.doneCount
-    // A confirmation, since Clear all takes everything in one go; it survives a rotation.
-    var confirmClear by rememberSaveable { mutableStateOf(false) }
     ScreenHeader(
         title =
             when {
@@ -412,6 +410,8 @@ private fun ListTop(
                 shopping -> "${ui.left} left"
                 else -> "HyperShop"
             },
+        // One mosaic for the list, whatever the count says.
+        seed = "Shopping list",
         overline = if (ui.loaded && !shopping) null else "Shopping list",
         subtitle =
             when {
@@ -457,9 +457,10 @@ private fun ListTop(
                         menu = false
                         actions.onShare()
                     })
+                    // No "are you sure?": the snackbar's Undo puts the list back.
                     DropdownMenuItem(text = { Text("Clear all") }, enabled = !ui.isEmpty, onClick = {
                         menu = false
-                        confirmClear = true
+                        actions.onClearAll()
                     })
                 }
             }
@@ -469,7 +470,8 @@ private fun ListTop(
                 Spacer(Modifier.height(12.dp))
                 LinearProgressIndicator(
                     progress = { if (total == 0) 0f else ui.doneCount / total.toFloat() },
-                    modifier = Modifier.fillMaxWidth().height(8.dp),
+                    // The subtitle already says "N of M bought"; the bar is not read out as well.
+                    modifier = Modifier.fillMaxWidth().height(8.dp).clearAndSetSemantics {},
                     strokeCap = StrokeCap.Round,
                     gapSize = 4.dp,
                     drawStopIndicator = {},
@@ -479,20 +481,6 @@ private fun ListTop(
             }
         },
     )
-    if (confirmClear) {
-        AlertDialog(
-            onDismissRequest = { confirmClear = false },
-            title = { Text("Clear the whole list?") },
-            text = { Text(if (total == 1) "1 item" else "$total items") },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmClear = false
-                    actions.onClearAll()
-                }, modifier = Modifier.testTag("clear-confirm")) { Text("Clear") }
-            },
-            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
-        )
-    }
 }
 
 @Composable
