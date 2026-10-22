@@ -51,7 +51,12 @@ class MigrationTest {
         val room =
             Room.databaseBuilder(ApplicationProvider.getApplicationContext(), HyperShopDatabase::class.java, name)
                 .addCallback(HyperShopDatabase.CALLBACK)
-                .addMigrations(HyperShopDatabase.MIGRATION_1_2, HyperShopDatabase.MIGRATION_2_3, HyperShopDatabase.MIGRATION_3_4)
+                .addMigrations(
+                    HyperShopDatabase.MIGRATION_1_2,
+                    HyperShopDatabase.MIGRATION_2_3,
+                    HyperShopDatabase.MIGRATION_3_4,
+                    HyperShopDatabase.MIGRATION_4_5,
+                )
                 .allowMainThreadQueries()
                 .build()
         val idx =
@@ -75,7 +80,12 @@ class MigrationTest {
         val room =
             Room.databaseBuilder(ApplicationProvider.getApplicationContext(), HyperShopDatabase::class.java, name)
                 .addCallback(HyperShopDatabase.CALLBACK)
-                .addMigrations(HyperShopDatabase.MIGRATION_1_2, HyperShopDatabase.MIGRATION_2_3, HyperShopDatabase.MIGRATION_3_4)
+                .addMigrations(
+                    HyperShopDatabase.MIGRATION_1_2,
+                    HyperShopDatabase.MIGRATION_2_3,
+                    HyperShopDatabase.MIGRATION_3_4,
+                    HyperShopDatabase.MIGRATION_4_5,
+                )
                 .allowMainThreadQueries()
                 .build()
         val meta = runBlocking { room.dao().meta() }
@@ -115,6 +125,83 @@ class MigrationTest {
         assertTrue(c.moveToFirst())
         assertEquals(12L, c.getLong(0))
         assertTrue(c.isNull(1))
+        c.close()
+        db.close()
+    }
+
+    @Test
+    fun recipesOnTheListBecomeMealsPlannedForTheWeekTheyWereAdded() {
+        val zone = java.time.ZoneId.systemDefault()
+
+        fun at(
+            y: Int,
+            m: Int,
+            d: Int,
+        ) = java.time.LocalDate.of(y, m, d).atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
+        helper.createDatabase(name, 4).apply {
+            execSQL("INSERT INTO Meta VALUES (1, 7, 12, 'old', 'marker', 99, NULL)")
+            execSQL(
+                "INSERT INTO Recipe VALUES (1,'https://example.com/chilli','Chilli',4,'METRIC',100,'WEB','RULES',NULL,0,1," +
+                    "'https://example.com/chilli',NULL,NULL)",
+            )
+            execSQL("INSERT INTO Recipe VALUES (2,NULL,'Soup',NULL,'METRIC',200,'WEB','RULES',NULL,0,2,'r:2',NULL,NULL)")
+            execSQL("INSERT INTO Recipe VALUES (3,NULL,'Old',2,'METRIC',300,'WEB','RULES',NULL,0,3,'r:3',NULL,NULL)")
+            // Chilli twice this week (Wednesday and Thursday), soup the week before, an archived one, and the hand-added use.
+            execSQL("INSERT INTO RecipeUse VALUES (10,1,'RECIPE',6,${at(2026, 10, 21)},NULL)")
+            execSQL("INSERT INTO RecipeUse VALUES (11,1,'RECIPE',4,${at(2026, 10, 22)},NULL)")
+            execSQL("INSERT INTO RecipeUse VALUES (12,2,'RECIPE',2,${at(2026, 10, 14)},NULL)")
+            execSQL("INSERT INTO RecipeUse VALUES (13,3,'RECIPE',2,${at(2026, 10, 1)},${at(2026, 10, 9)})")
+            execSQL("INSERT INTO RecipeUse VALUES (14,NULL,'MANUAL',1,${at(2026, 10, 20)},NULL)")
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(name, 5, true, HyperShopDatabase.MIGRATION_4_5)
+        val c = db.query("SELECT weekStart, libraryKey, servings, position, useId FROM PlannedMeal ORDER BY useId")
+        val rows = ArrayList<List<Any?>>()
+        while (c.moveToNext()) {
+            rows += listOf(c.getLong(0), c.getString(1), if (c.isNull(2)) null else c.getInt(2), c.getInt(3), c.getLong(4))
+        }
+        c.close()
+        val thisWeek = java.time.LocalDate.of(2026, 10, 19).toEpochDay()
+        val lastWeek = java.time.LocalDate.of(2026, 10, 12).toEpochDay()
+        assertEquals(
+            listOf(
+                listOf(thisWeek, "https://example.com/chilli", 6, 0, 10L),
+                listOf(thisWeek, "https://example.com/chilli", 4, 1, 11L),
+                // Soup doesn't say what it serves: no servings to keep.
+                listOf(lastWeek, "r:2", null, 0, 12L),
+            ),
+            rows,
+        )
+        // Nothing on the list was touched.
+        val uses = db.query("SELECT COUNT(*) FROM RecipeUse")
+        uses.moveToFirst()
+        assertEquals(5, uses.getInt(0))
+        uses.close()
+        db.close()
+    }
+
+    @Test
+    fun aV1InstallMigratesAllTheWayToTheCurrentSchema() {
+        helper.createDatabase(name, 1).apply {
+            execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_Item_mergeKey_live ON Item(mergeKey) WHERE deletedAt IS NULL")
+            execSQL("INSERT INTO Recipe VALUES (1,'https://example.com/chilli','Chilli',4,'METRIC',100,'WEB','RULES',NULL,0)")
+            execSQL("INSERT INTO RecipeUse VALUES (10,1,'RECIPE',4,500,NULL)")
+            close()
+        }
+        val db =
+            helper.runMigrationsAndValidate(
+                name,
+                5,
+                true,
+                HyperShopDatabase.MIGRATION_1_2,
+                HyperShopDatabase.MIGRATION_2_3,
+                HyperShopDatabase.MIGRATION_3_4,
+                HyperShopDatabase.MIGRATION_4_5,
+            )
+        val c = db.query("SELECT libraryKey, useId FROM PlannedMeal")
+        assertTrue(c.moveToFirst())
+        assertEquals("https://example.com/chilli", c.getString(0))
+        assertEquals(10L, c.getLong(1))
         c.close()
         db.close()
     }

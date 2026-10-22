@@ -144,3 +144,8 @@ Run 2 stops here. The yes/no checks (install, probe, sync, offline, memory, glan
 | Watch build (fr245) and Monkey C compile | CI | green | yes |
 | Watch unit tests in the simulator | CI | not run: Error dialog (#12) | no |
 | Real phone, cloud provider, real Forerunner 245 | you | Hand-off E | — |
+
+# Release B — Make weekly shopping effortless (docs/design/release-b.md)
+
+## Step B
+- [x] B.1a The meal plan's data: `PlannedMeal` (week, library key, servings, link to its use), `Trip`/`TripItem` and `Regular` tables (schema 5, migration 4→5 plans every recipe still on the list in the week it was added, linked); `Week` (Monday start, by epoch day); `Planner` (plan, remove with Undo, servings through `rescaleUse`, repeat a week, preview and add a whole week in one transaction, idempotent). An import plans itself for this week; an edit, Remove from list and their Undo keep the link. `PlannerTest` (18), `WeekTest` (4), two new migration tests.

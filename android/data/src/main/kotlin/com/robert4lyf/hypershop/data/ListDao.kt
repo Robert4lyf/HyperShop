@@ -122,9 +122,14 @@ interface ListDao {
      */
     @Query(
         "DELETE FROM Recipe WHERE lastAddedAt IS NULL AND libraryKey IS NOT NULL AND importedAt < :before " +
-            "AND id NOT IN (SELECT recipeId FROM RecipeUse WHERE recipeId IS NOT NULL)",
+            "AND id NOT IN (SELECT recipeId FROM RecipeUse WHERE recipeId IS NOT NULL) " +
+            // A meal planned for this week or later still names it: the plan shows it and can add it.
+            "AND libraryKey NOT IN (SELECT libraryKey FROM PlannedMeal WHERE weekStart >= :keepWeek)",
     )
-    suspend fun deleteForgottenRecipes(before: Long)
+    suspend fun deleteForgottenRecipes(
+        before: Long,
+        keepWeek: Long,
+    )
 
     @Query("SELECT COUNT(*) FROM RecipeUse WHERE recipeId = :id")
     suspend fun usesOfRecipe(id: Long): Int
@@ -410,4 +415,95 @@ interface ListDao {
 
     @Query("DELETE FROM ImportJob")
     suspend fun clearJobs()
+
+    // ---- the meal plan (Release B) -------------------------------------------
+    @Query("SELECT * FROM PlannedMeal WHERE weekStart = :week ORDER BY position, id")
+    suspend fun plannedMeals(week: Long): List<PlannedMealEntity>
+
+    @Query("SELECT * FROM PlannedMeal WHERE weekStart = :week ORDER BY position, id")
+    fun observePlannedMeals(week: Long): Flow<List<PlannedMealEntity>>
+
+    @Query("SELECT * FROM PlannedMeal")
+    suspend fun allPlannedMeals(): List<PlannedMealEntity>
+
+    @Query("SELECT * FROM PlannedMeal WHERE id = :id")
+    suspend fun plannedMeal(id: Long): PlannedMealEntity?
+
+    @Query("SELECT * FROM PlannedMeal WHERE useId = :useId")
+    suspend fun mealsOfUse(useId: Long): List<PlannedMealEntity>
+
+    /** The latest week before [week] with a meal planned, or null. */
+    @Query("SELECT MAX(weekStart) FROM PlannedMeal WHERE weekStart < :week")
+    suspend fun latestWeekBefore(week: Long): Long?
+
+    @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM PlannedMeal WHERE weekStart = :week")
+    suspend fun nextMealPosition(week: Long): Int
+
+    @Insert
+    suspend fun insertPlannedMeal(m: PlannedMealEntity): Long
+
+    @Upsert
+    suspend fun upsertPlannedMeals(rows: List<PlannedMealEntity>)
+
+    @Query("DELETE FROM PlannedMeal WHERE id IN (:ids)")
+    suspend fun deletePlannedMeals(ids: List<Long>)
+
+    @Query("UPDATE PlannedMeal SET useId = :useId WHERE id = :id")
+    suspend fun linkMeal(
+        id: Long,
+        useId: Long?,
+    )
+
+    @Query("UPDATE PlannedMeal SET servings = :servings WHERE id = :id")
+    suspend fun setMealServings(
+        id: Long,
+        servings: Int?,
+    )
+
+    @Query("DELETE FROM PlannedMeal")
+    suspend fun clearPlannedMeals()
+
+    // ---- shopping history and Buy again (Release B) ----------------------------
+    @Insert
+    suspend fun insertTrip(t: TripEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTripItems(rows: List<TripItemEntity>)
+
+    @Query("SELECT * FROM Trip ORDER BY finishedAt DESC, id DESC")
+    suspend fun trips(): List<TripEntity>
+
+    @Query("SELECT * FROM TripItem WHERE tripId IN (:ids)")
+    suspend fun tripItems(ids: List<Long>): List<TripItemEntity>
+
+    @Query("SELECT * FROM TripItem")
+    suspend fun allTripItems(): List<TripItemEntity>
+
+    /** Undo of "Finish shopping": the trip it recorded. */
+    @Query("DELETE FROM Trip WHERE finishedAt = :stamp")
+    suspend fun deleteTripAt(stamp: Long)
+
+    @Query("DELETE FROM Trip WHERE id NOT IN (SELECT id FROM Trip ORDER BY finishedAt DESC, id DESC LIMIT :keep)")
+    suspend fun pruneTrips(keep: Int)
+
+    @Query("DELETE FROM Trip")
+    suspend fun clearTrips()
+
+    @Query("SELECT COUNT(*) FROM Trip")
+    fun observeTripCount(): Flow<Int>
+
+    @Query("SELECT * FROM Regular")
+    suspend fun regulars(): List<RegularEntity>
+
+    @Upsert
+    suspend fun putRegular(r: RegularEntity)
+
+    @Insert
+    suspend fun insertRegulars(rows: List<RegularEntity>)
+
+    @Query("DELETE FROM Regular WHERE mergeKey = :key")
+    suspend fun deleteRegular(key: String)
+
+    @Query("DELETE FROM Regular")
+    suspend fun clearRegulars()
 }

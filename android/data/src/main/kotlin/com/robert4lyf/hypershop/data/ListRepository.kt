@@ -26,6 +26,7 @@ import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.QtyUnit
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.parse.Normaliser
+import com.robert4lyf.hypershop.core.plan.Week
 import com.robert4lyf.hypershop.core.sync.OpResult
 import com.robert4lyf.hypershop.core.sync.WatchMessage
 import kotlinx.coroutines.CoroutineScope
@@ -104,6 +105,8 @@ data class UseLink(
 data class UseRemoval(
     val removed: RemovedUse,
     val decisions: List<LineDecisionEntity>,
+    /** The planned meals it was the shopping of: Undo links them again. */
+    val meals: List<Long> = emptyList(),
 )
 
 /** "Finish shopping": the stamp for Undo and how many ticked items went. */
@@ -138,16 +141,16 @@ data class WatchListView(
  * and writes the difference. The UI and the watch bridge share it.
  */
 class ListRepository(
-    private val db: HyperShopDatabase,
+    internal val db: HyperShopDatabase,
     private val catalog: Catalog = CatalogLoader.default,
-    private val clock: () -> Long = System::currentTimeMillis,
+    internal val clock: () -> Long = System::currentTimeMillis,
     /** Where the shared [list] reads run; lives as long as the repository (the app). */
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
-    private val dao = db.dao()
+    internal val dao = db.dao()
     private val normaliser = Normaliser(catalog)
     val merger = Merger(catalog, normaliser)
-    private val json = Json { ignoreUnknownKeys = true }
+    internal val json = Json { ignoreUnknownKeys = true }
 
     // ---- reading ------------------------------------------------------------------
 
@@ -217,7 +220,7 @@ class ListRepository(
 
     suspend fun overrides(): Map<String, AisleCode> = dao.overrides().associate { it.key to AisleCode.valueOf(it.aisleCode) }
 
-    private suspend fun load(): ShoppingList {
+    internal suspend fun load(): ShoppingList {
         val meta = requireNotNull(dao.meta()) { "Meta row missing" }
         return ShoppingList(
             items = dao.items().map(Mapping::item).associateBy { it.id },
@@ -236,7 +239,7 @@ class ListRepository(
      * merged into them are gone: the loser may still hold the new key, and live
      * keys are unique.
      */
-    private suspend fun persist(
+    internal suspend fun persist(
         old: ShoppingList,
         new: ShoppingList,
     ) {
@@ -271,7 +274,7 @@ class ListRepository(
     }
 
     /** One transaction: load, apply [op], persist. Null from [op] means no change. */
-    private suspend fun <T> write(op: suspend (ShoppingList) -> Pair<ShoppingList, T>?): T? =
+    internal suspend fun <T> write(op: suspend (ShoppingList) -> Pair<ShoppingList, T>?): T? =
         db.withTransaction {
             val old = load()
             val r = op(old) ?: return@withTransaction null
@@ -606,6 +609,8 @@ class ListRepository(
     suspend fun addSavedRecipe(
         recipeId: Long,
         servings: Int? = null,
+        /** Plan it as one of this week's meals too (false: the planner links it itself). */
+        plan: Boolean = true,
     ): ApplyResult? {
         val (r, lines) = librarySource(recipeId) ?: return null
         if (lines.isEmpty()) return null
@@ -626,7 +631,7 @@ class ListRepository(
             )
         // The preview reads the list outside apply's transaction: a change in between is Stale, so try again.
         repeat(3) {
-            val result = apply(preview(stored, servings ?: r.servingsOriginal))
+            val result = apply(preview(stored, servings ?: r.servingsOriginal), plan = plan)
             if (result is ApplyResult.Applied) return result
         }
         discardRecipe(stored.recipe.id)
@@ -711,9 +716,16 @@ class ListRepository(
         replacing: Long? = null,
         /** An edit of "Added by hand": the lines go back as hand-added items, with no recipe kept. */
         manual: Boolean = false,
+        /**
+         * A new recipe on the list is one of this week's meals (Release B): planned and
+         * linked in this transaction. An edit keeps the meals of the use it replaces.
+         */
+        plan: Boolean = true,
     ): ApplyResult =
         db.withTransaction {
             val old = load()
+            // Read before the old use goes: its meals' link is cleared with it (SET NULL).
+            val replacedMeals = replacing?.let { dao.mealsOfUse(it) }.orEmpty()
             val oldRecipe = replacing?.let { old.uses[it]?.recipeId }
             val kind = if (manual) UseKind.MANUAL else UseKind.RECIPE
             when (val r = merger.apply(without(old, replacing), preview, clock(), kind)) {
@@ -729,6 +741,7 @@ class ListRepository(
                     }
                     dao.putDecisions(preview.lineStatus.map { (line, s) -> LineDecisionEntity(r.useId, line, s.name) })
                     preview.incoming.recipeId?.let { addedToLibrary(it) }
+                    planApplied(r.useId, preview, replacedMeals, plan && replacing == null)
                     // The edited recipe was stored afresh; the old one goes once nothing uses it.
                     if (oldRecipe != null && oldRecipe != preview.incoming.recipeId && dao.uses().none { it.recipeId == oldRecipe }) {
                         db.openHelper.writableDatabase.execSQL("DELETE FROM Recipe WHERE id = ?", arrayOf(oldRecipe))
@@ -739,11 +752,43 @@ class ListRepository(
             }
         }
 
+    /**
+     * In [apply]'s transaction: the meals of a replaced use follow the new one, at its
+     * servings; or a new recipe on the list is planned for this week, linked to its use.
+     */
+    private suspend fun planApplied(
+        useId: Long,
+        preview: Preview,
+        replacedMeals: List<PlannedMealEntity>,
+        planNew: Boolean,
+    ) {
+        val recipe = preview.incoming.recipeId?.let { dao.recipe(it) } ?: return
+        val servings = preview.incoming.servings.takeIf { recipe.servingsOriginal != null }
+        for (m in replacedMeals) {
+            dao.linkMeal(m.id, useId)
+            dao.setMealServings(m.id, servings)
+        }
+        if (replacedMeals.isNotEmpty() || !planNew) return
+        val week = Week.of(clock()).startEpochDay
+        dao.insertPlannedMeal(
+            PlannedMealEntity(
+                weekStart = week,
+                libraryKey = recipe.libraryKey ?: recipe.url ?: "r:${recipe.id}",
+                servings = servings,
+                position = dao.nextMealPosition(week),
+                useId = useId,
+                addedAt = clock(),
+            ),
+        )
+    }
+
     /** Undo of an import: the use and everything that cascades, and the recipe if nothing else uses it. */
     suspend fun undoImport(useId: Long) {
         db.withTransaction {
             val old = load()
             val recipeId = old.uses[useId]?.recipeId
+            // The meal the import planned goes with it; it was never planned otherwise.
+            dao.mealsOfUse(useId).map { it.id }.takeIf { it.isNotEmpty() }?.let { dao.deletePlannedMeals(it) }
             persist(old, old.removeUse(useId))
             if (recipeId != null && dao.uses().none { it.recipeId == recipeId }) {
                 db.openHelper.writableDatabase.execSQL("DELETE FROM Recipe WHERE id = ?", arrayOf(recipeId))
@@ -759,8 +804,9 @@ class ListRepository(
             if (removed == null) return@withTransaction null
             // The use's review decisions cascade with it; Undo wants them back too.
             val decisions = dao.decisions(useId)
+            val meals = dao.mealsOfUse(useId).map { it.id }
             persist(old, next)
-            UseRemoval(removed, decisions)
+            UseRemoval(removed, decisions, meals)
         }
 
     /**
@@ -787,6 +833,7 @@ class ListRepository(
             // Only decisions of lines the copy still has: a decision's line is a foreign key.
             val lines = recipeId?.let { id -> dao.lines(id).map { it.id }.toSet() }.orEmpty()
             dao.putDecisions(r.decisions.filter { it.recipeLineId in lines })
+            for (id in r.meals) if (dao.plannedMeal(id)?.useId == null) dao.linkMeal(id, r.removed.use.id)
             true
         }
 
@@ -905,7 +952,7 @@ class ListRepository(
                 persist(old, next ?: purged)
                 dao.undelete(ids)
             }
-            dao.deleteForgottenRecipes(before)
+            dao.deleteForgottenRecipes(before, Week.of(now).startEpochDay)
         }
 
     /** Move to another aisle; "Always put X in Y?" yes → a user override. */
