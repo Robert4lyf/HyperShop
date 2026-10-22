@@ -173,6 +173,8 @@ fun SectionLabel(
 fun ScreenHeader(
     title: String,
     modifier: Modifier = Modifier,
+    /** What picks the mosaic; the title unless it changes as you go ("5 left"). */
+    seed: String = title,
     overline: String? = null,
     subtitle: String? = null,
     actions: @Composable RowScope.() -> Unit = {},
@@ -183,7 +185,7 @@ fun ScreenHeader(
             .fillMaxWidth()
             .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
             .clip(RoundedCornerShape(24.dp))
-            .lowPoly(title, end = HEADER_END),
+            .lowPoly(seed, end = HEADER_END),
     ) {
         CompositionLocalProvider(LocalContentColor provides Brand.OnHero) {
             Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 14.dp, bottom = 14.dp)) {

@@ -314,7 +314,7 @@ class SettingsViewModelTest {
         resolver.registerInputStreamSupplier(Uri.fromFile(broken)) { broken.inputStream() }
         vm.inspectRestore(Uri.fromFile(broken))
         await(vm.ui) { got.size == 3 }
-        assertTrue(got[2].text, got[2].text.startsWith("That backup is damaged"))
+        assertEquals("That backup file is damaged, so nothing was changed", got[2].text)
         assertNull(vm.ui.value.restorePrompt)
         assertEquals(1, runBlocking { c.repository.snapshot() }.liveItems.size)
         watching.cancel()

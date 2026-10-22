@@ -152,12 +152,8 @@ class LibraryScreenTest {
         compose.setContent {
             HyperShopTheme { EntryEditor(EntryForm(id = "milk", name = "milk", edited = true), onSave = { null }, onReset = { reset++ }) }
         }
+        // One tap; the view model's message carries Undo.
         compose.onNodeWithTag("entry-reset").performScrollTo().performClick()
-        compose.onNodeWithText("Reset Milk to default?").assertExists()
-        compose.onNodeWithText("Keep").performClick()
-        assertEquals(0, reset)
-        compose.onNodeWithTag("entry-reset").performClick()
-        compose.onNodeWithTag("entry-reset-confirm").performClick()
         assertEquals(1, reset)
     }
 

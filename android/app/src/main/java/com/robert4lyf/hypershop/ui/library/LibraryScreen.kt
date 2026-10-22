@@ -30,7 +30,6 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -365,7 +364,6 @@ fun EntryEditor(
     var error by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
     var advanced by rememberSaveable(start) { mutableStateOf(start.hasAdvanced) }
-    var confirmReset by rememberSaveable { mutableStateOf(false) }
     // Only awaits [onSave]'s answer and closes the sheet; the save itself runs in the view model.
     val scope = rememberCoroutineScope()
     // Any edit clears the last save's complaint: it was about the form as it was.
@@ -469,24 +467,10 @@ fun EntryEditor(
         }
         if (start.edited || start.custom) {
             OutlinedButton(
-                onClick = { confirmReset = true },
+                onClick = onReset,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("entry-reset"),
             ) { Text(if (start.custom) "Delete" else "Reset to default") }
         }
-    }
-    if (confirmReset) {
-        val name = start.name.replaceFirstChar { it.uppercase() }
-        AlertDialog(
-            onDismissRequest = { confirmReset = false },
-            title = { Text(if (start.custom) "Delete $name?" else "Reset $name to default?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmReset = false
-                    onReset()
-                }, modifier = Modifier.testTag("entry-reset-confirm")) { Text(if (start.custom) "Delete" else "Reset") }
-            },
-            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Keep") } },
-        )
     }
 }
 

@@ -198,16 +198,17 @@ class ListViewModelTest {
         await(vm.ui) { u -> u.aisles.flatMap { it.second }.size == 3 }
         // Typed by hand: no recipe to name.
         assertNull(await(vm.ui) { it.aisles.isNotEmpty() }.row("onion").from)
+        // Already on the list: nothing is doubled; the message offers the typed amount, one tap away.
         vm.addTyped("1 onion")
-        val asked = await(vm.ui) { it.plusOne != null }
-        assertEquals("onion", asked.plusOne!!.name)
-        assertEquals("1", asked.plusOne!!.amount)
-        vm.confirmPlusOne()
-        await(vm.ui) { it.plusOne == null && it.row("onion").main == "3 onions" }
+        val asked = nextMessage(vm)
+        assertEquals("Onion is already on the list", asked.text)
+        assertEquals("Add 1", asked.action)
+        assertEquals("2 onions", vm.ui.value.row("onion").main)
+        runBlocking { asked.undo!!.invoke() }
+        await(vm.ui) { it.row("onion").main == "3 onions" }
         vm.addTyped("onion")
-        assertNull(await(vm.ui) { it.plusOne != null }.plusOne!!.amount)
-        vm.dismissPlusOne()
-        assertEquals("3 onions", await(vm.ui) { it.plusOne == null }.row("onion").main)
+        assertEquals("Add 1 more", nextMessage(vm).action)
+        assertEquals("3 onions", vm.ui.value.row("onion").main)
     }
 
     @Test

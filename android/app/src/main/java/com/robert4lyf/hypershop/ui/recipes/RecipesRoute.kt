@@ -165,7 +165,6 @@ fun RecipesRoute(
     // The sheet's own confirmations: the sheet closes first, so the dialog is not under it.
     // Kept as the recipe's key (saveable), and looked up again after a rotation.
     var addAgain by rememberSaveable { mutableStateOf<String?>(null) }
-    var forget by rememberSaveable { mutableStateOf<String?>(null) }
     detail?.let { d ->
         RecipeDetailSheet(
             d,
@@ -175,13 +174,12 @@ fun RecipesRoute(
             },
             onRemove = {
                 vm.closeDetail()
-                forget = d.row.key
+                vm.removeFromLibrary(d.row)
             },
             onDismiss = vm::closeDetail,
         )
     }
     ui.libraryRow(addAgain)?.let { row -> AddAgainDialog(row, onConfirm = { vm.addFromLibrary(row) }, onDismiss = { addAgain = null }) }
-    ui.libraryRow(forget)?.let { row -> ForgetRecipeDialog(row, onConfirm = { vm.removeFromLibrary(row) }, onDismiss = { forget = null }) }
 }
 
 /** The saved recipe a dialog is about, by its key; null for no dialog (or one whose row has gone). */
@@ -205,8 +203,6 @@ fun RecipesScreen(
     onMeals: () -> Unit = {},
 ) {
     // Which use or saved recipe a dialog is about, by id or key, so it survives a rotation.
-    var confirm by rememberSaveable { mutableStateOf<Long?>(null) }
-    var forget by rememberSaveable { mutableStateOf<String?>(null) }
     var addAgain by rememberSaveable { mutableStateOf<String?>(null) }
     var renaming by rememberSaveable { mutableStateOf<Long?>(null) }
     var renamingSaved by rememberSaveable { mutableStateOf<String?>(null) }
@@ -292,7 +288,7 @@ fun RecipesScreen(
                     items(ui.uses, key = { it.useId }) { use ->
                         UseCard(
                             use,
-                            onRemove = { confirm = use.useId },
+                            onRemove = { onRemove(use) },
                             onEdit = { onEdit(use) },
                             onRename = { renaming = use.useId },
                             onOpen = { onOpenUse(use) },
@@ -316,7 +312,7 @@ fun RecipesScreen(
                         LibraryCard(
                             row,
                             onAdd = { if (row.onList) addAgain = row.key else library.onAdd(row) },
-                            onRemove = { forget = row.key },
+                            onRemove = { library.onRemove(row) },
                             onOpen = { library.onOpen(row) },
                             onRename = { renamingSaved = row.key },
                             onEdit = { library.onEdit(row) },
@@ -334,7 +330,6 @@ fun RecipesScreen(
         }
     }
     if (adding) AddRecipeSheet(add, onDismiss = { adding = false }, hasKey = hasKey, lastBook = ui.lastBook)
-    ui.libraryRow(forget)?.let { row -> ForgetRecipeDialog(row, onConfirm = { library.onRemove(row) }, onDismiss = { forget = null }) }
     ui.libraryRow(addAgain)?.let { row -> AddAgainDialog(row, onConfirm = { library.onAdd(row) }, onDismiss = { addAgain = null }) }
     renaming?.let { id -> ui.uses.firstOrNull { it.useId == id } }?.let { use ->
         val byHand = use.recipeId == null
@@ -348,49 +343,6 @@ fun RecipesScreen(
     ui.libraryRow(renamingSaved)?.let { row ->
         TitleDialog(row.title, onDismiss = { renamingSaved = null }) { library.onRename(row, it) }
     }
-    confirm?.let { id -> ui.uses.firstOrNull { it.useId == id } }?.let { use ->
-        AlertDialog(
-            onDismissRequest = { confirm = null },
-            title = { Text("Remove ${use.title} from the list?") },
-            text = {
-                Text(
-                    if (use.recipeId == null) {
-                        "Its items come off the list."
-                    } else {
-                        "Its items come off the list. The recipe stays in your saved recipes."
-                    },
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirm = null
-                    onRemove(use)
-                }) { Text("Remove") }
-            },
-            dismissButton = { TextButton(onClick = { confirm = null }) { Text("Keep") } },
-        )
-    }
-}
-
-/** "Remove from your recipes": asks first, and says the list is untouched. [onDismiss] runs whichever way it closes. */
-@Composable
-private fun ForgetRecipeDialog(
-    row: LibraryRow,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Remove ${row.title} from your saved recipes?") },
-        text = { Text(if (row.onList) "What it put on the list stays there." else "You can add it again from a link or a photo.") },
-        confirmButton = {
-            TextButton(onClick = {
-                onDismiss()
-                onConfirm()
-            }) { Text("Remove") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Keep") } },
-    )
 }
 
 /** "Add again" for a recipe already on the list: its amounts would double up, so it asks. */

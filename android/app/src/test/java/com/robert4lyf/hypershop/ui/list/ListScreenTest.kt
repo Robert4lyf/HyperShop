@@ -132,14 +132,9 @@ class ListScreenTest {
     @Test
     fun clearAllAsksFirst() {
         show()
+        // One tap: the snackbar's Undo is the safety net, not a dialog.
         compose.onNodeWithContentDescription("More").performClick()
         compose.onNodeWithText("Clear all").performClick()
-        compose.onNodeWithText("6 items").assertExists()
-        compose.onNodeWithText("Cancel").performClick()
-        assertEquals(emptyList<String>(), events)
-        compose.onNodeWithContentDescription("More").performClick()
-        compose.onNodeWithText("Clear all").performClick()
-        compose.onNodeWithTag("clear-confirm").performClick()
         assertEquals(listOf("clear"), events)
     }
 
@@ -293,18 +288,6 @@ class ListScreenTest {
         compose.onNodeWithTag("add-item").performTextInput("2 on")
         compose.onNodeWithTag("suggestion-onion").performClick()
         assertEquals(listOf("pick 2 on onion"), events)
-    }
-
-    @Test
-    fun plusOneSaysWhatItAdds() {
-        var p by mutableStateOf(PlusOne(1, "onion", "onion"))
-        compose.setContent { HyperShopTheme(dynamicColor = false) { PlusOneDialog(p, onYes = { events += "yes" }, onNo = {}) } }
-        compose.onNodeWithText("Add one more onion to it?").assertExists()
-        compose.onNodeWithText("Add").performClick()
-        p = PlusOne(1, "onion", "200 g onion", amount = "200 g")
-        compose.onNodeWithText("Add 200 g more onion to it?").assertExists()
-        compose.onNodeWithText("Add 200 g").performClick()
-        assertEquals(listOf("yes", "yes"), events)
     }
 
     @Test

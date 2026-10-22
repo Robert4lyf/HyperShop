@@ -72,17 +72,13 @@ class RecipesScreenTest {
         }
 
     @Test
-    fun removeAsksFirst() {
+    fun removeIsOneTapWithUndoOnTheMessage() {
         show()
         compose.onNodeWithContentDescription("Serves 4 · 6 still needed · 3 at home").assertExists()
-        // Every use can be removed from its menu, after a confirmation.
+        // Every use can be removed from its menu; the snackbar's Undo puts it back.
         compose.onNodeWithContentDescription("Serves 8 · 5 still needed").assertExists()
         compose.onNodeWithTag("more-2").performClick()
         compose.onNodeWithTag("remove-2").performClick()
-        compose.onNodeWithText("Keep").performClick()
-        compose.onNodeWithTag("more-2").performClick()
-        compose.onNodeWithTag("remove-2").performClick()
-        compose.onNodeWithText("Remove").performClick()
         assertEquals(listOf("remove 2"), events)
     }
 

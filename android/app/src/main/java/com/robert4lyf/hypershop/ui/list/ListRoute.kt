@@ -95,7 +95,6 @@ fun ListRoute(
             onDismiss = vm::closeItem,
         )
     }
-    ui.plusOne?.let { PlusOneDialog(it, onYes = vm::confirmPlusOne, onNo = vm::dismissPlusOne) }
 }
 
 /** Shows [m] with Undo for [UiMessage.seconds], outliving the screen that asked. */
@@ -105,7 +104,7 @@ fun show(
     m: UiMessage,
 ) {
     container.applicationScope.launch(kotlinx.coroutines.Dispatchers.Main) {
-        val r = snackbar.showTimed(m.text, m.undo?.let { "Undo" }, m.seconds)
+        val r = snackbar.showTimed(m.text, m.undo?.let { m.action }, m.seconds)
         if (r == SnackbarResult.ActionPerformed) m.undo?.invoke()
     }
 }

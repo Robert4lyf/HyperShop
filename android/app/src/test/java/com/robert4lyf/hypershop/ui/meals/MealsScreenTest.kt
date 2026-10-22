@@ -111,17 +111,11 @@ class MealsScreenTest {
     }
 
     @Test
-    fun removingAMealOnTheListSaysWhatComesOff() {
+    fun removingAMealIsOneTapWithUndoOnTheMessage() {
         show()
         compose.onNodeWithTag("meal-remove-1").performClick()
-        compose
-            .onNodeWithText("6 items it still needs come off the list. Anything bought stays bought. The recipe stays saved.")
-            .assertExists()
-        compose.onNodeWithText("Keep").performClick()
         compose.onNodeWithTag("meal-remove-2").performClick()
-        compose.onNodeWithText("It comes off this week's plan. The list and the recipe stay as they are.").assertExists()
-        compose.onNodeWithTag("meals-remove-confirm").performClick()
-        assertEquals(listOf("remove 2"), events)
+        assertEquals(listOf("remove 1", "remove 2"), events)
     }
 
     @Test

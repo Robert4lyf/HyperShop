@@ -252,7 +252,7 @@ class SettingsViewModel(
                 }
                 Inspection.NotABackup -> messages.send(UiMessage("That file isn't a HyperShop backup"))
                 is Inspection.Newer -> messages.send(UiMessage("That backup was made by a newer HyperShop. Update the app first."))
-                is Inspection.Broken -> messages.send(UiMessage("That backup is damaged (${i.problems.first()}), so nothing was changed"))
+                is Inspection.Broken -> messages.send(UiMessage("That backup file is damaged, so nothing was changed"))
                 Inspection.Unreadable -> messages.send(UiMessage("Couldn't read that file"))
             }
         }
@@ -296,14 +296,14 @@ class SettingsViewModel(
                 backups.restore(file)
             } catch (e: Exception) {
                 // Thrown before the first write (the journal couldn't be saved): nothing changed.
-                messages.send(UiMessage("Couldn't restore (${e.javaClass.simpleName}), so nothing was changed"))
+                messages.send(UiMessage("Couldn't read that backup, so nothing was changed"))
                 return RestoreOutcome.Failed(rolledBack = true)
             }
         when (outcome) {
             is RestoreOutcome.Restored -> Unit
             is RestoreOutcome.Refused ->
                 messages.send(
-                    UiMessage("That backup is damaged (${outcome.problems.first()}), so nothing was changed"),
+                    UiMessage("That backup file is damaged, so nothing was changed"),
                 )
             is RestoreOutcome.Failed ->
                 messages.send(

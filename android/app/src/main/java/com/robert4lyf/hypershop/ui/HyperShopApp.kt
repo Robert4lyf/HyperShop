@@ -280,11 +280,11 @@ private fun CompactNavBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             for ((r, label, on, off) in tabs) {
-                // The library and the voice test are part of Settings, and the meals of Recipes, so those tabs stay lit there.
+                // The library and the voice test are part of Settings, and the week's plan is about the list, so those tabs stay lit there.
                 val selected =
                     route == r ||
                         (r == Routes.SETTINGS && (route == Routes.LIBRARY || route == Routes.VOICE_TEST)) ||
-                        (r == Routes.RECIPES && route == Routes.MEALS)
+                        (r == Routes.LIST && route == Routes.MEALS)
                 Column(
                     Modifier
                         .weight(1f)

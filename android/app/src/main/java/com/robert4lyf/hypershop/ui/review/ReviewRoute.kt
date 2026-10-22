@@ -87,7 +87,8 @@ fun ReviewRoute(
     if (confirmDiscard) {
         AlertDialog(
             onDismissRequest = { confirmDiscard = false },
-            title = { Text("Discard this recipe?") },
+            title = { Text("Discard your changes?") },
+            text = { Text("The recipe stays as it was saved.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDiscard = false
@@ -110,7 +111,8 @@ fun ReviewRoute(
                 onRow = { sheetKey = it },
                 onServings = vm::setServings,
                 onAdd = vm::confirm,
-                onCancel = { if (s.ui.changed) confirmDiscard = true else vm.cancel() },
+                // A cancelled import has Undo on its snackbar; only an edit of a saved recipe (no Undo) asks first.
+                onCancel = { if (s.ui.changed && vm.isThrowaway) confirmDiscard = true else vm.cancel() },
                 onRetryClaude = vm::retryWithClaude,
                 onAisleInStock = vm::aisleInStock,
                 onClearInStock = vm::clearInStock,

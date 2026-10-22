@@ -111,7 +111,7 @@ class ReviewScreenTest {
         show()
         compose.onNodeWithText("Add 4 items").assertIsEnabled().performClick()
         compose.onNodeWithText("Cancel").performClick()
-        compose.onNodeWithText("Claude pending").fetchSemanticsNode()
+        compose.onNodeWithText("Waiting for Claude").fetchSemanticsNode()
         compose.onNodeWithText("Retry with Claude").performClick()
         compose.onNodeWithText("Serves 4").fetchSemanticsNode()
         assertEquals(listOf("add", "cancel", "retry"), events)
@@ -155,7 +155,7 @@ class ReviewScreenTest {
     fun noticeShowsWhenTheListChanged() {
         show(SAMPLE_REVIEW.copy(notice = "List changed — review updated", badge = Badge.CLAUDE))
         compose.onNodeWithText("List changed — review updated").fetchSemanticsNode()
-        compose.onNodeWithText("Parsed by Claude").fetchSemanticsNode()
+        compose.onNodeWithText("Read by Claude").fetchSemanticsNode()
     }
 
     @Test

@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -145,6 +146,50 @@ class ShopScreenTest {
         assertNull(nextAisle(cells(groups(onlyProduce), emptySet()), 0))
         val allDone = shop.copy(aisles = shop.aisles.map { (a, rows) -> a to rows.map { it.copy(state = TickState.DONE) } })
         assertNull(nextAisle(cells(groups(allDone), emptySet()), 0))
+    }
+
+    @Test
+    fun aTickedRowStaysAMomentSoTappingAgainUndoesIt() {
+        var ui by mutableStateOf(shop)
+        val live =
+            actions.copy(onToggle = { r ->
+                events += "toggle ${r.id}"
+                ui =
+                    ui.copy(
+                        aisles =
+                            ui.aisles.map { (a, rows) ->
+                                a to
+                                    rows.map {
+                                        when {
+                                            it.id != r.id -> it
+                                            it.state == TickState.DONE -> it.copy(state = TickState.OPEN)
+                                            else -> it.copy(state = TickState.DONE)
+                                        }
+                                    }
+                            },
+                    )
+            })
+        compose.mainClock.autoAdvance = false
+        compose.setContent { HyperShopTheme(dark = false, dynamicColor = false) { ListScreen(ui, live) } }
+        compose.onNodeWithTag("tick-4").performClick()
+        compose.mainClock.advanceTimeBy(300)
+        // Still in place, read as bought: a second tap unticks it.
+        compose.onNodeWithTag("tick-4").assertExists()
+        compose.onNodeWithTag("tick-4").performClick()
+        compose.mainClock.advanceTimeBy(LINGER_MS + 500)
+        compose.onNodeWithTag("tick-4").assertExists()
+        assertEquals(listOf("toggle 4", "toggle 4"), events)
+        // Left ticked: after the moment it folds into the aisle's "bought" row.
+        compose.onNodeWithTag("tick-4").performClick()
+        compose.mainClock.advanceTimeBy(LINGER_MS + 500)
+        compose.onNodeWithTag("tick-4").assertDoesNotExist()
+    }
+
+    @Test
+    fun finishIsAlwaysInTheBarButLiveOnlyOnceSomethingIsBought() {
+        val nothingBought = shop.copy(aisles = shop.aisles.map { (a, rows) -> a to rows.map { it.copy(state = TickState.OPEN) } })
+        show(nothingBought)
+        compose.onNodeWithTag("finish").assertIsNotEnabled()
     }
 
     @Test

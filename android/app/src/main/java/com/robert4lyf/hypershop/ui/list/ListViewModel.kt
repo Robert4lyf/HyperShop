@@ -58,15 +58,6 @@ data class ListRow(
     val from: String? = null,
 )
 
-/** "Onion is on the list. +1?" */
-data class PlusOne(
-    val itemId: Long,
-    val name: String,
-    val line: String,
-    /** The amount typed ("200 g"), or null when only the name was: the dialog says what it will add. */
-    val amount: String? = null,
-)
-
 /** The item sheet (PLAN §3.5). */
 data class ItemSheet(
     val id: Long,
@@ -110,7 +101,6 @@ data class ListUi(
     val loaded: Boolean = false,
     /** Imports waiting for review: the "1 recipe ready to review" card. */
     val readyJobs: List<Long> = emptyList(),
-    val plusOne: PlusOne? = null,
     val view: ListView = ListView.STORE,
     /** The recipe view's cards, in the order the recipes were added; empty in the other views. */
     val recipes: List<RecipeSection> = emptyList(),
@@ -179,7 +169,6 @@ class ListViewModel(
     private val messages = Channel<UiMessage>(Channel.BUFFERED)
     val events: Flow<UiMessage> = messages.receiveAsFlow()
 
-    private val plusOne = MutableStateFlow<PlusOne?>(null)
     private val _sheet = MutableStateFlow<ItemSheet?>(null)
     val sheet: StateFlow<ItemSheet?> = _sheet
 
@@ -203,7 +192,7 @@ class ListViewModel(
     private val listWithInStock = c.repository.list.map { Triple(it, c.repository.inStockOnList(it), sources(it)) }
 
     val ui: StateFlow<ListUi> =
-        combine(listWithInStock, c.settings.units, view, c.importJobs.ready, plusOne) { (list, lines, src), units, (ord, v, m), ready, p ->
+        combine(listWithInStock, c.settings.units, view, c.importJobs.ready) { (list, lines, src), units, (ord, v, m), ready ->
             lastList = list
             lastUnits = units
             build(
@@ -212,7 +201,7 @@ class ListViewModel(
                 ord,
                 v,
                 src,
-            ).copy(readyJobs = ready.map { it.id }, plusOne = p, inStock = inStockRows(lines, units), mode = m)
+            ).copy(readyJobs = ready.map { it.id }, inStock = inStockRows(lines, units), mode = m)
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.Eagerly, ListUi())
 
@@ -572,7 +561,8 @@ class ListViewModel(
     /**
      * Enter in the field. Typed items are rule-parsed (no Claude) and skip
      * review. Several lines (a paste) add one item per line. A single item
-     * already on the list asks "+1?" instead.
+     * already on the list is not doubled: a message says so, with "Add 1 more"
+     * (or the typed amount) one tap away, and typing carries on.
      */
     fun addTyped(text: String) =
         viewModelScope.launch {
@@ -581,7 +571,15 @@ class ListViewModel(
                 val p = c.ruleParser.parse(lines.single())
                 val existing = lastList.itemByKey(c.repository.target(p.name).mergeKey)
                 if (existing != null) {
-                    plusOne.value = PlusOne(existing.id, existing.displayName, lines.single(), amountOf(p))
+                    val amount = amountOf(p)
+                    val line = lines.single()
+                    messages.send(
+                        UiMessage(
+                            "${existing.displayName.replaceFirstChar { it.uppercase() }} is already on the list",
+                            undo = { addMore(line) },
+                            action = if (amount == null) "Add 1 more" else "Add $amount",
+                        ),
+                    )
                     return@launch
                 }
             }
@@ -595,20 +593,13 @@ class ListViewModel(
         c.repository.manualAdd(p.name, p.shopBase(UnitLocale.METRIC), p.shopUnit)
     }
 
-    /** "+1?" accepted: the typed amount (or one more) goes on as a manual contribution. */
-    fun confirmPlusOne() =
-        viewModelScope.launch {
-            val p = plusOne.value ?: return@launch
-            plusOne.value = null
-            val parsed = c.ruleParser.parse(p.line)
-            // As a typed add would: grams over spoons, the top of a range; one more when no amount was typed.
-            val typed = parsed.shopBase(UnitLocale.METRIC)
-            val q = if (parsed.quantity == null || typed.isPresence) QtyBase.of(Rational.ONE, null, UnitLocale.METRIC) else typed
-            c.repository.manualAdd(parsed.name, q, parsed.shopUnit.takeIf { parsed.quantity != null })
-        }
-
-    fun dismissPlusOne() {
-        plusOne.value = null
+    /** "Add 1 more" tapped: the typed amount (or one more) goes on as a manual contribution. */
+    private suspend fun addMore(line: String) {
+        val parsed = c.ruleParser.parse(line)
+        // As a typed add would: grams over spoons, the top of a range; one more when no amount was typed.
+        val typed = parsed.shopBase(UnitLocale.METRIC)
+        val q = if (parsed.quantity == null || typed.isPresence) QtyBase.of(Rational.ONE, null, UnitLocale.METRIC) else typed
+        c.repository.manualAdd(parsed.name, q, parsed.shopUnit.takeIf { parsed.quantity != null })
     }
 
     /** "Try a sample list". */

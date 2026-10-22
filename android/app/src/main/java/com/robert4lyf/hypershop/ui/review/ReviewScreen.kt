@@ -279,13 +279,13 @@ private fun Hero(
             ) {
                 val centred = Modifier.align(Alignment.CenterVertically)
                 when (ui.badge) {
-                    Badge.CLAUDE -> Badge("Parsed by Claude", Icons.Rounded.AutoAwesome, centred)
-                    Badge.CLAUDE_PENDING -> Badge("Claude pending", Icons.Rounded.HourglassTop, centred)
+                    Badge.CLAUDE -> Badge("Read by Claude", Icons.Rounded.AutoAwesome, centred)
+                    Badge.CLAUDE_PENDING -> Badge("Waiting for Claude", Icons.Rounded.HourglassTop, centred)
                     // Typed by hand: there is nothing for Claude to have read.
                     Badge.RULES ->
                         if (!ui.byHand) {
                             Badge(
-                                "Parsed offline",
+                                "Read offline",
                                 Icons.Rounded.CloudOff,
                                 centred,
                                 onClick = { explainOffline = true },
