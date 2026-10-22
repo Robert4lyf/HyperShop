@@ -215,9 +215,14 @@ jobs:
   # Runs the Monkey C tests (garmin/test: the sync traces generated from the
   # Kotlin model, and the rest). The simulator links webkit2gtk-4.0, which
   # Ubuntu 24.04 dropped, hence 22.04, and needs a display, hence Xvfb.
-  # Experimental: kept non-blocking until it has passed on a few runs.
+  # On request only (Run workflow): headless, the simulator never loads the
+  # device. It opens an "Error" dialog whose contents do not draw under Xvfb,
+  # with or without a window manager, software GL or the device fonts, so it
+  # failed every PR for ten minutes and said nothing (KNOWN_ISSUES #12). The
+  # watch tests run on a desktop instead (docs/HANDOFF.md, Hand-off E).
   simulator:
     name: Run the watch tests in the simulator
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-22.04
     continue-on-error: true
 

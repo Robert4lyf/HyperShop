@@ -26,12 +26,12 @@ if [[ -z "${DISPLAY:-}" ]]; then
     Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
     export DISPLAY=:99
     sleep 2
-fi
-# Without a window manager, the simulator's Error dialog was mapped but never
-# painted (a blank capture), so nobody could read it. Any small one will do.
-if command -v openbox > /dev/null; then
-    openbox > /dev/null 2>&1 &
-    sleep 1
+    # Without a window manager, the simulator's Error dialog was mapped but never
+    # framed or painted. Only for our own Xvfb: a desktop has its own.
+    if command -v openbox > /dev/null; then
+        openbox > /dev/null 2>&1 &
+        sleep 1
+    fi
 fi
 SIM_LOG="${ROOT}/garmin/build/simulator.log"
 # With openbox the Error dialog got its frame but its contents stayed transparent,
