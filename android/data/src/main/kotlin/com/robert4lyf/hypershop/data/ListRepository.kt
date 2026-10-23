@@ -526,6 +526,56 @@ class ListRepository(
 
     // ---- the recipe library -------------------------------------------------------------
 
+    /**
+     * Ratings, cooking notes and photos, by library entry. They are not the list, so no
+     * rev moves; a recipe removed from the library keeps its row, so its Undo (or saving
+     * the same page again) brings them back.
+     */
+    fun observeRecipeNotes(): Flow<Map<String, RecipeNoteEntity>> =
+        dao.observeRecipeNotes().map {
+                rows ->
+            rows.associateBy { it.libraryKey }
+        }
+
+    suspend fun recipeNote(key: String): RecipeNoteEntity? = dao.recipeNote(key)
+
+    /** Stars out of 5; null (or 0) clears them. */
+    suspend fun setRating(
+        key: String,
+        stars: Int?,
+    ) = changeNote(key) { it.copy(rating = stars?.takeIf { s -> s in 1..MAX_STARS }) }
+
+    /** The cook's own notes ("10 min longer", "half the chilli"); blank clears them. */
+    suspend fun setCookingNotes(
+        key: String,
+        notes: String,
+    ) = changeNote(key) { it.copy(notes = notes.trim().take(MAX_COOKING_NOTES).ifEmpty { null }) }
+
+    /** The photo shown for the recipe: a file name in the app's photo folder (null for none), and where it came from. */
+    suspend fun setRecipePhoto(
+        key: String,
+        photo: String?,
+        fromUrl: String?,
+    ) = changeNote(key) { it.copy(photo = photo?.take(MAX_TITLE), photoUrl = fromUrl?.take(MAX_URL)) }
+
+    /** The page's photo, remembered so it can be fetched; a photo already chosen is left alone. */
+    suspend fun offerRecipePhoto(
+        key: String,
+        url: String,
+    ) = changeNote(key) { if (it.photo == null && it.photoUrl == null) it.copy(photoUrl = url.take(MAX_URL)) else it }
+
+    private suspend fun changeNote(
+        key: String,
+        f: (RecipeNoteEntity) -> RecipeNoteEntity,
+    ) {
+        if (key.isEmpty() || key.length > MAX_URL) return
+        db.withTransaction {
+            val was = dao.recipeNote(key) ?: RecipeNoteEntity(key)
+            val now = f(was)
+            if (now != was) dao.putRecipeNote(now.copy(updatedAt = clock()))
+        }
+    }
+
     /** Every recipe that has been on the list (its latest copy), the one added longest ago first. */
     fun observeLibrary(): Flow<List<LibraryRecipe>> =
         dao.observeLibrary().map { rows ->
@@ -1311,6 +1361,7 @@ class ListRepository(
                 trips = dao.trips(),
                 tripItems = dao.allTripItems(),
                 regulars = dao.regulars(),
+                recipeNotes = dao.recipeNotes(),
             )
         }
 
@@ -1333,6 +1384,7 @@ class ListRepository(
             dao.clearPlannedMeals()
             dao.clearTrips()
             dao.clearRegulars()
+            dao.clearRecipeNotes()
             dao.clearDecisions()
             dao.clearContributions()
             dao.clearTicks()
@@ -1378,6 +1430,7 @@ class ListRepository(
             dao.insertTripItems(b.tripItems)
             dao.pruneTrips(MAX_TRIPS)
             dao.insertRegulars(b.regulars)
+            dao.insertRecipeNotes(b.recipeNotes)
             // A file from before the plan: its recipes on the list become planned meals, as the 4→5 migration did.
             if (b.planVersion == 0) PlanSeed.fromUses(db.openHelper.writableDatabase)
             val meta = dao.meta()!!
@@ -1403,6 +1456,15 @@ class ListRepository(
         const val RESULT_HISTORY = 64
         const val MAX_BOOK = 120
         const val MAX_PAGE = 20
+
+        /** A rating is stars out of this. */
+        const val MAX_STARS = 5
+
+        /** Cooking notes: a few paragraphs of tweaks, not a recipe book. */
+        const val MAX_COOKING_NOTES = 4_000
+
+        /** A photo's web address (and a library key, which can be a page's). */
+        const val MAX_URL = 2_000
 
         /** Trips kept for Buy again: half a year of weekly shops. */
         const val MAX_TRIPS = 26
