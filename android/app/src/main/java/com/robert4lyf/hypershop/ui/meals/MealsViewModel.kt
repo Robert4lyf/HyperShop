@@ -54,6 +54,8 @@ data class Meal(
     val source: String?,
     /** Still in "Your recipes". */
     val saved: Boolean = true,
+    /** The recipe's photo on this phone, or null (its mosaic is drawn). */
+    val photo: String? = null,
 )
 
 /** A saved recipe that could be planned. */
@@ -64,6 +66,7 @@ data class Pick(
     /** How many times it is planned in the week shown. */
     val planned: Int,
     val source: String?,
+    val photo: String? = null,
 )
 
 data class MealsUi(
@@ -154,16 +157,22 @@ class MealsViewModel(
     val ui: StateFlow<MealsUi> =
         combine(
             combine(weekView, c.repository.list) { v, l -> v to l },
-            c.repository.observeLibrary(),
+            combine(c.repository.observeLibrary(), c.recipePhotos.paths()) { l, p -> l to p },
             snapshotFlow { query },
             asked,
             extras,
-        ) { (v, list), lib, q, asked, (buy, home) ->
-            val meals = v.meals.map { it.toMeal().let { m -> asked[m.id]?.let { n -> m.copy(servings = n) } ?: m } }
+        ) { (v, list), (lib, photos), q, asked, (buy, home) ->
+            val meals =
+                v.meals.map {
+                    it.toMeal().copy(photo = photos[it.libraryKey]).let { m -> asked[m.id]?.let { n -> m.copy(servings = n) } ?: m }
+                }
             val counts = v.meals.groupingBy { it.libraryKey }.eachCount()
             val term = q.trim().lowercase()
             val picks =
-                lib.map { r -> Pick(r.key, r.title, r.lines, counts[r.key] ?: 0, r.url?.let { siteOf(it) } ?: bookRef(r.book, r.page)) }
+                lib.map {
+                        r ->
+                    Pick(r.key, r.title, r.lines, counts[r.key] ?: 0, r.url?.let { siteOf(it) } ?: bookRef(r.book, r.page), photos[r.key])
+                }
                     .filter { term.isEmpty() || it.title.lowercase().contains(term) }
             MealsUi(
                 loaded = true,

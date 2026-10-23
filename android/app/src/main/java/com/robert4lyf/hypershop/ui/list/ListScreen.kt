@@ -87,6 +87,7 @@ import com.robert4lyf.hypershop.ui.common.ScreenHeader
 import com.robert4lyf.hypershop.ui.common.TickMark
 import com.robert4lyf.hypershop.ui.common.sectionItem
 import com.robert4lyf.hypershop.ui.common.sectionPosition
+import com.robert4lyf.hypershop.ui.recipes.RecipeArt
 import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.theme.card
@@ -675,8 +676,13 @@ private fun RecipeTitle(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Box(Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(content), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = container, modifier = Modifier.size(20.dp))
+        if (section.kind == RecipeSection.Kind.RECIPE) {
+            // The recipe's own picture, the same as on its card on the Recipes tab.
+            RecipeArt(section.title, section.photo, Modifier.size(56.dp).clip(RoundedCornerShape(14.dp)))
+        } else {
+            Box(Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(content), contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = container, modifier = Modifier.size(20.dp))
+            }
         }
         Text(
             section.title,

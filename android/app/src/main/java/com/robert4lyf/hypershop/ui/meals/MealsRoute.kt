@@ -80,8 +80,8 @@ import com.robert4lyf.hypershop.ui.common.fieldLift
 import com.robert4lyf.hypershop.ui.common.label
 import com.robert4lyf.hypershop.ui.common.pillFieldColors
 import com.robert4lyf.hypershop.ui.list.show
+import com.robert4lyf.hypershop.ui.recipes.RecipeArt
 import com.robert4lyf.hypershop.ui.theme.card
-import com.robert4lyf.hypershop.ui.theme.lowPoly
 import com.robert4lyf.hypershop.ui.util.factoryFor
 
 data class MealsActions(
@@ -294,7 +294,7 @@ private fun MealCard(
         color = MaterialTheme.colorScheme.card,
     ) {
         Row(Modifier.padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).lowPoly(m.title))
+            RecipeArt(m.title, m.photo, Modifier.size(MEAL_ART).clip(RoundedCornerShape(16.dp)))
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 // The title and its state read as one TalkBack node; the servings controls stay their own.
                 Column(Modifier.semantics(mergeDescendants = true) {}) {
@@ -565,7 +565,7 @@ private fun PickRow(
             .testTag("pick-${p.key}"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).lowPoly(p.title))
+        RecipeArt(p.title, p.photo, Modifier.size(PICK_ART).clip(RoundedCornerShape(14.dp)))
         Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
             Text(p.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(
@@ -635,3 +635,9 @@ private fun plural(
     n: Int,
     word: String,
 ) = if (n == 1) "1 $word" else "$n ${word}s"
+
+/** A planned meal's picture: big enough to know the dish by. */
+private val MEAL_ART = 72.dp
+
+/** A recipe to pick's picture. */
+private val PICK_ART = 56.dp

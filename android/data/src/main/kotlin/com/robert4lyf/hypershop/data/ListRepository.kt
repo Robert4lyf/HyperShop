@@ -100,6 +100,8 @@ data class UseSummary(
 data class UseLink(
     val title: String,
     val url: String?,
+    /** Its recipe's library entry ([LibraryRecipe.key]), for the recipe's photo. */
+    val libraryKey: String? = null,
 )
 
 /**
@@ -407,7 +409,11 @@ class ListRepository(
         return useIds.associateWith { id ->
             val u = l.uses[id]
             val r = u?.recipeId?.let { recipes[it] }
-            UseLink(r?.title ?: if (u?.kind == UseKind.MANUAL) manual else "Recipe", r?.url)
+            UseLink(
+                r?.title ?: if (u?.kind == UseKind.MANUAL) manual else "Recipe",
+                r?.url,
+                r?.let { it.libraryKey ?: it.url ?: "r:${it.id}" },
+            )
         }
     }
 

@@ -44,6 +44,8 @@ data class RecipesUi(
     val terms: List<String> = emptyList(),
     /** The book of the cookbook recipe added most recently: the photo form starts with it. */
     val lastBook: String? = null,
+    /** Each saved recipe's photo, by library key: a card on the list shows its recipe's. */
+    val photos: Map<String, String> = emptyMap(),
 )
 
 /** A saved recipe opened from "Your recipes": its ingredients, under their headings. */
@@ -130,8 +132,9 @@ class RecipesViewModel(
             c.repository.list.map { c.repository.usesOnList(it) },
             c.repository.observeLibrary(),
             c.repository.observeRecipeNotes(),
+            c.recipePhotos.paths(),
             terms,
-        ) { uses, lib, notes, (q, typing) ->
+        ) { uses, lib, notes, photos, (q, typing) ->
             val onList = uses.mapNotNull { it.libraryKey }.toSet()
             val rows =
                 lib.map {
@@ -146,7 +149,7 @@ class RecipesViewModel(
                         bookRef = bookRef(it.book, it.page),
                         rating = notes[it.key]?.rating,
                         notes = notes[it.key]?.notes,
-                        photo = c.recipePhotos.file(notes[it.key]?.photo)?.path,
+                        photo = photos[it.key],
                     )
                 }
             val shown =
@@ -159,7 +162,7 @@ class RecipesViewModel(
                     }
                 }
             val lastBook = lib.filter { it.book != null }.maxByOrNull { it.lastAddedAt }?.book
-            RecipesUi(uses, loaded = true, library = shown, hasLibrary = rows.isNotEmpty(), terms = q, lastBook = lastBook)
+            RecipesUi(uses, loaded = true, library = shown, hasLibrary = rows.isNotEmpty(), terms = q, lastBook = lastBook, photos = photos)
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecipesUi())
 

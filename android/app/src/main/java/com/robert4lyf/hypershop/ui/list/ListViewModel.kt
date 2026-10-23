@@ -156,6 +156,10 @@ data class RecipeSection(
     val title: String,
     val kind: Kind,
     val rows: List<ListRow>,
+    /** A recipe's library entry ([com.robert4lyf.hypershop.data.LibraryRecipe.key]), for its photo. */
+    val libraryKey: String? = null,
+    /** The recipe's photo on this phone, or null (its mosaic is drawn). */
+    val photo: String? = null,
 ) {
     enum class Kind { RECIPE, SHARED, BY_HAND }
 }
@@ -193,7 +197,13 @@ class ListViewModel(
     private val listWithInStock = c.repository.list.map { Triple(it, c.repository.inStockOnList(it), sources(it)) }
 
     val ui: StateFlow<ListUi> =
-        combine(listWithInStock, c.settings.units, view, c.importJobs.ready) { (list, lines, src), units, (ord, v, m), ready ->
+        combine(
+            listWithInStock,
+            c.settings.units,
+            view,
+            c.importJobs.ready,
+            c.recipePhotos.paths(),
+        ) { (list, lines, src), units, (ord, v, m), ready, photos ->
             lastList = list
             lastUnits = units
             build(
@@ -202,7 +212,14 @@ class ListViewModel(
                 ord,
                 v,
                 src,
-            ).copy(readyJobs = ready.map { it.id }, inStock = inStockRows(lines, units), mode = m)
+            ).let { ui ->
+                ui.copy(
+                    readyJobs = ready.map { it.id },
+                    inStock = inStockRows(lines, units),
+                    mode = m,
+                    recipes = ui.recipes.map { r -> r.libraryKey?.let { r.copy(photo = photos[it]) } ?: r },
+                )
+            }
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.Eagerly, ListUi())
 
@@ -252,8 +269,9 @@ class ListViewModel(
     private suspend fun sources(list: ShoppingList): Sources {
         val byItem = list.liveItems.associate { item -> item.id to list.contributionsOf(item.id).map { it.useId }.distinct().sorted() }
         val ids = byItem.values.flatten().toSet()
-        if (ids.isEmpty()) return Sources(byItem, emptyMap())
-        return Sources(byItem, c.repository.useLinks(list, ids).mapValues { it.value.title })
+        if (ids.isEmpty()) return Sources(byItem, emptyMap(), emptyMap())
+        val links = c.repository.useLinks(list, ids)
+        return Sources(byItem, links.mapValues { it.value.title }, links.mapNotNull { (id, l) -> l.libraryKey?.let { id to it } }.toMap())
     }
 
     /** The recipe title for each live item that exactly one use put on the list, when that use is a recipe. */
@@ -315,6 +333,7 @@ class ListViewModel(
                         sorted.map {
                             it.copy(from = null)
                         },
+                        libraryKey = src.keys[key.removePrefix("use-").toLong()],
                     )
             }
         }
@@ -360,7 +379,7 @@ class ListViewModel(
         units: UnitsSetting,
         ord: List<AisleCode>,
         view: ListView = ListView.STORE,
-        src: Sources = Sources(emptyMap(), emptyMap()),
+        src: Sources = Sources(emptyMap(), emptyMap(), emptyMap()),
     ): ListUi {
         val categorised = view == ListView.TYPE
         val from = fromTitles(list, src)
@@ -655,6 +674,8 @@ class ListViewModel(
 private class Sources(
     val uses: Map<Long, List<Long>>,
     val titles: Map<Long, String>,
+    /** Every recipe use's library key. */
+    val keys: Map<Long, String>,
 )
 
 private const val SHARED = "shared"

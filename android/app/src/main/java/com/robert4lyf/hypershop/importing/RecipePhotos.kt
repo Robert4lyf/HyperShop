@@ -11,6 +11,9 @@ import com.robert4lyf.hypershop.extract.Extractor
 import com.robert4lyf.hypershop.extract.FetchResult
 import com.robert4lyf.hypershop.extract.SafeFetcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -35,6 +38,18 @@ class RecipePhotos(
     private val lock = Mutex()
 
     private val dir get() = File(context.filesDir, DIR)
+
+    /**
+     * Each saved recipe's photo on this phone, by its library key: what every screen that shows a recipe
+     * draws it with ([com.robert4lyf.hypershop.ui.recipes.RecipeArt]).
+     */
+    fun paths(): Flow<Map<String, String>> =
+        repository.observeRecipeNotes()
+            .map { notes -> notes.mapNotNull { (key, n) -> file(n.photo)?.let { key to it.path } }.toMap() }
+            .flowOn(Dispatchers.IO)
+
+    /** The photo on this phone for the recipe saved as [key], or null. */
+    suspend fun pathOf(key: String): String? = withContext(Dispatchers.IO) { file(repository.recipeNote(key)?.photo)?.path }
 
     /** The photo file for [name], or null when there is none (or it is not one of ours). */
     fun file(name: String?): File? = name?.takeIf { BackupValidator.PHOTO_NAME.matches(it) }?.let { File(dir, it) }?.takeIf { it.isFile }

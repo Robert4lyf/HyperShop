@@ -124,6 +124,8 @@ data class ReviewUi(
     val cookbook: Boolean = false,
     val book: String? = null,
     val page: String? = null,
+    /** The saved recipe's photo on this phone, or null (its mosaic is drawn). */
+    val photo: String? = null,
 ) {
     private val rows: List<ReviewRow> get() = aisles.flatMap { it.second }
     val addCount: Int get() = rows.count { !it.inStock && it.adds }
@@ -517,6 +519,7 @@ class ReviewViewModel(
                     canAskClaude = r.parsedBy != ParsedBy.CLAUDE && !r.byHand && c.apiKeyStore.hasKey.value,
                     book = r.book,
                     page = r.page,
+                    photo = c.recipePhotos.pathOf(s.recipe.libraryKey ?: s.recipe.url ?: "r:${s.recipe.id}"),
                 ),
             )
     }

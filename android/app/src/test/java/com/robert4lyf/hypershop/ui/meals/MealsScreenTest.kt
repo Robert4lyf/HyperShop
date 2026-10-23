@@ -20,6 +20,7 @@ import com.robert4lyf.hypershop.data.MealShopping
 import com.robert4lyf.hypershop.data.Regular
 import com.robert4lyf.hypershop.data.WeekPreview
 import com.robert4lyf.hypershop.testutil.Shots
+import com.robert4lyf.hypershop.testutil.TestPhotos
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -51,14 +52,22 @@ class MealsScreenTest {
             range = week.range(),
             meals =
                 listOf(
-                    Meal(1, "Weeknight chilli", 4, MealShopping.TO_BUY, UseProgress(6, 0, 0, 0), "bbcgoodfood.com"),
+                    Meal(
+                        1,
+                        "Weeknight chilli",
+                        4,
+                        MealShopping.TO_BUY,
+                        UseProgress(6, 0, 0, 0),
+                        "bbcgoodfood.com",
+                        photo = TestPhotos.dish,
+                    ),
                     Meal(2, "Red lentil dal", null, MealShopping.NOT_ON_LIST, null, "Ottolenghi Simple · p. 142"),
                 ),
             preview = WeekPreview(meals = 1, newItems = 5, joined = 2, atHome = 1),
             itemsLeft = 6,
             picks =
                 listOf(
-                    Pick("k1", "Weeknight chilli", 9, 1, "bbcgoodfood.com"),
+                    Pick("k1", "Weeknight chilli", 9, 1, "bbcgoodfood.com", TestPhotos.dish),
                     Pick("k3", "Fish pie", 11, 0, null),
                 ),
             hasLibrary = true,
@@ -186,6 +195,7 @@ class MealsScreenTest {
     @Test
     fun recordLight() {
         show()
+        TestPhotos.settle(compose)
         compose.onRoot().captureRoboImage(Shots.path("meals-light.png"))
     }
 
