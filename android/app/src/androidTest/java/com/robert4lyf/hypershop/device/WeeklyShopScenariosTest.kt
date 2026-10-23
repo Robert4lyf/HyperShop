@@ -3,6 +3,10 @@ package com.robert4lyf.hypershop.device
 import android.net.Uri
 import android.util.Log
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.ComposeTimeoutException
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -20,6 +24,7 @@ import com.robert4lyf.hypershop.core.model.BaseKey
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
+import com.robert4lyf.hypershop.core.plan.Week
 import com.robert4lyf.hypershop.data.MealShopping
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.settings.ListMode
@@ -57,6 +62,57 @@ class WeeklyShopScenariosTest {
 
     private fun waitFor(what: () -> Boolean) = compose.waitUntil(15_000) { runCatching(what).getOrDefault(false) }
 
+    /** [waitFor], and on a timeout says what was awaited and what the screen and the data held instead. */
+    private fun waitFor(
+        what: String,
+        state: () -> String,
+        until: () -> Boolean,
+    ) {
+        try {
+            waitFor(until)
+        } catch (timeout: ComposeTimeoutException) {
+            throw AssertionError("Timed out waiting for $what. ${runCatching(state).getOrElse { "(state unreadable: $it)" }}", timeout)
+        }
+    }
+
+    /** The test tags on screen starting with [prefix], for a failure message. */
+    private fun tagsOnScreen(prefix: String): List<String> =
+        compose.onAllNodes(SemanticsMatcher("tag") { it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith(prefix) == true }, true)
+            .fetchSemanticsNodes()
+            .mapNotNull { it.config.getOrNull(SemanticsProperties.TestTag) }
+
+    private fun weekSummary(): String =
+        compose.onAllNodesWithTag("week-summary").fetchSemanticsNodes()
+            .joinToString { n -> n.config.getOrNull(SemanticsProperties.Text).orEmpty().joinToString() }
+
+    /**
+     * Plans the saved recipe [key] from the Plan screen, then waits for its meal card to be on screen.
+     *
+     * Planning puts a meal card *above* the picks, and it arrives from Room through the screen's flow after
+     * the tap's `waitForIdle` has returned (Compose's idling does not cover a flow on another dispatcher).
+     * Scrolling to the next pick before it lands races it: the late card pushes that pick down, out of the
+     * composition, and the next tap waits for a node that is no longer there. So the plan must be in the
+     * database and in the screen's own count ("N meals") before anything else moves.
+     */
+    private fun planPick(
+        c: AppContainer,
+        week: Week,
+        key: String,
+        meals: Int,
+    ) {
+        scrollTo("pick-add-$key")
+        tap("pick-add-$key")
+        waitFor(
+            "\"$key\" planned as meal $meals of week $week",
+            {
+                val planned = runBlocking { c.planner.week(week) }.map { it.libraryKey }
+                "Planned: $planned; summary: \"${weekSummary()}\"; picks on screen: ${tagsOnScreen("pick-add-")}"
+            },
+        ) {
+            runBlocking { c.planner.week(week) }.size == meals && weekSummary().startsWith(if (meals == 1) "1 meal" else "$meals meals")
+        }
+    }
+
     private fun has(tag: String) = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
 
     /**
@@ -65,18 +121,14 @@ class WeeklyShopScenariosTest {
      * An Undo snackbar can sit over part of a list for a few seconds; a person taps
      * around it, a touch injected at the control's centre would land on it.
      */
-    private fun tap(
-        tag: String,
-        find: () -> Unit = { waitFor { has(tag) } },
-    ) {
+    private fun tap(tag: String) {
         // Found, then pressed: between the two the list can be laid out again (the Plan screen's picks re-sort
-        // after the last one was planned) and the node be momentarily gone, or moved off screen. A person looks
-        // again ([find]: for a pick, scrolling back to it); so does this. The press is never made from inside
-        // waitUntil's condition: an action there can run in the middle of a frame's layout
-        // ("performMeasureAndLayout called during measure layout").
+        // after the last one was planned) and the node be momentarily gone. A person looks again; so does this.
+        // The press is never made from inside waitUntil's condition: an action there can run in the middle of
+        // a frame's layout ("performMeasureAndLayout called during measure layout").
         val end = System.currentTimeMillis() + 15_000
         while (true) {
-            find()
+            waitFor("\"$tag\" on screen", { "On screen: ${tagsOnScreen("")}" }) { has(tag) }
             val pressed =
                 try {
                     compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.OnClick)
@@ -93,17 +145,14 @@ class WeeklyShopScenariosTest {
     }
 
     /** Scrolls the Plan screen to [tag] (counted apart: a swipe, not a decision). */
-    private fun scrollTo(
-        tag: String,
-        count: Boolean = true,
-    ) {
+    private fun scrollTo(tag: String) {
         waitFor { has("meals") }
         // Not while the last tap's change is still being laid out (a scroll then measured mid-layout),
         // and not before the row is in the list at all (the saved recipes load after the screen opens).
         compose.waitForIdle()
         val inList = hasTestTag(tag)
         waitFor { runCatching { compose.onNodeWithTag("meals").performScrollToNode(inList) }.isSuccess }
-        if (count) scrolls++
+        scrolls++
     }
 
     private fun type(line: String) {
@@ -210,10 +259,7 @@ class WeeklyShopScenariosTest {
         val t0 = System.currentTimeMillis()
         tap("empty-plan")
         val keys = runBlocking { c.planner.week(c.planner.currentWeek() - 1) }.map { it.libraryKey }
-        for (k in keys) {
-            scrollTo("pick-add-$k")
-            tap("pick-add-$k") { scrollTo("pick-add-$k", count = false) }
-        }
+        for ((i, k) in keys.withIndex()) planPick(c, c.planner.currentWeek(), k, i + 1)
         tap("meals-add-to-list")
         waitFor {
             runBlocking { c.planner.week(c.planner.currentWeek()) }.let {
@@ -229,8 +275,12 @@ class WeeklyShopScenariosTest {
         val cupboard = runBlocking { c.homeCheck.view(c.repository.snapshot()) }.filter { !it.have }.map { it.mergeKey }
         for (k in cupboard) {
             scrollTo("home-have-$k")
-            tap("home-have-$k") { scrollTo("home-have-$k", count = false) }
-            waitFor { c.items().none { it.mergeKey == k } }
+            tap("home-have-$k")
+            // Gone from the list and from the screen: the row leaving moves the ones below it up, so the next
+            // scroll waits for that rather than racing it (as [planPick] waits for a new meal card).
+            waitFor("\"$k\" had at home", { "Rows on screen: ${tagsOnScreen("home-have-")}" }) {
+                c.items().none { it.mergeKey == k } && !has("home-have-$k")
+            }
         }
         tap("meals-shop")
         waitFor { has("shop") }
@@ -303,9 +353,7 @@ class WeeklyShopScenariosTest {
         tap("week-next")
         waitFor { compose.onAllNodesWithTag("week-name").fetchSemanticsNodes().any { it.config.toString().contains("Next week") } }
         val key = runBlocking { c.db.dao().recipe(chilli)!!.libraryKey!! }
-        scrollTo("pick-add-$key")
-        tap("pick-add-$key") { scrollTo("pick-add-$key", count = false) }
-        waitFor { runBlocking { c.planner.week(c.planner.currentWeek() + 1) }.size == 1 }
+        planPick(c, c.planner.currentWeek() + 1, key, 1)
         assertEquals(before, c.items().map { it.mergeKey })
         assertTrue(runBlocking { c.planner.week(c.planner.currentWeek()) }.isEmpty())
     }
