@@ -158,6 +158,47 @@ class RuleParserTest {
     }
 
     @Test
+    fun r36PlusInTheSameUnitIsAdded() {
+        val a = p.parse("2 tbsp plus 1 tbsp butter")
+        assertEquals(Rational.of(3), a.quantity)
+        assertEquals(QtyUnit.TBSP, a.unit)
+        assertNull(a.quantityText, "shown as the sum")
+        assertFalse(a.check)
+        val b = p.parse("2 tbsp butter plus 1 tbsp melted")
+        assertEquals("butter", b.name)
+        assertEquals(Rational.of(3), b.quantity)
+        assertFalse(b.check)
+        val c = p.parse("1 large egg, plus 1 egg yolk")
+        assertEquals(Rational.of(2), c.quantity, "the catalogue's same item: a yolk is an egg to buy")
+        val d = p.parse("100g caster sugar, plus 50g caster sugar")
+        assertEquals(Rational.of(150), d.quantity)
+        // A range stays a range, both ends moved.
+        val e = p.parse("1-2 tbsp oil plus 1 tbsp")
+        assertEquals(Rational.of(2), e.quantity)
+        assertEquals(Rational.of(3), e.quantityMax)
+    }
+
+    @Test
+    fun r36PlusThatMayBeAnotherThingIsFlaggedAndNotAdded() {
+        val a = p.parse("2 tbsp butter, plus 1 tbsp olive oil")
+        assertEquals("butter", a.name)
+        assertEquals(Rational.of(2), a.quantity)
+        assertTrue(a.check)
+        // In another unit, after the name: kept, unflagged, as before the sum was added.
+        val b = p.parse("1 cup flour plus 2 tbsp")
+        assertEquals(Rational.ONE, b.quantity)
+        assertEquals(QtyUnit.CUP, b.unit)
+        assertFalse(b.check)
+        // Inside brackets the extra is the cook's, for dusting or serving: never added.
+        val c = p.parse("2 tbsp flour (plus 2 tbsp for dusting)")
+        assertEquals(Rational.of(2), c.quantity)
+        assertFalse(c.check)
+        // Unquantified extras are not amounts.
+        assertEquals(Rational.of(140), p.parse("140g butter softened, plus extra for the tin").quantity)
+        assertFalse(p.parse("140g butter softened, plus extra for the tin").check)
+    }
+
+    @Test
     fun r6LeadingArticle() {
         val onion = p.parse("a large onion")
         assertEquals("onion", onion.name)

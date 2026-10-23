@@ -166,6 +166,7 @@ class RuleParser(
             var altQty: Rational? = null
             var altUnit: QtyUnit? = null
             var sizedCount = false
+            var summed = false
 
             if (qty != null) {
                 skipSizes()
@@ -259,11 +260,22 @@ class RuleParser(
                         }
                     }
                 }
-                // R3.6: 1 tablespoon plus 1 teaspoon sugar → the extra amount to the note.
+                // R3.6: "1 tbsp plus 1 tbsp sugar" is 2 tbsp; "1 tablespoon plus 1 teaspoon sugar" keeps the first
+                // amount and sends the extra to the note.
                 if (unit != null && (word(i) == "plus" || word(i) == "and") && kind(i + 1) == Kind.NUM) {
                     val save = i
                     i++
-                    if (readNumber() != null && readUnit() != null) notes += span(save, i) else i = save
+                    val more = readNumber()
+                    val moreUnit = more?.let { readUnit() }
+                    if (more == null || moreUnit == null) {
+                        i = save
+                    } else if (moreUnit == unit && word(save) == "plus") {
+                        qty = qty!! + more
+                        qtyMax = qtyMax?.plus(more)
+                        summed = true
+                    } else {
+                        notes += span(save, i)
+                    }
                 }
             } else {
                 // No number. R3.3: "Pinch of cayenne" is 1 pinch; R2.4: any other
@@ -301,13 +313,20 @@ class RuleParser(
             val (named, trailingUnit, impliedQty) = nameAndNote(unit == null && qty != null && !sizedCount)
             if (trailingUnit != null) unit = trailingUnit
             val name = shelf(named, unit)
+            val more = if (qty != null) plusAfterName(name, unit) else null
+            if (more != null) {
+                qty = qty!! + more
+                qtyMax = qtyMax?.plus(more)
+                summed = true
+            }
             if (qty == null && impliedQty != null) qty = impliedQty
             if (unit == QtyUnit.OTHER) flag("an unknown unit")
 
             if ("optional" in lower || "if desired" in lower || "if you like" in lower) optional = true
             // Several things on one line ("Toppings: cheese, avocado, lettuce"): one of them would be wrong.
             if (toks.any { it.kind == Kind.COLON } && toks.count { it.kind == Kind.COMMA } >= 2) flag("several items on one line")
-            val quantityText = trailingText ?: if (qtyEnd > qtyStart) span(qtyStart, qtyEnd).trim() else null
+            // A sum is shown as the sum, not as the first amount written.
+            val quantityText = if (summed) null else trailingText ?: if (qtyEnd > qtyStart) span(qtyStart, qtyEnd).trim() else null
             return ParsedIngredient(
                 raw = text,
                 name = name,
@@ -662,6 +681,45 @@ class RuleParser(
             // its own item, rather than becoming the fresh one.
             if (tinWord != null && e.aisle != AisleCode.TINS_JARS) return "$tinWord $name"
             return name
+        }
+
+        /**
+         * R3.6 after the name: "2 tbsp butter plus 1 tbsp melted", "1 large egg, plus 1 egg yolk". The amount
+         * after a "plus" outside brackets is added when it is in the same unit and of the same thing (nothing
+         * more than prep words, or the catalogue's same item); "2 tbsp butter, plus 1 tbsp oil" may be a second
+         * ingredient and is flagged. In another unit it stays in the note, as before.
+         */
+        fun plusAfterName(
+            name: String,
+            unit: QtyUnit?,
+        ): Rational? {
+            var depth = 0
+            var p = -1
+            for (k in i until toks.size) {
+                when (toks[k].kind) {
+                    Kind.LPAREN -> depth++
+                    Kind.RPAREN -> depth--
+                    else -> if (depth == 0 && word(k) == "plus" && kind(k + 1) == Kind.NUM) p = k
+                }
+                if (p >= 0) break
+            }
+            if (p < 0) return null
+            val save = i
+            i = p + 1
+            val more = readNumber()
+            val moreUnit = more?.let { readUnit() }
+            if (word(i) == "of") i++
+            var end = i
+            while (end < toks.size && toks[end].kind == Kind.WORD) end++
+            val rest = (i until end).mapNotNull { word(it) }.filter { it !in Lexicon.prep && it !in Lexicon.qualifiers }
+            i = save
+            if (more == null) return null
+            val same = rest.isEmpty() || entryOf(rest.joinToString(" "))?.let { it == entryOf(name) } == true
+            if (!same) {
+                flag("\"plus\" an amount of something else")
+                return null
+            }
+            return more.takeIf { moreUnit == unit }
         }
 
         /** A dash with whitespace on both sides. */
