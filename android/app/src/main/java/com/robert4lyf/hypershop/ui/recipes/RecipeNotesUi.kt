@@ -1,6 +1,7 @@
 package com.robert4lyf.hypershop.ui.recipes
 
 import android.graphics.BitmapFactory
+import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -49,7 +50,9 @@ import kotlin.math.max
 /**
  * A saved recipe's photo from the app's own storage, decoded off the main thread at
  * about the size it is drawn ([maxPx]), so a list of thumbnails is not a list of
- * 1280-pixel bitmaps. Nothing is drawn until it has been read.
+ * 1280-pixel bitmaps. Nothing is drawn until it has been read. A photo decoded
+ * lately is drawn from [PhotoCache] at once: scrolling back, coming back to the
+ * tab or closing a recipe decoded every photo on screen again (T.4).
  */
 @Composable
 fun RecipePhoto(
@@ -58,7 +61,13 @@ fun RecipePhoto(
     modifier: Modifier = Modifier,
     maxPx: Int = 1280,
 ) {
-    val image by produceState<ImageBitmap?>(null, path, maxPx) {
+    val key = PhotoCache.key(path, maxPx)
+    val image by produceState(PhotoCache.get(key), path, maxPx) {
+        // Asked again for this file and size, not for whatever was showing before the size changed.
+        PhotoCache.get(key)?.let {
+            value = it
+            return@produceState
+        }
         value =
             withContext(Dispatchers.IO) {
                 runCatching {
@@ -66,7 +75,11 @@ fun RecipePhoto(
                     BitmapFactory.decodeFile(path, bounds)
                     var sample = 1
                     while (max(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxPx) sample *= 2
-                    BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
+                    BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })?.let {
+                        PhotoDecodes.count.incrementAndGet()
+                        PhotoDecodes.bytes.addAndGet(it.allocationByteCount.toLong())
+                        PhotoCache.put(key, it.asImageBitmap(), it.allocationByteCount)
+                    }
                 }.getOrNull()
             }
     }
@@ -76,6 +89,56 @@ fun RecipePhoto(
     } else {
         Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant))
     }
+}
+
+/**
+ * The photos decoded lately, by file and size, up to [LIMIT] bytes of bitmap (an eighth of the
+ * heap on a small phone): about six cards' worth at 1280 pixels, enough for a screen and the one
+ * before it. A photo's file is named by its contents and never rewritten, so a name is the picture
+ * for good and nothing here goes stale; a photo changed is a new name.
+ */
+internal object PhotoCache {
+    private val LIMIT = minOf(Runtime.getRuntime().maxMemory() / 8, 32L * 1024 * 1024).toInt()
+
+    private class Entry(
+        val image: ImageBitmap,
+        val bytes: Int,
+    )
+
+    private val cache =
+        object : LruCache<String, Entry>(LIMIT) {
+            override fun sizeOf(
+                key: String,
+                value: Entry,
+            ) = value.bytes
+        }
+
+    fun key(
+        path: String,
+        maxPx: Int,
+    ) = "$maxPx:$path"
+
+    fun get(key: String): ImageBitmap? = cache.get(key)?.image
+
+    fun put(
+        key: String,
+        image: ImageBitmap,
+        bytes: Int,
+    ): ImageBitmap {
+        cache.put(key, Entry(image, bytes))
+        return image
+    }
+
+    fun clear() = cache.evictAll()
+
+    /** How many bitmaps are held (LruCache's own size() is in bytes here). */
+    fun count(): Int = cache.snapshot().size
+}
+
+/** How many photos have been decoded, and the bitmap bytes made: what the performance probe reads. */
+internal object PhotoDecodes {
+    val count = java.util.concurrent.atomic.AtomicInteger()
+    val bytes = java.util.concurrent.atomic.AtomicLong()
 }
 
 /**

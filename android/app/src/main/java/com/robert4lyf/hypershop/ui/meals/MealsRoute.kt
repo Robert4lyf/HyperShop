@@ -63,6 +63,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -312,6 +313,21 @@ private fun MealCard(
                         modifier = Modifier.testTag("meal-state-${m.id}"),
                     )
                 }
+                // Your own notes for it, as you wrote them on the recipe: read here, edited there.
+                m.notes?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontStyle = FontStyle.Italic,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier =
+                            Modifier.padding(
+                                top = 2.dp,
+                            ).semantics { contentDescription = "Your notes: $it" }.testTag("meal-notes-${m.id}"),
+                    )
+                }
                 m.servings?.takeIf { !past }?.let { s ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -511,7 +527,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.pickSection(
     all: Boolean,
     onAll: () -> Unit,
 ) {
-    val shown = if (all || ui.query.isNotBlank()) ui.picks else ui.picks.takeLast(PICKS_SHOWN).reversed()
+    // Already in "your usual" order (MealsViewModel): the first handful until a search or "Show all".
+    val shown = if (all || ui.query.isNotBlank()) ui.picks else ui.picks.take(PICKS_SHOWN)
     item(key = "pick") {
         Column(Modifier.padding(horizontal = 20.dp).padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionLabel(if (ui.meals.isEmpty()) "Choose meals" else "Add a meal")
@@ -570,6 +587,7 @@ private fun PickRow(
             Text(p.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(
                 listOfNotNull(
+                    p.rating?.let { "★ $it" },
                     plural(p.lines, "ingredient"),
                     p.source,
                     when (p.planned) {

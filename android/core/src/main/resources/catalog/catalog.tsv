@@ -1,4 +1,4 @@
-#version	3a53653f44e3
+#version	bccc690109e2
 #id	name	plural	synonyms	aisleCode	staple	shoppingUnit	displayPolicy	gramsPerCup	packNote	group
 onion	onion	onions	yellow onion|brown onion|white onion|spanish onion	PRODUCE	false	each	count	160		Vegetables
 red_onion	red onion	red onions	purple onion	PRODUCE	false	each	count	160		Vegetables
@@ -417,7 +417,7 @@ coriander_seed	coriander seeds	coriander seeds	coriander seed|whole coriander se
 paprika	paprika	paprika	sweet paprika|hungarian paprika|paprika powder	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
 smoked_paprika	smoked paprika	smoked paprika	pimenton|spanish smoked paprika	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
 cayenne	cayenne pepper	cayenne pepper	cayenne|ground red pepper	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
-chilli_flakes	chilli flakes	chilli flakes	red pepper flakes|red-pepper flakes|crushed red pepper|hot red pepper flake|chili flakes	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
+chilli_flakes	chilli flakes	chilli flakes	red pepper flakes|red-pepper flakes|crushed red pepper|crushed red pepper flakes|hot red pepper flake|chili flakes	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
 chilli_powder	chilli powder	chilli powder	chili powder|ancho chili powder|red chili powder|red chilli powder|kashmiri chilli powder|hot chilli powder|mild chilli powder	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
 turmeric	ground turmeric	ground turmeric	turmeric	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
 cinnamon	ground cinnamon	ground cinnamon	cinnamon	SPICES_CONDIMENTS	false	jar	presence			Herbs & spices
@@ -457,6 +457,7 @@ hot_sauce	hot sauce	hot sauce	tabasco|tabasco sauce|hot pepper sauce	SPICES_COND
 horseradish	horseradish sauce	horseradish sauce	horseradish|prepared horseradish	SPICES_CONDIMENTS	false	jar	presence			Sauces & condiments
 bbq_sauce	barbecue sauce	barbecue sauce	bbq sauce	SPICES_CONDIMENTS	false	bottle	presence			Sauces & condiments
 sweet_chilli	sweet chilli sauce	sweet chilli sauce	sweet chili sauce	WORLD_FOODS	false	bottle	presence			Asian
+chilli_garlic_sauce	chilli garlic sauce	chilli garlic sauce	chili garlic sauce|chile garlic sauce	WORLD_FOODS	false	bottle	presence			Asian
 mint_sauce	mint sauce	mint sauce		SPICES_CONDIMENTS	false	jar	presence			Sauces & condiments
 chutney	mango chutney	mango chutney	chutney	WORLD_FOODS	false	jar	presence			Middle Eastern & Indian
 gravy_granules	gravy granules	gravy granules	gravy	SPICES_CONDIMENTS	false	tub	presence			Sauces & condiments

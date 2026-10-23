@@ -61,9 +61,12 @@ import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
+import com.robert4lyf.hypershop.ui.theme.backdropHost
 import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.theme.cardEdge
 import com.robert4lyf.hypershop.ui.theme.lowPoly
+import com.robert4lyf.hypershop.ui.theme.onBackdrop
+import com.robert4lyf.hypershop.ui.theme.rememberHeroBackdrop
 import com.robert4lyf.hypershop.ui.theme.style
 
 /** The aisle's icon on its colour: the same mark on every screen. */
@@ -180,17 +183,20 @@ fun ScreenHeader(
     actions: @Composable RowScope.() -> Unit = {},
     below: @Composable ColumnScope.() -> Unit = {},
 ) {
+    val backdrop = rememberHeroBackdrop()
     Box(
         modifier
             .fillMaxWidth()
             .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
             .clip(RoundedCornerShape(24.dp))
-            .lowPoly(seed),
+            .lowPoly(seed)
+            .backdropHost(backdrop),
     ) {
         CompositionLocalProvider(LocalContentColor provides Brand.OnHero) {
             Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 14.dp, bottom = 14.dp)) {
                 Row(verticalAlignment = Alignment.Top) {
-                    Column(Modifier.weight(1f).padding(top = 2.dp)) {
+                    // The words and the icons get a little shade behind them where the mosaic is bright.
+                    Column(Modifier.weight(1f).padding(top = 2.dp).onBackdrop(backdrop).testTag("hero-text")) {
                         overline?.let {
                             // Soft white, not citrus: citrus only clears 3:1 on the brighter hero.
                             Text(it.uppercase(), style = MaterialTheme.typography.labelMedium, color = Brand.OnHeroSoft)
@@ -205,7 +211,7 @@ fun ScreenHeader(
                             Text(it, style = MaterialTheme.typography.bodyMedium, color = Brand.OnHeroSoft)
                         }
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically, content = actions)
+                    Row(Modifier.onBackdrop(backdrop), verticalAlignment = Alignment.CenterVertically, content = actions)
                 }
                 Column(Modifier.padding(end = 12.dp), content = below)
             }

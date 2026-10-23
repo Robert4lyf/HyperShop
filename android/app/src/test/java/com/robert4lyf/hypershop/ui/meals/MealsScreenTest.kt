@@ -1,6 +1,7 @@
 package com.robert4lyf.hypershop.ui.meals
 
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -60,6 +61,7 @@ class MealsScreenTest {
                         UseProgress(6, 0, 0, 0),
                         "bbcgoodfood.com",
                         photo = TestPhotos.dish,
+                        notes = "Half the chilli; 20 min longer",
                     ),
                     Meal(2, "Red lentil dal", null, MealShopping.NOT_ON_LIST, null, "Ottolenghi Simple · p. 142"),
                 ),
@@ -203,5 +205,12 @@ class MealsScreenTest {
     fun recordDark() {
         compose.setContent { HyperShopTheme(dark = true, dynamicColor = false) { MealsScreen(ui, actions) } }
         compose.onRoot().captureRoboImage(Shots.path("meals-dark.png"))
+    }
+
+    @Test
+    fun aPlannedMealShowsYourNotesForIt() {
+        show()
+        compose.onNodeWithTag("meal-notes-1").assertTextEquals("Half the chilli; 20 min longer")
+        compose.onNodeWithTag("meal-notes-2").assertDoesNotExist()
     }
 }

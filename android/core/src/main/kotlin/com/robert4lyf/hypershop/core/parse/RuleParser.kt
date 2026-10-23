@@ -2,9 +2,7 @@ package com.robert4lyf.hypershop.core.parse
 
 import com.robert4lyf.hypershop.core.catalog.Catalog
 import com.robert4lyf.hypershop.core.catalog.CatalogEntry
-import com.robert4lyf.hypershop.core.catalog.CatalogKey
 import com.robert4lyf.hypershop.core.catalog.CatalogLoader
-import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.Dimension
 import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.QtyUnit
@@ -21,6 +19,8 @@ class RuleParser(
     private val catalog: Catalog = CatalogLoader.default,
 ) {
     /** Parses a recipe's lines, tracking section headers (R8). Headers produce no ingredient. */
+    private val shelves = Shelf(catalog)
+
     fun parseLines(lines: List<String>): List<ParsedIngredient> {
         var section: String? = null
         val out = ArrayList<ParsedIngredient>()
@@ -166,6 +166,7 @@ class RuleParser(
             var altQty: Rational? = null
             var altUnit: QtyUnit? = null
             var sizedCount = false
+            var summed = false
 
             if (qty != null) {
                 skipSizes()
@@ -259,11 +260,23 @@ class RuleParser(
                         }
                     }
                 }
-                // R3.6: 1 tablespoon plus 1 teaspoon sugar → the extra amount to the note.
+                // R3.6: "1 tbsp plus 1 tbsp sugar" is 2 tbsp; "1 tablespoon plus 1 teaspoon sugar" keeps the first
+                // amount and sends the extra to the note.
                 if (unit != null && (word(i) == "plus" || word(i) == "and") && kind(i + 1) == Kind.NUM) {
                     val save = i
                     i++
-                    if (readNumber() != null && readUnit() != null) notes += span(save, i) else i = save
+                    val more = readNumber()
+                    val moreUnit = more?.let { readUnit() }
+                    if (more == null || moreUnit == null) {
+                        i = save
+                    } else if (moreUnit == unit && word(save) == "plus") {
+                        altQty = altQty?.let { it * (qty!! + more) / qty!! }
+                        qty = qty!! + more
+                        qtyMax = qtyMax?.plus(more)
+                        summed = true
+                    } else {
+                        notes += span(save, i)
+                    }
                 }
             } else {
                 // No number. R3.3: "Pinch of cayenne" is 1 pinch; R2.4: any other
@@ -301,13 +314,22 @@ class RuleParser(
             val (named, trailingUnit, impliedQty) = nameAndNote(unit == null && qty != null && !sizedCount)
             if (trailingUnit != null) unit = trailingUnit
             val name = shelf(named, unit)
+            val more = if (qty != null) plusAfterName(name, unit) else null
+            if (more != null) {
+                // "2 tbsp (30g) butter, plus 1 tbsp": the grams written for the first amount grow with it.
+                altQty = altQty?.let { it * (qty!! + more) / qty!! }
+                qty = qty!! + more
+                qtyMax = qtyMax?.plus(more)
+                summed = true
+            }
             if (qty == null && impliedQty != null) qty = impliedQty
             if (unit == QtyUnit.OTHER) flag("an unknown unit")
 
             if ("optional" in lower || "if desired" in lower || "if you like" in lower) optional = true
             // Several things on one line ("Toppings: cheese, avocado, lettuce"): one of them would be wrong.
             if (toks.any { it.kind == Kind.COLON } && toks.count { it.kind == Kind.COMMA } >= 2) flag("several items on one line")
-            val quantityText = trailingText ?: if (qtyEnd > qtyStart) span(qtyStart, qtyEnd).trim() else null
+            // A sum is shown as the sum, not as the first amount written.
+            val quantityText = if (summed) null else trailingText ?: if (qtyEnd > qtyStart) span(qtyStart, qtyEnd).trim() else null
             return ParsedIngredient(
                 raw = text,
                 name = name,
@@ -634,34 +656,50 @@ class RuleParser(
             head += left
         }
 
-        /**
-         * Where the name alone points at the wrong shelf: tins of whole tomatoes are tinned
-         * tomatoes, not fresh ones ("canned" and "tinned" go to the note as qualifiers), and
-         * beef "(minced)" is beef mince, not a joint. Only to an entry the catalogue has.
-         */
+        /** Q.3 tins and mince ([Shelf]), from the words said about the name itself. */
         fun shelf(
             name: String,
             unit: QtyUnit?,
-        ): String {
-            // Only what was said about the name itself (its moved qualifiers, its own brackets): "4 tomatoes
-            // (or 400g tinned)" and "lamb, tossed with ground cumin" are not tins and not mince.
-            val tinWord = nameWords.firstOrNull { it == "canned" || it == "tinned" }
-            val e = entryOf(name) ?: return if (tinWord != null) "$tinWord $name" else name
-            if ((unit == QtyUnit.TIN || tinWord != null) && e.aisle == AisleCode.PRODUCE) {
-                // "canned crushed tomato": the catalogue's plural is what its tinned synonyms are made of.
-                val forms = listOf(name, e.plural).distinct()
-                forms
-                    .flatMap { listOf("tinned $it", "canned $it") }
-                    .firstOrNull { entryOf(it)?.aisle?.let { a -> a != AisleCode.PRODUCE } == true }
-                    ?.let { return it }
+        ): String = shelves.of(name, unit, nameWords)
+
+        /**
+         * R3.6 after the name: "2 tbsp butter plus 1 tbsp melted", "1 large egg, plus 1 egg yolk". The amount
+         * after a "plus" outside brackets is added when it is in the same unit and of the same thing (nothing
+         * more than prep words, or the catalogue's same item); "2 tbsp butter, plus 1 tbsp oil" may be a second
+         * ingredient and is flagged. In another unit it stays in the note, as before.
+         */
+        fun plusAfterName(
+            name: String,
+            unit: QtyUnit?,
+        ): Rational? {
+            var depth = 0
+            var p = -1
+            for (k in i until toks.size) {
+                when (toks[k].kind) {
+                    Kind.LPAREN -> depth++
+                    Kind.RPAREN -> depth--
+                    else -> if (depth == 0 && word(k) == "plus" && kind(k + 1) == Kind.NUM) p = k
+                }
+                if (p >= 0) break
             }
-            if (e.aisle == AisleCode.MEAT_FISH && ("minced" in nameWords || "ground" in nameWords)) {
-                "$name mince".takeIf { entryOf(it)?.aisle == AisleCode.MEAT_FISH }?.let { return it }
+            if (p < 0) return null
+            val save = i
+            i = p + 1
+            val more = readNumber()
+            val moreUnit = more?.let { readUnit() }
+            if (word(i) == "of") i++
+            // What the extra is said to be, up to what it is for: "plus 2 tbsp for dusting" is more of the same.
+            var end = i
+            while (end < toks.size && toks[end].kind == Kind.WORD && word(end) !in Lexicon.nameEnders) end++
+            val rest = (i until end).mapNotNull { word(it) }.filter { it !in Lexicon.prep && it !in Lexicon.qualifiers }
+            i = save
+            if (more == null) return null
+            val same = rest.isEmpty() || entryOf(rest.joinToString(" "))?.let { it == entryOf(name) } == true
+            if (!same) {
+                flag("\"plus\" an amount of something else")
+                return null
             }
-            // "tinned salmon", "canned peaches": a tin of something the catalogue only knows fresh stays a tin,
-            // its own item, rather than becoming the fresh one.
-            if (tinWord != null && e.aisle != AisleCode.TINS_JARS) return "$tinWord $name"
-            return name
+            return more.takeIf { moreUnit == unit }
         }
 
         /** A dash with whitespace on both sides. */
@@ -717,12 +755,7 @@ class RuleParser(
         return u to 1
     }
 
-    /** The catalogue's entry for [phrase], as written or with its last word singular. */
-    private fun entryOf(phrase: String): CatalogEntry? {
-        val k = CatalogKey.of(phrase)
-        if (k.isEmpty()) return null
-        return catalog.lookup(k) ?: catalog.lookup(Normaliser.singularKey(k))
-    }
+    private fun entryOf(phrase: String): CatalogEntry? = shelves.entryOf(phrase)
 
     private fun joinWords(toks: List<Token>): String {
         val sb = StringBuilder()

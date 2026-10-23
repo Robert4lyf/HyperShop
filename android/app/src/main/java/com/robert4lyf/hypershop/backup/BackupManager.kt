@@ -209,11 +209,20 @@ class BackupManager(
     /** [f] as a plain backup's JSON: what an archive holds as its `backup.json`. */
     fun jsonOf(f: BackupFile): String = writer.encodeToString(BackupFile.serializer(), f)
 
-    /** Where an archive's photos wait between [inspect] and [restore]. */
+    /**
+     * Where archives' photos wait between [inspect] and [restore]: a folder of its own for each inspection
+     * ([StagedPhotos.dir]), so inspecting another file, or one that fails, never touches the photos a
+     * confirmation still waiting would restore.
+     */
     private val staging get() = File(c.context.cacheDir, "restore-photos")
 
-    /** The archive inspected last is not going to be restored: its staged photos go. */
-    fun discardStaged() {
+    /** [photos] are not going to be restored: they go, and nothing else staged does. */
+    fun discardStaged(photos: StagedPhotos?) {
+        photos?.dir?.takeIf { it.parentFile == staging }?.deleteRecursively()
+    }
+
+    /** At start-up: no inspection outlives the process, so whatever is staged is left over. */
+    fun discardAllStaged() {
         staging.deleteRecursively()
     }
 
@@ -244,7 +253,8 @@ class BackupManager(
 
     /** An archive: its photos staged, its JSON checked as any backup's. */
     private fun inspectArchive(input: java.io.InputStream): Inspection {
-        val read = BackupArchive.read(input, staging, MAX_BYTES.toLong())
+        val dir = File(staging, java.util.UUID.randomUUID().toString())
+        val read = BackupArchive.read(input, dir, MAX_BYTES.toLong())
         val ok =
             when (read) {
                 is BackupArchive.Read.Newer -> return Inspection.Newer(read.version)
@@ -253,11 +263,11 @@ class BackupManager(
             }
         val i = inspectText(ok.backup)
         if (i !is Inspection.Ok) {
-            discardStaged()
+            dir.deleteRecursively()
             return if (i is Inspection.NotABackup) Inspection.Broken(listOf("the archive's backup is not one")) else i
         }
         val available = ok.photos + localPhotos(i.file)
-        return i.copy(summary = summary(i.file, available), photos = StagedPhotos(staging, ok.photos))
+        return i.copy(summary = summary(i.file, available), photos = StagedPhotos(dir, ok.photos))
     }
 
     /** A plain JSON backup carries no photos: the ones it names count only if they are on this phone already. */
@@ -265,8 +275,11 @@ class BackupManager(
         if (i is Inspection.Ok) i.copy(summary = summary(i.file, localPhotos(i.file))) else i
 
     /** The photos [f] names that are already in this phone's photo folder (the same name is the same picture). */
-    private fun localPhotos(f: BackupFile): Set<String> =
-        f.data.recipeNotes.mapNotNull { it.photo }.filter { c.recipePhotos.file(it) != null }.toSet()
+    private fun localPhotos(f: BackupFile): Set<String> = intactHere(f.data.recipeNotes.mapNotNull { it.photo }.toSet())
+
+    /** Which of [names] are whole photos in this phone's folder: there, hashing to their name, a JPEG. Read once each. */
+    private fun intactHere(names: Set<String>): Set<String> =
+        names.filter { n -> c.recipePhotos.file(n)?.let { BackupArchive.isIntact(it) } == true }.toSet()
 
     fun inspectText(text: String): Inspection {
         val head =
@@ -304,6 +317,13 @@ class BackupManager(
         f: BackupFile,
         photos: StagedPhotos? = null,
     ): RestoreOutcome =
+        // Off the main thread: checking every photo (a hash and a size read each) is real work.
+        withContext(Dispatchers.IO) { restoreOnThisThread(f, photos) }
+
+    private suspend fun restoreOnThisThread(
+        f: BackupFile,
+        photos: StagedPhotos?,
+    ): RestoreOutcome =
         try {
             lock.withLock {
                 // Checked here too, not only by inspect(): nothing destructive starts on a file that would be refused.
@@ -312,7 +332,7 @@ class BackupManager(
                 c.recipePhotos.exclusive { restoreLocked(f, photos) }
             }
         } finally {
-            if (photos != null) discardStaged()
+            discardStaged(photos)
         }
 
     private suspend fun restoreLocked(
@@ -326,7 +346,9 @@ class BackupManager(
         // Only the photos a recipe in the file shows: an archive listing others brings nothing in with them.
         val named = f.data.recipeNotes.mapNotNull { it.photo }.toSet()
         for (name in photos?.names.orEmpty().intersect(named)) {
-            if (!c.recipePhotos.adopt(File(photos!!.dir, name))) {
+            val staged = File(photos!!.dir, name)
+            // Checked again as it goes in: what waited in the cache since the inspection is still that photo.
+            if (!BackupArchive.isIntact(staged) || !c.recipePhotos.adopt(staged)) {
                 Timber.e("Restore: photo %s could not be put in place", name)
                 return RestoreOutcome.Failed(rolledBack = true)
             }
@@ -348,13 +370,15 @@ class BackupManager(
     }
 
     /**
-     * [f] with every photo name that will not be a file here taken off its recipe, so the database
-     * never names a missing file. A photo from a recipe's page keeps its address, and is fetched again.
+     * [f] with every photo name that will not be a whole file here taken off its recipe, so the database
+     * never names a missing or damaged file. A photo from a recipe's page keeps its address, and is fetched again.
      */
     private fun withAvailablePhotos(f: BackupFile): BackupFile {
         val notes = f.data.recipeNotes
-        if (notes.all { it.photo == null || c.recipePhotos.file(it.photo) != null }) return f
-        val fixed = notes.map { n -> if (n.photo != null && c.recipePhotos.file(n.photo) == null) n.copy(photo = null) else n }
+        // Whole, not merely there: a damaged file is not a photo to point a recipe at.
+        val whole = intactHere(notes.mapNotNull { it.photo }.toSet())
+        if (notes.all { it.photo == null || it.photo in whole }) return f
+        val fixed = notes.map { n -> if (n.photo != null && n.photo !in whole) n.copy(photo = null) else n }
         return f.copy(data = f.data.copy(recipeNotes = fixed))
     }
 

@@ -16,6 +16,7 @@ import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.settings.ThemeMode
 import com.robert4lyf.hypershop.ui.common.UiMessage
+import com.robert4lyf.hypershop.ui.recipes.PhotoCache
 import com.robert4lyf.hypershop.watch.WatchLinkState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitAll
@@ -257,6 +258,8 @@ class SettingsViewModel(
             _ui.update { it.copy(dataBusy = false) }
             when (i) {
                 is Inspection.Ok -> {
+                    // Another file picked while one waited: the one waiting is not going to be restored.
+                    if (pendingRestore?.photos != i.photos) backups.discardStaged(pendingRestore?.photos)
                     pendingRestore = i
                     _ui.update { it.copy(restorePrompt = i.summary) }
                 }
@@ -268,8 +271,8 @@ class SettingsViewModel(
         }
 
     fun cancelRestore() {
+        backups.discardStaged(pendingRestore?.photos)
         pendingRestore = null
-        backups.discardStaged()
         _ui.update { it.copy(restorePrompt = null) }
     }
 
@@ -314,7 +317,8 @@ class SettingsViewModel(
                 return RestoreOutcome.Failed(rolledBack = true)
             }
         when (outcome) {
-            is RestoreOutcome.Restored -> Unit
+            // A restore can put a whole file back under the name of a damaged one: nothing decoded before stands.
+            is RestoreOutcome.Restored -> PhotoCache.clear()
             is RestoreOutcome.Refused ->
                 messages.send(
                     UiMessage("That backup file is damaged, so nothing was changed"),

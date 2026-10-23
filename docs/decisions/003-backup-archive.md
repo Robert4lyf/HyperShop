@@ -40,6 +40,18 @@ stay until the next start's sweep, so Undo (a restore of what was there) finds
 them. Backup, restore and recovery hold `RecipePhotos`' lock, so no photo is
 changed or swept half-way.
 
+**Step T (staging, integrity, retention).** Each inspection stages its photos in
+a folder of its own (`StagedPhotos.dir`, a UUID under `restore-photos`);
+discarding or restoring one removes only that folder, a new inspection discards
+the pending one it replaces, and start-up clears what a dead process left. A
+staged photo is checked again (`BackupArchive.isIntact`) as it is adopted, and a
+photo already on the phone counts as there only if it is whole, never merely
+present. The restore runs off the main thread, since that check hashes every
+photo. A removed recipe's note (stars, notes, photo) is kept while anything
+names its key — a stored copy of the recipe or a planned meal — then marked
+(`RecipeNote.orphanedAt`, travelling in backups) and deleted 30 days later at
+start-up, before the sweep, which then takes its photo if nothing else shows it.
+
 A plain JSON backup still restores: its photos count as there only when the
 same file is already on the phone; the rest are said to be missing in the
 restore prompt.
@@ -49,3 +61,5 @@ restore prompt.
   app is one person's, updated in step, so this is accepted.
 - A backup grows with the photos: about 150–400 KB each at 1280 pixels.
 - No database migration: the format change is the file's, not Room's.
+- A rating, notes or photo on a recipe removed for good is gone 30 days after
+  nothing names it (Step T); a backup taken in that month still carries it.

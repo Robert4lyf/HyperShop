@@ -4,11 +4,14 @@ import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.QtyUnit
 import com.robert4lyf.hypershop.core.model.Rational
+import com.robert4lyf.hypershop.core.parse.Shelf
 
 /**
  * Turns Claude's JSON into the shared [ParsedIngredient] (spec R1). Names are
- * kept as Claude wrote them; the shared normaliser maps them to a mergeKey and
- * the units to QtyBase downstream, exactly as for the rule parser.
+ * kept as Claude wrote them, but for the rule parser's own shelf rule ([Shelf]):
+ * "tomatoes" in tins are tinned tomatoes, "minced lamb" lamb mince, whichever
+ * reader read the line. The shared normaliser maps them to a mergeKey and the
+ * units to QtyBase downstream, exactly as for the rule parser.
  *
  * Numeric ranges are checked here, not in the schema: an out-of-range amount
  * is dropped and the line marked `check`, so it is highlighted in review.
@@ -17,6 +20,8 @@ object PostProcess {
     const val MAX_QTY = 100_000.0
     const val MAX_INGREDIENTS = 300
     const val MAX_LINE = 500
+
+    private val shelf by lazy { Shelf() }
 
     fun recipe(
         out: ClaudeOutput,
@@ -72,13 +77,14 @@ object PostProcess {
             if (q == null || qMax < q) flag("a range that goes down")
             qMax = null
         }
+        val u = unit(i.unit)
         return ParsedIngredient(
             raw = i.raw.take(MAX_LINE),
-            name = i.name.trim().lowercase().take(MAX_LINE),
+            name = shelf.ofWritten(i.name.trim().lowercase().take(MAX_LINE), u),
             quantity = q,
             quantityMax = qMax,
             quantityText = i.quantityText?.take(60),
-            unit = unit(i.unit),
+            unit = u,
             altQuantity = amount(i.altQuantity),
             altUnit = unit(i.altUnit),
             note = i.note?.trim()?.take(MAX_LINE)?.ifEmpty { null },

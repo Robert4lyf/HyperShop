@@ -1,5 +1,16 @@
 # Hand-off notes
 
+## Status: Step T (refinement) — ⏸ Hand-off H, plus checks 29–34
+
+Step T (PROGRESS.md › Step T, the report in docs/reports/refinement-pass.md) made white text readable on bright heroes, gave a removed recipe's notes and photo an end (kept 30 days after nothing names them), added Sort and "4★ & up" to Saved, cached photos, and made "plus" amounts add up. **Run on:** the JVM (every check below has a test) and CI's emulator (photo timings). **Not run on:** a real phone, any real Forerunner 245. These need your eyes:
+
+29. **Bright heroes.** Light mode, at your usual brightness: the recipe titles, subtitles and the menu dots on the brightest (right-hand) end of a mosaic, and on a pale photo, readable at arm's length? Any soft dark patch behind the text that looks like a smudge rather than a shadow? ___
+30. **Sort and 4★.** Saved › Sort: each of Recently added, Highest rated, Most planned, A–Z puts the recipe you expect first? "4★ & up" leaves only those, and searching keeps it on?
+31. **Plan the week.** The first picks are the meals you plan most (not just this week's)? A planned meal shows the cooking notes you wrote on its saved recipe?
+32. **Scroll with photos.** With 20 or more photographed recipes, scroll Saved to the end and back fast: does any photo flash grey on the way back? (It should not now.) Any stutter? ___
+33. **"Plus" lines.** Paste a recipe with "2 tbsp butter plus 1 tbsp melted": the row reads 3 tbsp? One with "1 cup plus 2 tbsp flour" still reads 1 cup, the extra in the note.
+34. **A removed recipe, a month on.** Rate and photograph a recipe, Remove it from Saved, then save the same page again within the month: stars, notes and photo come back? (After 30 days with nothing naming it, they are gone for good; that part is tested, not worth waiting for.)
+
 ## Status: Step S (stability and data integrity) — ⏸ Hand-off H, plus checks 25–28
 
 Step S (PROGRESS.md › Step S, the report in docs/reports/stability-pass.md) fixed the returning-shopper emulator scenario, put recipe photos into backups, made a photo two recipes share safe to remove from one, and stopped two identical ingredient lines being sent to Claude as one. Hand-off H below is still the list; these are added to it. Nothing here has been done on a real phone. Do 25–26 on a second install or a phone whose list you can lose.

@@ -416,7 +416,7 @@ coriander_seed,coriander seeds,coriander seeds,coriander seed|whole coriander se
 paprika,paprika,paprika,sweet paprika|hungarian paprika|paprika powder,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
 smoked_paprika,smoked paprika,smoked paprika,pimenton|spanish smoked paprika,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
 cayenne,cayenne pepper,cayenne pepper,cayenne|ground red pepper,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
-chilli_flakes,chilli flakes,chilli flakes,red pepper flakes|red-pepper flakes|crushed red pepper|hot red pepper flake|chili flakes,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
+chilli_flakes,chilli flakes,chilli flakes,red pepper flakes|red-pepper flakes|crushed red pepper|crushed red pepper flakes|hot red pepper flake|chili flakes,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
 chilli_powder,chilli powder,chilli powder,chili powder|ancho chili powder|red chili powder|red chilli powder|kashmiri chilli powder|hot chilli powder|mild chilli powder,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
 turmeric,ground turmeric,ground turmeric,turmeric,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
 cinnamon,ground cinnamon,ground cinnamon,cinnamon,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,agent-estimate
@@ -456,6 +456,7 @@ hot_sauce,hot sauce,hot sauce,tabasco|tabasco sauce|hot pepper sauce,SPICES_COND
 horseradish,horseradish sauce,horseradish sauce,horseradish|prepared horseradish,SPICES_CONDIMENTS,false,jar,presence,,,Sauces & condiments,agent-estimate
 bbq_sauce,barbecue sauce,barbecue sauce,bbq sauce,SPICES_CONDIMENTS,false,bottle,presence,,,Sauces & condiments,agent-estimate
 sweet_chilli,sweet chilli sauce,sweet chilli sauce,sweet chili sauce,WORLD_FOODS,false,bottle,presence,,,Asian,agent-estimate
+chilli_garlic_sauce,chilli garlic sauce,chilli garlic sauce,chili garlic sauce|chile garlic sauce,WORLD_FOODS,false,bottle,presence,,,Asian,agent-estimate
 mint_sauce,mint sauce,mint sauce,,SPICES_CONDIMENTS,false,jar,presence,,,Sauces & condiments,agent-estimate
 chutney,mango chutney,mango chutney,chutney,WORLD_FOODS,false,jar,presence,,,Middle Eastern & Indian,agent-estimate
 gravy_granules,gravy granules,gravy granules,gravy,SPICES_CONDIMENTS,false,tub,presence,,,Sauces & condiments,agent-estimate

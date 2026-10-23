@@ -56,6 +56,8 @@ data class Meal(
     val saved: Boolean = true,
     /** The recipe's photo on this phone, or null (its mosaic is drawn). */
     val photo: String? = null,
+    /** Your cooking notes for the recipe, to read while planning and cooking (written on the recipe's sheet). */
+    val notes: String? = null,
 )
 
 /** A saved recipe that could be planned. */
@@ -67,7 +69,13 @@ data class Pick(
     val planned: Int,
     val source: String?,
     val photo: String? = null,
-)
+    val rating: Int? = null,
+    /** When it was saved, and how many meals it has been planned as in other weeks: what puts "your usual" first. */
+    val addedAt: Long = 0,
+    val timesPlanned: Int = 0,
+) {
+    val facts get() = com.robert4lyf.hypershop.ui.recipes.RecipeFacts(key, title, addedAt, rating, timesPlanned)
+}
 
 data class MealsUi(
     val loaded: Boolean = false,
@@ -157,23 +165,48 @@ class MealsViewModel(
     val ui: StateFlow<MealsUi> =
         combine(
             combine(weekView, c.repository.list) { v, l -> v to l },
-            combine(c.repository.observeLibrary(), c.recipePhotos.paths()) { l, p -> l to p },
+            combine(
+                c.repository.observeLibrary(),
+                c.recipePhotos.paths(),
+                c.repository.observeRecipeNotes(),
+                c.repository.observeTimesPlanned(),
+            ) { l, p, n, t -> Library(l, p, n, t) },
             snapshotFlow { query },
             asked,
             extras,
-        ) { (v, list), (lib, photos), q, asked, (buy, home) ->
+        ) { (v, list), (lib, photos, notes, planned), q, asked, (buy, home) ->
             val meals =
                 v.meals.map {
-                    it.toMeal().copy(photo = photos[it.libraryKey]).let { m -> asked[m.id]?.let { n -> m.copy(servings = n) } ?: m }
+                    it.toMeal().copy(photo = photos[it.libraryKey], notes = notes[it.libraryKey]?.notes).let { m ->
+                        asked[m.id]?.let { n -> m.copy(servings = n) } ?: m
+                    }
                 }
             val counts = v.meals.groupingBy { it.libraryKey }.eachCount()
             val term = q.trim().lowercase()
             val picks =
                 lib.map {
                         r ->
-                    Pick(r.key, r.title, r.lines, counts[r.key] ?: 0, r.url?.let { siteOf(it) } ?: bookRef(r.book, r.page), photos[r.key])
-                }
-                    .filter { term.isEmpty() || it.title.lowercase().contains(term) }
+                    Pick(
+                        r.key,
+                        r.title,
+                        r.lines,
+                        counts[r.key] ?: 0,
+                        r.url?.let { siteOf(it) } ?: bookRef(r.book, r.page),
+                        photos[r.key],
+                        notes[r.key]?.rating,
+                        r.lastAddedAt,
+                        // The other weeks' only: planning it now must not move it under the thumb that planned it.
+                        // Never below none: the two counts come from two flows, and this week's can arrive first.
+                        ((planned[r.key] ?: 0) - (counts[r.key] ?: 0)).coerceAtLeast(0),
+                    )
+                }.filter { term.isEmpty() || it.title.lowercase().contains(term) }
+                    // Your usual first: planned most, then rated best, then newest (LibraryOrder).
+                    .let {
+                        com.robert4lyf.hypershop.ui.recipes.LibraryOrder.sort(
+                            it,
+                            com.robert4lyf.hypershop.ui.recipes.LibrarySort.PLANNED,
+                        ) { p -> p.facts }
+                    }
             MealsUi(
                 loaded = true,
                 week = v.week,
@@ -196,6 +229,13 @@ class MealsViewModel(
             )
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MealsUi())
+
+    private data class Library(
+        val recipes: List<com.robert4lyf.hypershop.data.LibraryRecipe>,
+        val photos: Map<String, String>,
+        val notes: Map<String, com.robert4lyf.hypershop.data.RecipeNoteEntity>,
+        val planned: Map<String, Int>,
+    )
 
     private class WeekView(
         val week: Week,
