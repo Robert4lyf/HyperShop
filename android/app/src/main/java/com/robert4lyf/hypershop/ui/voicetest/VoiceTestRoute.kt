@@ -200,12 +200,15 @@ fun VoiceTestScreen(
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                         SegmentedButton(
                             selected = segmented,
+                            // No checkmark: it would push the label sideways on every switch; the fill says which is on.
+                            icon = {},
                             onClick = { segmented = true },
                             shape = SegmentedButtonDefaults.itemShape(0, 2),
                             colors = basilSegmentedColors(),
                         ) { Text("Long session") }
                         SegmentedButton(
                             selected = !segmented,
+                            icon = {},
                             onClick = { segmented = false },
                             shape = SegmentedButtonDefaults.itemShape(1, 2),
                             colors = basilSegmentedColors(),

@@ -288,6 +288,8 @@ fun RecipesScreen(
                         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                             SegmentedButton(
                                 selected = !showLibrary,
+                                // No checkmark: it would push the label sideways on every switch; the fill says which is on.
+                                icon = {},
                                 onClick = { picked = false },
                                 shape = SegmentedButtonDefaults.itemShape(0, 2),
                                 colors = basilSegmentedColors(),
@@ -295,6 +297,7 @@ fun RecipesScreen(
                             ) { Text("On the list") }
                             SegmentedButton(
                                 selected = showLibrary,
+                                icon = {},
                                 onClick = { picked = true },
                                 shape = SegmentedButtonDefaults.itemShape(1, 2),
                                 colors = basilSegmentedColors(),

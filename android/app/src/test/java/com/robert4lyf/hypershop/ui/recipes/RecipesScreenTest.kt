@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -328,5 +329,24 @@ class RecipesScreenTest {
         compose.setContent { HyperShopTheme(dynamicColor = false) { RecipesScreen(rated, onRemove = {}) } }
         compose.onNodeWithTag("view-library").performClick()
         compose.onNodeWithText("★ 5/5", substring = true).assertExists()
+    }
+
+    @Test
+    fun switchingBetweenOnTheListAndSavedLeavesTheLabelsWhereTheyAre() {
+        compose.setContent { HyperShopTheme(dynamicColor = false) { RecipesScreen(USES, onRemove = {}) } }
+
+        fun lefts() =
+            listOf(
+                "On the list",
+                "Saved",
+            ).map { compose.onNodeWithText(it, useUnmergedTree = true).getUnclippedBoundsInRoot().left }
+        val before = lefts()
+        compose.onNodeWithTag("view-library").performClick()
+        compose.waitForIdle()
+        // A checkmark on the selected side used to push its label along on every switch.
+        assertEquals(before, lefts())
+        compose.onNodeWithTag("view-list").performClick()
+        compose.waitForIdle()
+        assertEquals(before, lefts())
     }
 }

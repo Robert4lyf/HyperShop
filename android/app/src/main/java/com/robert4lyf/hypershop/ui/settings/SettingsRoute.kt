@@ -361,6 +361,8 @@ private fun AppearanceGroup(
         THEME_LABELS.forEachIndexed { i, (t, label) ->
             SegmentedButton(
                 selected = ui.theme == t,
+                // No checkmark: it would push the label sideways on every switch; the fill says which is on.
+                icon = {},
                 onClick = { actions.onTheme(t) },
                 shape = SegmentedButtonDefaults.itemShape(i, THEME_LABELS.size),
                 colors = basilSegmentedColors(),
@@ -380,6 +382,7 @@ private fun ListGroup(
         UNIT_LABELS.forEachIndexed { i, (u, label) ->
             SegmentedButton(
                 selected = ui.units == u,
+                icon = {},
                 onClick = { actions.onUnits(u) },
                 shape = SegmentedButtonDefaults.itemShape(i, UNIT_LABELS.size),
                 colors = basilSegmentedColors(),
