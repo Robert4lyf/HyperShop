@@ -111,6 +111,8 @@ internal object Lexicon {
             "thick", "thin", "fresh", "about", "approximately", "approx", "heaped", "heaping", "level",
             "scant", "good", "good-quality", "high-quality", "best-quality", "generous", "ripe", "few",
             "fat", "rounded", "plump", "juicy", "thumb-sized", "thumb-size", "each", "organic",
+            // The shelf, not the product: "canned crushed tomatoes" are crushed tomatoes (RuleParser.shelf).
+            "canned", "tinned",
         )
 
     /**

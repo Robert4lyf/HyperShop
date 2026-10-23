@@ -56,6 +56,7 @@ baby plum tomato,cherry_tomato
 baby spinach,spinach
 back bacon,bacon
 bacon,bacon
+bacon lardons,pancetta
 bacon rashers,bacon
 bagel,bagel
 bagels,bagel
@@ -91,12 +92,19 @@ bean sprouts,beansprouts
 beans,dried_beans
 beansprouts,beansprouts
 beef,beef
+beef bouillon,beef_stock_cube
+beef bouillon cube,beef_stock_cube
+beef bouillon cubes,beef_stock_cube
 beef brisket,beef_brisket
 beef broth,beef_stock
-beef chuck,beef
+beef chuck,braising_steak
+beef for braising,braising_steak
+beef for stewing,braising_steak
 beef mince,beef_mince
 beef steak,steak
 beef stock,beef_stock
+beef stock cube,beef_stock_cube
+beef stock cubes,beef_stock_cube
 beefsteak tomato,tomato
 beer,beer
 beet,beetroot
@@ -150,7 +158,8 @@ bouquet garni,mixed_herbs_fresh
 bourbon,whisky
 bow tie pasta,farfalle
 bow-tie pasta,farfalle
-braising steak,beef
+braising beef,braising_steak
+braising steak,braising_steak
 bramley apple,apple
 brandy,brandy
 bread,bread
@@ -203,6 +212,7 @@ canned plum tomatoes,chopped_tomatoes
 canned pumpkin,pumpkin_puree
 canned tomatoes,chopped_tomatoes
 canned tuna,tuna_tin
+canned whole tomatoes,chopped_tomatoes
 cannellini bean,cannellini_beans
 cannellini beans,cannellini_beans
 canola oil,vegetable_oil
@@ -305,7 +315,8 @@ chopped frozen onion,frozen_diced_onion
 chopped tomatoes,chopped_tomatoes
 chorizo,chorizo
 chorizo sausage,chorizo
-chuck,beef
+chuck,braising_steak
+chuck steak,braising_steak
 chutney,chutney
 ciabatta,ciabatta
 ciabattas,ciabatta
@@ -475,6 +486,7 @@ duck breast,duck
 duck legs,duck
 dumpling skins,dumpling_wrappers
 dumpling wrappers,dumpling_wrappers
+durum wheat semolina,semolina
 dutch-process cocoa,cocoa
 ear of corn,sweetcorn_cob
 eating apple,apple
@@ -523,6 +535,7 @@ figs,fig
 filo,filo_pastry
 filo pastry,filo_pastry
 fine salt,salt
+fine semolina,semolina
 fino sherry,sherry
 firm tofu,tofu
 fish,white_fish
@@ -562,11 +575,15 @@ fresh chillies,chilli
 fresh coconut,coconut_fresh
 fresh coriander,coriander
 fresh dill,dill
+fresh egg lasagna sheets,fresh_pasta
+fresh egg lasagne sheets,fresh_pasta
 fresh fig,fig
 fresh ginger,ginger
 fresh green chilli,chilli
 fresh herbs,mixed_herbs_fresh
 fresh horseradish,horseradish_root
+fresh lasagna sheets,fresh_pasta
+fresh lasagne,fresh_pasta
 fresh lasagne sheets,fresh_pasta
 fresh mint,mint
 fresh mozzarella,mozzarella
@@ -1159,6 +1176,7 @@ red wine,red_wine
 red wine vinegar,red_wine_vinegar
 red-pepper flakes,chilli_flakes
 red-wine vinegar,red_wine_vinegar
+remilled durum wheat semolina,semolina
 rhubarb,rhubarb
 rib-eye steak,steak
 ribeye steak,steak
@@ -1235,6 +1253,9 @@ seltzer,soda_water
 semi-skimmed milk,milk
 semisweet chocolate,dark_chocolate
 semisweet chocolate chips,dark_chocolate
+semola rimacinata,semolina
+semolina,semolina
+semolina flour,semolina
 serrano,serrano_chilli
 serrano chile,serrano_chilli
 serrano chilli,serrano_chilli
@@ -1273,10 +1294,12 @@ skirt steak,steak
 slab bacon,bacon
 sliced bacon,bacon
 slivered almonds,almond
+smoked bacon lardons,pancetta
 smoked haddock,haddock
 smoked ham,ham
 smoked ham hock,ham_hock
 smoked ham hocks,ham_hock
+smoked lardons,pancetta
 smoked mackerel,smoked_mackerel
 smoked mackerel fillets,smoked_mackerel
 smoked paprika,smoked_paprika
@@ -1321,7 +1344,8 @@ star anise,star_anise
 steak,steak
 steaks,steak
 stem ginger,crystallised_ginger
-stewing beef,beef
+stewing beef,braising_steak
+stewing steak,braising_steak
 stilton,stilton
 stilton cheese,stilton
 stock,vegetable_stock
@@ -1396,9 +1420,11 @@ tiger prawns,prawn
 tilapia,tilapia
 tilapia fillet,tilapia
 tinned lentils,lentils_tin
+tinned plum tomatoes,chopped_tomatoes
 tinned sweetcorn,sweetcorn_tin
 tinned tomatoes,chopped_tomatoes
 tinned tuna,tuna_tin
+tinned whole tomatoes,chopped_tomatoes
 toasted almonds,almond
 toasted sesame oil,sesame_oil
 toasted sesame seeds,sesame_seed

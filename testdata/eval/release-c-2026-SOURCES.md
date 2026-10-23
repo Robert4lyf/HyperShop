@@ -121,3 +121,16 @@ parser output:
 | rc-110 | name `cinnamon`, unit `stick` | name `cinnamon stick`, no unit | a cinnamon stick is the product sold; "2cm" is its size |
 | rc-188 | no unit | unit `fillet` | R2 lists `fillet` as a count unit |
 | rc-280 | name `pepper` | name `bell pepper` | "peppers" on a shopping list are the vegetable |
+
+## Label corrections in the final quality pass (step Q.3, labels sha256 76b2e1294107…)
+
+Two labels named a tin by a name the catalogue files as the fresh vegetable, so the
+evaluator scored the line against loose produce in the PRODUCE aisle. The labelling
+convention is the name a UK shopper looks for, and for a tin that is the tinned product.
+Both corrections also change the score (each line is now right); they are recorded
+here for that reason. The amounts, units and pack sizes are unchanged.
+
+| id | was | now | why |
+|---|---|---|---|
+| rc-074 | name `plum tomatoes` | `tinned plum tomatoes` | "1 x 400g tin of plum tomatoes": a tin, not fresh plum tomatoes |
+| rc-173 | name `whole tomatoes` | `tinned whole tomatoes` | "2 (14.5-oz.) cans whole tomatoes": cans, not fresh tomatoes |

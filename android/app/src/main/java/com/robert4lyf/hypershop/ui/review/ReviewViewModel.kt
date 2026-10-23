@@ -25,7 +25,11 @@ import com.robert4lyf.hypershop.importing.ImportInput
 import com.robert4lyf.hypershop.importing.ImportResult
 import com.robert4lyf.hypershop.importing.Importer
 import com.robert4lyf.hypershop.importing.JobState
+import com.robert4lyf.hypershop.importing.LineCorrection
+import com.robert4lyf.hypershop.importing.LineIdentity
+import com.robert4lyf.hypershop.importing.LineOrigin
 import com.robert4lyf.hypershop.importing.PhotoStore
+import com.robert4lyf.hypershop.importing.ReviewLines
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.common.webLink
 import kotlinx.coroutines.Dispatchers
@@ -210,11 +214,12 @@ class ReviewViewModel(
     private var changed = false
 
     /**
-     * Lines the user corrected (by the line as the recipe wrote it) and lines removed:
+     * Lines the user corrected and lines removed, by which recipe line they are
+     * ([LineOrigin], never the text alone: a recipe can say "100 g sugar" twice):
      * "Ask Claude" reads the recipe again, and these stand over whatever it says.
+     * Kept with the job, so they outlive leaving the review.
      */
-    private val pinned = LinkedHashMap<String, ParsedIngredient>()
-    private val removedRaw = HashSet<String>()
+    private val corrections = LinkedHashMap<LineOrigin, LineCorrection>()
 
     /**
      * Applying or retrying with Claude. [recompute] carries it into the UI, so a
@@ -265,12 +270,36 @@ class ReviewViewModel(
     ): ImportResult =
         c
             .claudeParse(jobId) {
-                c.importer.parse(
-                    r,
-                    allowClaude = true,
-                    model = c.settings.model.first(),
-                ).also { if (keep(it)) c.importJobs.finish(jobId, it) }
+                c.importer
+                    .parse(
+                        r,
+                        allowClaude = true,
+                        model = c.settings.model.first(),
+                    ).also { if (keep(it)) c.importJobs.finish(jobId, withReviewOf(it, c.importJobs.get(jobId)?.result)) }
             }.await()
+
+    /**
+     * The answer as it is kept on the job: with the review's state *as the job holds it when the answer
+     * arrives*, not when the call started — a Stop, then edits, then Back mid-call must not lose those
+     * edits — and the lines they were made on, to lay the corrections over the answer on opening.
+     */
+    private fun withReviewOf(
+        answer: ImportResult,
+        now: ImportResult?,
+    ): ImportResult {
+        if (now == null || answer.parsedBy != ParsedBy.CLAUDE) return answer
+        return answer.copy(
+            title = now.title ?: answer.title,
+            book = now.book,
+            page = now.page,
+            targetServings = now.targetServings,
+            inStockKeys = now.inStockKeys,
+            decisionsSaved = now.decisionsSaved,
+            aisleMoves = now.aisleMoves,
+            corrections = now.corrections,
+            claudeBefore = ReviewLines(now.lines, LineIdentity.originsOf(now)).takeIf { now.corrections.isNotEmpty() },
+        )
+    }
 
     private suspend fun load() {
         units = c.settings.units.first()
@@ -319,7 +348,19 @@ class ReviewViewModel(
     /** "Add again" on [ReviewState.AlreadyOnList]. */
     fun addAgain() = act { if (_state.value is ReviewState.AlreadyOnList) result?.let { begin(it) } }
 
-    private suspend fun begin(r: ImportResult) {
+    private suspend fun begin(from: ImportResult) {
+        corrections.clear()
+        for (c in from.corrections) corrections[c.origin] = c
+        // An answer from Claude saved while corrections stood: they are laid over it here.
+        val before = from.claudeBefore
+        val r =
+            if (before != null && before.lines.size == before.origins.size) {
+                val rec = LineIdentity.reconcile(from.lines, before.lines, before.origins, corrections.toMap())
+                from.copy(lines = rec.lines, origins = rec.origins, claudeBefore = null)
+            } else {
+                from.copy(origins = LineIdentity.originsOf(from), claudeBefore = null)
+            }
+        result = r
         servings = r.targetServings ?: r.servings
         if (r.decisionsSaved) aisleMoves.putAll(r.aisleMoves)
         store(r)
@@ -379,6 +420,7 @@ class ReviewViewModel(
                 inStockKeys = decisions.filterValues { it.inStock }.keys.sorted(),
                 decisionsSaved = true,
                 aisleMoves = aisleMoves.toMap(),
+                corrections = corrections.values.toList(),
             )
         result = edited
         c.importJobs.update(jobId, edited)
@@ -586,7 +628,9 @@ class ReviewViewModel(
                 (state.value as? ReviewState.Ready)?.let { _state.value = it.copy(ui = it.ui.copy(busy = true, retrying = true)) }
                 try {
                     val again = parseWithClaude(r.copy(claudePending = true, askClaude = true)) { it.parsedBy == ParsedBy.CLAUDE }
-                    val kept = keepCorrections(again, r)
+                    // Laid over the review as it is now, not as it was when the call started: a second Ask
+                    // Claude after Stop and an edit joins the first call (AppContainer.claudeParse).
+                    val kept = keepCorrections(again, result ?: r, corrections.toMap())
                     store(kept)
                     result = kept
                 } finally {
@@ -598,24 +642,14 @@ class ReviewViewModel(
             }
     }
 
-    /**
-     * Claude's reading with the user's corrections laid over it: a line the user edited,
-     * renamed or swapped keeps their reading (matched by the line as written, else by its
-     * place when the count is the same), and a line they removed stays removed.
-     */
+    /** Claude's reading with the user's corrections laid over it, line by line ([LineIdentity.reconcile]). */
     private fun keepCorrections(
         again: ImportResult,
         before: ImportResult,
+        fixed: Map<LineOrigin, LineCorrection>,
     ): ImportResult {
-        if (pinned.isEmpty() && removedRaw.isEmpty()) return again
-        val sameShape = again.lines.size == before.lines.size
-        val lines =
-            again.lines.mapIndexedNotNull { i, l ->
-                val was = before.lines.getOrNull(i)?.takeIf { sameShape }
-                if (l.raw in removedRaw || was?.raw in removedRaw) return@mapIndexedNotNull null
-                pinned[l.raw] ?: was?.let { pinned[it.raw] } ?: l
-            }
-        return again.copy(lines = lines)
+        val r = LineIdentity.reconcile(again.lines, before.lines, LineIdentity.originsOf(before), fixed)
+        return again.copy(lines = r.lines, origins = r.origins, corrections = fixed.values.toList(), claudeBefore = null)
     }
 
     /** "Stop" while asking Claude. An answer that still arrives is kept on the job for next time. */
@@ -919,16 +953,13 @@ class ReviewViewModel(
         val lines = r.lines.toMutableList()
         val indices = s.lines.indices.filter { s.lines[it].first.id in lineIds && it in lines.indices }
         if (indices.isEmpty()) return null
-        val raws = r.rawLines.toMutableList()
+        val origins = LineIdentity.originsOf(r)
         for (i in indices) {
-            val was = lines[i]
-            lines[i] = f(was)
-            pinned.remove(was.raw)
-            pinned[lines[i].raw] = lines[i]
-            // An edited line is what Claude should read too.
-            if (raws.size == lines.size && raws[i] == was.raw) raws[i] = lines[i].raw
+            lines[i] = f(lines[i])
+            // Claude goes on reading the recipe as written; this reading of the line stands over its.
+            corrections[origins[i]] = LineCorrection(origins[i], lines[i])
         }
-        val edited = r.copy(lines = lines, rawLines = raws)
+        val edited = r.copy(lines = lines, origins = origins)
         store(edited)
         result = edited
         changed = true
@@ -972,8 +1003,13 @@ class ReviewViewModel(
             val t = text.trim()
             val r = result ?: return@act
             if (t.isEmpty()) return@act
-            removedRaw -= t
-            val edited = r.copy(lines = r.lines + c.ruleParser.parse(t), rawLines = r.rawLines + t)
+            val origins = LineIdentity.originsOf(r)
+            val origin = LineIdentity.next(t, origins + corrections.keys)
+            val line = c.ruleParser.parse(t)
+            // A line the user typed is their reading of it, like an edit: it stands over Claude's, and is kept if
+            // Claude's answer leaves it out (an answer to a call made before it was typed does).
+            corrections[origin] = LineCorrection(origin, line)
+            val edited = r.copy(lines = r.lines + line, rawLines = r.rawLines + t, origins = origins + origin)
             store(edited)
             result = edited
             changed = true
@@ -993,13 +1029,16 @@ class ReviewViewModel(
             val index = s.lines.indexOfFirst { it.first.id == lineId }
             if (index !in r.lines.indices || r.lines.size < 2) return@act
             val line = r.lines[index]
-            val aligned = r.rawLines.size == r.lines.size
+            val origins = LineIdentity.originsOf(r)
+            val origin = origins[index]
+            val was = corrections[origin]
+            // The source line stays for Claude to read; the removal stands over its reading of this one only.
+            corrections[origin] = LineCorrection(origin, line, removed = true)
             val edited =
                 r.copy(
                     lines = r.lines.filterIndexed { i, _ -> i != index },
-                    rawLines = if (aligned) r.rawLines.filterIndexed { i, _ -> i != index } else r.rawLines,
+                    origins = origins.filterIndexed { i, _ -> i != index },
                 )
-            removedRaw += line.raw
             store(edited)
             result = edited
             changed = true
@@ -1008,28 +1047,26 @@ class ReviewViewModel(
             _events.send(
                 UiMessage(
                     "Removed ${name.replaceFirstChar { it.uppercase() }} from this recipe",
-                    undo = { restoreLine(index, line, if (aligned) r.rawLines[index] else null) },
+                    undo = { restoreLine(index, line, origin, was) },
                 ),
             )
         }
 
-    /** Undo of [removeLine]: the line back where it was. */
+    /** Undo of [removeLine]: that line (not another with the same text) back where it was, as it was. */
     private fun restoreLine(
         index: Int,
         line: ParsedIngredient,
-        raw: String?,
+        origin: LineOrigin,
+        was: LineCorrection?,
     ) = act {
         val r = result ?: return@act
+        val origins = LineIdentity.originsOf(r)
+        // Already back (a second Undo), or Claude has since returned it: nothing to restore.
+        if (origin in origins || corrections[origin]?.removed != true) return@act
+        if (was != null) corrections[origin] = was else corrections.remove(origin)
         val at = index.coerceIn(0, r.lines.size)
         val lines = r.lines.toMutableList().also { it.add(at, line) }
-        val raws =
-            if (raw != null && r.rawLines.size == r.lines.size) {
-                r.rawLines.toMutableList().also { it.add(at, raw) }
-            } else {
-                r.rawLines
-            }
-        removedRaw -= line.raw
-        val edited = r.copy(lines = lines, rawLines = raws)
+        val edited = r.copy(lines = lines, origins = origins.toMutableList().also { it.add(at, origin) })
         store(edited)
         result = edited
         changed = true

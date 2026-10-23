@@ -58,6 +58,12 @@ data class ImportResult(
     /** A cookbook recipe's book and page, as typed (photo or typed in; editable on review). */
     val book: String? = null,
     val page: String? = null,
+    /** Which recipe line each of [lines] is ([LineIdentity]); empty until the review first changes the lines. */
+    val origins: List<LineOrigin> = emptyList(),
+    /** Lines corrected or removed on the review, by origin: they stand over a later "Ask Claude". */
+    val corrections: List<LineCorrection> = emptyList(),
+    /** An answer from Claude saved while [corrections] stood: the lines it was asked about, to lay them over it on opening. */
+    val claudeBefore: ReviewLines? = null,
 ) {
     /** "Added by hand" opened for editing: no recipe, no book, saved back as hand-added items. */
     val byHand: Boolean get() = method == BY_HAND

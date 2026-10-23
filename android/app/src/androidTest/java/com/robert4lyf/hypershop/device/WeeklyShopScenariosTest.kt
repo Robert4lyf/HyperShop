@@ -66,8 +66,11 @@ class WeeklyShopScenariosTest {
      * around it, a touch injected at the control's centre would land on it.
      */
     private fun tap(tag: String) {
-        waitFor { has(tag) }
-        compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.OnClick)
+        // Found, then pressed: between the two the list can be laid out again (the Plan screen's picks re-sort
+        // after the last one was planned) and the node be momentarily gone. A person looks again; so does this.
+        compose.waitUntil(15_000) {
+            runCatching { compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.OnClick) }.isSuccess
+        }
         taps++
         compose.waitForIdle()
     }

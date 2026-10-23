@@ -11,19 +11,17 @@ name: Connect IQ
 # difference between "never compiled" and "compiled", which is where the five
 # bugs the first real session found came from.
 #
-# Protocol parity is NOT checked here: this workflow is path-filtered on
-# garmin/**, and parity can be broken from the Kotlin side alone. It runs in
-# android.yml, which has no paths filter.
+# Protocol parity is NOT checked here: parity can be broken from the Kotlin
+# side alone. It runs in android.yml's "Build and test", on every PR.
+#
+# The workflow runs on every PR so that "Connect IQ result" can be a required
+# check on main: a path-filtered workflow never reports on a PR it skips, and a
+# required check that never reports blocks the merge for ever. The `changes`
+# job decides whether the watch was touched; the compile runs only then, and
+# "Connect IQ result" passes when it was skipped or passed and fails otherwise.
 
 on:
   pull_request:
-    paths:
-      - 'garmin/**'
-      - '.github/workflows/connectiq.yml'
-      - 'tools/build_watch.sh'
-      - 'tools/package_watch.sh'
-      - 'tools/device_facts.py'
-      - 'tools/run_watch_tests.sh'
   workflow_dispatch:
 
 # The one place the pinned version is written for both the script and the
@@ -32,8 +30,35 @@ env:
   CIQ_SDK_VERSION: '9.2.0'
 
 jobs:
+  changes:
+    name: Watch files changed
+    runs-on: ubuntu-latest
+    outputs:
+      watch: ${{ steps.diff.outputs.watch }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # The paths the workflow used to be filtered on. A run by hand always builds.
+      - name: Compare with the base branch
+        id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then echo "watch=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if git diff --name-only "$BASE" HEAD \
+              | grep -qE '^(garmin/|\.github/workflows/connectiq\.yml$|tools/(build_watch\.sh|package_watch\.sh|device_facts\.py|run_watch_tests\.sh)$)'; then
+            echo "watch=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "watch=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No watch files changed; the compile is skipped."
+          fi
+
   check:
     name: Manifest and resource check
+    needs: changes
+    if: needs.changes.outputs.watch == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -56,6 +81,8 @@ jobs:
 
   build:
     name: Compile the watch app
+    needs: changes
+    if: needs.changes.outputs.watch == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -119,6 +146,8 @@ jobs:
   # signed .prg as an artifact, ready to sideload.
   device:
     name: Build for the Forerunner 245
+    needs: changes
+    if: needs.changes.outputs.watch == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -224,7 +253,8 @@ jobs:
     name: Run the watch tests in the simulator
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-22.04
-    continue-on-error: true
+    # No continue-on-error: a run that fails says so. It is on request only and
+    # never a required check, so a red run here blocks nothing.
 
     steps:
       - name: Check the secrets are set
@@ -291,3 +321,24 @@ jobs:
           path: garmin/build/simulator-screens/
           retention-days: 1
           if-no-files-found: ignore
+
+  # The one check main requires from this workflow (docs/github-protection.md):
+  # green when the watch was not touched, or when it was and both the resource
+  # check and the compile passed. The Forerunner 245 build needs secrets a fork
+  # lacks, and the simulator is on request only, so neither is part of it.
+  result:
+    name: Connect IQ result
+    if: always()
+    needs: [changes, check, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every watch job passed or was not needed
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          CHECK: ${{ needs.check.result }}
+          BUILD: ${{ needs.build.result }}
+        run: |
+          [ "$CHANGES" = "success" ] || { echo "::error::changes ended $CHANGES"; exit 1; }
+          for r in "$CHECK" "$BUILD"; do
+            case "$r" in success|skipped) ;; *) echo "::error::a watch job ended $r"; exit 1 ;; esac
+          done

@@ -212,7 +212,9 @@ class RuleParserTest {
         assertEquals(QtyUnit.TIN, can.unit)
         assertEquals(Rational.of(14), can.altQuantity)
         assertEquals(QtyUnit.OZ, can.altUnit)
-        assertEquals("tomatoes", can.name)
+        // A can of tomatoes is tinned tomatoes, never the fresh vegetable (quality pass Q.3).
+        assertEquals("tinned tomatoes", can.name)
+        assertEquals("cat:chopped_tomatoes", Normaliser().mergeKey(can.name))
     }
 
     @Test
@@ -382,7 +384,8 @@ class RuleParserReleaseCTest {
         assertEquals(Rational.of(5, 4), cups.quantity)
         assertEquals(QtyUnit.CUP, cups.unit)
         val beef = p.parse("Beef (minced, coarsely ground and mixed) 10.6 oz")
-        assertEquals("beef", beef.name)
+        // Minced beef is beef mince, a different product from a joint (quality pass Q.3).
+        assertEquals("beef mince", beef.name)
         assertEquals(QtyUnit.OZ, beef.unit)
         assertEquals("minced, coarsely ground and mixed", beef.note)
         val spinach = p.parse("Spinach 8.8 oz")

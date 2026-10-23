@@ -1,7 +1,10 @@
 package com.robert4lyf.hypershop.core.parse
 
 import com.robert4lyf.hypershop.core.catalog.Catalog
+import com.robert4lyf.hypershop.core.catalog.CatalogEntry
+import com.robert4lyf.hypershop.core.catalog.CatalogKey
 import com.robert4lyf.hypershop.core.catalog.CatalogLoader
+import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.Dimension
 import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.QtyUnit
@@ -160,6 +163,13 @@ class RuleParser(
                 }
             }
             val qtyEnd = i
+            // "1 recipe Italian Dressing", "1 batch roasted tomatoes": made from another recipe, not bought as such.
+            if (qty != null && word(i) in SUB_RECIPE) {
+                notes += toks[i].text.lowercase()
+                i++
+                if (word(i) == "of") i++
+                flag("made from another recipe")
+            }
             var unit: QtyUnit? = null
             var altQty: Rational? = null
             var altUnit: QtyUnit? = null
@@ -269,7 +279,8 @@ class RuleParser(
                 val start = i
                 skipSizes()
                 val u = unitAt(i)
-                if (u != null && u.first in R33 && i == start && start == 0) {
+                // "Pinch of cayenne", and "small bunch thyme" with a size before the unit word.
+                if (u != null && u.first in R33 && start == 0) {
                     i += u.second
                     qty = Rational.ONE
                     unit = u.first
@@ -295,8 +306,9 @@ class RuleParser(
             }
             if (word(i) == "of") i++ // R4.5
 
-            val (name, trailingUnit, impliedQty) = nameAndNote(unit == null && qty != null && !sizedCount)
+            val (named, trailingUnit, impliedQty) = nameAndNote(unit == null && qty != null && !sizedCount)
             if (trailingUnit != null) unit = trailingUnit
+            val name = shelf(named, unit)
             if (qty == null && impliedQty != null) qty = impliedQty
             if (unit == QtyUnit.OTHER) flag("an unknown unit")
 
@@ -321,6 +333,9 @@ class RuleParser(
         }
 
         val lower = text.lowercase()
+
+        /** Words said about the name itself: qualifiers moved off it and its own brackets ([shelf]). */
+        val nameWords = HashSet<String>()
 
         // ---- quantity ---------------------------------------------------------------
 
@@ -471,6 +486,8 @@ class RuleParser(
                             optional = true
                         } else if (inner.isNotEmpty()) {
                             notes += inner
+                            // "Beef (minced, …)": what the name's own brackets say about it, not an alternative.
+                            if (!inner.lowercase().startsWith("or ")) nameWords += inner.lowercase().split(NOT_LETTERS)
                         }
                         k = close + 1
                         continue
@@ -491,10 +508,16 @@ class RuleParser(
                 k++
             }
             if (cut < limit) notes += span(cut + 1, limit)
+            pickSlashSide(head)
 
             // Words of the name: prep words and qualifiers to the note (R4.1) unless
             // they start a catalogue name (R4.2); a postnominal phrase ends the name.
-            val words = head.filter { it.kind == Kind.WORD || it.kind == Kind.DASH || it.kind == Kind.NUM || it.kind == Kind.OTHER }
+            // A footnote mark ("brown rice*") is not part of the name.
+            val words =
+                head.filter {
+                    it.kind == Kind.WORD || it.kind == Kind.DASH || it.kind == Kind.NUM ||
+                        it.kind == Kind.OTHER && !it.text.all { c -> c in FOOTNOTE_MARKS }
+                }
             val kept = ArrayList<Token>()
             val moved = ArrayList<String>()
             var idx = 0
@@ -512,6 +535,7 @@ class RuleParser(
                 idx++
             }
             if (moved.isNotEmpty()) notes.add(0, moved.joinToString(" "))
+            nameWords += moved
             // A leftover amount ("1 lb. 4 oz. beef", "1/0 cup sugar") is not a name: R7.
             if (head.firstOrNull()?.kind in LEFTOVER && catalog.lookup(joinWords(kept)) == null) {
                 flag("an amount left in the name")
@@ -529,6 +553,12 @@ class RuleParser(
                 name = fruit
                 implied = n
                 notes.add(0, part)
+            }
+            // "long- or short-grain brown rice": one product either way, the first spelled out.
+            HYPHEN_OR.find(name)?.let { m ->
+                val (a, b, tail) = m.destructured
+                name = "$a-$tail" + name.substring(m.range.last + 1)
+                notes.add(0, "or $b-$tail")
             }
             // R4.4: "A or B" keeps A; "safflower or peanut oil" shares the head noun.
             val orAt = " $name ".indexOf(" or ")
@@ -584,6 +614,64 @@ class RuleParser(
             return false
         }
 
+        /**
+         * "flax seed/linseeds": two names the catalogue files as one thing, so the first is the name and
+         * nothing is flagged. Anything else ("salt/pepper", "milk/dark chocolate", "scotch fillet / rib
+         * eye") may be two products: the first is kept, the other goes to the note, and it is flagged.
+         */
+        fun pickSlashSide(head: MutableList<Token>) {
+            val at = head.indexOfFirst { it.kind == Kind.SLASH }
+            if (at <= 0 || at >= head.size - 1) return
+            val before = head[at - 1]
+            val after = head[at + 1]
+            if (before.kind != Kind.WORD || after.kind != Kind.WORD) return
+            if (before.text.lowercase() in AND_OR || after.text.lowercase() in AND_OR) return
+            val left = head.subList(0, at).toList()
+            val right = head.subList(at + 1, head.size).toList()
+            val l = entryOf(joinWords(left))
+            val r = entryOf(joinWords(right))
+            if (l != null && l.id == r?.id) {
+                // Two names for one thing ("flax seed/linseeds"): the first, nothing to decide.
+                notes += joinWords(right)
+            } else {
+                // Two things, or a name the catalogue does not know: one of two, for the shopper to choose (R4.4).
+                notes += "or ${joinWords(right)}"
+                flag("\"A or B\": one of two")
+            }
+            head.clear()
+            head += left
+        }
+
+        /**
+         * Where the name alone points at the wrong shelf: tins of whole tomatoes are tinned
+         * tomatoes, not fresh ones ("canned" and "tinned" go to the note as qualifiers), and
+         * beef "(minced)" is beef mince, not a joint. Only to an entry the catalogue has.
+         */
+        fun shelf(
+            name: String,
+            unit: QtyUnit?,
+        ): String {
+            // Only what was said about the name itself (its moved qualifiers, its own brackets): "4 tomatoes
+            // (or 400g tinned)" and "lamb, tossed with ground cumin" are not tins and not mince.
+            val tinWord = nameWords.firstOrNull { it == "canned" || it == "tinned" }
+            val e = entryOf(name) ?: return if (tinWord != null) "$tinWord $name" else name
+            if ((unit == QtyUnit.TIN || tinWord != null) && e.aisle == AisleCode.PRODUCE) {
+                // "canned crushed tomato": the catalogue's plural is what its tinned synonyms are made of.
+                val forms = listOf(name, e.plural).distinct()
+                forms
+                    .flatMap { listOf("tinned $it", "canned $it") }
+                    .firstOrNull { entryOf(it)?.aisle?.let { a -> a != AisleCode.PRODUCE } == true }
+                    ?.let { return it }
+            }
+            if (e.aisle == AisleCode.MEAT_FISH && ("minced" in nameWords || "ground" in nameWords)) {
+                "$name mince".takeIf { entryOf(it)?.aisle == AisleCode.MEAT_FISH }?.let { return it }
+            }
+            // "tinned salmon", "canned peaches": a tin of something the catalogue only knows fresh stays a tin,
+            // its own item, rather than becoming the fresh one.
+            if (tinWord != null && e.aisle != AisleCode.TINS_JARS) return "$tinWord $name"
+            return name
+        }
+
         /** A dash with whitespace on both sides. */
         fun spacedDash(at: Int): Boolean {
             val t = toks[at]
@@ -637,6 +725,13 @@ class RuleParser(
         return u to 1
     }
 
+    /** The catalogue's entry for [phrase], as written or with its last word singular. */
+    private fun entryOf(phrase: String): CatalogEntry? {
+        val k = CatalogKey.of(phrase)
+        if (k.isEmpty()) return null
+        return catalog.lookup(k) ?: catalog.lookup(Normaliser.singularKey(k))
+    }
+
     private fun joinWords(toks: List<Token>): String {
         val sb = StringBuilder()
         for ((k, t) in toks.withIndex()) {
@@ -659,6 +754,18 @@ class RuleParser(
 
         val DOZEN: Rational = Rational.of(12)
         val DECILITRE: Rational = Rational.of(100)
+
+        /** "long- or short-grain": a word, a hyphen, "or", and a hyphenated word sharing its tail. */
+        val HYPHEN_OR = Regex("^([a-z]+)-or ([a-z]+)-([a-z]+)")
+
+        val AND_OR = setOf("and", "or")
+
+        val SUB_RECIPE = setOf("recipe", "recipes", "batch", "batches", "quantity")
+
+        val NOT_LETTERS = Regex("[^a-z]+")
+
+        /** Footnote marks after a name ("brown rice*"); "%" and "&" are part of names. */
+        const val FOOTNOTE_MARKS = "*†‡"
 
         /** What "a"/"an" must come before to mean one. */
         val ARTICLE_BEFORE = setOf(Kind.WORD, Kind.NUM)

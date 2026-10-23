@@ -66,4 +66,17 @@ class ImportJobsTest {
             assertEquals(listOf(shared), c.importJobs.ready.first().map { it.id })
             assertEquals(JobState.DONE, c.importJobs.get(edit)!!.state)
         }
+
+    @Test
+    fun aClaudeAnswerArrivingAfterCancelDoesNotBringTheImportBack() =
+        runBlocking {
+            val c = TestContainer.create()
+            val id = running(c)
+            c.importJobs.finishRun(id, soup)
+            c.importJobs.discarding(id)
+            // The answer to an Ask Claude still in flight when Cancel was tapped.
+            c.importJobs.finish(id, soup.copy(title = "Soup, read by Claude"))
+            assertEquals(JobState.DISCARDING, c.importJobs.get(id)!!.state)
+            assertEquals("Soup", c.importJobs.get(id)!!.result!!.title)
+        }
 }

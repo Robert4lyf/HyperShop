@@ -1,5 +1,47 @@
 # Hand-off notes
 
+## Status: Final quality pass — ⏸ Hand-off H (replaces E, F and G)
+
+The final quality pass is on branch `claude/serene-lovelace-464dnp` (PROGRESS.md › Quality pass, the report in docs/reports/quality-pass.md). Hand-offs E, F and G were never answered; their checks that still matter are folded into H below, so H is the one list to work through. Everything here was driven on the JVM and CI's emulator; nothing in this list has been done on a real phone or a real Forerunner 245. **Back up first** (Settings › Data › Back up to a file), and do checks 15–17 on a second install or a phone whose list you can lose: they restore backups.
+
+**When a check fails, capture:** a screenshot or screen recording; the recipe URL or the exact line text; for the watch, the time it happened and `adb logcat -d -s HyperShop:* WatchSync:* > watch.txt` from the phone straight afterwards (the watch side has no log you can pull, so say what the watch showed). Write the check number next to it.
+
+## ⏸ Hand-off H — your checks (yes/no, and three numbers)
+
+**A routine week**
+1. **Upgrade.** Install over your current version. Does the list open with no "Starting…" wait, everything you had still there, and Recipes › Plan the week showing the recipes on the list as this week's meals, nothing added twice?
+2. **Stopwatch.** The week after a finished trip: List › Plan this week › Same as last week? › Add N meals › Buy again's Add all › Already at home? (Have it on what you have) › Start shopping. Time from opening the app to the shop screen, leaving out deciding what to cook: ___ min ___ s. Expected: under two minutes.
+3. **Already at home.** Is the list short and about this week's meals only? "Have it" takes an item off; "Need it" puts exactly that amount back?
+4. **One-handed shop.** Tick ten items quickly with your thumb at the largest font size you use. Every tick shows at once and none undoes another? A mis-tap tapped again within two seconds unticks without expanding "N bought"? Does the bottom bar stay still?
+5. **Remove a meal you have part-bought.** What you bought stays ticked; only the rest comes off; Undo puts it back. Did any Undo-only action (Clear all, Remove a meal, Remove from list, Reset a library entry) feel too easy to trigger by accident? ___
+6. **Finish shopping.** Finish, then open Buy again next week: are the chips things you buy by hand, and nothing a recipe asked for?
+
+**Recipe imports**
+7. **Three real recipes** (UK site, US site, a chatty blog). On each review, count the rows that are wrong and how many of those were flagged ("Check: …"). Wrong *and unflagged* is what matters: ___ / ___ / ___. Expected: tins of tomatoes in Tins & jars (not Fruit & veg), minced beef as beef mince, cups of cheese, rice or seeds in grams (not ml).
+8. **Correct a line, then Ask Claude.** Set an amount on the sheet's Amount field, rename a row, and Remove from recipe + Undo (back where it was). Then Ask Claude: all three corrections still there?
+9. **Two identical lines** (new in this pass). Share or paste a recipe that lists the same line twice in two sections, e.g. "100 g sugar" under the cake and again under the icing. Change only the first to 150 g and Ask Claude: the first still 150 g, the second still 100 g, the row 250 g? Remove one of them, Undo: the right one back in its place? Leave the review and open it again from the card: still as you left it?
+10. **Edit after buying.** Buy part of a recipe, then edit it to need more: the bought amount stays bought and only the extra is needed?
+
+**Accessibility and looks**
+11. **TalkBack.** Tick an item in the shop: is the new count spoken? Swipe through the review: title a heading, outcome spoken before the button, focus in reading order?
+12. **Largest font size.** Are the tab labels whole, and can you still find Add, Start shopping and Finish without scrolling sideways?
+13. **Dark mode and daylight.** Light and dark: is all text readable on the heroes? Outside in daylight at your usual brightness, can you read the shop list? ___
+14. **Plan screen density.** Is the week screen readable at a glance, or is there too much on it? Which part would you remove first? ___
+
+**Backup** (second install or a list you can lose)
+15. **Downloads and a cloud provider.** Back up to Downloads, then to Google Drive (or another cloud provider). Restore each: the list, the week's plan, Buy again's regulars and your Claude key all still there?
+16. **A broken file.** Restore a file that is not a backup (any photo or PDF): refused with a plain-words message, nothing changed?
+17. **Undo of a restore** after ticking something: refused (the list has moved on), not silently undoing the tick?
+
+**Garmin Forerunner 245**
+18. **First sync.** Open the watch app with the phone near: the phone's list, in aisle order, merged (one onion row for two recipes)?
+19. **Offline ticks and Undo.** Phone Bluetooth off. On the watch tick three items, then Undo one. On the phone, add a recipe that also needs one of the ticked items, and change the amount of a shared ingredient. Bluetooth on: within a few seconds phone and watch agree; the shared item shows the new recipe's share still needed; the undone item is not bought; nothing bought twice.
+20. **Rapid ticks.** Tick five items as fast as the watch allows: all five bought on the phone, none twice.
+21. **Restore with the watch open.** Restore a backup on the phone: the watch switches to the restored list within a few seconds and none of its old ticks land on it (the watch epoch changed).
+22. **Phone restart.** Force-stop HyperShop with the watch app open, tick on the watch, open HyperShop: the tick arrives.
+23. **A long list.** With 60+ items (Debug tools › Load sample, twice), scroll the watch list to the end while ticking on the phone: no page from an older list mixed in (snapshot build identifiers), every row present once.
+24. **Watch unit tests on a desktop** (CI cannot run them, KNOWN_ISSUES #12): `tools/run_watch_tests.sh` on Linux with a display, or the three commands at the top of `tools/build_watch.sh`. Every test PASSED?
+
 ## Status: Release C (exceptional polish and real-world quality) — ⏸ Hand-off G
 
 Release C is on branch `ccr-5923064f-985kmq` (PROGRESS.md › Release C, docs/design/release-c.md, the report in docs/reports/release-c-final.md). Everything below was driven on the JVM and CI's emulator; only you can say how it feels in a shop, with TalkBack, and with your own recipes. **Back up first** (Settings › Data › Back up to a file).
@@ -8,7 +50,7 @@ Release C is on branch `ccr-5923064f-985kmq` (PROGRESS.md › Release C, docs/de
 
 State: commits C.0–C.7 are on `ccr-5923064f-985kmq` and pushed. Left to do, in order: C.8 the adversarial review of `git diff 06e4126..HEAD -- android` (areas: `ReviewViewModel.keepCorrections`/`setAmount`/`removeLine`+Undo; `ListViewModel.prep` gated on list mode and the "+1" snackbar; `ShopScreen` lingering ticks; the dialogs replaced by Undo; the parser's trailing amounts, lengths, decilitres, shared heads; `BuyAgain.view(list)`, `Planner.recipesByKeys`; `AmountField(initial)`), fixing what it finds, one `[C.8]` commit with the findings in docs/reports/release-c-final.md § 8; then C.9: fill § 8 of the report, commit `[C.9]`, `tools/verify.sh` green before each commit, and open the PR with the body in the final report's "Delivery" section (the draft PR text is the report's own summary). Rules: CLAUDE.md (gate before every commit, golden data never edited, PROGRESS.md in the same commit as its step).
 
-## ⏸ Hand-off G — your checks (yes/no)
+## Hand-off G — folded into H (kept for the record)
 
 1. **Three real recipes.** Share three recipes you actually cook (one from a UK site, one US, one blog with chatty lines). On each review: how many rows are wrong, and how many of those did the app flag ("Check: …")? Wrong and unflagged is what matters: ___ / ___ / ___.
 2. **Correcting a line.** On a flagged row, open the sheet. Is the line as the recipe wrote it visible, and does the reason say what to do? Set the amount from the Amount field, rename the row, swap "A or B". Then tap Ask Claude: are your corrections still there afterwards?
@@ -27,7 +69,7 @@ State: commits C.0–C.7 are on `ccr-5923064f-985kmq` and pushed. Left to do, in
 
 Release B is on branch `claude/release-b` (PROGRESS.md › Release B, docs/design/release-b.md). The emulator drives every flow; only you can say whether a real week is quicker. **Back up first** (Settings › Data › Back up to a file): the update migrates your database, and your recipes on the list become this week's planned meals.
 
-## ⏸ Hand-off F — your checks (yes/no, and two times)
+## Hand-off F — folded into H (kept for the record)
 
 1. **The upgrade.** After installing, open Recipes › Plan the week. Are the recipes that were on your list there as this week's meals, each saying how much is still to buy? Nothing added twice to the list?
 2. **Stopwatch, the first week.** Plan next week's shop as you normally would on the Plan screen (meals, then the items you always buy, then Already at home?), and press Start shopping. Time it from opening the app to the shop screen, leaving out time spent deciding what to cook. ___ min ___ s
@@ -45,7 +87,7 @@ Release B is on branch `claude/release-b` (PROGRESS.md › Release B, docs/desig
 
 Release A is on branch `claude/release-a-verified` (PROGRESS.md › Release A). What CI's emulator verified and what it cannot is in docs/design/release-a.md. These checks need your phone and your watch. **Back up first** (Settings › Data › Back up to a file).
 
-## ⏸ Hand-off E — your checks (yes/no)
+## Hand-off E — folded into H (kept for the record)
 
 **Phone**
 1. **Start-up.** Open HyperShop from cold. Does the list appear with no visible wait (no "Starting…" screen)?
