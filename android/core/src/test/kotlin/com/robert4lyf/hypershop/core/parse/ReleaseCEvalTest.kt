@@ -28,12 +28,17 @@ class ReleaseCEvalTest {
 
     @Test
     fun everyLineReadsAsRecorded() {
-        val problems = EvalGate.check(eval, "testdata/eval/release-c-2026-baseline.json")
+        val problems = EvalGate.check(eval, "testdata/eval/release-c-2026-baseline.json", LABELS_AT_GATE)
         assertTrue(problems.isEmpty(), problems.joinToString("\n"))
     }
 
     @Test
     fun totalsHoldTheirFloors() {
         EvalFloors.check(eval, EvalFloors.RELEASE_C)
+    }
+
+    private companion object {
+        /** The labels' checksum when the gate was set (Q.2b); a later change needs a recorded correction. */
+        const val LABELS_AT_GATE = "0ab2c23c7752"
     }
 }

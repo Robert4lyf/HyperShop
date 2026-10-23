@@ -73,7 +73,7 @@ class DuplicateLinesReviewTest {
     private fun <T : ViewModel> tracked(vm: T): T = vm.also { models += it }
 
     /** Claude's answer: each line as (raw, grams, section), named as the rules name it so the rows stay comparable. */
-    private fun answer(vararg lines: Triple<String, Int, String>) {
+    private fun answerResponse(vararg lines: Triple<String, Int, String>): MockResponse {
         val inner =
             buildJsonObject {
                 put("status", "ok")
@@ -115,7 +115,11 @@ class DuplicateLinesReviewTest {
                     }
                 }
             }
-        claude.enqueue(MockResponse().setBody(body.toString()))
+        return MockResponse().setBody(body.toString())
+    }
+
+    private fun answer(vararg lines: Triple<String, Int, String>) {
+        claude.enqueue(answerResponse(*lines))
     }
 
     private val cake = Triple("100 g sugar", 100, "For the cake")
@@ -336,4 +340,53 @@ class DuplicateLinesReviewTest {
         job.cancel()
         return id ?: throw AssertionError("no review opened")
     }
+
+    @Test
+    fun anAnswerSavedWhileTheReviewWasClosedIsReadWithTheCorrectionsOverIt() {
+        // Review fix: the job holds Claude's answer, saved with the lines it replaced and the corrections then
+        // standing (the icing's sugar removed). Opening the review lays the removal over the answer.
+        val job = job()
+        val vm = open(job)
+        vm.removeLine(sugarLines(vm)[1].id)
+        settle(vm, "100g")
+        val shown = kept(job)
+        val answer = listOf(cake, flour, icing).map { (raw, _, section) -> parsedLike(raw, section) }
+        runBlocking {
+            val saved =
+                shown.copy(
+                    lines = answer,
+                    origins = emptyList(),
+                    claudeBefore = com.robert4lyf.hypershop.importing.ReviewLines(shown.lines, shown.origins),
+                )
+            c.importJobs.update(job, saved)
+        }
+        vm.viewModelScope.cancel()
+        val again = open(job)
+        assertEquals("100g", sugarRow(again))
+        assertEquals(listOf("For the cake:100"), sugars(job))
+    }
+
+    @Test
+    fun askingAgainAfterStopAndAnEditLaysTheAnswerOverTheReviewAsItIsNow() {
+        // Review fix: the first call outlives Stop; a second Ask Claude joins it. The removal made between the two
+        // must stand over the answer, which was asked for before it.
+        val job = job()
+        val vm = open(job)
+        claude.enqueue(answerResponse(cake, flour, icing).setBodyDelay(1500, java.util.concurrent.TimeUnit.MILLISECONDS))
+        vm.retryWithClaude()
+        awaitTrue { claude.requestCount == 1 }
+        vm.stopRetry()
+        await(vm.state) { it is ReviewState.Ready && !it.ui.busy }
+        vm.removeLine(sugarLines(vm)[0].id)
+        settle(vm, "100g")
+        vm.retryWithClaude()
+        await(vm.state) { it is ReviewState.Ready && !it.ui.busy && it.ui.badge == Badge.CLAUDE }
+        assertEquals(1, claude.requestCount)
+        assertEquals(listOf("For the icing:100"), sugars(job))
+    }
+
+    private fun parsedLike(
+        raw: String,
+        section: String,
+    ) = com.robert4lyf.hypershop.core.parse.RuleParser().parse(raw).copy(section = section)
 }

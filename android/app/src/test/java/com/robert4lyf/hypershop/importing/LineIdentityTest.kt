@@ -184,9 +184,10 @@ class LineIdentityTest {
         val r = LineIdentity.reconcile(en, fr, ofr, fixed(LineCorrection(ofr[1], mine)))
         assertEquals(listOf("100 g sugar", "200 g farine"), r.lines.map { it.raw })
         assertEquals(Rational.of(250), r.lines[1].quantity)
-        // One fewer line back: no pairing is safe, so the correction stays and Claude's lines are marked to check.
+        // One fewer line back: no pairing is safe, so the review's lines stand (the untouched one marked to
+        // check) and Claude's are not added beside them, which could buy the corrected one twice.
         val short = LineIdentity.reconcile(en.take(1), fr, ofr, fixed(LineCorrection(ofr[1], mine)))
-        assertEquals(listOf("100 g sugar", "200 g farine"), short.lines.map { it.raw })
+        assertEquals(listOf("100 g sucre", "200 g farine"), short.lines.map { it.raw })
         assertTrue(short.lines[0].check)
         assertFalse(short.lines[1].check)
     }
@@ -196,5 +197,43 @@ class LineIdentityTest {
         val again = listOf(cakeSugar.copy(name = "caster sugar"), icingSugar.copy(name = "icing sugar"))
         val r = LineIdentity.reconcile(again, before, origins, emptyMap())
         assertEquals(again, r.lines)
+    }
+
+    @Test
+    fun aTranslationThatCannotBeLinedUpKeepsTheReviewNotBoth() {
+        // Review fix: a French recipe, the flour corrected; Claude translates and splits "sel et poivre".
+        val fr = listOf(line("200 g farine", 200, name = "farine"), line("sel et poivre", null, name = "sel et poivre"))
+        val o = LineIdentity.originsOf(fr)
+        val mine = fr[0].copy(name = "plain flour")
+        val en =
+            listOf(
+                line("200 g flour", 200, name = "flour"),
+                line("salt and pepper", null, name = "salt"),
+                line("salt and pepper", null, name = "pepper"),
+            )
+        val r = LineIdentity.reconcile(en, fr, o, fixed(LineCorrection(o[0], mine)))
+        // The corrected flour once (not 400 g of it), the other line as it was, marked to check.
+        assertEquals(listOf("plain flour", "sel et poivre"), r.lines.map { it.name })
+        assertEquals(o, r.origins)
+        assertFalse(r.lines[0].check)
+        assertTrue(r.lines[1].check)
+    }
+
+    @Test
+    fun aRemovedLineDoesNotComeBackThroughATranslation() {
+        val de = listOf(line("200 g Zucker", 200, name = "zucker"), line("2 Eier", null, name = "eier"))
+        val o = LineIdentity.originsOf(de)
+        val en = listOf(line("200 g sugar", 200, name = "sugar"), line("2 eggs", null, name = "eggs"))
+        val r = LineIdentity.reconcile(en, de.take(1), o.take(1), fixed(LineCorrection(o[1], de[1], removed = true)))
+        assertEquals(listOf("zucker"), r.lines.map { it.name })
+        assertTrue(r.origins.none { it == o[1] })
+    }
+
+    @Test
+    fun aSplitLineIsSentToClaudeOnce() {
+        val split = listOf(line("salt and pepper", null, name = "salt"), line("salt and pepper", null, name = "pepper"), flour)
+        assertEquals(listOf("salt and pepper", "200 g flour"), LineIdentity.sourceLines(split))
+        // Two genuine lines with the same text in different places are both sent.
+        assertEquals(listOf("100 g sugar", "200 g flour", "100 g sugar"), LineIdentity.sourceLines(before))
     }
 }

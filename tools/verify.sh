@@ -23,6 +23,12 @@ fi
 
 step() { printf '\n== %s\n' "$*"; }
 
+# The evaluation gate rewrites its own baselines with this set (EvalGate); the gate must never run that way.
+if [ "${HYPERSHOP_EVAL_UPDATE:-}" != "" ]; then
+  echo "HYPERSHOP_EVAL_UPDATE is set: unset it; verify.sh does not run with the evaluation gate rewriting itself" >&2
+  exit 1
+fi
+
 step "Gradle: ktlint, unit tests, assembleDebug"
 # ktlint on its own and from scratch: ktlint-gradle 12.1.2 under Gradle's
 # caches keeps reporting errors in files that no longer exist (KNOWN_ISSUES #3).

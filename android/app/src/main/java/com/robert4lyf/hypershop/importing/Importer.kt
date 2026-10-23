@@ -120,7 +120,11 @@ class Importer(
         allowClaude: Boolean,
         model: ClaudeModel,
     ): ImportResult {
-        val ruled = base.copy(lines = rules.parseLines(base.rawLines), parsedBy = ParsedBy.RULES)
+        // Lines read afresh: the review's origins no longer describe them, and its corrections are laid over them
+        // from the lines they replace (ReviewViewModel.begin and keepCorrections).
+        val replaced = ReviewLines(base.lines, LineIdentity.originsOf(base)).takeIf { base.corrections.isNotEmpty() }
+        val ruled =
+            base.copy(lines = rules.parseLines(base.rawLines), parsedBy = ParsedBy.RULES, origins = emptyList(), claudeBefore = replaced)
         val keyed = claude != null && hasKey()
         val photo = base.photo?.takeIf { base.rawLines.isEmpty() }
         if (photo != null && !keyed) return ruled.copy(claudePending = false, error = ImportError.PHOTO_NEEDS_KEY)
@@ -160,7 +164,11 @@ class Importer(
                         base.copy(
                             lines = r.recipe.ingredients,
                             // A photo's lines are kept as text from now on ("Retry with Claude" re-reads those).
-                            rawLines = base.rawLines.ifEmpty { r.recipe.ingredients.map { it.raw } },
+                            rawLines = base.rawLines.ifEmpty { LineIdentity.sourceLines(r.recipe.ingredients) },
+                            // Claude's lines are new: the review's origins no longer describe them, and its
+                            // corrections are laid over them from the lines they replaced (ReviewViewModel.begin).
+                            origins = emptyList(),
+                            claudeBefore = replaced,
                             photo = null,
                             title = base.title ?: r.recipe.title,
                             servings = base.servings ?: r.recipe.servings,

@@ -31,4 +31,4 @@
 | 26 | Import | "2 tbsp butter plus 1 tbsp melted" asks for 2 tbsp: spec R3.6 sends a "plus" amount to the note rather than adding it, also when the units match. A small under-buy on a few lines; changing it is a spec change, not a fix. | open (spec) |
 | 27 | Import | The final held-out set (`testdata/eval/final-2026.json`) was independent for its first reading only (78 % right, 19 of 114 accepted lines wrong). Its errors then guided some Q.3 fixes, so its later 84 % is not an independent figure. The next parser change needs a fresh set to be measured honestly. | open |
 | 28 | Hardware | Nothing in the final quality pass was run on a real phone or a Forerunner 245: no device was reachable from the container. Hand-off H in docs/HANDOFF.md is the list. | open (needs you) |
-
+| 29 | Import | The Q.3 tin and mince readings live in the rule parser; Claude's answers are post-processed without them. A Claude reading "tomatoes" with unit tin would still be filed as fresh tomatoes. Claude is asked for the name a UK shopper looks for ("tinned tomatoes"), so this is the fallback path only; found by the quality pass's review. | open |

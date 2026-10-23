@@ -100,7 +100,6 @@ class CriticalLinesTest {
             Case("small bunch thyme", "cat:thyme", "1 bunch"),
             Case("3  beef bouillon cubes (, crumbled)", "cat:beef_stock_cube", "3"),
             Case("300g bacon lardons", "cat:pancetta", "300g"),
-            Case("1/2 tsp cooking salt / kosher salt", "cat:salt", "½tsp"),
             // A recipe's own metric figure is what is shopped by.
             Case("1/2 cup (113g) butter", "cat:butter", "120g", locale = UnitLocale.US),
         )

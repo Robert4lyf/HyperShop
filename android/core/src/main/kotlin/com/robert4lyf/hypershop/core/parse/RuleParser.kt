@@ -334,6 +334,9 @@ class RuleParser(
 
         val lower = text.lowercase()
 
+        /** Words said about the name itself: qualifiers moved off it and its own brackets ([shelf]). */
+        val nameWords = HashSet<String>()
+
         // ---- quantity ---------------------------------------------------------------
 
         /** Skips "about"/"approx."/"around" before the amount into the note; returns where the amount starts. */
@@ -483,6 +486,8 @@ class RuleParser(
                             optional = true
                         } else if (inner.isNotEmpty()) {
                             notes += inner
+                            // "Beef (minced, …)": what the name's own brackets say about it, not an alternative.
+                            if (!inner.lowercase().startsWith("or ")) nameWords += inner.lowercase().split(NOT_LETTERS)
                         }
                         k = close + 1
                         continue
@@ -511,7 +516,7 @@ class RuleParser(
             val words =
                 head.filter {
                     it.kind == Kind.WORD || it.kind == Kind.DASH || it.kind == Kind.NUM ||
-                        it.kind == Kind.OTHER && it.text.any { c -> c.isLetterOrDigit() }
+                        it.kind == Kind.OTHER && !it.text.all { c -> c in FOOTNOTE_MARKS }
                 }
             val kept = ArrayList<Token>()
             val moved = ArrayList<String>()
@@ -530,6 +535,7 @@ class RuleParser(
                 idx++
             }
             if (moved.isNotEmpty()) notes.add(0, moved.joinToString(" "))
+            nameWords += moved
             // A leftover amount ("1 lb. 4 oz. beef", "1/0 cup sugar") is not a name: R7.
             if (head.firstOrNull()?.kind in LEFTOVER && catalog.lookup(joinWords(kept)) == null) {
                 flag("an amount left in the name")
@@ -609,9 +615,9 @@ class RuleParser(
         }
 
         /**
-         * "flax seed/linseeds", "cooking salt / kosher salt", "scotch fillet steak / boneless rib eye":
-         * two names for one thing. The side the catalogue knows is the name (the first when it knows
-         * both or neither); the other goes to the note. Not an "A or B" choice, so not flagged.
+         * "flax seed/linseeds": two names the catalogue files as one thing, so the first is the name and
+         * nothing is flagged. Anything else ("salt/pepper", "milk/dark chocolate", "scotch fillet / rib
+         * eye") may be two products: the first is kept, the other goes to the note, and it is flagged.
          */
         fun pickSlashSide(head: MutableList<Token>) {
             val at = head.indexOfFirst { it.kind == Kind.SLASH }
@@ -622,10 +628,18 @@ class RuleParser(
             if (before.text.lowercase() in AND_OR || after.text.lowercase() in AND_OR) return
             val left = head.subList(0, at).toList()
             val right = head.subList(at + 1, head.size).toList()
-            val keepRight = !known(joinWords(left)) && known(joinWords(right))
-            notes += joinWords(if (keepRight) left else right)
+            val l = entryOf(joinWords(left))
+            val r = entryOf(joinWords(right))
+            if (l != null && l.id == r?.id) {
+                // Two names for one thing ("flax seed/linseeds"): the first, nothing to decide.
+                notes += joinWords(right)
+            } else {
+                // Two things, or a name the catalogue does not know: one of two, for the shopper to choose (R4.4).
+                notes += "or ${joinWords(right)}"
+                flag("\"A or B\": one of two")
+            }
             head.clear()
-            head += if (keepRight) right else left
+            head += left
         }
 
         /**
@@ -637,9 +651,11 @@ class RuleParser(
             name: String,
             unit: QtyUnit?,
         ): String {
-            val e = entryOf(name) ?: return name
-            val said = lower.split(NOT_LETTERS).toSet()
-            if ((unit == QtyUnit.TIN || "canned" in said || "tinned" in said) && e.aisle == AisleCode.PRODUCE) {
+            // Only what was said about the name itself (its moved qualifiers, its own brackets): "4 tomatoes
+            // (or 400g tinned)" and "lamb, tossed with ground cumin" are not tins and not mince.
+            val tinWord = nameWords.firstOrNull { it == "canned" || it == "tinned" }
+            val e = entryOf(name) ?: return if (tinWord != null) "$tinWord $name" else name
+            if ((unit == QtyUnit.TIN || tinWord != null) && e.aisle == AisleCode.PRODUCE) {
                 // "canned crushed tomato": the catalogue's plural is what its tinned synonyms are made of.
                 val forms = listOf(name, e.plural).distinct()
                 forms
@@ -647,9 +663,12 @@ class RuleParser(
                     .firstOrNull { entryOf(it)?.aisle?.let { a -> a != AisleCode.PRODUCE } == true }
                     ?.let { return it }
             }
-            if (e.aisle == AisleCode.MEAT_FISH && ("minced" in said || "ground" in said)) {
+            if (e.aisle == AisleCode.MEAT_FISH && ("minced" in nameWords || "ground" in nameWords)) {
                 "$name mince".takeIf { entryOf(it)?.aisle == AisleCode.MEAT_FISH }?.let { return it }
             }
+            // "tinned salmon", "canned peaches": a tin of something the catalogue only knows fresh stays a tin,
+            // its own item, rather than becoming the fresh one.
+            if (tinWord != null && e.aisle != AisleCode.TINS_JARS) return "$tinWord $name"
             return name
         }
 
@@ -706,9 +725,7 @@ class RuleParser(
         return u to 1
     }
 
-    /** The catalogue has [phrase], as written or with its last word singular. */
-    private fun known(phrase: String): Boolean = entryOf(phrase) != null
-
+    /** The catalogue's entry for [phrase], as written or with its last word singular. */
     private fun entryOf(phrase: String): CatalogEntry? {
         val k = CatalogKey.of(phrase)
         if (k.isEmpty()) return null
@@ -746,6 +763,9 @@ class RuleParser(
         val SUB_RECIPE = setOf("recipe", "recipes", "batch", "batches", "quantity")
 
         val NOT_LETTERS = Regex("[^a-z]+")
+
+        /** Footnote marks after a name ("brown rice*"); "%" and "&" are part of names. */
+        const val FOOTNOTE_MARKS = "*†‡"
 
         /** What "a"/"an" must come before to mean one. */
         val ARTICLE_BEFORE = setOf(Kind.WORD, Kind.NUM)

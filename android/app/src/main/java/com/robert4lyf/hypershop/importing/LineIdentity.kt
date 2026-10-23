@@ -25,6 +25,17 @@ data class LineCorrection(
     val removed: Boolean = false,
 )
 
+/**
+ * The review's lines as they were when Claude was asked, kept with an answer saved
+ * on the job ([ImportResult.claudeBefore]) so a review opened later lays the
+ * corrections over it ([LineIdentity.reconcile]) instead of showing Claude's raw reading.
+ */
+@Serializable
+data class ReviewLines(
+    val lines: List<ParsedIngredient>,
+    val origins: List<LineOrigin>,
+)
+
 /** Claude's answer with the user's corrections laid over it, and each line's origin. */
 data class Reconciled(
     val lines: List<ParsedIngredient>,
@@ -51,6 +62,13 @@ object LineIdentity {
             LineOrigin(s, n)
         }
     }
+
+    /**
+     * The source lines for Claude to read, from lines already parsed (a photo's, a saved recipe's): a line read
+     * as several ("salt and pepper" → salt, pepper) carries its text on each part, and is sent once, not once per part.
+     */
+    fun sourceLines(lines: List<ParsedIngredient>): List<String> =
+        lines.map { it.raw }.filterIndexed { i, raw -> i == 0 || normal(raw) != normal(lines[i - 1].raw) }
 
     /** [r]'s origins, one per line: the ones kept with it, or (an import not yet reviewed) its lines' own. */
     fun originsOf(r: ImportResult): List<LineOrigin> = r.origins.takeIf { it.size == r.lines.size } ?: originsOf(r.lines)
@@ -82,7 +100,9 @@ object LineIdentity {
      *   the user had not touched are marked for checking (with none, Claude's stand);
      * - lines whose text matched nothing on either side (Claude translated them):
      *   paired by position only when the counts agree and no removed line is among
-     *   them, otherwise Claude's lines are kept and marked for checking.
+     *   them; otherwise, if the user decided anything about one of them, those lines
+     *   stay as the review had them (untouched ones marked) and Claude's are not
+     *   added, and if not, Claude's stand.
      *
      * A corrected line Claude left out stays (where it was in the recipe); an
      * untouched one Claude left out goes, as Claude's reading of the rest does.
@@ -120,7 +140,11 @@ object LineIdentity {
         val loneKnown = known.filter { it.source !in claudeBySource }
         val byPosition = loneClaude.size == loneKnown.size && loneKnown.none { corrections[it]?.removed == true }
         if (byPosition) loneClaude.zip(loneKnown).forEach { (i, o) -> match[i] = o }
-        val unsure = if (byPosition) emptySet() else loneClaude.toSet().takeIf { loneKnown.any { it in corrections } }.orEmpty()
+        // Not pairable, and a decision among them: which of Claude's lines is the corrected or removed one cannot be
+        // told, so those lines stay exactly as the review had them (untouched ones marked) and Claude's unmatched lines
+        // are not added beside them — adding them would buy a corrected ingredient twice, or bring a removed one back.
+        val keepReview = !byPosition && loneKnown.any { it in corrections }
+        val dropped = if (keepReview) loneClaude.toSet() else emptySet()
 
         val out = ArrayList<Pair<ParsedIngredient, LineOrigin>>()
         val used = HashSet<LineOrigin>(known)
@@ -156,9 +180,10 @@ object LineIdentity {
                 }
                 continue
             }
+            if (i in dropped) continue
             val o = match[i]
             if (o == null) {
-                out += (if (i in unsure) l.marked(CHECK_ALIGN) else l) to fresh(l.raw)
+                out += l to fresh(l.raw)
                 continue
             }
             emitted += o
@@ -170,13 +195,22 @@ object LineIdentity {
             }
         }
 
-        // A corrected line Claude did not return: kept, after the nearest line before it in the recipe.
+        // A corrected line Claude did not return, and (when Claude's could not be lined up) every line of the review
+        // it would have replaced: kept, after the nearest line before it in the recipe.
+        val kept = if (keepReview) loneKnown.toSet() else emptySet()
         for ((k, o) in origins.withIndex()) {
-            val c = corrections[o] ?: continue
-            if (c.removed || o in emitted) continue
+            if (o in emitted) continue
+            val c = corrections[o]
+            val line =
+                when {
+                    c?.removed == true -> continue
+                    c != null -> c.line
+                    o in kept -> before[k].marked(CHECK_ALIGN)
+                    else -> continue
+                }
             val anchor = origins.subList(0, k).lastOrNull { prev -> out.any { it.second == prev } }
             val at = anchor?.let { a -> out.indexOfLast { it.second == a } + 1 } ?: minOf(k, out.size)
-            out.add(at, c.line to o)
+            out.add(at, line to o)
             emitted += o
         }
         return Reconciled(out.map { it.first }, out.map { it.second })

@@ -249,7 +249,11 @@ interface ListDao {
         state: String,
     )
 
-    @Query("UPDATE ImportJob SET state = :state, resultJson = :resultJson, error = :error WHERE id = :id AND state != 'DONE'")
+    // Not over a DONE job, nor a DISCARDING one: an answer that lands after Cancel must not bring the import back.
+    @Query(
+        "UPDATE ImportJob SET state = :state, resultJson = :resultJson, error = :error " +
+            "WHERE id = :id AND state NOT IN ('DONE', 'DISCARDING')",
+    )
     suspend fun finishJob(
         id: Long,
         state: String,

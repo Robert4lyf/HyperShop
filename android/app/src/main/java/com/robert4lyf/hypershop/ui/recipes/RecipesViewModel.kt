@@ -15,6 +15,7 @@ import com.robert4lyf.hypershop.data.bookRef
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.importing.ImportInput
 import com.robert4lyf.hypershop.importing.ImportResult
+import com.robert4lyf.hypershop.importing.LineIdentity
 import com.robert4lyf.hypershop.importing.PhotoStore
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import kotlinx.coroutines.Dispatchers
@@ -218,7 +219,7 @@ class RecipesViewModel(
                 preTick = method != ImportResult.LIBRARY_EDIT,
                 parsedBy = runCatching { ParsedBy.valueOf(r.parsedBy) }.getOrDefault(ParsedBy.RULES),
                 model = r.model,
-                rawLines = lines.map { it.raw },
+                rawLines = LineIdentity.sourceLines(lines),
                 libraryKey = row.key,
                 book = r.book,
                 page = r.page,
@@ -343,7 +344,7 @@ class RecipesViewModel(
                     lines = src.lines,
                     parsedBy = runCatching { ParsedBy.valueOf(r.parsedBy) }.getOrDefault(ParsedBy.RULES),
                     model = r.model,
-                    rawLines = src.lines.map { it.raw },
+                    rawLines = LineIdentity.sourceLines(src.lines),
                     preTick = false,
                     editsUse = use.useId,
                     inStockLines = src.inStockLines,

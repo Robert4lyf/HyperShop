@@ -29,6 +29,7 @@ import com.robert4lyf.hypershop.importing.LineCorrection
 import com.robert4lyf.hypershop.importing.LineIdentity
 import com.robert4lyf.hypershop.importing.LineOrigin
 import com.robert4lyf.hypershop.importing.PhotoStore
+import com.robert4lyf.hypershop.importing.ReviewLines
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.common.webLink
 import kotlinx.coroutines.Dispatchers
@@ -266,8 +267,6 @@ class ReviewViewModel(
     private suspend fun parseWithClaude(
         r: ImportResult,
         keep: (ImportResult) -> Boolean = { true },
-        // Applied before the answer is kept on the job, so the corrections go with it even if the screen has gone.
-        transform: (ImportResult) -> ImportResult = { it },
     ): ImportResult =
         c
             .claudeParse(jobId) {
@@ -276,9 +275,31 @@ class ReviewViewModel(
                         r,
                         allowClaude = true,
                         model = c.settings.model.first(),
-                    ).let(transform)
-                    .also { if (keep(it)) c.importJobs.finish(jobId, it) }
+                    ).also { if (keep(it)) c.importJobs.finish(jobId, withReviewOf(it, c.importJobs.get(jobId)?.result)) }
             }.await()
+
+    /**
+     * The answer as it is kept on the job: with the review's state *as the job holds it when the answer
+     * arrives*, not when the call started — a Stop, then edits, then Back mid-call must not lose those
+     * edits — and the lines they were made on, to lay the corrections over the answer on opening.
+     */
+    private fun withReviewOf(
+        answer: ImportResult,
+        now: ImportResult?,
+    ): ImportResult {
+        if (now == null || answer.parsedBy != ParsedBy.CLAUDE) return answer
+        return answer.copy(
+            title = now.title ?: answer.title,
+            book = now.book,
+            page = now.page,
+            targetServings = now.targetServings,
+            inStockKeys = now.inStockKeys,
+            decisionsSaved = now.decisionsSaved,
+            aisleMoves = now.aisleMoves,
+            corrections = now.corrections,
+            claudeBefore = ReviewLines(now.lines, LineIdentity.originsOf(now)).takeIf { now.corrections.isNotEmpty() },
+        )
+    }
 
     private suspend fun load() {
         units = c.settings.units.first()
@@ -328,10 +349,18 @@ class ReviewViewModel(
     fun addAgain() = act { if (_state.value is ReviewState.AlreadyOnList) result?.let { begin(it) } }
 
     private suspend fun begin(from: ImportResult) {
-        val r = from.copy(origins = LineIdentity.originsOf(from))
-        result = r
         corrections.clear()
-        for (c in r.corrections) corrections[c.origin] = c
+        for (c in from.corrections) corrections[c.origin] = c
+        // An answer from Claude saved while corrections stood: they are laid over it here.
+        val before = from.claudeBefore
+        val r =
+            if (before != null && before.lines.size == before.origins.size) {
+                val rec = LineIdentity.reconcile(from.lines, before.lines, before.origins, corrections.toMap())
+                from.copy(lines = rec.lines, origins = rec.origins, claudeBefore = null)
+            } else {
+                from.copy(origins = LineIdentity.originsOf(from), claudeBefore = null)
+            }
+        result = r
         servings = r.targetServings ?: r.servings
         if (r.decisionsSaved) aisleMoves.putAll(r.aisleMoves)
         store(r)
@@ -598,13 +627,10 @@ class ReviewViewModel(
                 retrying = true
                 (state.value as? ReviewState.Ready)?.let { _state.value = it.copy(ui = it.ui.copy(busy = true, retrying = true)) }
                 try {
-                    val fixed = corrections.toMap()
-                    val kept =
-                        parseWithClaude(
-                            r.copy(claudePending = true, askClaude = true),
-                            keep = { it.parsedBy == ParsedBy.CLAUDE },
-                            transform = { again -> keepCorrections(again, r, fixed) },
-                        )
+                    val again = parseWithClaude(r.copy(claudePending = true, askClaude = true)) { it.parsedBy == ParsedBy.CLAUDE }
+                    // Laid over the review as it is now, not as it was when the call started: a second Ask
+                    // Claude after Stop and an edit joins the first call (AppContainer.claudeParse).
+                    val kept = keepCorrections(again, result ?: r, corrections.toMap())
                     store(kept)
                     result = kept
                 } finally {
@@ -623,7 +649,7 @@ class ReviewViewModel(
         fixed: Map<LineOrigin, LineCorrection>,
     ): ImportResult {
         val r = LineIdentity.reconcile(again.lines, before.lines, LineIdentity.originsOf(before), fixed)
-        return again.copy(lines = r.lines, origins = r.origins, corrections = fixed.values.toList())
+        return again.copy(lines = r.lines, origins = r.origins, corrections = fixed.values.toList(), claudeBefore = null)
     }
 
     /** "Stop" while asking Claude. An answer that still arrives is kept on the job for next time. */
@@ -979,7 +1005,11 @@ class ReviewViewModel(
             if (t.isEmpty()) return@act
             val origins = LineIdentity.originsOf(r)
             val origin = LineIdentity.next(t, origins + corrections.keys)
-            val edited = r.copy(lines = r.lines + c.ruleParser.parse(t), rawLines = r.rawLines + t, origins = origins + origin)
+            val line = c.ruleParser.parse(t)
+            // A line the user typed is their reading of it, like an edit: it stands over Claude's, and is kept if
+            // Claude's answer leaves it out (an answer to a call made before it was typed does).
+            corrections[origin] = LineCorrection(origin, line)
+            val edited = r.copy(lines = r.lines + line, rawLines = r.rawLines + t, origins = origins + origin)
             store(edited)
             result = edited
             changed = true
