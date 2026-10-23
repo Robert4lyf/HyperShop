@@ -140,7 +140,8 @@ chicken_liver,chicken livers,chicken livers,chicken liver,MEAT_FISH,false,pack,m
 turkey,turkey,turkey,turkey breast,MEAT_FISH,false,pack,mass,140,,Poultry,agent-estimate
 turkey_mince,turkey mince,turkey mince,ground turkey,MEAT_FISH,false,pack,mass,225,,Poultry,agent-estimate
 duck,duck,duck,duck breast|duck legs,MEAT_FISH,false,pack,count,,,Poultry,agent-estimate
-beef,beef,beef,stewing beef|braising steak|chuck|beef chuck,MEAT_FISH,false,pack,mass,,,Meat,agent-estimate
+beef,beef,beef,,MEAT_FISH,false,pack,mass,,,Meat,agent-estimate
+braising_steak,braising steak,braising steak,braising beef|stewing beef|stewing steak|beef for braising|beef for stewing|chuck steak|beef chuck|chuck,MEAT_FISH,false,pack,mass,,,Meat,agent-estimate
 beef_mince,beef mince,beef mince,minced beef|ground beef|ground chuck|mince,MEAT_FISH,false,pack,mass,225,1 × 500 g pack,Meat,agent-estimate
 steak,steak,steaks,sirloin steak|ribeye steak|rib-eye steak|flank steak|skirt steak|beef steak,MEAT_FISH,false,pack,count,,,Meat,agent-estimate
 beef_brisket,beef brisket,beef brisket,brisket,MEAT_FISH,false,each,mass,,,Meat,agent-estimate
@@ -150,7 +151,7 @@ pork_chop,pork chop,pork chops,,MEAT_FISH,false,pack,count,,,Meat,agent-estimate
 pork_mince,pork mince,pork mince,ground pork|minced pork,MEAT_FISH,false,pack,mass,225,,Meat,agent-estimate
 pork_belly,pork belly,pork belly,,MEAT_FISH,false,pack,mass,,,Meat,agent-estimate
 bacon,bacon,bacon,bacon rashers|streaky bacon|back bacon|thick-cut bacon|slab bacon|sliced bacon,MEAT_FISH,false,pack,count,,1 × pack of 8 rashers,Meat,agent-estimate
-pancetta,pancetta,pancetta,cubed pancetta|lardons,MEAT_FISH,false,pack,mass,140,,Meat,agent-estimate
+pancetta,pancetta,pancetta,cubed pancetta|lardons|bacon lardons|smoked lardons|smoked bacon lardons,MEAT_FISH,false,pack,mass,140,,Meat,agent-estimate
 ham,ham,ham,cooked ham|smoked ham,CHILLED,false,pack,mass,140,,Deli,agent-estimate
 ham_hock,ham hock,ham hocks,smoked ham hock|smoked ham hocks|gammon hock,MEAT_FISH,false,each,count,,,Meat,agent-estimate
 prosciutto,prosciutto,prosciutto,parma ham|serrano ham,CHILLED,false,pack,mass,,,Deli,agent-estimate
@@ -216,7 +217,7 @@ cheese,cheese,cheese,grated cheese,DAIRY_EGGS,false,pack,mass,113,,Cheese,agent-
 tofu,tofu,tofu,firm tofu|silken tofu,CHILLED,false,pack,count,,,,agent-estimate
 hummus,houmous,houmous,hummus,CHILLED,false,tub,count,,,,agent-estimate
 pesto,pesto,pesto,basil pesto|green pesto,TINS_JARS,false,jar,count,,,Jars & pickles,agent-estimate
-fresh_pasta,fresh pasta,fresh pasta,fresh tagliatelle|fresh lasagne sheets,CHILLED,false,pack,count,,,Pastry & pasta,agent-estimate
+fresh_pasta,fresh pasta,fresh pasta,fresh tagliatelle|fresh lasagne sheets|fresh lasagna sheets|fresh egg lasagne sheets|fresh egg lasagna sheets|fresh lasagne,CHILLED,false,pack,count,,,Pastry & pasta,agent-estimate
 puff_pastry,puff pastry,puff pastry,ready-rolled puff pastry,CHILLED,false,pack,count,,,Pastry & pasta,agent-estimate
 shortcrust_pastry,shortcrust pastry,shortcrust pastry,pie crust|pie dough,CHILLED,false,pack,count,,,Pastry & pasta,agent-estimate
 filo_pastry,filo pastry,filo pastry,phyllo|phyllo dough|filo,CHILLED,false,pack,count,,,Pastry & pasta,agent-estimate
@@ -231,7 +232,7 @@ edamame,edamame beans,edamame beans,edamame|soya beans,FROZEN,false,bag,mass,155
 broad_beans,broad beans,broad beans,fava beans|fava bean|broad bean,FROZEN,false,bag,mass,150,,,agent-estimate
 ice_cream,ice cream,ice cream,vanilla ice cream,FROZEN,false,tub,count,,,,agent-estimate
 ice,ice,ice,ice cubes,FROZEN,false,bag,presence,,,,agent-estimate
-chopped_tomatoes,chopped tomatoes,chopped tomatoes,canned tomatoes|tinned tomatoes|diced tomatoes|crushed tomatoes|whole peeled tomatoes|canned plum tomatoes|plum tomatoes in juice,TINS_JARS,false,tin,count,,1 × 400 g tin,Tomatoes,agent-estimate
+chopped_tomatoes,chopped tomatoes,chopped tomatoes,canned tomatoes|tinned tomatoes|diced tomatoes|crushed tomatoes|whole peeled tomatoes|canned plum tomatoes|tinned plum tomatoes|tinned whole tomatoes|canned whole tomatoes|plum tomatoes in juice,TINS_JARS,false,tin,count,,1 × 400 g tin,Tomatoes,agent-estimate
 passata,passata,passata,tomato sauce|strained tomatoes|sieved tomatoes|tomato passata,TINS_JARS,false,carton,volume,,,Tomatoes,agent-estimate
 tomato_puree,tomato purée,tomato purée,tomato paste|double concentrated tomato puree,TINS_JARS,false,tube,presence,,,Tomatoes,agent-estimate
 sundried_tomato,sun-dried tomatoes,sun-dried tomatoes,sundried tomatoes|sun dried tomatoes,TINS_JARS,false,jar,count,,,Tomatoes,agent-estimate
@@ -264,6 +265,7 @@ corn_syrup,corn syrup,corn syrup,light corn syrup|dark corn syrup,BAKING,false,b
 peanut_butter,peanut butter,peanut butter,smooth peanut butter|crunchy peanut butter,TINS_JARS,false,jar,presence,,,Spreads & syrups,agent-estimate
 tahini,tahini,tahini,tahini paste,WORLD_FOODS,false,jar,presence,,,Middle Eastern & Indian,agent-estimate
 stock_cube,stock cubes,stock cubes,bouillon cube|stock cube|bouillon|chicken stock cube|chicken stock cubes|chicken bouillon cube,TINS_JARS,false,pack,presence,,,Stock,agent-estimate
+beef_stock_cube,beef stock cubes,beef stock cubes,beef stock cube|beef bouillon cube|beef bouillon cubes|beef bouillon,TINS_JARS,false,pack,presence,,,Stock,agent-estimate
 chicken_stock,chicken stock,chicken stock,chicken broth|low-sodium chicken broth,TINS_JARS,false,carton,volume,,,Stock,agent-estimate
 vegetable_stock,vegetable stock,vegetable stock,vegetable broth|veg stock|stock|broth,TINS_JARS,false,carton,volume,,,Stock,agent-estimate
 beef_stock,beef stock,beef stock,beef broth,TINS_JARS,false,carton,volume,,,Stock,agent-estimate
@@ -333,6 +335,7 @@ bamboo_shoots,bamboo shoots,bamboo shoots,,WORLD_FOODS,false,tin,count,,,Asian,a
 tamarind,tamarind paste,tamarind paste,tamarind,WORLD_FOODS,false,jar,presence,,,Asian,agent-estimate
 coconut_flakes,desiccated coconut,desiccated coconut,shredded coconut|coconut flakes|unsweetened shredded coconut,BAKING,false,bag,mass,60,,Chocolate & decorations,agent-estimate
 flour,plain flour,plain flour,all-purpose flour|flour|white flour|unbleached all-purpose flour|ap flour,BAKING,false,bag,mass,125,1 × 1.5 kg bag,Flour,agent-estimate
+semolina,semolina,semolina,durum wheat semolina|remilled durum wheat semolina|semola rimacinata|fine semolina|semolina flour,BAKING,false,bag,mass,167,,Flour,agent-estimate
 self_raising_flour,self-raising flour,self-raising flour,self-rising flour,BAKING,false,bag,mass,125,,Flour,agent-estimate
 strong_flour,strong white bread flour,strong white bread flour,bread flour|strong flour,BAKING,false,bag,mass,130,,Flour,agent-estimate
 wholemeal_flour,wholemeal flour,wholemeal flour,whole-wheat flour|whole wheat flour|wholewheat flour,BAKING,false,bag,mass,120,,Flour,agent-estimate

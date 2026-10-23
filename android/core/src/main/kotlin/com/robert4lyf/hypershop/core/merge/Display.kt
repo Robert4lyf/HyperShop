@@ -47,6 +47,11 @@ object Display {
             parts = parts - BaseKey.VOLUME + (BaseKey.MASS to (parts[BaseKey.MASS] ?: Rational.ZERO) + g)
         }
         if (parts.isEmpty()) return null
+        // A cup of something solid the catalogue has no density for: millilitres of chickpeas
+        // would be a conversion nobody shops by, and grams would be a guess. The recipe's cups stay.
+        // (Bought by weight or by count; a "presence" item such as wine is shown in ml as before.)
+        val weighedOrCounted = policy == DisplayPolicy.MASS || policy == DisplayPolicy.COUNT
+        val cupsOfSolid = weighedOrCounted && hint == QtyUnit.CUP && parts.containsKey(BaseKey.VOLUME)
         val order = listOf(Dimension.COUNT, Dimension.MASS, Dimension.VOLUME)
         return parts.entries
             .sortedWith(compareBy({ order.indexOf(it.key.dimension) }, { it.key.countUnit?.ordinal ?: -1 }))
@@ -54,7 +59,7 @@ object Display {
                 when (k.dimension) {
                     Dimension.COUNT -> count(v, k.countUnit, produce)
                     Dimension.MASS -> mass(v, units, hint)
-                    Dimension.VOLUME -> volume(v, units, hint)
+                    Dimension.VOLUME -> if (cupsOfSolid) solidCups(v) else volume(v, units, hint)
                 }
             }
     }
@@ -186,13 +191,29 @@ object Display {
                 "${fraction(roundUp(oz, Rational.of(1, 4)))}oz"
             }
         }
-        val d = g.toDouble()
+        // Rounded first, so 998 g reads "1kg" and not "1000g".
+        val d = g.toDouble().let { if (it >= 100) roundUpD(it, 10.0) else it }
         return when {
             d >= 1000 -> "${trim(roundUpD(d / 1000, 0.1))}kg"
             d >= 100 -> "${trim(roundUpD(d, 10.0))}g"
             d >= 10 -> "${trim(roundUpD(d, 5.0))}g"
             else -> "${trim(roundUpD(d, 1.0))}g"
         }
+    }
+
+    private fun cups(ml: Rational): String =
+        "${fraction(roundUp(ml / Rational.of(240), Rational.of(1, 4)))} ${if (ml > Rational.of(240)) "cups" else "cup"}"
+
+    /**
+     * Cups as the recipe wrote them. A metric cup is 250 ml, 4 % over the US 240, so an amount
+     * within 5 % above a quarter cup is that quarter: one metric cup reads "1 cup", not "1¼".
+     */
+    private fun solidCups(ml: Rational): String {
+        val q = ml / Rational.of(240)
+        val quarter = Rational.of(1, 4)
+        val down = roundUp(q, quarter).let { up -> if (up > q) up - quarter else up }
+        val c = if (down > Rational.ZERO && q <= down * Rational.of(105, 100)) down else roundUp(q, quarter)
+        return "${fraction(c)} ${if (c > Rational.ONE) "cups" else "cup"}"
     }
 
     fun volume(
@@ -207,9 +228,7 @@ object Display {
         // Small amounts become spoons in imperial, and "as written" unless they were written in ml or l.
         val writtenMetric = hint == QtyUnit.ML || hint == QtyUnit.L
         val spoons = d < 60 && (units == UnitsSetting.IMPERIAL || units == UnitsSetting.AS_WRITTEN && !writtenMetric)
-        if (units == UnitsSetting.AS_WRITTEN && hint == QtyUnit.CUP || units == UnitsSetting.IMPERIAL && d >= 60) {
-            return "${fraction(roundUp(ml / Rational.of(240), Rational.of(1, 4)))} ${if (ml > Rational.of(240)) "cups" else "cup"}"
-        }
+        if (units == UnitsSetting.AS_WRITTEN && hint == QtyUnit.CUP || units == UnitsSetting.IMPERIAL && d >= 60) return cups(ml)
         if (spoons && d < 60) {
             // Under a tablespoon: teaspoons, unless they round up to three (14 ml is "1tbsp", not "3tsp").
             val tsp = roundUp(ml / Rational.of(5), Rational.of(1, 4))
@@ -219,8 +238,9 @@ object Display {
                 "${fraction(roundUp(ml / Rational.of(15), Rational.of(1, 2)))}tbsp"
             }
         }
+        val r = if (d >= 100) roundUpD(d, 10.0) else d
         return when {
-            d >= 1000 -> "${trim(roundUpD(d / 1000, 0.1))}l"
+            r >= 1000 -> "${trim(roundUpD(r / 1000, 0.1))}l"
             d >= 100 -> "${trim(roundUpD(d, 10.0))}ml"
             d >= 10 -> "${trim(roundUpD(d, 5.0))}ml"
             else -> "${trim(roundUpD(d, 1.0))}ml"

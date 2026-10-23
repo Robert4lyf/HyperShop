@@ -53,8 +53,18 @@ class DisplayTest {
         }
         // 113 g, rounded.
         assertEquals("120g", amount(QtyBase.of(Rational.ONE, QtyUnit.CUP, UnitLocale.US), "frozen_diced_onion", QtyUnit.CUP))
-        // No density known: still metric, in ml.
-        assertEquals("240ml", amount(QtyBase.of(Rational.ONE, QtyUnit.CUP, UnitLocale.US), "okra", QtyUnit.CUP))
+        // No density known for something bought by weight or count: the recipe's cups, not millilitres of okra
+        // (quality pass Q.3: a conversion nobody shops by, and grams would be a guess). A metric cup is "1 cup" too.
+        assertEquals("1 cup", amount(QtyBase.of(Rational.ONE, QtyUnit.CUP, UnitLocale.US), "okra", QtyUnit.CUP))
+        assertEquals("1 cup", amount(QtyBase.of(Rational.ONE, QtyUnit.CUP, UnitLocale.METRIC), "okra", QtyUnit.CUP))
+        assertEquals("1½ cups", amount(QtyBase.of(Rational.of(3, 2), QtyUnit.CUP, UnitLocale.US), "chickpeas", QtyUnit.CUP))
+        // An amount that rounds up to a kilogram or a litre is said in kilograms or litres (2.2 lb of mascarpone).
+        assertEquals("1kg", Display.mass(Rational.of(998), UnitsSetting.METRIC))
+        assertEquals("1l", Display.volume(Rational.of(995), UnitsSetting.METRIC))
+        assertEquals("990g", Display.mass(Rational.of(985), UnitsSetting.METRIC))
+        // A liquid, or an amount not written in cups, is unchanged.
+        assertEquals("240ml", amount(QtyBase.of(Rational.ONE, QtyUnit.CUP, UnitLocale.US), "milk", QtyUnit.CUP))
+        assertEquals("200ml", amount(QtyBase.of(Rational.of(200), QtyUnit.ML, UnitLocale.METRIC), "okra", QtyUnit.ML))
         // Liquids in ml; spoons as written, even large amounts of a solid.
         assertEquals("500ml", amount(QtyBase.of(Rational.of(500), QtyUnit.ML, UnitLocale.METRIC), "milk", QtyUnit.ML))
         assertEquals("4tbsp", amount(QtyBase.of(Rational.of(4), QtyUnit.TBSP, UnitLocale.US), "butter", QtyUnit.TBSP))

@@ -20,8 +20,8 @@ object EvalFloors {
         val acceptedWrongAtMost: Int,
     )
 
-    val RELEASE_C = Floors(right = 251, name = 251, quantity = 284, unit = 281, catalogue = 249, shown = 279, acceptedWrongAtMost = 19)
-    val FINAL = Floors(right = 107, name = 111, quantity = 133, unit = 134, catalogue = 111, shown = 133, acceptedWrongAtMost = 19)
+    val RELEASE_C = Floors(right = 259, name = 259, quantity = 284, unit = 281, catalogue = 258, shown = 282, acceptedWrongAtMost = 11)
+    val FINAL = Floors(right = 115, name = 118, quantity = 134, unit = 135, catalogue = 118, shown = 133, acceptedWrongAtMost = 11)
 
     fun check(
         eval: ExtractionEval,
