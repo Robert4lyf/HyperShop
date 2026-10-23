@@ -282,39 +282,6 @@ class PerformanceProbeTest {
     }
 
     /** [n] saved recipes, each with its own photo, written as RecipePhotos writes them (a 1280-pixel JPEG named by its hash). */
-    private fun AppContainer.photographed(n: Int): List<Long> {
-        val dir = java.io.File(context.filesDir, com.robert4lyf.hypershop.importing.RecipePhotos.DIR).apply { mkdirs() }
-        val rnd = java.util.Random(n.toLong())
-        return (1..n).map { i ->
-            val id = saveRecipe("Recipe $i", "2 onions", "500g beef mince")
-            // A photo-like JPEG: blocks of colour with grain, about the size a real 1280-pixel photo compresses to.
-            val bmp = android.graphics.Bitmap.createBitmap(1280, 960, android.graphics.Bitmap.Config.ARGB_8888)
-            val canvas = android.graphics.Canvas(bmp)
-            val paint = android.graphics.Paint()
-            for (b in 0 until 600) {
-                paint.color = android.graphics.Color.rgb(rnd.nextInt(256), rnd.nextInt(256), rnd.nextInt(256))
-                val x = rnd.nextInt(1280).toFloat()
-                val y = rnd.nextInt(960).toFloat()
-                canvas.drawRect(x, y, x + 20 + rnd.nextInt(200), y + 20 + rnd.nextInt(200), paint)
-            }
-            val bytes =
-                java.io.ByteArrayOutputStream().also {
-                    bmp.compress(
-                        android.graphics.Bitmap.CompressFormat.JPEG,
-                        85,
-                        it,
-                    )
-                }.toByteArray()
-            bmp.recycle()
-            val hash = java.security.MessageDigest.getInstance("SHA-256").digest(bytes).take(12).joinToString("") { "%02x".format(it) }
-            val name = "$hash.jpg"
-            java.io.File(dir, name).writeBytes(bytes)
-            runBlocking { repository.setRecipePhoto(repository.libraryKeyOf(id)!!, name, null) }
-            id
-        }
-    }
-
-    /** Waits until no photo has been decoded for [quietMs]: the screen has drawn what it is going to. */
     private fun settled(quietMs: Long = 400): Int {
         var last = -1
         var since = System.currentTimeMillis()
