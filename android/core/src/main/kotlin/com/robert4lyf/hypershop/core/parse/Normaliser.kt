@@ -66,7 +66,6 @@ class Normaliser(
         /** Protected designations of origin, printed after a cheese's name ("PDO", Italian "DOP"). */
         private val ORIGIN_MARKS = setOf("pdo", "dop", "aop", "aoc", "pgi", "igp")
 
-        /** "-ves" plurals whose singular ends in f/fe; every other "-ves" just drops the s (cloves, olives, chives). */
         /** U.3: "-ies" words whose singular is not "-y": "chillies" were "chilly". */
         private val IE_PLURALS =
             mapOf(
@@ -79,6 +78,7 @@ class Normaliser(
                 "smoothies" to "smoothie",
             )
 
+        /** "-ves" plurals whose singular ends in f/fe; every other "-ves" just drops the s (cloves, olives, chives). */
         private val F_PLURALS =
             mapOf(
                 "leaves" to "leaf",
