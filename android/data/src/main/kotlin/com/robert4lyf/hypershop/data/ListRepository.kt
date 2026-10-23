@@ -618,6 +618,9 @@ class ListRepository(
         }
     }
 
+    /** How many meals each saved recipe has been planned as (its library key), all weeks kept. */
+    fun observeTimesPlanned(): Flow<Map<String, Int>> = dao.observeTimesPlanned().map { rows -> rows.associate { it.key to it.n } }
+
     /** Every recipe that has been on the list (its latest copy), the one added longest ago first. */
     fun observeLibrary(): Flow<List<LibraryRecipe>> =
         dao.observeLibrary().map { rows ->

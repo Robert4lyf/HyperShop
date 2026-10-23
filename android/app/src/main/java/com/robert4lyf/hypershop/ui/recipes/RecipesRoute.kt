@@ -27,8 +27,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.Edit
@@ -39,11 +42,13 @@ import androidx.compose.material.icons.rounded.People
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -135,6 +140,8 @@ fun RecipesRoute(
                 onOpen = vm::openDetail,
                 onRename = { row, title -> vm.renameSaved(row, title) },
                 onEdit = vm::editSaved,
+                onSort = vm::sortBy,
+                onHighlyRated = vm::showHighlyRated,
             ),
         search =
             SearchBox(
@@ -160,6 +167,7 @@ fun RecipesRoute(
             UseDetailContent(
                 d,
                 photo = d.use.libraryKey?.let { ui.photos[it] },
+                notes = d.use.libraryKey?.let { ui.notes[it] },
                 onEdit = {
                     vm.closeUse()
                     vm.edit(d.use)
@@ -334,9 +342,10 @@ fun RecipesScreen(
                     item(key = "library-search") {
                         Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             RecipeSearchBox(search)
-                            if (ui.terms.isNotEmpty() && ui.library.isEmpty()) {
+                            LibraryView(ui, library)
+                            if (ui.library.isEmpty() && (ui.terms.isNotEmpty() || ui.highlyRated)) {
                                 Text(
-                                    "No matches",
+                                    if (ui.terms.isEmpty()) "No recipes rated 4★ or 5★ yet" else "No matches",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -346,6 +355,7 @@ fun RecipesScreen(
                     items(ui.library, key = { "lib-${it.key}" }) { row ->
                         LibraryCard(
                             row,
+                            showPlanned = ui.sort == LibrarySort.PLANNED,
                             onAdd = { if (row.onList) addAgain = row.key else library.onAdd(row) },
                             onRemove = { library.onRemove(row) },
                             onOpen = { library.onOpen(row) },
@@ -453,6 +463,47 @@ private fun RecipeSearchBox(s: SearchBox) {
     }
 }
 
+/** How "Saved" is ordered, and whether only the highly rated show: two small chips under the search, nothing more. */
+@Composable
+private fun LibraryView(
+    ui: RecipesUi,
+    library: LibraryActions,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        var open by remember { mutableStateOf(false) }
+        Box {
+            AssistChip(
+                onClick = { open = true },
+                label = { Text(if (ui.terms.isEmpty()) ui.sort.label else "Best match") },
+                leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                trailingIcon = { Icon(Icons.Rounded.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                enabled = ui.terms.isEmpty(),
+                modifier = Modifier.semantics { contentDescription = "Sort: ${ui.sort.label}" }.testTag("library-sort"),
+            )
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                for (s in LibrarySort.entries) {
+                    DropdownMenuItem(
+                        text = { Text(s.label) },
+                        leadingIcon = { if (s == ui.sort) Icon(Icons.Rounded.Check, contentDescription = null) },
+                        onClick = {
+                            open = false
+                            library.onSort(s)
+                        },
+                        modifier = Modifier.testTag("sort-${s.name}"),
+                    )
+                }
+            }
+        }
+        FilterChip(
+            selected = ui.highlyRated,
+            onClick = { library.onHighlyRated(!ui.highlyRated) },
+            label = { Text("4★ & up") },
+            leadingIcon = { if (ui.highlyRated) Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp)) },
+            modifier = Modifier.testTag("filter-highly-rated"),
+        )
+    }
+}
+
 /** What "Your recipes" can do. */
 data class LibraryActions(
     val onAdd: (LibraryRow) -> Unit = {},
@@ -462,6 +513,8 @@ data class LibraryActions(
     val onRename: (LibraryRow, String) -> Unit = { _, _ -> },
     /** The review screen, saving back to the library only. */
     val onEdit: (LibraryRow) -> Unit = {},
+    val onSort: (LibrarySort) -> Unit = {},
+    val onHighlyRated: (Boolean) -> Unit = {},
 )
 
 /** What the open recipe's sheet can change about it: stars, cooking notes, its photo. */
@@ -477,6 +530,7 @@ data class RecipeNoteActions(
 @Composable
 private fun LibraryCard(
     row: LibraryRow,
+    showPlanned: Boolean,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
     onOpen: () -> Unit,
@@ -526,6 +580,7 @@ private fun LibraryCard(
                             webLink(row.url)?.let { siteName(it) } ?: row.bookRef,
                             row.rating?.let { "★ $it/5" },
                             if (row.lines == 1) "1 ingredient" else "${row.lines} ingredients",
+                            row.timesPlanned.takeIf { showPlanned && it > 0 }?.let { if (it == 1) "planned once" else "planned $it times" },
                             "added " + DateUtils.getRelativeTimeSpanString(row.lastAddedAt, now, DAY).toString().lowercase(),
                         )
                     Text(
@@ -859,6 +914,8 @@ fun UseDetailContent(
     onEdit: () -> Unit,
     onRemove: () -> Unit,
     photo: String? = null,
+    /** Your cooking notes for it: read here, written on the saved recipe's sheet. */
+    notes: String? = null,
 ) {
     val open = rememberOpenLink()
     val use = detail.use
@@ -910,6 +967,14 @@ fun UseDetailContent(
                         }
                     }
                     OutlinedButton(onClick = onRemove, modifier = Modifier.testTag("use-detail-remove")) { Text("Remove from list") }
+                }
+            }
+        }
+        notes?.let { n ->
+            item(key = "notes") {
+                Column(Modifier.padding(top = 8.dp).testTag("use-notes"), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("Your notes", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Text(n, style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }

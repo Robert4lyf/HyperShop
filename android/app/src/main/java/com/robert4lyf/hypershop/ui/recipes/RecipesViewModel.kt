@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -46,6 +47,12 @@ data class RecipesUi(
     val lastBook: String? = null,
     /** Each saved recipe's photo, by library key: a card on the list shows its recipe's. */
     val photos: Map<String, String> = emptyMap(),
+    /** Each saved recipe's cooking notes, by library key: shown with it wherever it is on the list. */
+    val notes: Map<String, String> = emptyMap(),
+    /** How "Saved" is ordered (while not searching: then it is best match first). */
+    val sort: LibrarySort = LibrarySort.RECENT,
+    /** Only 4★ and 5★ recipes. */
+    val highlyRated: Boolean = false,
 )
 
 /** A saved recipe opened from "Your recipes": its ingredients, under their headings. */
@@ -85,7 +92,11 @@ data class LibraryRow(
     val notes: String? = null,
     /** The recipe's photo on this phone, or null. */
     val photo: String? = null,
-)
+    /** How many meals it has been planned as. */
+    val timesPlanned: Int = 0,
+) {
+    val facts get() = RecipeFacts(key, title, lastAddedAt, rating, timesPlanned)
+}
 
 /** The Recipes tab (PLAN §3.5): the uses on the list. */
 class RecipesViewModel(
@@ -113,6 +124,14 @@ class RecipesViewModel(
         val catalogVersion: String,
     )
 
+    private val order = MutableStateFlow(LibrarySort.RECENT to false)
+
+    /** "Sort": the order of "Saved". Only the screen's: nothing stored or planned changes. */
+    fun sortBy(sort: LibrarySort) = order.update { it.copy(first = sort) }
+
+    /** "4★ & up" on or off. */
+    fun showHighlyRated(on: Boolean) = order.update { it.copy(second = on) }
+
     /** The search index, rebuilt when the library's recipes or the catalogue change. */
     private var index: Pair<IndexKey, List<RecipeSearch.Recipe>>? = null
 
@@ -130,11 +149,13 @@ class RecipesViewModel(
     val ui: StateFlow<RecipesUi> =
         combine(
             c.repository.list.map { c.repository.usesOnList(it) },
-            c.repository.observeLibrary(),
+            combine(c.repository.observeLibrary(), c.repository.observeTimesPlanned()) { l, t -> l to t },
             c.repository.observeRecipeNotes(),
             c.recipePhotos.paths(),
-            terms,
-        ) { uses, lib, notes, photos, (q, typing) ->
+            combine(terms, order) { t, o -> t to o },
+        ) { uses, (lib, planned), notes, photos, (search, view) ->
+            val (q, typing) = search
+            val (sort, highly) = view
             val onList = uses.mapNotNull { it.libraryKey }.toSet()
             val rows =
                 lib.map {
@@ -150,19 +171,32 @@ class RecipesViewModel(
                         rating = notes[it.key]?.rating,
                         notes = notes[it.key]?.notes,
                         photo = photos[it.key],
+                        timesPlanned = planned[it.key] ?: 0,
                     )
                 }
             val shown =
                 if (q.isEmpty()) {
-                    rows
+                    LibraryOrder.sort(rows, sort) { it.facts }
                 } else {
+                    // Searching: best match first, whatever the sort.
                     val byId = rows.associateBy { it.recipeId }
                     RecipeSearch.search(indexFor(lib), q, typing).mapNotNull { h ->
                         byId[h.id]?.copy(uses = h.uses.takeIf { it.isNotEmpty() }?.joinToString(", "))
                     }
-                }
+                }.filter { !highly || LibraryOrder.highlyRated(it.rating) }
             val lastBook = lib.filter { it.book != null }.maxByOrNull { it.lastAddedAt }?.book
-            RecipesUi(uses, loaded = true, library = shown, hasLibrary = rows.isNotEmpty(), terms = q, lastBook = lastBook, photos = photos)
+            RecipesUi(
+                uses,
+                loaded = true,
+                library = shown,
+                hasLibrary = rows.isNotEmpty(),
+                terms = q,
+                lastBook = lastBook,
+                photos = photos,
+                notes = notes.mapNotNull { (k, n) -> n.notes?.let { k to it } }.toMap(),
+                sort = sort,
+                highlyRated = highly,
+            )
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecipesUi())
 

@@ -312,6 +312,12 @@ data class LineCount(
     val n: Int,
 )
 
+/** A count per library key (meals planned per saved recipe). */
+data class KeyCount(
+    val key: String,
+    val n: Int,
+)
+
 /**
  * A meal planned for a week (docs/design/release-b.md): only the intent. Its
  * ingredients come from the saved recipe ([libraryKey], its latest copy) and its

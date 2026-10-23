@@ -383,4 +383,27 @@ class RecipesScreenTest {
         compose.waitForIdle()
         assertEquals(before, lefts())
     }
+
+    @Test
+    fun savedHasASortAndAHighlyRatedChipAndSaysWhenNothingIsRatedSo() {
+        val got = mutableListOf<String>()
+        var ui by mutableStateOf(USES)
+        compose.setContent {
+            HyperShopTheme(dynamicColor = false) {
+                RecipesScreen(
+                    ui,
+                    onRemove = {},
+                    library = LibraryActions(onSort = { got += "sort ${it.name}" }, onHighlyRated = { got += "rated $it" }),
+                )
+            }
+        }
+        compose.onNodeWithTag("view-library").performClick()
+        compose.onNodeWithTag("library-sort").performClick()
+        compose.onNodeWithTag("sort-RATING").performClick()
+        compose.onNodeWithTag("filter-highly-rated").performClick()
+        assertEquals(listOf("sort RATING", "rated true"), got)
+        ui = USES.copy(library = emptyList(), highlyRated = true)
+        compose.waitForIdle()
+        compose.onNodeWithText("No recipes rated 4★ or 5★ yet").assertExists()
+    }
 }

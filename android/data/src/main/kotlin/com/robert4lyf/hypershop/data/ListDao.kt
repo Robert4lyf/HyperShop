@@ -433,6 +433,10 @@ interface ListDao {
     @Query("SELECT * FROM PlannedMeal")
     suspend fun allPlannedMeals(): List<PlannedMealEntity>
 
+    /** How many meals each saved recipe has been planned as, every week kept. */
+    @Query("SELECT libraryKey AS `key`, COUNT(*) AS n FROM PlannedMeal GROUP BY libraryKey")
+    fun observeTimesPlanned(): Flow<List<KeyCount>>
+
     @Query("SELECT * FROM PlannedMeal WHERE id = :id")
     suspend fun plannedMeal(id: Long): PlannedMealEntity?
 
