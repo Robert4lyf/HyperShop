@@ -196,7 +196,8 @@ class MealsViewModel(
                         notes[r.key]?.rating,
                         r.lastAddedAt,
                         // The other weeks' only: planning it now must not move it under the thumb that planned it.
-                        (planned[r.key] ?: 0) - (counts[r.key] ?: 0),
+                        // Never below none: the two counts come from two flows, and this week's can arrive first.
+                        ((planned[r.key] ?: 0) - (counts[r.key] ?: 0)).coerceAtLeast(0),
                     )
                 }.filter { term.isEmpty() || it.title.lowercase().contains(term) }
                     // Your usual first: planned most, then rated best, then newest (LibraryOrder).

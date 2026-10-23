@@ -270,6 +270,7 @@ class RuleParser(
                     if (more == null || moreUnit == null) {
                         i = save
                     } else if (moreUnit == unit && word(save) == "plus") {
+                        altQty = altQty?.let { it * (qty!! + more) / qty!! }
                         qty = qty!! + more
                         qtyMax = qtyMax?.plus(more)
                         summed = true
@@ -315,6 +316,8 @@ class RuleParser(
             val name = shelf(named, unit)
             val more = if (qty != null) plusAfterName(name, unit) else null
             if (more != null) {
+                // "2 tbsp (30g) butter, plus 1 tbsp": the grams written for the first amount grow with it.
+                altQty = altQty?.let { it * (qty!! + more) / qty!! }
                 qty = qty!! + more
                 qtyMax = qtyMax?.plus(more)
                 summed = true
@@ -685,8 +688,9 @@ class RuleParser(
             val more = readNumber()
             val moreUnit = more?.let { readUnit() }
             if (word(i) == "of") i++
+            // What the extra is said to be, up to what it is for: "plus 2 tbsp for dusting" is more of the same.
             var end = i
-            while (end < toks.size && toks[end].kind == Kind.WORD) end++
+            while (end < toks.size && toks[end].kind == Kind.WORD && word(end) !in Lexicon.nameEnders) end++
             val rest = (i until end).mapNotNull { word(it) }.filter { it !in Lexicon.prep && it !in Lexicon.qualifiers }
             i = save
             if (more == null) return null

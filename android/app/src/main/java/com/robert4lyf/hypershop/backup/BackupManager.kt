@@ -317,6 +317,13 @@ class BackupManager(
         f: BackupFile,
         photos: StagedPhotos? = null,
     ): RestoreOutcome =
+        // Off the main thread: checking every photo (a hash and a size read each) is real work.
+        withContext(Dispatchers.IO) { restoreOnThisThread(f, photos) }
+
+    private suspend fun restoreOnThisThread(
+        f: BackupFile,
+        photos: StagedPhotos?,
+    ): RestoreOutcome =
         try {
             lock.withLock {
                 // Checked here too, not only by inspect(): nothing destructive starts on a file that would be refused.

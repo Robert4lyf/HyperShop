@@ -179,6 +179,24 @@ class RuleParserTest {
     }
 
     @Test
+    fun r36ASumCarriesItsMetricAmountAndAnExtraForSomethingIsTheSameThing() {
+        // T.7: the grams written for the first amount grow with the sum, or the list shops 30 g for 3 tbsp.
+        val a = p.parse("2 tbsp (30g) butter, plus 1 tbsp melted")
+        assertEquals(Rational.of(3), a.quantity)
+        assertEquals(Rational.of(45), a.altQuantity)
+        val b = p.parse("1 cup (240ml) stock plus 1 cup")
+        assertEquals(Rational.of(2), b.quantity)
+        assertEquals(Rational.of(480), b.altQuantity)
+        // "For dusting", "for greasing": what the extra is for, not another thing.
+        val flour = p.parse("200g plain flour, plus 2 tbsp for dusting")
+        assertFalse(flour.check)
+        assertEquals(Rational.of(200), flour.quantity)
+        val butter = p.parse("175g butter, plus 25g for greasing")
+        assertFalse(butter.check)
+        assertEquals(Rational.of(200), butter.quantity)
+    }
+
+    @Test
     fun r36PlusThatMayBeAnotherThingIsFlaggedAndNotAdded() {
         val a = p.parse("2 tbsp butter, plus 1 tbsp olive oil")
         assertEquals("butter", a.name)
