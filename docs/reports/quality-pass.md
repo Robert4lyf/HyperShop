@@ -147,7 +147,7 @@ Kept apart on purpose:
 
 ## 7. GitHub protection
 
-See docs/github-protection.md. The status of the ruleset itself is in the PR's closing comment.
+**Not configured.** The ruleset (deletions and force pushes blocked, PRs required, `Build and test`, `Device scenarios (emulator)` and `Connect IQ result` required, admin bypass for PRs only) was written and its check names confirmed against PR #60's runs, but creating it was refused: the session's GitHub access is not permitted to write the rulesets API (HTTP 403). main is therefore still unprotected. docs/github-protection.md has the two-minute manual steps and `docs/github-ruleset.json` for `gh api --input`. What *was* changed: `connectiq.yml` now reports one `Connect IQ result` on every PR (so it can be required without blocking PRs that do not touch the watch; seen on this PR: changed-files, compile, resource check and result all green), and the simulator job no longer has `continue-on-error`.
 
 ## 8. Adversarial review
 
@@ -237,5 +237,6 @@ I reviewed my own diff, and two independent reviewers read it from the code, wit
 
 - Branch `claude/serene-lovelace-464dnp`, PR #60.
 - Commits Q.1, Q.2a, Q.2b, Q.3, Q.4 (two commits), Q.5a and Q.6, plus this report.
-- Docs: this report; PROGRESS.md; CLAUDE.md (one rule); HANDOFF.md (Hand-off H); KNOWN_ISSUES #25–29; github-protection.md; the evaluation sets' SOURCES files.
+- Docs: this report; PROGRESS.md; CLAUDE.md (one rule); HANDOFF.md (Hand-off H); KNOWN_ISSUES #25–29; github-protection.md and github-ruleset.json; the evaluation sets' SOURCES files.
+- To do by you: apply the ruleset (docs/github-protection.md).
 - Outstanding: Hand-off H's 24 checks.

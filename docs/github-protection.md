@@ -1,8 +1,12 @@
-# How main is protected
+# How main is to be protected
 
-Set up in the final quality pass (Q.5). The repository is public, so GitHub's
-rulesets are available on the free plan; this is one ruleset, **"main: PRs and
-green checks"**, on the default branch.
+**Status: intended, not yet applied.** In the final quality pass (Q.5) the
+session's GitHub access was refused write access to the rulesets API (HTTP 403
+through its proxy), so main still has no protection. Apply it yourself in two
+minutes, from the browser or from a terminal (below). The repository is public,
+so rulesets are on the free plan. The workflow change it depends on
+(`Connect IQ result` reporting on every PR) is merged with this pass, and all
+three required checks were seen reporting on PR #60 before this was written.
 
 ## The rules
 
@@ -39,18 +43,32 @@ Not required, on purpose:
   that fails shows red instead of green.
 - **Release APK** runs after a merge, on main; it is not a PR check.
 
-## Applying or changing it
+## Applying it
 
-With admin rights on the repository: Settings › Rules › Rulesets › "main: PRs and
-green checks". Or from a terminal with `gh` authenticated as an admin:
+**From a terminal**, with `gh` signed in as the repository's owner:
 
 ```bash
-gh api repos/Robert4lyf/HyperShop/rulesets --jq '.[] | {id, name, enforcement}'
-gh api repos/Robert4lyf/HyperShop/rulesets/<id>      # the full rule set
+gh api -X POST repos/Robert4lyf/HyperShop/rulesets --input docs/github-ruleset.json
+gh api repos/Robert4lyf/HyperShop/rulesets --jq '.[] | {id, name, enforcement}'   # check it is there
 ```
 
-To switch it off in an emergency, set its enforcement to "Disabled" on the same
-page; nothing else changes.
+**In the browser:** Settings › Rules › Rulesets › New ruleset › New branch ruleset.
+
+1. Name `main: PRs and green checks`; Enforcement status **Active**.
+2. Bypass list: Add bypass › Repository admin, then set it to **For pull requests only**.
+3. Target branches: Add target › Include default branch.
+4. Tick **Restrict deletions** and **Block force pushes**.
+5. Tick **Require a pull request before merging**; Required approvals **0**.
+6. Tick **Require status checks to pass**; leave "Require branches to be up to date" unticked; Add checks:
+   `Build and test`, `Device scenarios (emulator)`, `Connect IQ result` (source: GitHub Actions).
+7. Create.
+
+**Confirming it works:** open a PR whose CI is still running — the merge button
+says the required checks have not passed; once all three are green it merges.
+`git push origin main` from a clone is refused. Release APK still runs on the
+merge commit (it is triggered by the push the merge makes, which the rules allow).
+
+To switch it off in an emergency: the same page, Enforcement status › Disabled.
 
 ## Actions storage
 
