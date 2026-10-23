@@ -68,8 +68,21 @@ class WeeklyShopScenariosTest {
     private fun tap(tag: String) {
         // Found, then pressed: between the two the list can be laid out again (the Plan screen's picks re-sort
         // after the last one was planned) and the node be momentarily gone. A person looks again; so does this.
-        compose.waitUntil(15_000) {
-            runCatching { compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.OnClick) }.isSuccess
+        // The press is never made from inside waitUntil's condition: an action there can run in the middle of
+        // a frame's layout ("performMeasureAndLayout called during measure layout").
+        val end = System.currentTimeMillis() + 15_000
+        while (true) {
+            waitFor { has(tag) }
+            val pressed =
+                try {
+                    compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.OnClick)
+                    true
+                } catch (gone: AssertionError) {
+                    if (System.currentTimeMillis() > end) throw gone
+                    false
+                }
+            if (pressed) break
+            compose.waitForIdle()
         }
         taps++
         compose.waitForIdle()
