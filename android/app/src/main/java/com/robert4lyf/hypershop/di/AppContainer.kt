@@ -313,6 +313,9 @@ class AppContainer(
             return
         }
         startup.value = Startup.Ready
+        // Only now: an interrupted restore is resolved, so the photos it brought are named by the database
+        // (or are not needed), and a file nothing names is safe to delete.
+        runCatching { recipePhotos.sweep() }.onFailure { Timber.w(it, "Photo sweep failed") }
         repository.purgeDeleted()
         importJobs.finishDiscards()
         importJobs.finishThrowaways()
