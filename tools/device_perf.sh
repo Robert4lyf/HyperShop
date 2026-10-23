@@ -25,6 +25,36 @@ else
   exit 1
 fi
 
+# U.4: cold start with no data and with 300 photographed recipes, and Saved surviving a rotation, on the
+# installed app itself. Emulator only: the app's data is cleared first.
+echo "== cold start and rotation"
+MAIN=$APP/com.robert4lyf.hypershop.MainActivity
+cold() {
+  for i in 1 2 3; do
+    adb shell am force-stop "$APP"
+    sleep 2
+    t=$(adb shell am start -W -n "$MAIN" | sed -n 's/^TotalTime: //p' | tr -d '\r')
+    echo "cold start, $1, run $i: ${t:-?} ms"
+    sleep 3
+  done
+  adb shell am force-stop "$APP"
+}
+startup_probe() {
+  adb logcat -c
+  out=$(adb shell am instrument -w -e startup true -e class "com.robert4lyf.hypershop.device.StartupProbeTest#$1" "$RUNNER")
+  adb logcat -d -s HyperShopPerf:I | sed -n 's/.*HyperShopPerf: //p'
+  if ! grep -q "^OK (" <<< "$out"; then
+    echo "$out"
+    exit 1
+  fi
+}
+adb shell pm clear "$APP" > /dev/null
+cold "no data"
+startup_probe a_seedThreeHundredPhotos
+cold "300 photographed recipes"
+startup_probe b_savedSurvivesARotation
+adb shell pm clear "$APP" > /dev/null
+
 # Each way through on its own instrumentation run: a fresh process, as a person opening the app.
 echo "== weekly shop effort"
 for t in b_returningWeeklyShopperTheQuickWay b_returningWeeklyShopperItemByItem; do

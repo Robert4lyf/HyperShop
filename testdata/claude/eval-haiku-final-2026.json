@@ -1,0 +1,1149 @@
+{
+    "fq-001": {
+        "raw": "1.6kg braising steak cut into large chunks",
+        "name": "braising steak",
+        "quantity": "8/5",
+        "quantityText": "1.6kg",
+        "unit": "kg",
+        "note": "cut into large chunks",
+        "aisleSuggestion": "MEAT_FISH"
+    },
+    "fq-002": {
+        "raw": "3 bay leaves",
+        "name": "bay leaf",
+        "quantity": "3",
+        "quantityText": "3",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-003": {
+        "raw": "small bunch thyme",
+        "name": "thyme",
+        "quantity": "1",
+        "quantityText": "small bunch",
+        "unit": "bunch",
+        "note": "small",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-004": {
+        "raw": "2 bottles cheap  red wine",
+        "name": "red wine",
+        "quantity": "2",
+        "quantityText": "2",
+        "unit": "other",
+        "note": "cheap, bottles",
+        "aisleSuggestion": "DRINKS"
+    },
+    "fq-005": {
+        "raw": "2 tbsp oil",
+        "name": "oil",
+        "quantity": "2",
+        "quantityText": "2 tbsp",
+        "unit": "tbsp",
+        "aisleSuggestion": "OILS_VINEGARS"
+    },
+    "fq-006": {
+        "raw": "3 large or 6 normal  carrots cut into large chunks",
+        "name": "carrot",
+        "quantity": "3",
+        "quantityText": "3 large or 6 normal",
+        "altQuantity": "6",
+        "note": "large or 6 normal, cut into large chunks",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-007": {
+        "raw": "2 onions roughly chopped",
+        "name": "onion",
+        "quantity": "2",
+        "quantityText": "2",
+        "note": "roughly chopped",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-008": {
+        "raw": "3 tbsp plain flour",
+        "name": "plain flour",
+        "quantity": "3",
+        "quantityText": "3 tbsp",
+        "unit": "tbsp",
+        "aisleSuggestion": "BAKING"
+    },
+    "fq-009": {
+        "raw": "1 tbsp tomato purée",
+        "name": "tomato purée",
+        "quantity": "1",
+        "quantityText": "1 tbsp",
+        "unit": "tbsp",
+        "aisleSuggestion": "TINS_JARS"
+    },
+    "fq-010": {
+        "raw": "small knob butter",
+        "name": "butter",
+        "quantity": "1",
+        "quantityText": "small knob",
+        "unit": "other",
+        "note": "small knob",
+        "estimated": true,
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-011": {
+        "raw": "300g bacon lardons",
+        "name": "bacon lardons",
+        "quantity": "300",
+        "quantityText": "300g",
+        "unit": "g",
+        "aisleSuggestion": "CHILLED"
+    },
+    "fq-012": {
+        "raw": "500g pearl onions or small shallots, peeled",
+        "name": "pearl onions",
+        "quantity": "500",
+        "quantityText": "500g",
+        "unit": "g",
+        "note": "or small shallots, peeled",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-013": {
+        "raw": "400g mushrooms halved",
+        "name": "mushrooms",
+        "quantity": "400",
+        "quantityText": "400g",
+        "unit": "g",
+        "note": "halved",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-014": {
+        "raw": "chopped parsley",
+        "name": "parsley",
+        "note": "chopped",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-015": {
+        "raw": "50g baguette cut into small chunks",
+        "name": "baguette",
+        "quantity": "50",
+        "quantityText": "50g",
+        "unit": "g",
+        "note": "cut into small chunks",
+        "aisleSuggestion": "BAKERY"
+    },
+    "fq-016": {
+        "raw": "2 tbsp butter plus 1 tbsp melted",
+        "name": "butter",
+        "quantity": "2",
+        "quantityText": "2 tbsp",
+        "unit": "tbsp",
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-017": {
+        "raw": "350g spiral or other short pasta",
+        "name": "spiral pasta",
+        "quantity": "350",
+        "quantityText": "350g",
+        "unit": "g",
+        "note": "or other short pasta",
+        "aisleSuggestion": "PASTA_RICE_GRAINS"
+    },
+    "fq-018": {
+        "raw": "1 garlic clove finely chopped",
+        "name": "garlic",
+        "quantity": "1",
+        "quantityText": "1",
+        "unit": "clove",
+        "note": "finely chopped",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-019": {
+        "raw": "1 tsp English mustard powder",
+        "name": "english mustard powder",
+        "quantity": "1",
+        "quantityText": "1 tsp",
+        "unit": "tsp",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-020": {
+        "raw": "3 tbsp plain flour",
+        "name": "plain flour",
+        "quantity": "3",
+        "quantityText": "3 tbsp",
+        "unit": "tbsp",
+        "aisleSuggestion": "BAKING"
+    },
+    "fq-021": {
+        "raw": "500ml whole milk",
+        "name": "whole milk",
+        "quantity": "500",
+        "quantityText": "500ml",
+        "unit": "ml",
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-022": {
+        "raw": "250g vegetarian mature cheddar grated",
+        "name": "vegetarian mature cheddar",
+        "quantity": "250",
+        "quantityText": "250g",
+        "unit": "g",
+        "note": "grated",
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-023": {
+        "raw": "50g parmesan (or vegetarian alternative), grated",
+        "name": "parmesan",
+        "quantity": "50",
+        "quantityText": "50g",
+        "unit": "g",
+        "note": "or vegetarian alternative, grated",
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-024": {
+        "raw": "100g plain flour",
+        "name": "plain flour",
+        "quantity": "100",
+        "quantityText": "100g",
+        "unit": "g",
+        "aisleSuggestion": "BAKING"
+    },
+    "fq-025": {
+        "raw": "2 large eggs",
+        "name": "egg",
+        "quantity": "2",
+        "quantityText": "2",
+        "note": "large",
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-026": {
+        "raw": "300ml milk",
+        "name": "milk",
+        "quantity": "300",
+        "quantityText": "300ml",
+        "unit": "ml",
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-027": {
+        "raw": "1 tbsp sunflower or vegetable oil plus a little extra for frying",
+        "name": "sunflower oil",
+        "quantity": "1",
+        "quantityText": "1 tbsp",
+        "unit": "tbsp",
+        "note": "or vegetable oil, plus a little extra for frying",
+        "aisleSuggestion": "OILS_VINEGARS"
+    },
+    "fq-028": {
+        "raw": "lemon wedges to serve (optional)",
+        "name": "lemon",
+        "note": "wedges to serve",
+        "optional": true,
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-029": {
+        "raw": "caster sugar to serve (optional)",
+        "name": "caster sugar",
+        "note": "to serve",
+        "optional": true,
+        "aisleSuggestion": "BAKING"
+    },
+    "fq-030": {
+        "raw": "600 g / 1.2 lb   scotch fillet steak / boneless rib eye ((Note 1))",
+        "name": "scotch fillet steak",
+        "quantity": "600",
+        "quantityText": "600 g / 1.2 lb",
+        "unit": "g",
+        "altQuantity": "6/5",
+        "altUnit": "lb",
+        "note": "or boneless rib eye; see Note 1",
+        "aisleSuggestion": "MEAT_FISH"
+    },
+    "fq-031": {
+        "raw": "1/2 tsp cooking salt / kosher salt ((halve for table salt, +50% for flakes))",
+        "name": "cooking salt",
+        "quantity": "1/2",
+        "quantityText": "1/2 tsp",
+        "unit": "tsp",
+        "note": "or kosher salt; halve for table salt, +50% for flakes",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-032": {
+        "raw": "1/4 tsp black pepper",
+        "name": "black pepper",
+        "quantity": "1/4",
+        "quantityText": "1/4 tsp",
+        "unit": "tsp",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-033": {
+        "raw": "2 tbsp vegetable oil (, divided)",
+        "name": "vegetable oil",
+        "quantity": "2",
+        "quantityText": "2 tbsp",
+        "unit": "tbsp",
+        "note": "divided",
+        "aisleSuggestion": "OILS_VINEGARS"
+    },
+    "fq-034": {
+        "raw": "1  large onion ((or 2 small onions), sliced)",
+        "name": "onion",
+        "quantity": "1",
+        "quantityText": "1",
+        "altQuantity": "2",
+        "note": "large; or 2 small onions, sliced",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-035": {
+        "raw": "300 g / 10 oz   mushrooms (, sliced (not too thin))",
+        "name": "mushrooms",
+        "quantity": "300",
+        "quantityText": "300 g / 10 oz",
+        "unit": "g",
+        "altQuantity": "10",
+        "altUnit": "oz",
+        "note": "sliced (not too thin)",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-036": {
+        "raw": "50 g / 3 tbsp   butter",
+        "name": "butter",
+        "quantity": "50",
+        "quantityText": "50 g / 3 tbsp",
+        "unit": "g",
+        "altQuantity": "3",
+        "altUnit": "tbsp",
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-037": {
+        "raw": "2 tbsp flour ((Note 2))",
+        "name": "flour",
+        "quantity": "2",
+        "quantityText": "2 tbsp",
+        "unit": "tbsp",
+        "note": "see Note 2",
+        "aisleSuggestion": "BAKING"
+    },
+    "fq-038": {
+        "raw": "2 cups beef broth (, preferably salt reduced)",
+        "name": "beef broth",
+        "quantity": "2",
+        "quantityText": "2 cups",
+        "unit": "cup",
+        "note": "preferably salt reduced",
+        "aisleSuggestion": "TINS_JARS"
+    },
+    "fq-039": {
+        "raw": "1 tbsp Dijon mustard",
+        "name": "dijon mustard",
+        "quantity": "1",
+        "quantityText": "1 tbsp",
+        "unit": "tbsp",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-040": {
+        "raw": "2/3 cup sour cream",
+        "name": "sour cream",
+        "quantity": "667/1000",
+        "quantityText": "2/3 cup",
+        "unit": "cup",
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-041": {
+        "raw": "Salt and pepper (, to taste)",
+        "name": "salt",
+        "note": "to taste",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-042": {
+        "raw": "250 - 300 g / 8 - 10 oz   pasta or egg noodles of choice ((Note 3))",
+        "name": "pasta",
+        "quantity": "250",
+        "quantityMax": "300",
+        "quantityText": "250 - 300 g / 8 - 10 oz",
+        "unit": "g",
+        "altQuantity": "8",
+        "altUnit": "oz",
+        "note": "or egg noodles of choice; see Note 3",
+        "aisleSuggestion": "PASTA_RICE_GRAINS"
+    },
+    "fq-043": {
+        "raw": "Chopped chives (, for garnish (optional))",
+        "name": "chives",
+        "note": "chopped; for garnish",
+        "optional": true,
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-044": {
+        "raw": "1 Tbsp olive or avocado oil",
+        "name": "olive oil",
+        "quantity": "1",
+        "quantityText": "1 Tbsp",
+        "unit": "tbsp",
+        "note": "or avocado oil",
+        "aisleSuggestion": "OILS_VINEGARS"
+    },
+    "fq-045": {
+        "raw": "1/2 cup diced white onion or shallot",
+        "name": "white onion",
+        "quantity": "1/2",
+        "quantityText": "1/2 cup",
+        "unit": "cup",
+        "note": "diced; or shallot",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-046": {
+        "raw": "1/2 medium red bell pepper ((chopped))",
+        "name": "red pepper",
+        "quantity": "1/2",
+        "quantityText": "1/2 medium",
+        "note": "medium, chopped",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-047": {
+        "raw": "3 cloves garlic, minced  ((3 cloves yield ~1 1/2 Tbsp))",
+        "name": "garlic",
+        "quantity": "3",
+        "quantityText": "3 cloves",
+        "unit": "clove",
+        "note": "minced",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-048": {
+        "raw": "1 28-ounce can crushed tomatoes",
+        "name": "crushed tomatoes",
+        "quantity": "1",
+        "quantityText": "1 28-ounce can",
+        "unit": "tin",
+        "aisleSuggestion": "TINS_JARS"
+    },
+    "fq-049": {
+        "raw": "1-3 Tbsp tomato paste",
+        "name": "tomato paste",
+        "quantity": "1",
+        "quantityMax": "3",
+        "quantityText": "1-3 Tbsp",
+        "unit": "tbsp",
+        "aisleSuggestion": "TINS_JARS"
+    },
+    "fq-050": {
+        "raw": "2-3 tsp coconut sugar or maple syrup  ((or omit if avoiding sugar))",
+        "name": "coconut sugar",
+        "quantity": "2",
+        "quantityMax": "3",
+        "quantityText": "2-3 tsp",
+        "unit": "tsp",
+        "note": "or maple syrup; or omit if avoiding sugar",
+        "aisleSuggestion": "BAKING"
+    },
+    "fq-051": {
+        "raw": "Sea salt to taste",
+        "name": "sea salt",
+        "quantityText": "to taste",
+        "note": "to taste",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-052": {
+        "raw": "2 tsp smoked or sweet paprika",
+        "name": "smoked paprika",
+        "quantity": "2",
+        "quantityText": "2 tsp",
+        "unit": "tsp",
+        "note": "or sweet paprika",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-053": {
+        "raw": "1 tsp ground cumin",
+        "name": "ground cumin",
+        "quantity": "1",
+        "quantityText": "1 tsp",
+        "unit": "tsp",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-054": {
+        "raw": "2 tsp chili powder",
+        "name": "chilli powder",
+        "quantity": "2",
+        "quantityText": "2 tsp",
+        "unit": "tsp",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-055": {
+        "raw": "1/4 tsp ground cinnamon",
+        "name": "ground cinnamon",
+        "quantity": "1/4",
+        "quantityText": "1/4 tsp",
+        "unit": "tsp",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-056": {
+        "raw": "1 pinch cayenne pepper ((optional))",
+        "name": "cayenne pepper",
+        "quantity": "1",
+        "quantityText": "1 pinch",
+        "unit": "pinch",
+        "optional": true,
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-057": {
+        "raw": "1 pinch each cardamom and coriander ((optional))",
+        "name": "ground cardamom",
+        "quantity": "1",
+        "quantityText": "1 pinch each",
+        "unit": "pinch",
+        "note": "each of cardamom and coriander",
+        "optional": true,
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-058": {
+        "raw": "1 ½ 15-ounce cans cooked chickpeas ((rinsed and drained))",
+        "name": "chickpeas",
+        "quantity": "3/2",
+        "quantityText": "1 ½ 15-ounce cans",
+        "unit": "tin",
+        "note": "cooked, rinsed and drained",
+        "aisleSuggestion": "TINS_JARS"
+    },
+    "fq-059": {
+        "raw": "4-5 whole kalamata or green olives ((optional // pitted and halved))",
+        "name": "kalamata olives",
+        "quantity": "4",
+        "quantityMax": "5",
+        "quantityText": "4-5 whole",
+        "note": "whole; or green olives; pitted and halved",
+        "optional": true,
+        "aisleSuggestion": "CHILLED"
+    },
+    "fq-060": {
+        "raw": "Lemon wedges",
+        "name": "lemon",
+        "note": "wedges",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-061": {
+        "raw": "Bread (gluten-free or this recipe or flatbread)",
+        "name": "bread",
+        "note": "gluten-free or flatbread",
+        "aisleSuggestion": "BAKERY"
+    },
+    "fq-062": {
+        "raw": "Fresh chopped parsley or cilantro",
+        "name": "fresh parsley",
+        "note": "chopped; or cilantro",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-063": {
+        "raw": "Rice or cauliflower rice",
+        "name": "rice",
+        "note": "or cauliflower rice",
+        "aisleSuggestion": "PASTA_RICE_GRAINS"
+    },
+    "fq-064": {
+        "raw": "Brown rice pasta (I love Trader Joe's organic brand with quinoa)",
+        "name": "brown rice pasta",
+        "note": "organic, with quinoa",
+        "aisleSuggestion": "PASTA_RICE_GRAINS"
+    },
+    "fq-065": {
+        "raw": "1 large onion",
+        "name": "onion",
+        "quantity": "1",
+        "quantityText": "1",
+        "note": "large",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-066": {
+        "raw": "1 red pepper",
+        "name": "red pepper",
+        "quantity": "1",
+        "quantityText": "1",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-067": {
+        "raw": "2 garlic cloves",
+        "name": "garlic",
+        "quantity": "2",
+        "quantityText": "2",
+        "unit": "clove",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-068": {
+        "raw": "1 tbsp oil",
+        "name": "oil",
+        "quantity": "1",
+        "quantityText": "1",
+        "unit": "tbsp",
+        "aisleSuggestion": "OILS_VINEGARS"
+    },
+    "fq-069": {
+        "raw": "1 heaped tsp hot chilli powder (or 1 level tbsp if you only have mild)",
+        "name": "hot chilli powder",
+        "quantity": "1",
+        "quantityText": "1",
+        "unit": "tsp",
+        "note": "heaped; or 1 level tbsp if you only have mild",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-070": {
+        "raw": "1 tsp paprika",
+        "name": "paprika",
+        "quantity": "1",
+        "quantityText": "1",
+        "unit": "tsp",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-071": {
+        "raw": "1 tsp ground cumin",
+        "name": "ground cumin",
+        "quantity": "1",
+        "quantityText": "1",
+        "unit": "tsp",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-072": {
+        "raw": "500g lean minced beef",
+        "name": "minced beef",
+        "quantity": "500",
+        "quantityText": "500g",
+        "unit": "g",
+        "note": "lean",
+        "aisleSuggestion": "MEAT_FISH"
+    },
+    "fq-073": {
+        "raw": "1 beef stock cube",
+        "name": "beef stock cube",
+        "quantity": "1",
+        "quantityText": "1",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-074": {
+        "raw": "400g can Mutti chopped tomatoes",
+        "name": "chopped tomatoes",
+        "quantity": "400",
+        "quantityText": "400g",
+        "unit": "g",
+        "note": "Mutti, tin",
+        "aisleSuggestion": "TINS_JARS"
+    },
+    "fq-075": {
+        "raw": "½ tsp dried marjoram",
+        "name": "dried marjoram",
+        "quantity": "1/2",
+        "quantityText": "½",
+        "unit": "tsp",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-076": {
+        "raw": "1 tsp sugar (or add a thumbnail-sized piece of dark chocolate along with the beans instead, see tip)",
+        "name": "sugar",
+        "quantity": "1",
+        "quantityText": "1",
+        "unit": "tsp",
+        "note": "or add a thumbnail-sized piece of dark chocolate along with the beans instead",
+        "aisleSuggestion": "BAKING"
+    },
+    "fq-077": {
+        "raw": "2 tbsp tomato purée",
+        "name": "tomato purée",
+        "quantity": "2",
+        "quantityText": "2",
+        "unit": "tbsp",
+        "aisleSuggestion": "TINS_JARS"
+    },
+    "fq-078": {
+        "raw": "410g can red kidney beans",
+        "name": "red kidney beans",
+        "quantity": "410",
+        "quantityText": "410g",
+        "unit": "g",
+        "note": "tin",
+        "aisleSuggestion": "TINS_JARS"
+    },
+    "fq-079": {
+        "raw": "plain boiled long grain rice to serve",
+        "name": "long grain rice",
+        "note": "plain, boiled, to serve",
+        "aisleSuggestion": "PASTA_RICE_GRAINS"
+    },
+    "fq-080": {
+        "raw": "soured cream to serve",
+        "name": "soured cream",
+        "note": "to serve",
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-081": {
+        "raw": "3 cups cooked quinoa",
+        "name": "quinoa",
+        "quantity": "3",
+        "quantityText": "3",
+        "unit": "cup",
+        "note": "cooked",
+        "aisleSuggestion": "PASTA_RICE_GRAINS"
+    },
+    "fq-082": {
+        "raw": "1 recipe Roasted Tomatoes",
+        "name": "roasted tomatoes",
+        "quantity": "1",
+        "quantityText": "1",
+        "unit": "other",
+        "note": "from recipe",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-083": {
+        "raw": "2 cups arugula",
+        "name": "arugula",
+        "quantity": "2",
+        "quantityText": "2",
+        "unit": "cup",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-084": {
+        "raw": "1 cup sliced Persian cucumbers",
+        "name": "persian cucumber",
+        "quantity": "1",
+        "quantityText": "1",
+        "unit": "cup",
+        "note": "sliced",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-085": {
+        "raw": "1 cup mixed fresh basil and mint leaves",
+        "name": "basil",
+        "quantity": "1",
+        "quantityText": "1",
+        "unit": "cup",
+        "note": "fresh, mixed with mint leaves",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-086": {
+        "raw": "¾ cup crumbled feta cheese",
+        "name": "feta cheese",
+        "quantity": "3/4",
+        "quantityText": "¾",
+        "unit": "cup",
+        "note": "crumbled",
+        "aisleSuggestion": "CHILLED"
+    },
+    "fq-087": {
+        "raw": "¾ cup kalamata olives (pitted and sliced)",
+        "name": "kalamata olives",
+        "quantity": "3/4",
+        "quantityText": "¾",
+        "unit": "cup",
+        "note": "pitted and sliced",
+        "aisleSuggestion": "CHILLED"
+    },
+    "fq-088": {
+        "raw": "½ cup diced red onion",
+        "name": "red onion",
+        "quantity": "1/2",
+        "quantityText": "½",
+        "unit": "cup",
+        "note": "diced",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-089": {
+        "raw": "⅓ cup toasted pine nuts",
+        "name": "pine nuts",
+        "quantity": "33/100",
+        "quantityText": "⅓",
+        "unit": "cup",
+        "note": "toasted",
+        "aisleSuggestion": "NUTS_DRIED_FRUIT"
+    },
+    "fq-090": {
+        "raw": "1 recipe Italian Dressing (plus 2 additional garlic cloves, grated)",
+        "name": "italian dressing",
+        "quantity": "1",
+        "quantityText": "1",
+        "unit": "other",
+        "note": "from recipe",
+        "aisleSuggestion": "OILS_VINEGARS"
+    },
+    "fq-091": {
+        "raw": "½ teaspoon sea salt",
+        "name": "sea salt",
+        "quantity": "1/2",
+        "quantityText": "½",
+        "unit": "tsp",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-092": {
+        "raw": "Freshly ground black pepper",
+        "name": "black pepper",
+        "note": "freshly ground",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-093": {
+        "raw": "Red pepper flakes",
+        "name": "red pepper flakes",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-094": {
+        "raw": "1 cup roasted chickpeas",
+        "name": "chickpeas",
+        "quantity": "1",
+        "quantityText": "1",
+        "unit": "cup",
+        "note": "roasted",
+        "aisleSuggestion": "TINS_JARS"
+    },
+    "fq-095": {
+        "raw": "1 tbsp sunflower oil",
+        "name": "sunflower oil",
+        "quantity": "1",
+        "quantityText": "1",
+        "unit": "tbsp",
+        "aisleSuggestion": "OILS_VINEGARS"
+    },
+    "fq-096": {
+        "raw": "1 large onion chopped",
+        "name": "onion",
+        "quantity": "1",
+        "quantityText": "1",
+        "note": "large, chopped",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-097": {
+        "raw": "2-3 medium carrots chopped",
+        "name": "carrot",
+        "quantity": "2",
+        "quantityMax": "3",
+        "quantityText": "2-3",
+        "note": "medium, chopped",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-098": {
+        "raw": "500g pack lamb mince",
+        "name": "lamb mince",
+        "quantity": "500",
+        "quantityText": "500g",
+        "unit": "g",
+        "note": "pack",
+        "aisleSuggestion": "MEAT_FISH"
+    },
+    "fq-099": {
+        "raw": "2 tbsp tomato purée",
+        "name": "tomato purée",
+        "quantity": "2",
+        "quantityText": "2",
+        "unit": "tbsp",
+        "aisleSuggestion": "TINS_JARS"
+    },
+    "fq-100": {
+        "raw": "large splash Worcestershire sauce",
+        "name": "worcestershire sauce",
+        "quantityText": "large splash",
+        "unit": "other",
+        "note": "large splash",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-101": {
+        "raw": "500ml beef stock",
+        "name": "beef stock",
+        "quantity": "500",
+        "quantityText": "500ml",
+        "unit": "ml",
+        "aisleSuggestion": "TINS_JARS"
+    },
+    "fq-102": {
+        "raw": "900g potatoes cut into chunks",
+        "name": "potato",
+        "quantity": "900",
+        "quantityText": "900g",
+        "unit": "g",
+        "note": "cut into chunks",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-103": {
+        "raw": "85g butter",
+        "name": "butter",
+        "quantity": "85",
+        "quantityText": "85g",
+        "unit": "g",
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-104": {
+        "raw": "3 tbsp milk",
+        "name": "milk",
+        "quantity": "3",
+        "quantityText": "3",
+        "unit": "tbsp",
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-105": {
+        "raw": "8 oz / 250g   dried fettuccine",
+        "name": "fettuccine",
+        "quantity": "8",
+        "quantityText": "8",
+        "unit": "oz",
+        "altQuantity": "250",
+        "altUnit": "g",
+        "note": "dried",
+        "aisleSuggestion": "PASTA_RICE_GRAINS"
+    },
+    "fq-106": {
+        "raw": "3 tbsp unsalted butter",
+        "name": "unsalted butter",
+        "quantity": "3",
+        "quantityText": "3",
+        "unit": "tbsp",
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-107": {
+        "raw": "1  small shallot (, very finely minced (eschallot in Australia) (Note 1))",
+        "name": "shallot",
+        "quantity": "1",
+        "quantityText": "1",
+        "note": "small, very finely minced",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-108": {
+        "raw": "1/2 cup heavy cream ((Note 2))",
+        "name": "double cream",
+        "quantity": "1/2",
+        "quantityText": "1/2",
+        "unit": "cup",
+        "note": "heavy cream",
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-109": {
+        "raw": "3/4 cup freshly grated Parmigiano Reggiano or parmesan ((Notes 3 and 4))",
+        "name": "parmesan",
+        "quantity": "3/4",
+        "quantityText": "3/4",
+        "unit": "cup",
+        "note": "freshly grated, or Parmigiano Reggiano",
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-110": {
+        "raw": "1/4 tsp salt",
+        "name": "salt",
+        "quantity": "1/4",
+        "quantityText": "1/4",
+        "unit": "tsp",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-111": {
+        "raw": "Good grind of black pepper",
+        "name": "black pepper",
+        "quantityText": "Good grind",
+        "note": "good grind",
+        "estimated": true,
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-112": {
+        "raw": "Fresh parsley ((optional))",
+        "name": "parsley",
+        "note": "fresh",
+        "optional": true,
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-113": {
+        "raw": "Extra Parmigiano Reggiano",
+        "name": "parmesan",
+        "note": "extra",
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-114": {
+        "raw": "1 tbsp olive oil",
+        "name": "olive oil",
+        "quantity": "1",
+        "quantityText": "1",
+        "unit": "tbsp",
+        "aisleSuggestion": "OILS_VINEGARS"
+    },
+    "fq-115": {
+        "raw": "1  onion (, finely chopped (white, yellow or brown))",
+        "name": "onion",
+        "quantity": "1",
+        "quantityText": "1",
+        "note": "finely chopped; white, yellow or brown",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-116": {
+        "raw": "1  medium carrot (, peeled and very finely diced)",
+        "name": "carrot",
+        "quantity": "1",
+        "quantityText": "1",
+        "note": "medium; peeled and very finely diced",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-117": {
+        "raw": "1  celery stick (, very finely diced)",
+        "name": "celery",
+        "quantity": "1",
+        "quantityText": "1",
+        "unit": "stick",
+        "note": "very finely diced",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-118": {
+        "raw": "2  garlic cloves (, minced)",
+        "name": "garlic",
+        "quantity": "2",
+        "quantityText": "2",
+        "unit": "clove",
+        "note": "minced",
+        "aisleSuggestion": "PRODUCE"
+    },
+    "fq-119": {
+        "raw": "1 kg / 2 lb  beef mince ((ground beef) (Note 1))",
+        "name": "beef mince",
+        "quantity": "1",
+        "quantityText": "1 kg / 2 lb",
+        "unit": "kg",
+        "altQuantity": "2",
+        "altUnit": "lb",
+        "note": "ground beef; Note 1",
+        "aisleSuggestion": "MEAT_FISH"
+    },
+    "fq-120": {
+        "raw": "800g / 28 oz  canned crushed tomato",
+        "name": "crushed tomato",
+        "quantity": "800",
+        "quantityText": "800g / 28 oz",
+        "unit": "g",
+        "altQuantity": "28",
+        "altUnit": "oz",
+        "note": "canned",
+        "aisleSuggestion": "TINS_JARS"
+    },
+    "fq-121": {
+        "raw": "1/4 cup tomato paste",
+        "name": "tomato paste",
+        "quantity": "1/4",
+        "quantityText": "1/4",
+        "unit": "cup",
+        "aisleSuggestion": "TINS_JARS"
+    },
+    "fq-122": {
+        "raw": "1 cup pinot noir red wine (, or other dry red wine (Note 2))",
+        "name": "pinot noir red wine",
+        "quantity": "1",
+        "quantityText": "1",
+        "unit": "cup",
+        "note": "or other dry red wine; Note 2",
+        "aisleSuggestion": "DRINKS"
+    },
+    "fq-123": {
+        "raw": "3  beef bouillon cubes (, crumbled)",
+        "name": "beef bouillon cubes",
+        "quantity": "3",
+        "quantityText": "3",
+        "note": "crumbled",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-124": {
+        "raw": "2  bay leaves (, dried or fresh)",
+        "name": "bay leaves",
+        "quantity": "2",
+        "quantityText": "2",
+        "note": "dried or fresh",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-125": {
+        "raw": "1/2 tsp EACH dried thyme and oregano",
+        "name": "dried thyme",
+        "quantity": "1/2",
+        "quantityText": "1/2",
+        "unit": "tsp",
+        "note": "each",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-126": {
+        "raw": "2 tsp Worcestershire Sauce",
+        "name": "worcestershire sauce",
+        "quantity": "2",
+        "quantityText": "2",
+        "unit": "tsp",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-127": {
+        "raw": "1 - 2 tsp sugar ((if needed - Note 3))",
+        "name": "sugar",
+        "quantity": "1",
+        "quantityMax": "2",
+        "quantityText": "1 - 2",
+        "unit": "tsp",
+        "note": "if needed; Note 3",
+        "optional": true,
+        "aisleSuggestion": "BAKING"
+    },
+    "fq-128": {
+        "raw": "1/2 tsp salt and black pepper",
+        "name": "salt",
+        "quantity": "1/2",
+        "quantityText": "1/2",
+        "unit": "tsp",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-129": {
+        "raw": "60g / 4 tbsp  butter",
+        "name": "butter",
+        "quantity": "60",
+        "quantityText": "60g / 4 tbsp",
+        "unit": "g",
+        "altQuantity": "4",
+        "altUnit": "tbsp",
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-130": {
+        "raw": "1/2 cup flour",
+        "name": "flour",
+        "quantity": "1/2",
+        "quantityText": "1/2",
+        "unit": "cup",
+        "aisleSuggestion": "BAKING"
+    },
+    "fq-131": {
+        "raw": "4 cups milk (, preferably full fat but low fat ok)",
+        "name": "milk",
+        "quantity": "4",
+        "quantityText": "4",
+        "unit": "cup",
+        "note": "preferably full fat; low fat ok",
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-132": {
+        "raw": "2 cups gruyere or Colby cheese (, shred yourself (or cheddar, Monterey Jack, OR 1 cup / 100g shredded parmesan) (Note 4))",
+        "name": "gruyere cheese",
+        "quantity": "2",
+        "quantityText": "2",
+        "unit": "cup",
+        "note": "or Colby cheese; shred yourself (or cheddar, Monterey Jack, or 1 cup / 100g shredded parmesan); Note 4",
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-133": {
+        "raw": "Pinch of freshly ground nutmeg",
+        "name": "nutmeg",
+        "quantityText": "Pinch",
+        "unit": "pinch",
+        "note": "freshly ground",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-134": {
+        "raw": "Salt and pepper",
+        "name": "salt",
+        "aisleSuggestion": "SPICES_CONDIMENTS"
+    },
+    "fq-135": {
+        "raw": "350g/ 12 oz  fresh lasagna sheets ((or 250g/8oz dried) (Note 5))",
+        "name": "lasagne sheets",
+        "quantity": "350",
+        "quantityText": "350g/ 12 oz",
+        "unit": "g",
+        "altQuantity": "250",
+        "altUnit": "g",
+        "note": "fresh; or 250g/8oz dried; Note 5",
+        "aisleSuggestion": "CHILLED"
+    },
+    "fq-136": {
+        "raw": "1 1/2 cups (tightly packed) mozzarella cheese (, shred yourself (Note 4))",
+        "name": "mozzarella cheese",
+        "quantity": "3/2",
+        "quantityText": "1 1/2",
+        "unit": "cup",
+        "note": "tightly packed; shred yourself; Note 4",
+        "aisleSuggestion": "DAIRY_EGGS"
+    },
+    "fq-137": {
+        "raw": "Finely chopped basil or parsley (, for garnish (optional))",
+        "name": "basil",
+        "note": "finely chopped, or parsley; for garnish",
+        "optional": true,
+        "aisleSuggestion": "PRODUCE"
+    }
+}
