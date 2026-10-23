@@ -3,6 +3,9 @@ package com.robert4lyf.hypershop.ui.recipes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -17,6 +20,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.robert4lyf.hypershop.core.merge.UseProgress
@@ -266,5 +270,63 @@ class RecipesScreenTest {
     fun recordDark() {
         show(dark = true)
         compose.onRoot().captureRoboImage(Shots.path("recipes-dark.png"))
+    }
+
+    @Test
+    fun theRecipeSheetTakesStarsNotesAndAPhoto() {
+        val photo =
+            java.io.File.createTempFile("dal", ".jpg").apply {
+                val b = android.graphics.Bitmap.createBitmap(640, 360, android.graphics.Bitmap.Config.ARGB_8888)
+                b.eraseColor(android.graphics.Color.rgb(210, 120, 40))
+                outputStream().use { b.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }
+            }
+        var row by mutableStateOf(DETAIL.row.copy(url = "https://example.com/dal", rating = 4, notes = "Simmer 10 min longer"))
+        val got = mutableListOf<String>()
+        val actions =
+            RecipeNoteActions(
+                onRate = { _, n -> got += "rate $n" },
+                onNotes = { _, t -> got += "notes $t" },
+                onChoosePhoto = { got += "choose" },
+                onPagePhoto = { got += "page" },
+                onRemovePhoto = { got += "remove" },
+            )
+        compose.setContent {
+            HyperShopTheme(
+                dynamicColor = false,
+            ) { RecipeDetailContent(DETAIL.copy(row = row), onAdd = {}, notes = actions) }
+        }
+        // The rating is one choice of five, read as such.
+        compose.onNodeWithTag("rating").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "4 of 5 stars"))
+        compose.onNodeWithTag("rate-2").performClick()
+        // Notes are saved on Save only: typing alone changes nothing.
+        compose.onNodeWithText("Simmer 10 min longer").assertExists()
+        compose.onNodeWithTag("cooking-notes-save").assertDoesNotExist()
+        compose.onNodeWithTag("cooking-notes").performTextReplacement("Simmer 10 min longer. Half the chilli.")
+        compose.onNodeWithTag("cooking-notes-save").performClick()
+        // No photo yet, and the recipe has a page: its photo can be fetched, or one chosen.
+        compose.onNodeWithTag("photo-page").performClick()
+        compose.onNodeWithTag("photo-choose").performClick()
+        compose.onNodeWithTag("photo-remove").assertDoesNotExist()
+        assertEquals(listOf("rate 2", "notes Simmer 10 min longer. Half the chilli.", "page", "choose"), got)
+        // With a photo: it heads the sheet, and can be removed or changed.
+        row = row.copy(photo = photo.path)
+        compose.waitForIdle()
+        compose.onNodeWithTag("recipe-photo").assertExists()
+        compose.onNodeWithTag("photo-page").assertDoesNotExist()
+        compose.onNodeWithText("Change photo", substring = true).assertExists()
+        compose.onNodeWithTag("photo-remove").performClick()
+        assertEquals("remove", got.last())
+        // The photo is read off the main thread: let it arrive before the picture is taken.
+        Thread.sleep(500)
+        compose.waitForIdle()
+        compose.onRoot().captureRoboImage(Shots.path("recipe-notes-light.png"))
+    }
+
+    @Test
+    fun aRatedRecipeSaysSoOnItsCard() {
+        val rated = USES.copy(library = USES.library.map { if (it.key == "r:9") it.copy(rating = 5) else it })
+        compose.setContent { HyperShopTheme(dynamicColor = false) { RecipesScreen(rated, onRemove = {}) } }
+        compose.onNodeWithTag("view-library").performClick()
+        compose.onNodeWithText("★ 5/5", substring = true).assertExists()
     }
 }

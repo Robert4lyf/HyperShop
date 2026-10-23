@@ -7,6 +7,7 @@ import android.net.Uri
 import com.robert4lyf.hypershop.data.BackupValidator
 import com.robert4lyf.hypershop.data.ListRepository
 import com.robert4lyf.hypershop.data.RecipeNoteEntity
+import com.robert4lyf.hypershop.extract.Extractor
 import com.robert4lyf.hypershop.extract.FetchResult
 import com.robert4lyf.hypershop.extract.SafeFetcher
 import kotlinx.coroutines.Dispatchers
@@ -61,6 +62,21 @@ class RecipePhotos(
             val url = n.photoUrl ?: continue
             if (file(n.photo) == null) download(n.libraryKey, url)
         }
+    }
+
+    /**
+     * "Use the recipe page's photo" on a recipe saved before photos were kept: the page is fetched again
+     * (as a share would), its photo found and fetched. False when the page or its photo can't be had.
+     */
+    suspend fun fromPage(
+        key: String,
+        pageUrl: String,
+    ): Boolean {
+        val page = fetcher.fetch(pageUrl) as? FetchResult.Ok ?: return false
+        val html = if (page.contentType == "application/ld+json") Extractor.wrapLdJson(page.body) else page.body
+        val image = withContext(Dispatchers.Default) { Extractor.extract(html, page.finalUrl).image } ?: return false
+        repository.setRecipePhoto(key, repository.recipeNote(key)?.photo, image)
+        return download(key, image)
     }
 
     /** A photo chosen from the phone's photos (the system picker: no permission needed). */
