@@ -343,6 +343,8 @@ class PerformanceProbeTest {
         val c = DeviceContainer.create()
         c.photographed(n)
         val decodes = com.robert4lyf.hypershop.ui.recipes.PhotoDecodes
+        // Each size measured from cold: nothing left over from the run before.
+        com.robert4lyf.hypershop.ui.recipes.PhotoCache.clear()
         decodes.count.set(0)
         decodes.bytes.set(0)
         var shown by androidx.compose.runtime.mutableStateOf(true)
@@ -373,6 +375,8 @@ class PerformanceProbeTest {
                     }
                 }
             }
+            // The Saved toggle shows once the library has loaded: with 100 recipes and more, after the first frame.
+            compose.waitUntil(30_000) { compose.onAllNodesWithTag("view-library").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("view-library").performClick()
             compose.waitUntil(30_000) { compose.onAllNodesWithTag(newest).fetchSemanticsNodes().isNotEmpty() }
         }
@@ -389,7 +393,7 @@ class PerformanceProbeTest {
             shown = false
             compose.waitForIdle()
             shown = true
-            compose.waitForIdle()
+            compose.waitUntil(30_000) { compose.onAllNodesWithTag("view-library").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("view-library").performClick()
             compose.waitForIdle()
         }
