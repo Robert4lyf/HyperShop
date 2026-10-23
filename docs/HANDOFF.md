@@ -1,5 +1,14 @@
 # Hand-off notes
 
+## Status: Step S (stability and data integrity) — ⏸ Hand-off H, plus checks 25–28
+
+Step S (PROGRESS.md › Step S, the report in docs/reports/stability-pass.md) fixed the returning-shopper emulator scenario, put recipe photos into backups, made a photo two recipes share safe to remove from one, and stopped two identical ingredient lines being sent to Claude as one. Hand-off H below is still the list; these are added to it. Nothing here has been done on a real phone. Do 25–26 on a second install or a phone whose list you can lose.
+
+25. **A chosen photo moves phones.** On a recipe in Saved, Choose a photo from your gallery. Back up to Google Drive (the file is now `hypershop-backup-<date>.zip`). On a second install (or after Clear storage), restore it: the recipe shows the same photo, with its stars and cooking notes? The "Backed up …" message and the restore prompt counted the photos?
+26. **Restore over photos, then Undo.** With photos on the phone, restore a backup from another install, then Undo straight away: your own photos back on your recipes?
+27. **One picture, two recipes.** Choose the same gallery photo for two saved recipes, then Remove photo on one: the other still shows it?
+28. **Twice the same line, side by side.** Paste a recipe whose ingredients include "100 g sugar" on two lines in a row. Add it, then Edit it from its card and Ask Claude: both lines still there and the row 200 g?
+
 ## Status: Final quality pass — ⏸ Hand-off H (replaces E, F and G)
 
 The final quality pass is on branch `claude/serene-lovelace-464dnp` (PROGRESS.md › Quality pass, the report in docs/reports/quality-pass.md). Hand-offs E, F and G were never answered; their checks that still matter are folded into H below, so H is the one list to work through. Everything here was driven on the JVM and CI's emulator; nothing in this list has been done on a real phone or a real Forerunner 245. **Back up first** (Settings › Data › Back up to a file), and do checks 15–17 on a second install or a phone whose list you can lose: they restore backups.
