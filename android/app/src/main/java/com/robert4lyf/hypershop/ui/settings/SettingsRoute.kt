@@ -173,7 +173,7 @@ fun SettingsRoute(
     // The user picks where the backup goes and which file to restore; the app never sees any other file.
     val createBackup =
         rememberLauncherForActivityResult(
-            ActivityResultContracts.CreateDocument("application/json"),
+            ActivityResultContracts.CreateDocument("application/zip"),
         ) { uri: Uri? -> uri?.let(vm::backupTo) }
     val openBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? -> uri?.let(vm::inspectRestore) }
     SettingsScreen(
@@ -200,7 +200,11 @@ fun SettingsRoute(
             onLibrary = onLibrary,
             onVoiceTest = onVoiceTest,
             onBackup = { createBackup.launch(BackupManager.suggestedName(container.clock())) },
-            onRestore = { openBackup.launch(arrayOf("application/json", "application/octet-stream", "text/plain", "*/*")) },
+            onRestore = {
+                openBackup.launch(
+                    arrayOf("application/zip", "application/json", "application/octet-stream", "text/plain", "*/*"),
+                )
+            },
             onConfirmRestore = vm::confirmRestore,
             onCancelRestore = vm::cancelRestore,
             onClearHistory = vm::clearHistory,
@@ -261,8 +265,22 @@ fun SettingsScreen(
             title = { Text("Restore this backup?") },
             text = {
                 Text(
-                    "From $date: ${if (p.recipes == 1) "1 recipe" else "${p.recipes} recipes"} and " +
+                    "From $date: ${if (p.recipes == 1) "1 recipe" else "${p.recipes} recipes"}" +
+                        (
+                            if (p.photos == 0) {
+                                ""
+                            } else if (p.photos == 1) {
+                                ", 1 photo"
+                            } else {
+                                ", ${p.photos} photos"
+                            }
+                        ) + " and " +
                         "${if (p.itemsOnList == 1) "1 item" else "${p.itemsOnList} items"} on the list.\n\n" +
+                        when (p.missingPhotos) {
+                            0 -> ""
+                            1 -> "1 recipe photo isn't in this backup and will be missing.\n\n"
+                            else -> "${p.missingPhotos} recipe photos aren't in this backup and will be missing.\n\n"
+                        } +
                         "Everything on this phone is replaced (Undo is offered afterwards). Your Claude key stays as it is.",
                 )
             },

@@ -1,6 +1,8 @@
 package com.robert4lyf.hypershop.device
 
 import android.content.ContentValues
+import android.graphics.Bitmap
+import android.graphics.Color
 import android.net.Uri
 import android.provider.MediaStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -20,6 +22,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
 
 /**
  * Backups through a real content provider (MediaStore's Downloads, the one the
@@ -33,11 +36,11 @@ class DeviceBackupProviderTest {
     private val resolver get() = DeviceContainer.context.contentResolver
     private val json = Json { encodeDefaults = true }
 
-    private fun newDocument(): Uri {
+    private fun newDocument(zip: Boolean = false): Uri {
         val values =
             ContentValues().apply {
-                put(MediaStore.Downloads.DISPLAY_NAME, "hypershop-test-${System.nanoTime()}.json")
-                put(MediaStore.Downloads.MIME_TYPE, "application/json")
+                put(MediaStore.Downloads.DISPLAY_NAME, "hypershop-test-${System.nanoTime()}.${if (zip) "zip" else "json"}")
+                put(MediaStore.Downloads.MIME_TYPE, if (zip) "application/zip" else "application/json")
             }
         return requireNotNull(resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)).also { made += it }
     }
@@ -76,6 +79,45 @@ class DeviceBackupProviderTest {
         assertEquals("sk-ant-device-test", runBlocking { c.apiKeyStore.get() })
         assertTrue(runBlocking { m.restore(done.before) } is RestoreOutcome.Restored)
         assertTrue(c.items().isEmpty())
+    }
+
+    /**
+     * A photo chosen from the phone's photos goes into the backup through the provider and comes back from it.
+     * The photo's file is deleted between the two, as on another phone; only that one file, never the folder,
+     * so the test cannot touch anything else in it.
+     */
+    @Test
+    fun aChosenPhotoTravelsThroughAProvider() {
+        val c = DeviceContainer.create()
+        val m = BackupManager(c, "device")
+        val id = c.saveRecipe("Weeknight chilli", "2 onions")
+        val key = runBlocking { c.repository.libraryKeyOf(id) }!!
+        // A colour of its own, so the photo's name (its content's hash) is not one a real recipe could have.
+        val b =
+            Bitmap.createBitmap(
+                320,
+                240,
+                Bitmap.Config.ARGB_8888,
+            ).apply { eraseColor(Color.rgb(17, (System.nanoTime() % 255).toInt(), 99)) }
+        val picked =
+            File(c.context.cacheDir, "pick-${System.nanoTime()}.jpg").apply {
+                outputStream().use { b.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+            }
+        assertTrue(runBlocking { c.recipePhotos.pick(key, Uri.fromFile(picked)) })
+        val photo = runBlocking { c.repository.recipeNote(key) }!!.photo!!
+        val bytes = c.recipePhotos.file(photo)!!.readBytes()
+        val uri = newDocument(zip = true)
+        val written = runBlocking { m.writeTo(c.context, uri) }.getOrThrow()
+        assertEquals(1, written.photos)
+        assertTrue(c.recipePhotos.file(photo)!!.delete())
+        val read = runBlocking { m.inspect(c.context, uri) }
+        assertTrue(read.toString(), read is Inspection.Ok)
+        val ok = read as Inspection.Ok
+        assertEquals(setOf(photo), ok.photos!!.names)
+        assertTrue(runBlocking { m.restore(ok.file, ok.photos) } is RestoreOutcome.Restored)
+        assertEquals(photo, runBlocking { c.repository.recipeNote(key) }!!.photo)
+        assertTrue(bytes.contentEquals(c.recipePhotos.file(photo)!!.readBytes()))
+        picked.delete()
     }
 
     @Test

@@ -19,7 +19,7 @@ import java.io.File
 class BackupManagerTest {
     @Test
     fun writeThenInspectIsOk() {
-        val c = TestContainer.create()
+        val c = TestContainer.create(key = "sk-ant-test")
         c.add("2 onions", "1 carrot")
         val m = BackupManager(c, "1.0-test")
         val file = File(c.context.cacheDir, "b-${System.nanoTime()}.json")
@@ -33,8 +33,9 @@ class BackupManagerTest {
         val ok = i as Inspection.Ok
         assertEquals("1.0-test", ok.summary.appVersion)
         assertEquals(1, ok.summary.recipes)
-        // The text form, without any resolver.
-        assertTrue(m.inspectText(file.readText()) is Inspection.Ok)
+        // Written as an archive; its JSON is the plain backup's, readable on its own, without any resolver.
+        assertTrue(BackupArchive.isArchive(file.readBytes()))
+        assertTrue(m.inspectText(m.jsonOf(runBlocking { m.snapshot() })) is Inspection.Ok)
         assertEquals(Inspection.NotABackup, m.inspectText("milk, eggs"))
         assertEquals(Inspection.NotABackup, m.inspectText("""{"format":"something-else","version":1}"""))
         assertEquals(Inspection.Newer(2), m.inspectText("""{"format":"hypershop-backup","version":2}"""))
@@ -44,7 +45,14 @@ class BackupManagerTest {
         assertEquals(Inspection.NotABackup, m.inspectText("""{"format":"hypershop-backup","version":null}"""))
         assertTrue(m.inspectText("""{"format":"hypershop-backup","version":1}""") is Inspection.Broken)
         // The key never travels.
-        assertTrue(!file.readText().contains("sk-ant"))
+        // Every entry read inflated: the compressed bytes would hide it.
+        val inflated =
+            java.util.zip.ZipInputStream(file.inputStream()).use {
+                    z ->
+                generateSequence { z.nextEntry }.map { String(z.readBytes()) }.toList()
+            }
+        assertTrue(inflated.joinToString().contains("hypershop-backup"))
+        assertTrue(inflated.none { it.contains("sk-ant") })
     }
 
     @Test

@@ -63,6 +63,19 @@ data class BackupSummary(
     val appVersion: String?,
     val recipes: Int,
     val itemsOnList: Int,
+    /** Photo files there will be (in the backup, or already on this phone). */
+    val photos: Int = 0,
+    /**
+     * Photos recipes name that are neither, and cannot be fetched again from a page: they will be
+     * missing. Writing, the ones that were not on this phone to put in the file.
+     */
+    val missingPhotos: Int = 0,
+)
+
+/** An archive's photos, checked and waiting outside the photo folder until the restore is confirmed. */
+data class StagedPhotos(
+    val dir: File,
+    val names: Set<String>,
 )
 
 /** Reading a backup file: one of these. */
@@ -70,6 +83,8 @@ sealed interface Inspection {
     data class Ok(
         val file: BackupFile,
         val summary: BackupSummary,
+        /** An archive's photos; null for a plain JSON backup, which has none. */
+        val photos: StagedPhotos? = null,
     ) : Inspection
 
     /** Not a HyperShop backup at all (or not JSON). */
@@ -146,32 +161,59 @@ class BackupManager(
         )
     }
 
-    fun summary(f: BackupFile): BackupSummary {
+    /** [f] in numbers; [available] is the photo files there will be (null: count every one named as there). */
+    fun summary(
+        f: BackupFile,
+        available: Set<String>? = null,
+    ): BackupSummary {
         val live = f.data.items.filter { it.deletedAt == null }.map { it.id }.toSet()
         val recipes = f.data.recipes.count { it.lastAddedAt != null }
-        return BackupSummary(f.createdAt, f.appVersion, recipes, live.size)
+        val named = f.data.recipeNotes.filter { it.photo != null }
+        val have = named.mapNotNull { it.photo }.filter { available == null || it in available }.toSet()
+        val missing = named.filter { available != null && it.photo !in available && it.photoUrl == null }.mapNotNull { it.photo }.toSet()
+        return BackupSummary(f.createdAt, f.appVersion, recipes, live.size, have.size, missing.size)
     }
 
-    /** Writes the current data to [uri]. Null on success, else what went wrong in a sentence. */
+    /**
+     * Writes the current data and every photo a recipe shows to [uri], as an archive ([BackupArchive]).
+     * The data and the photo folder are read with no photo changing ([RecipePhotos.exclusive]), so the file
+     * holds the photos its recipes name. A photo named but not on this phone is counted in
+     * [BackupSummary.missingPhotos] and said, not skipped in silence.
+     */
     suspend fun writeTo(
         context: Context,
         uri: Uri,
     ): Result<BackupSummary> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val file = snapshot()
-                val text = writer.encodeToString(BackupFile.serializer(), file)
-                // "wt" truncates what was there; a provider that refuses the mode (Drive did) gets plain "w".
-                val out =
-                    try {
-                        context.contentResolver.openOutputStream(uri, "wt")
-                    } catch (e: Exception) {
-                        null
-                    } ?: context.contentResolver.openOutputStream(uri, "w") ?: throw IOException("could not open the file")
-                out.use { it.write(text.toByteArray()) }
-                summary(file)
+                c.recipePhotos.exclusive {
+                    val file = snapshot()
+                    val names = file.data.recipeNotes.mapNotNull { it.photo }.toSortedSet()
+                    val files = names.mapNotNull { c.recipePhotos.file(it) }
+                    // "wt" truncates what was there; a provider that refuses the mode (Drive did) gets plain "w".
+                    val out =
+                        try {
+                            context.contentResolver.openOutputStream(uri, "wt")
+                        } catch (e: Exception) {
+                            null
+                        } ?: context.contentResolver.openOutputStream(uri, "w") ?: throw IOException("could not open the file")
+                    out.use { BackupArchive.write(it, file.createdAt, jsonOf(file).toByteArray(), files) }
+                    val s = summary(file, files.map { it.name }.toSet())
+                    s.copy(missingPhotos = names.size - files.size)
+                }
             }.onFailure { Timber.w(it, "Backup failed") }
         }
+
+    /** [f] as a plain backup's JSON: what an archive holds as its `backup.json`. */
+    fun jsonOf(f: BackupFile): String = writer.encodeToString(BackupFile.serializer(), f)
+
+    /** Where an archive's photos wait between [inspect] and [restore]. */
+    private val staging get() = File(c.context.cacheDir, "restore-photos")
+
+    /** The archive inspected last is not going to be restored: its staged photos go. */
+    fun discardStaged() {
+        staging.deleteRecursively()
+    }
 
     /** Reads and checks [uri] without changing anything. */
     suspend fun inspect(
@@ -179,20 +221,50 @@ class BackupManager(
         uri: Uri,
     ): Inspection =
         withContext(Dispatchers.IO) {
-            val bytes =
-                try {
-                    val stream = context.contentResolver.openInputStream(uri) ?: return@withContext Inspection.Unreadable
-                    stream.use { it.readNBytes(MAX_BYTES + 1) }
-                } catch (e: IOException) {
-                    Timber.w(e, "Backup unreadable")
-                    return@withContext Inspection.Unreadable
-                } catch (e: SecurityException) {
-                    return@withContext Inspection.Unreadable
+            try {
+                val stream = context.contentResolver.openInputStream(uri) ?: return@withContext Inspection.Unreadable
+                stream.buffered().use { input ->
+                    input.mark(4)
+                    val head = input.readNBytes(4)
+                    input.reset()
+                    if (BackupArchive.isArchive(head)) return@use inspectArchive(input)
+                    val bytes = input.readNBytes(MAX_BYTES + 1)
+                    if (bytes.size > MAX_BYTES) return@use Inspection.Broken(listOf("the file is larger than a backup can be"))
+                    withLocalPhotos(inspectText(String(bytes)))
                 }
-            if (bytes.size > MAX_BYTES) return@withContext Inspection.Broken(listOf("the file is larger than a backup can be"))
-            val text = String(bytes)
-            inspectText(text)
+            } catch (e: IOException) {
+                Timber.w(e, "Backup unreadable")
+                Inspection.Unreadable
+            } catch (e: SecurityException) {
+                Inspection.Unreadable
+            }
         }
+
+    /** An archive: its photos staged, its JSON checked as any backup's. */
+    private fun inspectArchive(input: java.io.InputStream): Inspection {
+        val read = BackupArchive.read(input, staging, MAX_BYTES.toLong())
+        val ok =
+            when (read) {
+                is BackupArchive.Read.Newer -> return Inspection.Newer(read.version)
+                is BackupArchive.Read.Broken -> return Inspection.Broken(listOf(read.problem))
+                is BackupArchive.Read.Ok -> read
+            }
+        val i = inspectText(ok.backup)
+        if (i !is Inspection.Ok) {
+            discardStaged()
+            return if (i is Inspection.NotABackup) Inspection.Broken(listOf("the archive's backup is not one")) else i
+        }
+        val available = ok.photos + localPhotos(i.file)
+        return i.copy(summary = summary(i.file, available), photos = StagedPhotos(staging, ok.photos))
+    }
+
+    /** A plain JSON backup carries no photos: the ones it names count only if they are on this phone already. */
+    private fun withLocalPhotos(i: Inspection): Inspection =
+        if (i is Inspection.Ok) i.copy(summary = summary(i.file, localPhotos(i.file))) else i
+
+    /** The photos [f] names that are already in this phone's photo folder (the same name is the same picture). */
+    private fun localPhotos(f: BackupFile): Set<String> =
+        f.data.recipeNotes.mapNotNull { it.photo }.filter { c.recipePhotos.file(it) != null }.toSet()
 
     fun inspectText(text: String): Inspection {
         val head =
@@ -226,24 +298,61 @@ class BackupManager(
      * by the database changes nothing; a failure after it is rolled back to what
      * was there, and only when that fails too is the restore left for [recover].
      */
-    suspend fun restore(f: BackupFile): RestoreOutcome =
-        lock.withLock {
-            // Checked here too, not only by inspect(): nothing destructive starts on a file that would be refused.
-            BackupFileValidator.validate(f).takeIf { it.isNotEmpty() }?.let { return@withLock RestoreOutcome.Refused(it) }
-            val before = snapshot()
-            journal.begin(f, before)
-            val problems =
-                try {
-                    apply(f)
-                } catch (e: Exception) {
-                    Timber.e(e, "Restore failed part-way; rolling back")
-                    val back = runCatching { apply(before).isEmpty() }.onFailure { Timber.e(it, "Rollback failed") }.getOrDefault(false)
-                    if (back) journal.end()
-                    return@withLock RestoreOutcome.Failed(rolledBack = back)
-                }
-            journal.end()
-            if (problems.isEmpty()) RestoreOutcome.Restored(before) else RestoreOutcome.Refused(problems)
+    suspend fun restore(
+        f: BackupFile,
+        photos: StagedPhotos? = null,
+    ): RestoreOutcome =
+        try {
+            lock.withLock {
+                // Checked here too, not only by inspect(): nothing destructive starts on a file that would be refused.
+                BackupFileValidator.validate(f).takeIf { it.isNotEmpty() }?.let { return@withLock RestoreOutcome.Refused(it) }
+                // No photo changes, and no sweep, from here to the end: the folder holds every photo either side names.
+                c.recipePhotos.exclusive { restoreLocked(f, photos) }
+            }
+        } finally {
+            if (photos != null) discardStaged()
         }
+
+    private suspend fun restoreLocked(
+        f: BackupFile,
+        photos: StagedPhotos?,
+    ): RestoreOutcome {
+        // The archive's photos go into the folder before the journal: a file there that nothing names yet is
+        // harmless (the next start's sweep takes it if the restore never happens), and once the journal
+        // exists, finishing the restore after a crash needs nothing that is not already in place. The
+        // photos in the folder now stay too, so a rollback (or Undo) finds what the old data names.
+        for (name in photos?.names.orEmpty()) {
+            if (!c.recipePhotos.adopt(File(photos!!.dir, name))) {
+                Timber.e("Restore: photo %s could not be put in place", name)
+                return RestoreOutcome.Failed(rolledBack = true)
+            }
+        }
+        val target = withAvailablePhotos(f)
+        val before = snapshot()
+        journal.begin(target, before)
+        val problems =
+            try {
+                apply(target)
+            } catch (e: Exception) {
+                Timber.e(e, "Restore failed part-way; rolling back")
+                val back = runCatching { apply(before).isEmpty() }.onFailure { Timber.e(it, "Rollback failed") }.getOrDefault(false)
+                if (back) journal.end()
+                return RestoreOutcome.Failed(rolledBack = back)
+            }
+        journal.end()
+        return if (problems.isEmpty()) RestoreOutcome.Restored(before) else RestoreOutcome.Refused(problems)
+    }
+
+    /**
+     * [f] with every photo name that will not be a file here taken off its recipe, so the database
+     * never names a missing file. A photo from a recipe's page keeps its address, and is fetched again.
+     */
+    private fun withAvailablePhotos(f: BackupFile): BackupFile {
+        val notes = f.data.recipeNotes
+        if (notes.all { it.photo == null || c.recipePhotos.file(it.photo) != null }) return f
+        val fixed = notes.map { n -> if (n.photo != null && c.recipePhotos.file(n.photo) == null) n.copy(photo = null) else n }
+        return f.copy(data = f.data.copy(recipeNotes = fixed))
+    }
 
     /**
      * At start-up, before anything else reads the data: a restore the process
@@ -252,17 +361,21 @@ class BackupManager(
      */
     suspend fun recover(): Recovery? =
         lock.withLock {
-            val p = journal.pending() ?: return@withLock null
-            val target = p.target?.takeIf { BackupFileValidator.validate(it).isEmpty() }
-            val outcome =
-                when {
-                    target != null && tryApply(target) -> Recovery.FINISHED
-                    p.previous != null && tryApply(p.previous) -> Recovery.ROLLED_BACK
-                    // Kept for the next start; nothing here can say which half is current.
-                    else -> return@withLock Recovery.STUCK
-                }
-            journal.end()
-            outcome
+            // Both sides' photos were put in the folder before the journal was written; nothing deletes one
+            // until this is over (the sweep runs after it, and never while a restore is still pending).
+            c.recipePhotos.exclusive {
+                val p = journal.pending() ?: return@exclusive null
+                val target = p.target?.takeIf { BackupFileValidator.validate(it).isEmpty() }
+                val outcome =
+                    when {
+                        target != null && tryApply(target) -> Recovery.FINISHED
+                        p.previous != null && tryApply(p.previous) -> Recovery.ROLLED_BACK
+                        // Kept for the next start; nothing here can say which half is current.
+                        else -> return@exclusive Recovery.STUCK
+                    }
+                journal.end()
+                outcome
+            }
         }
 
     /** The user chose to keep the data as it is after a restore that could not be finished. */
@@ -308,7 +421,7 @@ class BackupManager(
 
         fun suggestedName(createdAt: Long): String {
             val d = java.time.Instant.ofEpochMilli(createdAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
-            return "hypershop-backup-$d.json"
+            return "hypershop-backup-$d.zip"
         }
     }
 }
