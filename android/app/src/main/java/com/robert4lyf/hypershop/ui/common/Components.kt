@@ -185,7 +185,7 @@ fun ScreenHeader(
             .fillMaxWidth()
             .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
             .clip(RoundedCornerShape(24.dp))
-            .lowPoly(seed, end = HEADER_END, scrim = true),
+            .lowPoly(seed),
     ) {
         CompositionLocalProvider(LocalContentColor provides Brand.OnHero) {
             Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 14.dp, bottom = 14.dp)) {
@@ -457,6 +457,3 @@ fun CountPill(
 fun EdgeDivider(modifier: Modifier = Modifier) {
     HorizontalDivider(modifier, color = MaterialTheme.colorScheme.cardEdge)
 }
-
-/** How far a header's mosaic runs: short of the palette's brightest end, where white buttons sit. */
-internal const val HEADER_END = 0.86f

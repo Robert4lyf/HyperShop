@@ -92,7 +92,6 @@ import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.data.bookRef
 import com.robert4lyf.hypershop.ui.common.AisleBadge
 import com.robert4lyf.hypershop.ui.common.BottomActionBar
-import com.robert4lyf.hypershop.ui.common.HEADER_END
 import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.SectionPosition
 import com.robert4lyf.hypershop.ui.common.Tone
@@ -268,7 +267,7 @@ private fun Hero(
                 .padding(start = 16.dp, end = 16.dp, top = 4.dp)
                 .clip(RoundedCornerShape(24.dp))
                 // The recipe's own mosaic, the same as its card on the Recipes tab.
-                .lowPoly(ui.title, end = HEADER_END, scrim = true)
+                .lowPoly(ui.title)
                 .padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
