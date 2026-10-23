@@ -118,7 +118,8 @@ class RecipesViewModel(
         // Photos known but not on this phone (after a restore onto another one, or an offer made offline):
         // fetched once, quietly, when the recipes are first shown.
         viewModelScope.launch {
-            val missing = c.repository.observeRecipeNotes().first().values.filter { it.photoUrl != null && c.recipePhotos.file(it.photo) == null }
+            val missing =
+                c.repository.observeRecipeNotes().first().values.filter { it.photoUrl != null && c.recipePhotos.file(it.photo) == null }
             if (missing.isNotEmpty()) c.applicationScope.launch { c.recipePhotos.fill(missing) }
         }
     }
