@@ -1020,7 +1020,8 @@ class ReviewViewModel(
             if (t.isEmpty()) return@act
             val origins = LineIdentity.originsOf(r)
             val origin = LineIdentity.next(t, origins + corrections.keys)
-            val line = c.ruleParser.parse(t)
+            // Its own source line, the next one: it is never a part of a line above it, however it reads.
+            val line = c.ruleParser.parse(t).copy(sourceLine = r.rawLines.size)
             // A line the user typed is their reading of it, like an edit: it stands over Claude's, and is kept if
             // Claude's answer leaves it out (an answer to a call made before it was typed does).
             corrections[origin] = LineCorrection(origin, line)

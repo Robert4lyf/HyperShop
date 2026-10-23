@@ -27,6 +27,13 @@ data class ParsedIngredient(
     val check: Boolean = false,
     /** Why [check] is set, in a few words for the review screen ("has 'or'"). */
     val checkReason: String? = null,
+    /**
+     * Which line of the recipe's ingredient text this was read from (its index in the lines read), when
+     * known. Claude can read one line as several ingredients ("salt and pepper" → salt, pepper), each
+     * carrying that line's text: they share this, where two lines that only read the same ("100 g sugar"
+     * for the cake and again for the icing) do not. Null on a line stored before lines carried it.
+     */
+    val sourceLine: Int? = null,
 ) {
     /** R1 derived flag. */
     val garnish: Boolean

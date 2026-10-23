@@ -232,8 +232,68 @@ class LineIdentityTest {
     @Test
     fun aSplitLineIsSentToClaudeOnce() {
         val split = listOf(line("salt and pepper", null, name = "salt"), line("salt and pepper", null, name = "pepper"), flour)
-        assertEquals(listOf("salt and pepper", "200 g flour"), LineIdentity.sourceLines(split))
-        // Two genuine lines with the same text in different places are both sent.
-        assertEquals(listOf("100 g sugar", "200 g flour", "100 g sugar"), LineIdentity.sourceLines(before))
+        // The flour sits under a heading: it goes before it, as the recipe had it.
+        assertEquals(listOf("salt and pepper", "${flour.section}:", "200 g flour"), LineIdentity.sourceLines(split))
+        // Two genuine lines with the same text in different places are both sent, each under its heading.
+        assertEquals(
+            listOf("For the cake:", "100 g sugar", "200 g flour", "For the icing:", "100 g sugar"),
+            LineIdentity.sourceLines(before),
+        )
+    }
+
+    private val sugar = line("100 g sugar", 100)
+    private val salt = line("salt and pepper", null, name = "salt")
+    private val pepper = line("salt and pepper", null, name = "black pepper")
+
+    private fun numbered(vararg l: Pair<ParsedIngredient, Int>) = l.map { (p, n) -> p.copy(sourceLine = n) }
+
+    @Test
+    fun twoAdjacentIdenticalLinesAreTwoLinesWhereverTheyComeFrom() {
+        // Numbered (read since lines carried their source): two numbers, two lines.
+        assertEquals(listOf("100 g sugar", "100 g sugar"), LineIdentity.sourceLines(numbered(sugar to 0, sugar to 1)))
+        // Stored before: same text, same ingredient, so two lines (a split's parts name different ones).
+        assertEquals(listOf("100 g sugar", "100 g sugar"), LineIdentity.sourceLines(listOf(sugar, sugar)))
+        // Different headings, side by side once the headings are gone.
+        val sections = listOf(sugar.copy(section = "For the cake"), sugar.copy(section = "For the icing"))
+        assertEquals(listOf("For the cake:", "100 g sugar", "For the icing:", "100 g sugar"), LineIdentity.sourceLines(sections))
+    }
+
+    @Test
+    fun aSplitIsOneLineAndTwoIdenticalSplitsAreTwo() {
+        assertEquals(listOf("salt and pepper"), LineIdentity.sourceLines(numbered(salt to 3, pepper to 3)))
+        assertEquals(
+            listOf("salt and pepper", "salt and pepper"),
+            LineIdentity.sourceLines(numbered(salt to 0, pepper to 0, salt to 1, pepper to 1)),
+        )
+        // Stored before lines were numbered: a name coming round again is the next line.
+        assertEquals(listOf("salt and pepper", "salt and pepper"), LineIdentity.sourceLines(listOf(salt, pepper, salt, pepper)))
+        assertEquals(listOf("salt and pepper"), LineIdentity.sourceLines(listOf(salt, pepper)))
+    }
+
+    @Test
+    fun aRuleParsedLineAndATypedOneKeepTheirOwnNumber() {
+        val lines = com.robert4lyf.hypershop.core.parse.RuleParser().parseLines(listOf("For the cake:", "100 g sugar", "100 g sugar"))
+        assertEquals(listOf(1, 2), lines.map { it.sourceLine })
+        // Rereading numbers them by the list it makes, headings included.
+        val (again, raw) = LineIdentity.reread(lines)
+        assertEquals(listOf("For the cake:", "100 g sugar", "100 g sugar"), raw)
+        assertEquals(listOf(1, 2), again.map { it.sourceLine })
+    }
+
+    @Test
+    fun claudesReadingIsNumberedByTheLinesItWasSent() {
+        val raw = listOf("For the cake:", "salt and pepper", "100 g sugar", "100 g sugar", "200 g flour")
+        // Split, duplicated, and in another order.
+        val said = listOf(flour, salt, pepper, sugar, sugar)
+        assertEquals(listOf(4, 1, 1, 2, 3), LineIdentity.attach(said, raw).map { it.sourceLine })
+        // Claude combined the two sugars into one: one source line, the other left unclaimed.
+        assertEquals(listOf(1, 1, 2, 4), LineIdentity.attach(listOf(salt, pepper, sugar, flour), raw).map { it.sourceLine })
+        // A line it rephrased matches none: no number, rather than a guess.
+        assertEquals(listOf(null), LineIdentity.attach(listOf(line("caster sugar, 100g", 100)), raw).map { it.sourceLine })
+        // Each of two identical lines split: two groups of two.
+        val twice = listOf("salt and pepper", "salt and pepper")
+        assertEquals(listOf(0, 0, 1, 1), LineIdentity.attach(listOf(salt, pepper, salt, pepper), twice).map { it.sourceLine })
+        // And what it numbered goes back to Claude one line per line.
+        assertEquals(twice, LineIdentity.sourceLines(LineIdentity.attach(listOf(salt, pepper, salt, pepper), twice)))
     }
 }

@@ -232,8 +232,9 @@ class RecipesViewModel(
         row: LibraryRow,
         method: String,
     ) = viewModelScope.launch {
-        val (r, lines) = c.repository.librarySource(row.recipeId) ?: return@launch
-        if (lines.isEmpty()) return@launch
+        val (r, stored) = c.repository.librarySource(row.recipeId) ?: return@launch
+        if (stored.isEmpty()) return@launch
+        val (lines, raw) = LineIdentity.reread(stored)
         val result =
             ImportResult(
                 url = r.url,
@@ -246,7 +247,7 @@ class RecipesViewModel(
                 preTick = method != ImportResult.LIBRARY_EDIT,
                 parsedBy = runCatching { ParsedBy.valueOf(r.parsedBy) }.getOrDefault(ParsedBy.RULES),
                 model = r.model,
-                rawLines = LineIdentity.sourceLines(lines),
+                rawLines = raw,
                 libraryKey = row.key,
                 book = r.book,
                 page = r.page,
@@ -389,6 +390,7 @@ class RecipesViewModel(
             }
             val src = c.repository.editSource(use.useId) ?: return@launch
             val r = src.recipe
+            val (lines, raw) = LineIdentity.reread(src.lines)
             val result =
                 ImportResult(
                     url = r.url,
@@ -397,10 +399,10 @@ class RecipesViewModel(
                     targetServings = src.servings.takeIf { r.servingsOriginal != null },
                     locale = UnitLocale.valueOf(r.unitLocale),
                     method = "EDIT",
-                    lines = src.lines,
+                    lines = lines,
                     parsedBy = runCatching { ParsedBy.valueOf(r.parsedBy) }.getOrDefault(ParsedBy.RULES),
                     model = r.model,
-                    rawLines = LineIdentity.sourceLines(src.lines),
+                    rawLines = raw,
                     preTick = false,
                     editsUse = use.useId,
                     inStockLines = src.inStockLines,
