@@ -62,6 +62,8 @@ data class ImportResult(
     val origins: List<LineOrigin> = emptyList(),
     /** Lines corrected or removed on the review, by origin: they stand over a later "Ask Claude". */
     val corrections: List<LineCorrection> = emptyList(),
+    /** The recipe page's own photo, offered to the library entry when the recipe is saved ([RecipePhotos]). */
+    val imageUrl: String? = null,
     /** An answer from Claude saved while [corrections] stood: the lines it was asked about, to lay them over it on opening. */
     val claudeBefore: ReviewLines? = null,
 ) {

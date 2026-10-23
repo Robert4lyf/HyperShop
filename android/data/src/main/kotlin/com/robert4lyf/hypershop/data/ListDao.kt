@@ -516,4 +516,22 @@ interface ListDao {
 
     @Query("DELETE FROM Regular")
     suspend fun clearRegulars()
+
+    @Query("SELECT * FROM RecipeNote")
+    fun observeRecipeNotes(): Flow<List<RecipeNoteEntity>>
+
+    @Query("SELECT * FROM RecipeNote")
+    suspend fun recipeNotes(): List<RecipeNoteEntity>
+
+    @Query("SELECT * FROM RecipeNote WHERE libraryKey = :key")
+    suspend fun recipeNote(key: String): RecipeNoteEntity?
+
+    @Upsert
+    suspend fun putRecipeNote(n: RecipeNoteEntity)
+
+    @Insert
+    suspend fun insertRecipeNotes(rows: List<RecipeNoteEntity>)
+
+    @Query("DELETE FROM RecipeNote")
+    suspend fun clearRecipeNotes()
 }

@@ -1,6 +1,9 @@
 package com.robert4lyf.hypershop.ui.recipes
 
 import android.text.format.DateUtils
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +14,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -70,6 +74,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -166,7 +172,17 @@ fun RecipesRoute(
     // The sheet's own confirmations: the sheet closes first, so the dialog is not under it.
     // Kept as the recipe's key (saveable), and looked up again after a rotation.
     var addAgain by rememberSaveable { mutableStateOf<String?>(null) }
-    detail?.let { d ->
+    // The photo picker: the system's, so no permission; the recipe it is for is kept across the trip there.
+    var photoFor by rememberSaveable { mutableStateOf<String?>(null) }
+    val picker =
+        rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            val row = ui.libraryRow(photoFor)
+            if (uri != null && row != null) vm.choosePhoto(row, uri)
+            photoFor = null
+        }
+    detail?.let { snap ->
+        // The sheet follows the library as it changes (stars, notes, a photo arriving), not the moment it opened.
+        val d = ui.libraryRow(snap.row.key)?.let { snap.copy(row = it) } ?: snap
         RecipeDetailSheet(
             d,
             onAdd = {
@@ -178,6 +194,17 @@ fun RecipesRoute(
                 vm.removeFromLibrary(d.row)
             },
             onDismiss = vm::closeDetail,
+            notes =
+                RecipeNoteActions(
+                    onRate = vm::rate,
+                    onNotes = vm::saveNotes,
+                    onChoosePhoto = { row ->
+                        photoFor = row.key
+                        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    },
+                    onPagePhoto = vm::pagePhoto,
+                    onRemovePhoto = vm::removePhoto,
+                ),
         )
     }
     ui.libraryRow(addAgain)?.let { row -> AddAgainDialog(row, onConfirm = { vm.addFromLibrary(row) }, onDismiss = { addAgain = null }) }
@@ -261,6 +288,8 @@ fun RecipesScreen(
                         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                             SegmentedButton(
                                 selected = !showLibrary,
+                                // No checkmark: it would push the label sideways on every switch; the fill says which is on.
+                                icon = {},
                                 onClick = { picked = false },
                                 shape = SegmentedButtonDefaults.itemShape(0, 2),
                                 colors = basilSegmentedColors(),
@@ -268,6 +297,7 @@ fun RecipesScreen(
                             ) { Text("On the list") }
                             SegmentedButton(
                                 selected = showLibrary,
+                                icon = {},
                                 onClick = { picked = true },
                                 shape = SegmentedButtonDefaults.itemShape(1, 2),
                                 colors = basilSegmentedColors(),
@@ -430,6 +460,15 @@ data class LibraryActions(
     val onEdit: (LibraryRow) -> Unit = {},
 )
 
+/** What the open recipe's sheet can change about it: stars, cooking notes, its photo. */
+data class RecipeNoteActions(
+    val onRate: (LibraryRow, Int) -> Unit = { _, _ -> },
+    val onNotes: (LibraryRow, String) -> Unit = { _, _ -> },
+    val onChoosePhoto: (LibraryRow) -> Unit = {},
+    val onPagePhoto: (LibraryRow) -> Unit = {},
+    val onRemovePhoto: (LibraryRow) -> Unit = {},
+)
+
 /** One saved recipe: its name, where it's from, how big, when last added; Add to list. */
 @Composable
 private fun LibraryCard(
@@ -456,13 +495,16 @@ private fun LibraryCard(
             Modifier.padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // A tile of the recipe's own mosaic: the same colours as its card on the list.
-            Box(Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).lowPoly(row.title))
+            // The recipe's photo when it has one; else a tile of its own mosaic, the colours of its card on the list.
+            val tile = Modifier.size(40.dp).clip(RoundedCornerShape(13.dp))
+            row.photo?.let { RecipePhoto(it, contentDescription = null, modifier = tile, maxPx = 160) }
+                ?: Box(tile.lowPoly(row.title))
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(row.title, style = MaterialTheme.typography.titleMedium)
                 val bits =
                     listOfNotNull(
                         webLink(row.url)?.let { siteName(it) } ?: row.bookRef,
+                        row.rating?.let { "★ $it/5" },
                         if (row.lines == 1) "1 ingredient" else "${row.lines} ingredients",
                         "added " + DateUtils.getRelativeTimeSpanString(row.lastAddedAt, now, DAY).toString().lowercase(),
                     )
@@ -657,8 +699,9 @@ private fun RecipeDetailSheet(
     onAdd: () -> Unit,
     onRemove: () -> Unit,
     onDismiss: () -> Unit,
+    notes: RecipeNoteActions,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) { RecipeDetailContent(detail, onAdd, onRemove) }
+    ModalBottomSheet(onDismissRequest = onDismiss) { RecipeDetailContent(detail, onAdd, onRemove, notes) }
 }
 
 /** A saved recipe's ingredients, as written, with "Add to list", its page and "Remove from your recipes". */
@@ -667,14 +710,25 @@ fun RecipeDetailContent(
     detail: RecipeDetail,
     onAdd: () -> Unit,
     onRemove: () -> Unit = {},
+    notes: RecipeNoteActions = RecipeNoteActions(),
 ) {
     val open = rememberOpenLink()
     val url = webLink(detail.row.url)
+    val row = detail.row
     LazyColumn(
         Modifier.fillMaxWidth().testTag("recipe-detail"),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        row.photo?.let { path ->
+            item(key = "photo") {
+                RecipePhoto(
+                    path,
+                    contentDescription = "Photo of ${row.title}",
+                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(MaterialTheme.shapes.large).testTag("recipe-photo"),
+                )
+            }
+        }
         item(key = "title") {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(detail.row.title, style = MaterialTheme.typography.headlineSmall)
@@ -691,6 +745,26 @@ fun RecipeDetailContent(
                 )
                 DetailButtons(onAdd, url?.let { { open(it) } }, onList = detail.row.onList)
                 OutlinedButton(onClick = onRemove, modifier = Modifier.testTag("detail-remove")) { Text("Remove from your recipes") }
+            }
+        }
+        item(key = "yours") {
+            // What you keep about it: stars, notes for next time, its photo.
+            Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Your rating", style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
+                StarRating(row.rating, onRate = { notes.onRate(row, it) })
+                CookingNotes(row.notes, onSave = { notes.onNotes(row, it) }, modifier = Modifier.padding(top = 4.dp))
+                PhotoButtons(
+                    hasPhoto = row.photo != null,
+                    fromPage = url != null,
+                    onChoose = { notes.onChoosePhoto(row) },
+                    onPage = { notes.onPagePhoto(row) },
+                    onRemove = { notes.onRemovePhoto(row) },
+                )
+                Text(
+                    "Ingredients",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(top = 12.dp).semantics { heading() },
+                )
             }
         }
         detail.sections.forEachIndexed { i, (heading, lines) ->

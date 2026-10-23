@@ -10,7 +10,7 @@ import com.robert4lyf.hypershop.core.catalog.CatalogLoader
 import com.robert4lyf.hypershop.core.model.AisleCode
 
 @Database(
-    version = 5,
+    version = 6,
     exportSchema = true,
     entities = [
         MetaEntity::class, ItemEntity::class, ItemAliasEntity::class, RecipeEntity::class, RecipeLineEntity::class,
@@ -18,7 +18,7 @@ import com.robert4lyf.hypershop.core.model.AisleCode
         ImportJobEntity::class, AisleEntity::class, StoreProfileEntity::class, AisleOrderEntity::class,
         CategoryOverrideEntity::class, StapleEntity::class, ClaudeUsageEntity::class, DeletedItemEntity::class,
         WatchInstallEntity::class, WatchOpResultEntity::class, PlannedMealEntity::class, TripEntity::class,
-        TripItemEntity::class, RegularEntity::class,
+        TripItemEntity::class, RegularEntity::class, RecipeNoteEntity::class,
     ],
 )
 abstract class HyperShopDatabase : RoomDatabase() {
@@ -117,6 +117,17 @@ abstract class HyperShopDatabase : RoomDatabase() {
                 }
             }
 
+        /** v6: a saved recipe's rating, cooking notes and photo ([RecipeNoteEntity]). */
+        val MIGRATION_5_6: Migration =
+            object : LiveKeyMigration(5, 6) {
+                override fun migrateTables(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `RecipeNote` (`libraryKey` TEXT NOT NULL, `rating` INTEGER, `notes` TEXT, " +
+                            "`photo` TEXT, `photoUrl` TEXT, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`libraryKey`))",
+                    )
+                }
+            }
+
         /** Seeds aisles, the store and its aisle order, staples and Meta (PLAN §3.4, §4). */
         val CALLBACK =
             object : Callback() {
@@ -159,7 +170,7 @@ abstract class HyperShopDatabase : RoomDatabase() {
                 context,
                 HyperShopDatabase::class.java,
                 NAME,
-            ).addCallback(CALLBACK).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
+            ).addCallback(CALLBACK).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
 
         /**
          * Tests: [queryExecutor] can run Room's background work (invalidation

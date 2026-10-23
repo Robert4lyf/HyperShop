@@ -152,4 +152,31 @@ class SafeFetcherTest {
         server.enqueue(MockResponse().setResponseCode(403))
         assertEquals(FetchResult.HttpError(403), runBlocking { fetcher.fetch(server.url("/").toString()) })
     }
+
+    @Test
+    fun aRecipePhotoIsFetchedAsAnImageOnly() {
+        val jpeg = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 1, 2, 3)
+        server.enqueue(MockResponse().setHeader("Content-Type", "image/jpeg").setBody(Buffer().write(jpeg)))
+        val r = runBlocking { fetcher.fetchImage(server.url("/p.jpg").toString()) } as FetchResult.Image
+        assertEquals("image/jpeg", r.contentType)
+        assertTrue(r.bytes.contentEquals(jpeg))
+        // A page is not a photo, a photo is not a page.
+        server.enqueue(html())
+        assertTrue(runBlocking { fetcher.fetchImage(server.url("/page").toString()) } is FetchResult.WrongType)
+        server.enqueue(MockResponse().setHeader("Content-Type", "image/svg+xml").setBody("<svg/>"))
+        assertTrue(runBlocking { fetcher.fetchImage(server.url("/x.svg").toString()) } is FetchResult.WrongType)
+        server.enqueue(MockResponse().setHeader("Content-Type", "image/png").setBody(Buffer().write(jpeg)))
+        assertTrue(runBlocking { fetcher.fetch(server.url("/p.png").toString()) } is FetchResult.WrongType)
+        // Capped.
+        server.enqueue(
+            MockResponse().setHeader(
+                "Content-Type",
+                "image/png",
+            ).setBody(Buffer().write(ByteArray((SafeFetcher.MAX_IMAGE_BYTES + 1).toInt()))),
+        )
+        assertEquals(FetchResult.TooLarge, runBlocking { fetcher.fetchImage(server.url("/big.png").toString()) })
+        // And held to the same rules as a page.
+        assertTrue(runBlocking { SafeFetcher().fetchImage("http://example.com/p.jpg") } is FetchResult.Blocked)
+        assertTrue(runBlocking { SafeFetcher().fetchImage("https://10.0.0.1/p.jpg") } is FetchResult.Blocked)
+    }
 }

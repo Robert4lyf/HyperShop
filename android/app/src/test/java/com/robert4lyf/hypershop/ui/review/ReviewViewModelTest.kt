@@ -249,9 +249,11 @@ class ReviewViewModelTest {
     fun stopWhileRetryingClearsTheSpinner() {
         val claude = MockWebServer().apply { start() }
         try {
+            // Long enough that the call is still in flight when Stop is tapped; short enough that the server's
+            // shutdown, which waits for the held reply, finishes within its own few seconds (on CI it did not at 5 s).
             claude.enqueue(
                 MockResponse()
-                    .setHeadersDelay(5, TimeUnit.SECONDS)
+                    .setHeadersDelay(2, TimeUnit.SECONDS)
                     .setBody(File("../../testdata/claude/synthetic-ok-cake.json").readText()),
             )
             val c = TestContainer.create(claude = claude, key = "sk-ant-test")

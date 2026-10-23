@@ -77,6 +77,12 @@ data class LibraryRow(
     val uses: String? = null,
     /** "Ottolenghi Simple · p. 142" for a cookbook recipe. */
     val bookRef: String? = null,
+    /** Your stars out of 5, or null. */
+    val rating: Int? = null,
+    /** Your cooking notes ("10 min longer, half the chilli"), or null. */
+    val notes: String? = null,
+    /** The recipe's photo on this phone, or null. */
+    val photo: String? = null,
 )
 
 /** The Recipes tab (PLAN §3.5): the uses on the list. */
@@ -108,9 +114,24 @@ class RecipesViewModel(
     /** The search index, rebuilt when the library's recipes or the catalogue change. */
     private var index: Pair<IndexKey, List<RecipeSearch.Recipe>>? = null
 
+    init {
+        // Photos known but not on this phone (after a restore onto another one, or an offer made offline):
+        // fetched once, quietly, when the recipes are first shown.
+        viewModelScope.launch {
+            val missing =
+                c.repository.observeRecipeNotes().first().values.filter { it.photoUrl != null && c.recipePhotos.file(it.photo) == null }
+            if (missing.isNotEmpty()) c.applicationScope.launch { c.recipePhotos.fill(missing) }
+        }
+    }
+
     /** From the shared list read; only while the tab is shown (and 5 s after, across a rotation). */
     val ui: StateFlow<RecipesUi> =
-        combine(c.repository.list.map { c.repository.usesOnList(it) }, c.repository.observeLibrary(), terms) { uses, lib, (q, typing) ->
+        combine(
+            c.repository.list.map { c.repository.usesOnList(it) },
+            c.repository.observeLibrary(),
+            c.repository.observeRecipeNotes(),
+            terms,
+        ) { uses, lib, notes, (q, typing) ->
             val onList = uses.mapNotNull { it.libraryKey }.toSet()
             val rows =
                 lib.map {
@@ -123,6 +144,9 @@ class RecipesViewModel(
                         it.lastAddedAt,
                         it.key in onList,
                         bookRef = bookRef(it.book, it.page),
+                        rating = notes[it.key]?.rating,
+                        notes = notes[it.key]?.notes,
+                        photo = c.recipePhotos.file(notes[it.key]?.photo)?.path,
                     )
                 }
             val shown =
@@ -243,6 +267,35 @@ class RecipesViewModel(
             }
             _detail.value = RecipeDetail(row, r.servingsOriginal, sections)
         }
+
+    /** Stars out of 5; the same star again takes the rating away. */
+    fun rate(
+        row: LibraryRow,
+        stars: Int,
+    ) = viewModelScope.launch { c.repository.setRating(row.key, stars.takeIf { it != row.rating }) }
+
+    /** Cooking notes for the recipe; blank clears them. */
+    fun saveNotes(
+        row: LibraryRow,
+        notes: String,
+    ) = c.applicationScope.launch { c.repository.setCookingNotes(row.key, notes) }
+
+    /** A photo chosen from the phone's photos for the recipe. */
+    fun choosePhoto(
+        row: LibraryRow,
+        uri: Uri,
+    ) = c.applicationScope.launch {
+        if (!c.recipePhotos.pick(row.key, uri)) messages.send(UiMessage("Couldn't use that photo"))
+    }
+
+    /** The recipe page's own photo, for a recipe saved before photos were kept (or after one was removed). */
+    fun pagePhoto(row: LibraryRow) =
+        c.applicationScope.launch {
+            val url = row.url ?: return@launch
+            if (!c.recipePhotos.fromPage(row.key, url)) messages.send(UiMessage("Couldn't get a photo from the recipe's page"))
+        }
+
+    fun removePhoto(row: LibraryRow) = c.applicationScope.launch { c.recipePhotos.remove(row.key) }
 
     fun closeDetail() {
         _detail.value = null

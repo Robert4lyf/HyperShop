@@ -29,6 +29,8 @@ data class Extraction(
     /** Trimmed page text, for Claude when no structured data was found. */
     val pageText: String?,
     val method: Method,
+    /** The recipe's own photo, absolute https (or http) URL: JSON-LD `image`, microdata, then `og:image`. */
+    val image: String? = null,
 )
 
 /**
@@ -47,6 +49,7 @@ object Extractor {
     const val MAX_LINES = 300
     const val MAX_LINE = 500
     const val MAX_PAGE_TEXT = 30_000
+    const val MAX_IMAGE_URL = 2_000
 
     private val json =
         Json {
@@ -86,6 +89,10 @@ object Extractor {
         baseUrl: String,
     ): Extraction {
         val doc = Jsoup.parse(html, baseUrl)
+        return extractFrom(doc).copy(image = pageImage(doc))
+    }
+
+    private fun extractFrom(doc: Document): Extraction {
         val pageTitle = doc.selectFirst("meta[property=og:title]")?.attr("content")?.ifBlank { null } ?: doc.title().ifBlank { null }
         val ld = jsonLd(doc)
         val ldTitle = ld.firstOrNull()?.title
@@ -301,6 +308,52 @@ object Extractor {
             sb.append(c)
         }
         return sb.toString()
+    }
+
+    // ---- the recipe's photo -----------------------------------------------------------
+
+    /** The first image the page declares for its recipe; a page's general share image when it declares none. */
+    fun pageImage(doc: Document): String? {
+        val candidates = ArrayList<String>()
+        for (s in doc.select("script[type=application/ld+json]")) {
+            val raw = s.data()
+            if (raw.length > MAX_BLOCK || depth(raw) > MAX_DEPTH) continue
+            val el = runCatching { json.parseToJsonElement(sanitiseJson(raw)) }.getOrNull() ?: continue
+            findRecipes(el, 0).firstNotNullOfOrNull { imageOf(it["image"], 0) }?.let { candidates += it }
+        }
+        doc.select("[itemscope][itemtype~=(?i)schema.org/Recipe] [itemprop=image]").firstOrNull()?.let {
+            candidates += it.attr("content").ifBlank { it.attr("src") }.ifBlank { it.attr("href") }
+        }
+        doc.selectFirst("meta[property=og:image]")?.attr("content")?.let { candidates += it }
+        return candidates.firstNotNullOfOrNull { absolute(doc, it) }
+    }
+
+    /** schema.org `image`: a URL, an ImageObject (`url`/`contentUrl`), or a list of either. */
+    private fun imageOf(
+        e: JsonElement?,
+        d: Int,
+    ): String? =
+        when {
+            d > 3 || e == null -> null
+            e is JsonPrimitive -> e.contentOrNull
+            e is JsonArray -> e.firstNotNullOfOrNull { imageOf(it, d + 1) }
+            e is JsonObject -> imageOf(e["url"] ?: e["contentUrl"], d + 1)
+            else -> null
+        }
+
+    /** [url] made absolute against the page (a relative one needs the page's address), http(s) only. */
+    private fun absolute(
+        doc: Document,
+        url: String,
+    ): String? {
+        val t = url.trim()
+        if (t.isEmpty() || t.length > MAX_IMAGE_URL) return null
+        val abs =
+            runCatching {
+                val base = doc.location().ifEmpty { null }
+                if (base == null) java.net.URI(t) else java.net.URI(base).resolve(t)
+            }.getOrNull() ?: return null
+        return abs.toString().takeIf { abs.isAbsolute && (abs.scheme == "https" || abs.scheme == "http") }
     }
 
     // ---- 3. microdata, 4. heading, 5. page text ----------------------------------------

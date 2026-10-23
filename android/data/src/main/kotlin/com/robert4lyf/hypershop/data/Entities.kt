@@ -383,3 +383,21 @@ data class RegularEntity(
     val displayName: String,
     val pinned: Boolean,
 )
+
+/**
+ * What you keep about a saved recipe, by its library entry ([LibraryRecipe.key]),
+ * so it outlives Edit and Add again (each makes a new copy): a rating out of 5,
+ * cooking notes, and a photo. [photo] is a file in the app's own storage
+ * ([com.robert4lyf.hypershop] RecipePhotos), [photoUrl] the recipe page's own
+ * photo it was taken from, so a restore onto another phone can fetch it again.
+ */
+@Serializable
+@Entity(tableName = "RecipeNote")
+data class RecipeNoteEntity(
+    @PrimaryKey val libraryKey: String,
+    val rating: Int? = null,
+    val notes: String? = null,
+    val photo: String? = null,
+    val photoUrl: String? = null,
+    val updatedAt: Long = 0,
+)

@@ -421,6 +421,8 @@ fun EntryEditor(
                     POLICIES.forEachIndexed { i, (p, label) ->
                         SegmentedButton(
                             selected = f.policy == p,
+                            // No checkmark: it would push the label sideways on every switch; the fill says which is on.
+                            icon = {},
                             onClick = { edit(f.copy(policy = p)) },
                             shape = SegmentedButtonDefaults.itemShape(i, POLICIES.size),
                             colors = basilSegmentedColors(),

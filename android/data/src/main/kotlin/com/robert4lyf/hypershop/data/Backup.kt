@@ -48,6 +48,8 @@ data class BackupData(
     val trips: List<TripEntity> = emptyList(),
     val tripItems: List<TripItemEntity> = emptyList(),
     val regulars: List<RegularEntity> = emptyList(),
+    /** Ratings, cooking notes and photo addresses (not the photos: see [RecipeNoteEntity]). Absent from older files. */
+    val recipeNotes: List<RecipeNoteEntity> = emptyList(),
 )
 
 /**
@@ -59,6 +61,9 @@ data class BackupData(
 object BackupValidator {
     const val MAX_ROWS = 50_000
     private const val MAX_TEXT = 2_000
+
+    /** The names RecipePhotos gives its files. */
+    val PHOTO_NAME = Regex("[a-f0-9]{8,64}\\.jpg")
     private const val MAX_JSON = 20_000
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -246,6 +251,16 @@ object BackupValidator {
         check(tripKeys.size == tripKeys.toSet().size, "duplicate trip items")
         for (r in b.regulars) check(r.mergeKey.length in 1..MAX_TEXT && r.displayName.length <= MAX_TEXT, "regular: bad key")
         check(b.regulars.map { it.mergeKey }.toSet().size == b.regulars.size, "duplicate regulars")
+        check(b.recipeNotes.size <= MAX_ROWS, "recipeNotes: ${b.recipeNotes.size} rows is more than a backup can hold")
+        check(b.recipeNotes.map { it.libraryKey }.toSet().size == b.recipeNotes.size, "duplicate recipe notes")
+        for (n in b.recipeNotes) {
+            check(n.libraryKey.length in 1..ListRepository.MAX_URL, "recipe note: bad recipe key")
+            check(n.rating == null || n.rating in 1..ListRepository.MAX_STARS, "recipe note: rating out of range")
+            check((n.notes?.length ?: 0) <= ListRepository.MAX_COOKING_NOTES, "recipe note: notes too long")
+            check((n.photo?.length ?: 0) <= MAX_TEXT && (n.photoUrl?.length ?: 0) <= ListRepository.MAX_URL, "recipe note: photo too long")
+            // A file name, never a path: a restore must not point the app at a file outside its photo folder.
+            check(n.photo == null || PHOTO_NAME.matches(n.photo), "recipe note: bad photo name")
+        }
         check(b.catalogVersion.length <= MAX_TEXT, "the catalogue version is too long")
         check((b.manualTitle?.length ?: 0) <= MAX_TEXT, "the hand-added title is too long")
         return problems

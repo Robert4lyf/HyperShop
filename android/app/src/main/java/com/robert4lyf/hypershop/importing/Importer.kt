@@ -73,7 +73,8 @@ class Importer(
             when (val f = fetcher.fetch(url)) {
                 is FetchResult.Ok -> f
                 is FetchResult.Blocked -> return failed(url, fallbackTitle, locale, ImportError.BLOCKED)
-                is FetchResult.WrongType -> return failed(url, fallbackTitle, locale, ImportError.NOT_HTML)
+                // An image is only what fetchImage returns; a page fetch never gets one.
+                is FetchResult.WrongType, is FetchResult.Image -> return failed(url, fallbackTitle, locale, ImportError.NOT_HTML)
                 FetchResult.TooLarge -> return failed(url, fallbackTitle, locale, ImportError.TOO_LARGE)
                 is FetchResult.HttpError -> return failed(url, fallbackTitle, locale, ImportError.HTTP)
                 FetchResult.Network -> return failed(url, fallbackTitle, locale, ImportError.OFFLINE)
@@ -93,6 +94,7 @@ class Importer(
                 method = e.method.name,
                 rawLines = raw,
                 pageText = e.pageText,
+                imageUrl = e.image,
             )
         return parse(base, allowClaude(), model)
     }

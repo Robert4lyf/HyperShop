@@ -247,4 +247,44 @@ class ExtractorTest {
         assertEquals(2, recipe.lines.size)
         assertTrue(recipe.lines[0].startsWith("1 egg"))
     }
+
+    @Test
+    fun theRecipesOwnPhotoIsFoundAndMadeAbsolute() {
+        fun page(
+            ld: String,
+            head: String = "",
+        ) = "<html><head>$head<script type=\"application/ld+json\">$ld</script></head><body></body></html>"
+        val lines = "\"recipeIngredient\":[\"2 onions\"]"
+        val base = "https://example.com/recipes/chilli"
+        // A plain URL, a list, an ImageObject, and a relative one.
+        assertEquals(
+            "https://cdn.example.com/a.jpg",
+            Extractor.extract(page("{\"@type\":\"Recipe\",$lines,\"image\":\"https://cdn.example.com/a.jpg\"}"), base).image,
+        )
+        assertEquals(
+            "https://cdn.example.com/b.jpg",
+            Extractor.extract(
+                page("{\"@type\":\"Recipe\",$lines,\"image\":[\"https://cdn.example.com/b.jpg\",\"https://cdn.example.com/c.jpg\"]}"),
+                base,
+            ).image,
+        )
+        assertEquals(
+            "https://cdn.example.com/d.jpg",
+            Extractor.extract(
+                page("{\"@type\":\"Recipe\",$lines,\"image\":{\"@type\":\"ImageObject\",\"url\":\"https://cdn.example.com/d.jpg\"}}"),
+                base,
+            ).image,
+        )
+        assertEquals(
+            "https://example.com/img/e.jpg",
+            Extractor.extract(page("{\"@type\":\"Recipe\",$lines,\"image\":\"/img/e.jpg\"}"), base).image,
+        )
+        // No recipe image: the page's share image.
+        val og = "<meta property=\"og:image\" content=\"https://example.com/og.jpg\">"
+        assertEquals("https://example.com/og.jpg", Extractor.extract(page("{\"@type\":\"Recipe\",$lines}", og), base).image)
+        // Never a script, a data: URL or a file.
+        for (bad in listOf("javascript:alert(1)", "data:image/png;base64,AAAA", "file:///etc/passwd")) {
+            assertNull(Extractor.extract(page("{\"@type\":\"Recipe\",$lines,\"image\":\"$bad\"}"), base).image, bad)
+        }
+    }
 }
