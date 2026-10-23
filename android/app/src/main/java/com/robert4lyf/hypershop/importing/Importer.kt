@@ -162,11 +162,18 @@ class Importer(
                             claudeTried = true,
                             error = if (base.rawLines.isEmpty()) ImportError.NO_RECIPE else null,
                         )
-                    RecipeStatus.OK ->
+                    RecipeStatus.OK -> {
+                        // Each of Claude's lines knows the source line it came from: the ones it was sent, or for a
+                        // photo its own transcription, kept as text from now on ("Retry with Claude" re-reads those).
+                        val (lines, raw) =
+                            if (base.rawLines.isEmpty()) {
+                                LineIdentity.reread(r.recipe.ingredients)
+                            } else {
+                                LineIdentity.attach(r.recipe.ingredients, base.rawLines) to base.rawLines
+                            }
                         base.copy(
-                            lines = r.recipe.ingredients,
-                            // A photo's lines are kept as text from now on ("Retry with Claude" re-reads those).
-                            rawLines = base.rawLines.ifEmpty { LineIdentity.sourceLines(r.recipe.ingredients) },
+                            lines = lines,
+                            rawLines = raw,
                             // Claude's lines are new: the review's origins no longer describe them, and its
                             // corrections are laid over them from the lines they replaced (ReviewViewModel.begin).
                             origins = emptyList(),
@@ -182,6 +189,7 @@ class Importer(
                             sourceUrls = r.recipe.sourceUrls,
                             locale = localeFor(base.url, r.recipe.ingredients.map { it.raw }),
                         ).also { PhotoStore.delete(photo) }
+                    }
                 }
             is ClaudeResult.Refused -> ruled.copy(claudePending = true, claudeTried = true, claudeNote = "Claude declined; parsed offline")
             is ClaudeResult.Failed ->

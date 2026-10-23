@@ -100,6 +100,8 @@ class RecipePhotosTest {
         assertEquals(0, server.requestCount)
         runBlocking { c.recipePhotos.remove(key) }
         assertNull(note(key)!!.photo)
+        // Gone at the next start's sweep, once nothing names it.
+        runBlocking { c.recipePhotos.sweep() }
         assertNull(c.recipePhotos.file(chosen))
     }
 

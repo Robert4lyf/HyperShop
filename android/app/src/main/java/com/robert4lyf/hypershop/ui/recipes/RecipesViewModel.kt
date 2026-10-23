@@ -44,6 +44,8 @@ data class RecipesUi(
     val terms: List<String> = emptyList(),
     /** The book of the cookbook recipe added most recently: the photo form starts with it. */
     val lastBook: String? = null,
+    /** Each saved recipe's photo, by library key: a card on the list shows its recipe's. */
+    val photos: Map<String, String> = emptyMap(),
 )
 
 /** A saved recipe opened from "Your recipes": its ingredients, under their headings. */
@@ -130,8 +132,9 @@ class RecipesViewModel(
             c.repository.list.map { c.repository.usesOnList(it) },
             c.repository.observeLibrary(),
             c.repository.observeRecipeNotes(),
+            c.recipePhotos.paths(),
             terms,
-        ) { uses, lib, notes, (q, typing) ->
+        ) { uses, lib, notes, photos, (q, typing) ->
             val onList = uses.mapNotNull { it.libraryKey }.toSet()
             val rows =
                 lib.map {
@@ -146,7 +149,7 @@ class RecipesViewModel(
                         bookRef = bookRef(it.book, it.page),
                         rating = notes[it.key]?.rating,
                         notes = notes[it.key]?.notes,
-                        photo = c.recipePhotos.file(notes[it.key]?.photo)?.path,
+                        photo = photos[it.key],
                     )
                 }
             val shown =
@@ -159,7 +162,7 @@ class RecipesViewModel(
                     }
                 }
             val lastBook = lib.filter { it.book != null }.maxByOrNull { it.lastAddedAt }?.book
-            RecipesUi(uses, loaded = true, library = shown, hasLibrary = rows.isNotEmpty(), terms = q, lastBook = lastBook)
+            RecipesUi(uses, loaded = true, library = shown, hasLibrary = rows.isNotEmpty(), terms = q, lastBook = lastBook, photos = photos)
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecipesUi())
 
@@ -229,8 +232,9 @@ class RecipesViewModel(
         row: LibraryRow,
         method: String,
     ) = viewModelScope.launch {
-        val (r, lines) = c.repository.librarySource(row.recipeId) ?: return@launch
-        if (lines.isEmpty()) return@launch
+        val (r, stored) = c.repository.librarySource(row.recipeId) ?: return@launch
+        if (stored.isEmpty()) return@launch
+        val (lines, raw) = LineIdentity.reread(stored)
         val result =
             ImportResult(
                 url = r.url,
@@ -243,7 +247,7 @@ class RecipesViewModel(
                 preTick = method != ImportResult.LIBRARY_EDIT,
                 parsedBy = runCatching { ParsedBy.valueOf(r.parsedBy) }.getOrDefault(ParsedBy.RULES),
                 model = r.model,
-                rawLines = LineIdentity.sourceLines(lines),
+                rawLines = raw,
                 libraryKey = row.key,
                 book = r.book,
                 page = r.page,
@@ -386,6 +390,7 @@ class RecipesViewModel(
             }
             val src = c.repository.editSource(use.useId) ?: return@launch
             val r = src.recipe
+            val (lines, raw) = LineIdentity.reread(src.lines)
             val result =
                 ImportResult(
                     url = r.url,
@@ -394,10 +399,10 @@ class RecipesViewModel(
                     targetServings = src.servings.takeIf { r.servingsOriginal != null },
                     locale = UnitLocale.valueOf(r.unitLocale),
                     method = "EDIT",
-                    lines = src.lines,
+                    lines = lines,
                     parsedBy = runCatching { ParsedBy.valueOf(r.parsedBy) }.getOrDefault(ParsedBy.RULES),
                     model = r.model,
-                    rawLines = LineIdentity.sourceLines(src.lines),
+                    rawLines = raw,
                     preTick = false,
                     editsUse = use.useId,
                     inStockLines = src.inStockLines,

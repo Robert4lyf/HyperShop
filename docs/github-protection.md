@@ -1,12 +1,14 @@
 # How main is to be protected
 
-**Status: intended, not yet applied.** In the final quality pass (Q.5) the
-session's GitHub access was refused write access to the rulesets API (HTTP 403
-through its proxy), so main still has no protection. Apply it yourself in two
-minutes, from the browser or from a terminal (below). The repository is public,
-so rulesets are on the free plan. The workflow change it depends on
-(`Connect IQ result` reporting on every PR) is merged with this pass, and all
-three required checks were seen reporting on PR #60 before this was written.
+**Status: intended, not yet applied** (checked again 2026-10-23, Step S:
+`GET /repos/Robert4lyf/HyperShop/branches/main` says `"protected": false` and the
+repository has no rulesets). The session's GitHub access is refused write access
+to the rulesets API (HTTP 403 "Write access to this GitHub API path is not
+permitted through this proxy"), so it cannot be applied from a session. Apply it
+yourself in two minutes, from the browser or from a terminal (below). The
+repository is public, so rulesets are on the free plan. All three required
+checks report on every pull request; they were seen on PR #62 by the names
+below.
 
 ## The rules
 

@@ -534,4 +534,7 @@ interface ListDao {
 
     @Query("DELETE FROM RecipeNote")
     suspend fun clearRecipeNotes()
+
+    @Query("SELECT DISTINCT photo FROM RecipeNote WHERE photo IS NOT NULL")
+    suspend fun photosInUse(): List<String>
 }

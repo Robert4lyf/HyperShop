@@ -1,6 +1,7 @@
 package com.robert4lyf.hypershop.importing
 
 import com.robert4lyf.hypershop.core.model.ParsedIngredient
+import com.robert4lyf.hypershop.core.parse.sectionHeaderOf
 import kotlinx.serialization.Serializable
 
 /**
@@ -64,11 +65,99 @@ object LineIdentity {
     }
 
     /**
-     * The source lines for Claude to read, from lines already parsed (a photo's, a saved recipe's): a line read
-     * as several ("salt and pepper" → salt, pepper) carries its text on each part, and is sent once, not once per part.
+     * The source lines for Claude to read, from lines already parsed (a photo's, a saved recipe's): one per line of
+     * the recipe, never one per ingredient. A line Claude read as several ("salt and pepper" → salt, pepper) carries
+     * its text on each part and is sent once; two lines that only read the same ("100 g sugar" for the cake and
+     * again for the icing) are two lines and both are sent. Which is which is the lines' [ParsedIngredient.sourceLine],
+     * never their text: see [sourceKeys]. A section heading goes before its first line, as the recipe had it.
      */
-    fun sourceLines(lines: List<ParsedIngredient>): List<String> =
-        lines.map { it.raw }.filterIndexed { i, raw -> i == 0 || normal(raw) != normal(lines[i - 1].raw) }
+    fun sourceLines(lines: List<ParsedIngredient>): List<String> = reread(lines).second
+
+    /**
+     * [lines] and the source lines they were read from ([sourceLines]), with each line's
+     * [ParsedIngredient.sourceLine] made its index in that list: what a review of lines read
+     * earlier starts from, so a line typed in later (at the end) or Claude's next reading
+     * ([attach]) is numbered the same way.
+     */
+    fun reread(lines: List<ParsedIngredient>): Pair<List<ParsedIngredient>, List<String>> {
+        val keys = sourceKeys(lines)
+        val raw = ArrayList<String>()
+        val at = HashMap<Any, Int>()
+        var section: String? = null
+        val out =
+            lines.mapIndexed { i, l ->
+                val n =
+                    at.getOrPut(keys[i]) {
+                        val s = l.section?.trim()?.ifEmpty { null }
+                        if (s != null && s != section) headerFor(s)?.let { raw += it }
+                        section = s ?: section
+                        raw += l.raw
+                        raw.size - 1
+                    }
+                l.copy(sourceLine = n)
+            }
+        return out to raw
+    }
+
+    /**
+     * Claude's reading [lines] of the source lines [raw] it was sent, each line given the index of the source
+     * line it came from. Matched by text, in order, one source occurrence per ingredient, except that within a
+     * run of lines with one text a name that has not come up yet in the run is a further part of the same source
+     * line (Claude's split), and a name that has is the next occurrence. A line whose text is in none of [raw]
+     * (Claude rephrased it), or one more than [raw] has, is left without one.
+     */
+    fun attach(
+        lines: List<ParsedIngredient>,
+        raw: List<String>,
+    ): List<ParsedIngredient> {
+        val free = HashMap<String, ArrayDeque<Int>>()
+        for ((i, r) in raw.withIndex()) if (sectionHeaderOf(r) == null) free.getOrPut(normal(r)) { ArrayDeque() }.addLast(i)
+        val groups = splitGroups(lines)
+        val of = HashMap<Int, Int?>()
+        return lines.mapIndexed { i, l ->
+            val n = of.getOrPut(groups[i]) { free[normal(l.raw)]?.removeFirstOrNull() }
+            l.copy(sourceLine = n)
+        }
+    }
+
+    /**
+     * One key per line, equal for the lines read from one source line: its [ParsedIngredient.sourceLine]
+     * where it has one. A line stored before lines carried it is grouped as [splitGroups] does, which keeps
+     * two identical lines apart (their parts read the same name) and the parts of one split together.
+     */
+    private fun sourceKeys(lines: List<ParsedIngredient>): List<Any> {
+        val groups = splitGroups(lines)
+        return lines.mapIndexed { i, l -> l.sourceLine ?: "unnumbered-${groups[i]}" }
+    }
+
+    /**
+     * Lines with no [ParsedIngredient.sourceLine], grouped into source lines by what Claude does when it splits
+     * one: the parts are adjacent, share the line's text and name different ingredients. A name already in the
+     * group starts the next occurrence ("salt and pepper" twice, each split, is two groups of two). Lines with a
+     * source line are each their own group here; the group of line i is the index of its first line.
+     */
+    private fun splitGroups(lines: List<ParsedIngredient>): IntArray {
+        val group = IntArray(lines.size)
+        val names = HashSet<String>()
+        for ((i, l) in lines.withIndex()) {
+            val prev = lines.getOrNull(i - 1)
+            val name = l.name.trim().lowercase()
+            val joins =
+                prev != null && prev.sourceLine == null && l.sourceLine == null &&
+                    normal(prev.raw) == normal(l.raw) && name !in names
+            if (joins) {
+                group[i] = group[i - 1]
+            } else {
+                group[i] = i
+                names.clear()
+            }
+            names += name
+        }
+        return group
+    }
+
+    /** "For the icing" as the heading line the rule parser reads back as that section, or null if it would not. */
+    private fun headerFor(section: String): String? = "$section:".takeIf { sectionHeaderOf(it) == section }
 
     /** [r]'s origins, one per line: the ones kept with it, or (an import not yet reviewed) its lines' own. */
     fun originsOf(r: ImportResult): List<LineOrigin> = r.origins.takeIf { it.size == r.lines.size } ?: originsOf(r.lines)

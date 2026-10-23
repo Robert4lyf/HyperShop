@@ -24,6 +24,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.testutil.Shots
+import com.robert4lyf.hypershop.testutil.TestPhotos
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -222,7 +223,7 @@ class ListScreenTest {
                 view = ListView.RECIPE,
                 recipes =
                     listOf(
-                        RecipeSection("use-1", "Weeknight chilli", RecipeSection.Kind.RECIPE, rows.take(3)),
+                        RecipeSection("use-1", "Weeknight chilli", RecipeSection.Kind.RECIPE, rows.take(3), photo = TestPhotos.dish),
                         RecipeSection("use-2", "Red lentil dal", RecipeSection.Kind.RECIPE, listOf(rows[5])),
                         RecipeSection(
                             "shared",
@@ -241,6 +242,7 @@ class ListScreenTest {
         compose.onNodeWithTag("recipe-use-1").performClick()
         compose.onNodeWithTag("item-${rows.first().id}").assertDoesNotExist()
         compose.onNodeWithTag("recipe-use-1").performClick()
+        TestPhotos.settle(compose)
         compose.onRoot().captureRoboImage(Shots.path("list-recipes-light.png"))
     }
 

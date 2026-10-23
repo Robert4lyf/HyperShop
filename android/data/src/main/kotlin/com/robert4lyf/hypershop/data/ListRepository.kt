@@ -100,6 +100,8 @@ data class UseSummary(
 data class UseLink(
     val title: String,
     val url: String?,
+    /** Its recipe's library entry ([LibraryRecipe.key]), for the recipe's photo. */
+    val libraryKey: String? = null,
 )
 
 /**
@@ -407,7 +409,11 @@ class ListRepository(
         return useIds.associateWith { id ->
             val u = l.uses[id]
             val r = u?.recipeId?.let { recipes[it] }
-            UseLink(r?.title ?: if (u?.kind == UseKind.MANUAL) manual else "Recipe", r?.url)
+            UseLink(
+                r?.title ?: if (u?.kind == UseKind.MANUAL) manual else "Recipe",
+                r?.url,
+                r?.let { it.libraryKey ?: it.url ?: "r:${it.id}" },
+            )
         }
     }
 
@@ -560,6 +566,9 @@ class ListRepository(
         photo: String?,
         fromUrl: String?,
     ) = changeNote(key) { it.copy(photo = photo?.take(MAX_TITLE), photoUrl = fromUrl?.take(MAX_URL)) }
+
+    /** Every photo file a recipe shows: what a sweep of the photo folder must keep. */
+    suspend fun photosInUse(): Set<String> = dao.photosInUse().toSet()
 
     /** The page's photo, remembered so it can be fetched; a photo already chosen is left alone. */
     suspend fun offerRecipePhoto(

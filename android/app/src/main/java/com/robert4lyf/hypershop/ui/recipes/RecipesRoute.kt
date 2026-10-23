@@ -17,11 +17,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -84,7 +84,6 @@ import com.robert4lyf.hypershop.core.merge.UseState
 import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.EmptyHero
-import com.robert4lyf.hypershop.ui.common.HEADER_END
 import com.robert4lyf.hypershop.ui.common.HeroButton
 import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.PillShape
@@ -103,7 +102,6 @@ import com.robert4lyf.hypershop.ui.review.TitleDialog
 import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.theme.card
-import com.robert4lyf.hypershop.ui.theme.lowPoly
 import com.robert4lyf.hypershop.ui.util.factoryFor
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -157,6 +155,7 @@ fun RecipesRoute(
         ModalBottomSheet(onDismissRequest = vm::closeUse) {
             UseDetailContent(
                 d,
+                photo = d.use.libraryKey?.let { ui.photos[it] },
                 onEdit = {
                     vm.closeUse()
                     vm.edit(d.use)
@@ -319,6 +318,7 @@ fun RecipesScreen(
                     items(ui.uses, key = { it.useId }) { use ->
                         UseCard(
                             use,
+                            photo = use.libraryKey?.let { ui.photos[it] },
                             onRemove = { onRemove(use) },
                             onEdit = { onEdit(use) },
                             onRename = { renaming = use.useId },
@@ -491,54 +491,61 @@ private fun LibraryCard(
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.card,
     ) {
-        Row(
-            Modifier.padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // The recipe's photo when it has one; else a tile of its own mosaic, the colours of its card on the list.
-            val tile = Modifier.size(40.dp).clip(RoundedCornerShape(13.dp))
-            row.photo?.let { RecipePhoto(it, contentDescription = null, modifier = tile, maxPx = 160) }
-                ?: Box(tile.lowPoly(row.title))
-            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Text(row.title, style = MaterialTheme.typography.titleMedium)
-                val bits =
-                    listOfNotNull(
-                        webLink(row.url)?.let { siteName(it) } ?: row.bookRef,
-                        row.rating?.let { "★ $it/5" },
-                        if (row.lines == 1) "1 ingredient" else "${row.lines} ingredients",
-                        "added " + DateUtils.getRelativeTimeSpanString(row.lastAddedAt, now, DAY).toString().lowercase(),
-                    )
+        Column {
+            // The recipe's band, as on its card on the list: its photo, tall, else its own mosaic.
+            Box(Modifier.fillMaxWidth().then(if (row.photo != null) Modifier.heightIn(min = PHOTO_BAND) else Modifier)) {
+                RecipeBackdrop(row.title, row.photo, Modifier.matchParentSize())
                 Text(
-                    bits.joinToString(" · "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    row.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Brand.OnHero,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 20.dp, end = 16.dp, top = 14.dp, bottom = 12.dp),
                 )
-                row.uses?.let {
-                    Text("Uses $it", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
-                }
-                if (row.onList) {
-                    Text("On your list", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                }
             }
-            FilledTonalButton(onClick = onAdd, modifier = Modifier.testTag("lib-add-${row.key}")) {
-                Text(if (row.onList) "Add again" else "Add to list")
-            }
-            var menu by remember { mutableStateOf(false) }
-            Box {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More for ${row.title}") }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text("Rename") }, modifier = Modifier.testTag("lib-rename-${row.key}"), onClick = {
-                        menu = false
-                        onRename()
-                    })
-                    DropdownMenuItem(text = { Text("Edit") }, modifier = Modifier.testTag("lib-edit-${row.key}"), onClick = {
-                        menu = false
-                        onEdit()
-                    })
-                    DropdownMenuItem(text = { Text("Remove from your recipes") }, onClick = {
-                        menu = false
-                        onRemove()
-                    })
+            Row(
+                Modifier.padding(start = 20.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                    val bits =
+                        listOfNotNull(
+                            webLink(row.url)?.let { siteName(it) } ?: row.bookRef,
+                            row.rating?.let { "★ $it/5" },
+                            if (row.lines == 1) "1 ingredient" else "${row.lines} ingredients",
+                            "added " + DateUtils.getRelativeTimeSpanString(row.lastAddedAt, now, DAY).toString().lowercase(),
+                        )
+                    Text(
+                        bits.joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    row.uses?.let {
+                        Text("Uses $it", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
+                    }
+                    if (row.onList) {
+                        Text("On your list", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                FilledTonalButton(onClick = onAdd, modifier = Modifier.testTag("lib-add-${row.key}")) {
+                    Text(if (row.onList) "Add again" else "Add to list")
+                }
+                var menu by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More for ${row.title}") }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(text = { Text("Rename") }, modifier = Modifier.testTag("lib-rename-${row.key}"), onClick = {
+                            menu = false
+                            onRename()
+                        })
+                        DropdownMenuItem(text = { Text("Edit") }, modifier = Modifier.testTag("lib-edit-${row.key}"), onClick = {
+                            menu = false
+                            onEdit()
+                        })
+                        DropdownMenuItem(text = { Text("Remove from your recipes") }, onClick = {
+                            menu = false
+                            onRemove()
+                        })
+                    }
                 }
             }
         }
@@ -549,6 +556,7 @@ private fun LibraryCard(
 @Composable
 private fun UseCard(
     use: UseSummary,
+    photo: String?,
     onRemove: () -> Unit,
     onEdit: () -> Unit,
     onRename: () -> Unit,
@@ -570,11 +578,12 @@ private fun UseCard(
         val dark = LocalDarkTheme.current
         val hue = Brand.recipeHue(use.title)
         Column {
-            // The recipe's own colour band: the same hue as its review screen.
-            // Short of the brightest end, with the scrim, so the white title and menu stay legible.
-            Box(Modifier.fillMaxWidth().lowPoly(use.title, end = HEADER_END, scrim = true)) {
+            // The recipe's band: its photo, tall, with the title along the bottom; else its own mosaic,
+            // the same as its review screen's.
+            Box(Modifier.fillMaxWidth().then(if (photo != null) Modifier.heightIn(min = PHOTO_BAND) else Modifier)) {
+                RecipeBackdrop(use.title, photo, Modifier.matchParentSize())
                 Column(
-                    Modifier.padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 12.dp),
+                    Modifier.align(Alignment.BottomStart).padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -821,6 +830,7 @@ fun UseDetailContent(
     detail: UseDetail,
     onEdit: () -> Unit,
     onRemove: () -> Unit,
+    photo: String? = null,
 ) {
     val open = rememberOpenLink()
     val use = detail.use
@@ -830,6 +840,16 @@ fun UseDetailContent(
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        // Its photo heads it, as it heads the saved recipe's sheet.
+        photo?.let { path ->
+            item(key = "photo") {
+                RecipePhoto(
+                    path,
+                    contentDescription = "Photo of ${use.title}",
+                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(MaterialTheme.shapes.large).testTag("use-photo"),
+                )
+            }
+        }
         item(key = "title") {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(use.title, style = MaterialTheme.typography.headlineSmall)
@@ -889,3 +909,6 @@ fun UseDetailContent(
         }
     }
 }
+
+/** How tall a card's band is when it shows the recipe's photo. */
+private val PHOTO_BAND = 168.dp

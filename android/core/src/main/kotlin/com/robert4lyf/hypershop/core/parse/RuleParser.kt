@@ -24,7 +24,7 @@ class RuleParser(
     fun parseLines(lines: List<String>): List<ParsedIngredient> {
         var section: String? = null
         val out = ArrayList<ParsedIngredient>()
-        for (raw in lines) {
+        for ((i, raw) in lines.withIndex()) {
             val line = raw.trim()
             if (line.isEmpty()) continue
             val header = sectionHeader(line)
@@ -32,21 +32,13 @@ class RuleParser(
                 section = header
                 continue
             }
-            out += parse(line).copy(section = section)
+            out += parse(line).copy(section = section, sourceLine = i)
         }
         return out
     }
 
     /** R8: ends with ':' or is "For the …" or all caps, with no digits and ≤ 40 characters. */
-    fun sectionHeader(line: String): String? {
-        val t = line.trim()
-        if (t.isEmpty() || t.length > 40 || t.any { it.isDigit() }) return null
-        if (t.endsWith(":")) return t.dropLast(1).trim()
-        if (t.lowercase().startsWith("for the ")) return t
-        val letters = t.filter { it.isLetter() }
-        if (letters.length >= 3 && letters.all { it.isUpperCase() }) return t
-        return null
-    }
+    fun sectionHeader(line: String): String? = sectionHeaderOf(line)
 
     fun parse(raw: String): ParsedIngredient = Line(raw.take(Tokeniser.MAX_LINE)).parse()
 
@@ -823,4 +815,15 @@ internal object Regexless {
         if (rest.isEmpty()) return null
         return Triple(part, rest.joinToString(" "), n)
     }
+}
+
+/** [RuleParser.sectionHeader], for code that reads lines without parsing them (a header is not an ingredient). */
+fun sectionHeaderOf(line: String): String? {
+    val t = line.trim()
+    if (t.isEmpty() || t.length > 40 || t.any { it.isDigit() }) return null
+    if (t.endsWith(":")) return t.dropLast(1).trim()
+    if (t.lowercase().startsWith("for the ")) return t
+    val letters = t.filter { it.isLetter() }
+    if (letters.length >= 3 && letters.all { it.isUpperCase() }) return t
+    return null
 }

@@ -7,6 +7,7 @@ import com.robert4lyf.hypershop.backup.BackupFile
 import com.robert4lyf.hypershop.backup.BackupSummary
 import com.robert4lyf.hypershop.backup.Inspection
 import com.robert4lyf.hypershop.backup.RestoreOutcome
+import com.robert4lyf.hypershop.backup.StagedPhotos
 import com.robert4lyf.hypershop.claude.ClaudeModel
 import com.robert4lyf.hypershop.claude.KeyCheck
 import com.robert4lyf.hypershop.claude.SpendGuard
@@ -94,7 +95,7 @@ class SettingsViewModel(
     private val backups = c.backups
 
     /** The backup read and checked, waiting for "Restore". */
-    private var pendingRestore: BackupFile? = null
+    private var pendingRestore: Inspection.Ok? = null
 
     /** Aisle moves are written in tap order. */
     private val aisleWrites = Mutex()
@@ -235,7 +236,16 @@ class SettingsViewModel(
             _ui.update { it.copy(dataBusy = true) }
             val r = backups.writeTo(c.context, uri)
             _ui.update { it.copy(dataBusy = false) }
-            r.onSuccess { s -> messages.send(UiMessage("Backed up ${plural(s.recipes, "recipe")} and ${plural(s.itemsOnList, "item")}")) }
+            r.onSuccess { s ->
+                val photos = if (s.photos > 0) ", ${plural(s.photos, "photo")}" else ""
+                val missing =
+                    when (s.missingPhotos) {
+                        0 -> ""
+                        1 -> ". 1 photo wasn't on this phone, so it isn't in the backup"
+                        else -> ". ${s.missingPhotos} photos weren't on this phone, so they aren't in the backup"
+                    }
+                messages.send(UiMessage("Backed up ${plural(s.recipes, "recipe")}$photos and ${plural(s.itemsOnList, "item")}$missing"))
+            }
                 .onFailure { messages.send(UiMessage("Couldn't write the backup file")) }
         }
 
@@ -247,7 +257,7 @@ class SettingsViewModel(
             _ui.update { it.copy(dataBusy = false) }
             when (i) {
                 is Inspection.Ok -> {
-                    pendingRestore = i.file
+                    pendingRestore = i
                     _ui.update { it.copy(restorePrompt = i.summary) }
                 }
                 Inspection.NotABackup -> messages.send(UiMessage("That file isn't a HyperShop backup"))
@@ -259,19 +269,20 @@ class SettingsViewModel(
 
     fun cancelRestore() {
         pendingRestore = null
+        backups.discardStaged()
         _ui.update { it.copy(restorePrompt = null) }
     }
 
     /** "Restore": everything on the phone is replaced; Undo puts back what was there. */
     fun confirmRestore() =
         viewModelScope.launch {
-            val file = pendingRestore ?: return@launch
+            val inspected = pendingRestore ?: return@launch
             pendingRestore = null
             _ui.update { it.copy(restorePrompt = null, dataBusy = true) }
-            val outcome = restoreSafely(file)
+            val outcome = restoreSafely(inspected.file, inspected.photos)
             _ui.update { it.copy(dataBusy = false) }
             if (outcome !is RestoreOutcome.Restored) return@launch
-            val s = backups.summary(file)
+            val s = inspected.summary
             // Undo is a whole-database restore, so it is refused once the list has moved on (a tick
             // on the phone or the watch, a finished trip): a purchase is never undone by it.
             val restoredAt = c.repository.epochAndRev()
@@ -290,10 +301,13 @@ class SettingsViewModel(
         }
 
     /** A restore, with anything but success said in words; "nothing was changed" only when that is true. */
-    private suspend fun restoreSafely(file: BackupFile): RestoreOutcome {
+    private suspend fun restoreSafely(
+        file: BackupFile,
+        photos: StagedPhotos? = null,
+    ): RestoreOutcome {
         val outcome =
             try {
-                backups.restore(file)
+                backups.restore(file, photos)
             } catch (e: Exception) {
                 // Thrown before the first write (the journal couldn't be saved): nothing changed.
                 messages.send(UiMessage("Couldn't read that backup, so nothing was changed"))

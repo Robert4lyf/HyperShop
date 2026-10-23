@@ -124,6 +124,8 @@ data class ReviewUi(
     val cookbook: Boolean = false,
     val book: String? = null,
     val page: String? = null,
+    /** The saved recipe's photo on this phone, or null (its mosaic is drawn). */
+    val photo: String? = null,
 ) {
     private val rows: List<ReviewRow> get() = aisles.flatMap { it.second }
     val addCount: Int get() = rows.count { !it.inStock && it.adds }
@@ -517,6 +519,7 @@ class ReviewViewModel(
                     canAskClaude = r.parsedBy != ParsedBy.CLAUDE && !r.byHand && c.apiKeyStore.hasKey.value,
                     book = r.book,
                     page = r.page,
+                    photo = c.recipePhotos.pathOf(s.recipe.libraryKey ?: s.recipe.url ?: "r:${s.recipe.id}"),
                 ),
             )
     }
@@ -1017,7 +1020,8 @@ class ReviewViewModel(
             if (t.isEmpty()) return@act
             val origins = LineIdentity.originsOf(r)
             val origin = LineIdentity.next(t, origins + corrections.keys)
-            val line = c.ruleParser.parse(t)
+            // Its own source line, the next one: it is never a part of a line above it, however it reads.
+            val line = c.ruleParser.parse(t).copy(sourceLine = r.rawLines.size)
             // A line the user typed is their reading of it, like an edit: it stands over Claude's, and is kept if
             // Claude's answer leaves it out (an answer to a call made before it was typed does).
             corrections[origin] = LineCorrection(origin, line)

@@ -22,13 +22,16 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.robert4lyf.hypershop.core.merge.UseProgress
 import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.testutil.Shots
+import com.robert4lyf.hypershop.testutil.TestPhotos
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -38,7 +41,7 @@ import org.robolectric.annotation.GraphicsMode
 private val USES =
     RecipesUi(
         listOf(
-            UseSummary(1, 1, "Weeknight chilli", "https://example.com/chilli", 4, UseProgress(6, 0, 0, 0), 3),
+            UseSummary(1, 1, "Weeknight chilli", "https://example.com/chilli", 4, UseProgress(6, 0, 0, 0), 3, libraryKey = "r:1"),
             UseSummary(2, 2, "Lemon drizzle cake", null, 8, UseProgress(5, 0, 0, 0), 0),
             UseSummary(3, null, "Added by hand", null, null, UseProgress(2, 0, 0, 0), 0),
         ),
@@ -46,8 +49,18 @@ private val USES =
         library =
             listOf(
                 LibraryRow(9, "r:9", "Red lentil dal", null, 11, 1_700_000_000_000, onList = false),
-                LibraryRow(1, "r:1", "Weeknight chilli", "https://example.com/chilli", 14, 1_760_000_000_000, onList = true),
+                LibraryRow(
+                    1,
+                    "r:1",
+                    "Weeknight chilli",
+                    "https://example.com/chilli",
+                    14,
+                    1_760_000_000_000,
+                    onList = true,
+                    photo = TestPhotos.dish,
+                ),
             ),
+        photos = mapOf("r:1" to TestPhotos.dish),
     )
 
 private val DETAIL =
@@ -220,6 +233,7 @@ class RecipesScreenTest {
         compose.onNodeWithTag("view-library").performClick()
         compose.onNodeWithTag("lib-r:9").assertExists()
         compose.onNodeWithTag("use-1").assertDoesNotExist()
+        TestPhotos.settle(compose)
         compose.onRoot().captureRoboImage(Shots.path("recipes-library-light.png"))
         // A recipe added to the list brings the list back.
         ui = USES
@@ -253,24 +267,44 @@ class RecipesScreenTest {
                         "To serve" to listOf("Soured cream" to true),
                     ),
             )
-        compose.setContent { HyperShopTheme(dynamicColor = false) { UseDetailContent(detail, onEdit = { edited++ }, onRemove = {}) } }
+        compose.setContent {
+            HyperShopTheme(dynamicColor = false) { UseDetailContent(detail, onEdit = { edited++ }, onRemove = {}, photo = TestPhotos.dish) }
+        }
         compose.onNodeWithText("Serves 4 (written for 6)", substring = true).assertExists()
         compose.onAllNodesWithText("At home").assertCountEquals(2)
         compose.onNodeWithTag("use-detail-edit").performClick()
         assertEquals(1, edited)
+        compose.onNodeWithTag("use-photo").assertExists()
+        TestPhotos.settle(compose)
         compose.onRoot().captureRoboImage(Shots.path("use-detail-light.png"))
     }
 
     @Test
     fun recordLight() {
         show()
+        TestPhotos.settle(compose)
         compose.onRoot().captureRoboImage(Shots.path("recipes-light.png"))
     }
 
     @Test
     fun recordDark() {
         show(dark = true)
+        TestPhotos.settle(compose)
         compose.onRoot().captureRoboImage(Shots.path("recipes-dark.png"))
+    }
+
+    @Test
+    fun aRecipesPhotoIsItsBandOnBothTabs() {
+        show()
+        // On the list: the chilli, which has a photo, gets a tall band; the cake keeps its mosaic strip.
+        val withPhoto = compose.onNodeWithTag("use-1").getUnclippedBoundsInRoot()
+        val without = compose.onNodeWithTag("use-2").getUnclippedBoundsInRoot()
+        assertTrue((withPhoto.bottom - withPhoto.top) - (without.bottom - without.top) > 60.dp)
+        // Saved: the same.
+        compose.onNodeWithTag("view-library").performClick()
+        val saved = compose.onNodeWithTag("lib-r:1").getUnclippedBoundsInRoot()
+        val plain = compose.onNodeWithTag("lib-r:9").getUnclippedBoundsInRoot()
+        assertTrue((saved.bottom - saved.top) - (plain.bottom - plain.top) > 60.dp)
     }
 
     @Test

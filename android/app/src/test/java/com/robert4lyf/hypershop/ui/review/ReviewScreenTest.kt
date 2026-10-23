@@ -23,6 +23,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.testutil.Shots
+import com.robert4lyf.hypershop.testutil.TestPhotos
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -176,6 +177,13 @@ class ReviewScreenTest {
     fun recordLight() {
         show()
         compose.onRoot().captureRoboImage(Shots.path("review-light.png"))
+    }
+
+    @Test
+    fun recordWithPhoto() {
+        show(SAMPLE_REVIEW.copy(photo = TestPhotos.dish))
+        TestPhotos.settle(compose)
+        compose.onRoot().captureRoboImage(Shots.path("review-photo-light.png"))
     }
 
     @Test

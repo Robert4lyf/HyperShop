@@ -11,10 +11,14 @@ import com.robert4lyf.hypershop.extract.Extractor
 import com.robert4lyf.hypershop.extract.FetchResult
 import com.robert4lyf.hypershop.extract.SafeFetcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
 import java.security.MessageDigest
 import kotlin.math.max
 
@@ -25,16 +29,57 @@ import kotlin.math.max
  * JPEG in the app's own storage, named by a hash of its contents, so the list of
  * recipes never touches the network to draw one. The file name, and where it came
  * from, are the recipe's [RecipeNoteEntity] (written through [ListRepository]).
+ *
+ * Files are named by their content, so two recipes with the same picture share one,
+ * and a file is never changed once written. Ownership is the database's, and nothing
+ * but [sweep] deletes a file: at start-up, before the app is ready, after any
+ * interrupted restore is resolved, it takes what no recipe names. Deleting at the
+ * moment a photo is replaced looked tidier and was not safe: the same file can be
+ * another recipe's, the other side of an interrupted restore's, or what a restore's
+ * Undo would put back. Every change to a recipe's photo, and the sweep, runs under
+ * one lock, which a backup and a restore hold too ([exclusive]).
  */
 class RecipePhotos(
     private val context: Context,
     private val fetcher: SafeFetcher,
     private val repository: ListRepository,
 ) {
-    /** One fetch or decode at a time: a long library opening for the first time is not 50 downloads at once. */
+    /**
+     * One photo change at a time (and one fetch: a long library opening for the first time is not
+     * 50 downloads at once). Also what keeps a sweep, a backup and a restore apart from a change.
+     */
     private val lock = Mutex()
 
     private val dir get() = File(context.filesDir, DIR)
+
+    /**
+     * Each saved recipe's photo on this phone, by its library key: what every screen that shows a recipe
+     * draws it with ([com.robert4lyf.hypershop.ui.recipes.RecipeArt]).
+     */
+    fun paths(): Flow<Map<String, String>> =
+        repository.observeRecipeNotes()
+            .map { notes -> notes.mapNotNull { (key, n) -> file(n.photo)?.let { key to it.path } }.toMap() }
+            .flowOn(Dispatchers.IO)
+
+    /** The photo on this phone for the recipe saved as [key], or null. */
+    suspend fun pathOf(key: String): String? = withContext(Dispatchers.IO) { file(repository.recipeNote(key)?.photo)?.path }
+
+    /** [block] with no photo changed or deleted meanwhile: a backup reading the folder, a restore filling it. */
+    suspend fun <T> exclusive(block: suspend () -> T): T = lock.withLock { block() }
+
+    /**
+     * Deletes what nothing uses: files no recipe shows (replaced or removed, left by a change that failed
+     * before its database write, or by a restore that brought other photos) and half-written ones. Run at
+     * start-up once any interrupted restore is resolved and before anything can change a photo; [keep] is
+     * spared too.
+     */
+    suspend fun sweep(keep: Set<String> = emptySet()): Int =
+        lock.withLock {
+            val used = repository.photosInUse() + keep
+            withContext(Dispatchers.IO) {
+                dir.listFiles().orEmpty().count { f -> f.name !in used && f.delete() }
+            }
+        }
 
     /** The photo file for [name], or null when there is none (or it is not one of ours). */
     fun file(name: String?): File? = name?.takeIf { BackupValidator.PHOTO_NAME.matches(it) }?.let { File(dir, it) }?.takeIf { it.isFile }
@@ -75,7 +120,8 @@ class RecipePhotos(
         val page = fetcher.fetch(pageUrl) as? FetchResult.Ok ?: return false
         val html = if (page.contentType == "application/ld+json") Extractor.wrapLdJson(page.body) else page.body
         val image = withContext(Dispatchers.Default) { Extractor.extract(html, page.finalUrl).image } ?: return false
-        repository.setRecipePhoto(key, repository.recipeNote(key)?.photo, image)
+        // Read and written under the lock: a photo chosen meanwhile is not put back to the one before it.
+        lock.withLock { repository.setRecipePhoto(key, repository.recipeNote(key)?.photo, image) }
         return download(key, image)
     }
 
@@ -124,9 +170,33 @@ class RecipePhotos(
         name: String?,
         url: String?,
     ) {
-        val old = repository.recipeNote(key)?.photo
+        // The old file stays: another recipe may show the same picture, an interrupted restore's other side
+        // or a restore's Undo may name it. The next start's [sweep] takes it once nothing does.
         repository.setRecipePhoto(key, name, url)
-        if (old != null && old != name) withContext(Dispatchers.IO) { file(old)?.delete() }
+    }
+
+    /**
+     * A photo from a backup archive, already checked ([com.robert4lyf.hypershop.backup.BackupArchive]):
+     * moved into the folder under its own name, or left be when that file is already there (same name,
+     * same content). Called by a restore inside [exclusive]. False when it could not be put there.
+     */
+    fun adopt(staged: File): Boolean {
+        dir.mkdirs()
+        val f = File(dir, staged.name)
+        // The same name is the same picture, unless the copy here was damaged (written before writes were
+        // flushed, and cut short by a power loss): then the archive's checked copy replaces it.
+        if (f.isFile && com.robert4lyf.hypershop.backup.BackupArchive.isIntact(f)) return true
+        if (staged.renameTo(f)) return true
+        val tmp = File(dir, staged.name + ".part")
+        return runCatching {
+            staged.inputStream().use { input ->
+                FileOutputStream(tmp).use { out ->
+                    input.copyTo(out)
+                    out.fd.sync()
+                }
+            }
+            tmp.renameTo(f)
+        }.getOrDefault(false).also { if (!it) tmp.delete() }
     }
 
     /** Decoded, scaled and re-encoded: what is kept is always a JPEG this app made, never the bytes as fetched. */
@@ -153,16 +223,20 @@ class RecipePhotos(
                 scaled.compress(Bitmap.CompressFormat.JPEG, QUALITY, out)
                 val jpeg = out.toByteArray()
                 val name = MessageDigest.getInstance("SHA-256").digest(jpeg).take(12).joinToString("") { "%02x".format(it) } + ".jpg"
-                withContext(Dispatchers.IO) {
-                    dir.mkdirs()
-                    val f = File(dir, name)
-                    if (!f.isFile) {
+                val written =
+                    withContext(Dispatchers.IO) {
+                        dir.mkdirs()
+                        val f = File(dir, name)
+                        if (f.isFile) return@withContext true
+                        // Flushed and renamed whole: the database is only ever pointed at a complete file.
                         val tmp = File(dir, "$name.part")
-                        tmp.writeBytes(jpeg)
-                        tmp.renameTo(f)
+                        FileOutputStream(tmp).use { out ->
+                            out.write(jpeg)
+                            out.fd.sync()
+                        }
+                        tmp.renameTo(f).also { if (!it) tmp.delete() }
                     }
-                }
-                name
+                name.takeIf { written }
             }.getOrNull()
         }
 
