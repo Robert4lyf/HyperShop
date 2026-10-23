@@ -72,9 +72,10 @@ class PhotoOwnershipTest {
         assertNull(c.photoOf(a))
         assertEquals(shared, c.photoOf(b))
         assertNotNull("the other recipe still shows it", c.recipePhotos.file(shared))
-        // The last one to let go of it takes the file with it.
+        // Once nothing names it, the next start's sweep takes it (and not before: see the restore tests).
         runBlocking { c.recipePhotos.remove(b) }
-        assertNull(c.recipePhotos.file(shared))
+        assertNotNull(c.recipePhotos.file(shared))
+        assertEquals(1, runBlocking { c.recipePhotos.sweep() })
         assertTrue(c.photoFiles().isEmpty())
     }
 
@@ -87,6 +88,8 @@ class PhotoOwnershipTest {
         assertEquals(shared, c.photoOf(b))
         assertEquals(setOf(shared, replaced), c.photoFiles())
         assertTrue(c.everyNamedPhotoIsThere())
+        runBlocking { c.recipePhotos.sweep() }
+        assertEquals(setOf(shared, replaced), c.photoFiles())
     }
 
     @Test
@@ -136,10 +139,13 @@ class PhotoOwnershipTest {
         pick(a, Photos.jpeg())
         val photo = c.photoOf(a)!!
         val file = runBlocking { c.backups.snapshot() }
-        runBlocking { c.recipePhotos.remove(a) }
-        // The photo is gone from the phone; the backup names it. Put it back as a restore would find it.
+        runBlocking {
+            c.recipePhotos.remove(a)
+            c.recipePhotos.sweep()
+        }
+        // The photo is gone from the phone; the backup names it, and the restore finds it missing.
         assertNull(c.recipePhotos.file(photo))
-        pick(c.saved("Spare"), Photos.jpeg())
+        pick(c.saved("Spare"), Photos.jpeg(colour = Color.MAGENTA))
         val paused = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         val m = BackupManager(c, "test")

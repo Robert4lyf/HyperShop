@@ -567,12 +567,6 @@ class ListRepository(
         fromUrl: String?,
     ) = changeNote(key) { it.copy(photo = photo?.take(MAX_TITLE), photoUrl = fromUrl?.take(MAX_URL)) }
 
-    /**
-     * How many recipes show the photo file [name]. Photos are named by their content, so two recipes
-     * with the same picture share one file: a file is deleted only when this is 0.
-     */
-    suspend fun photoUses(name: String): Int = dao.photoUses(name)
-
     /** Every photo file a recipe shows: what a sweep of the photo folder must keep. */
     suspend fun photosInUse(): Set<String> = dao.photosInUse().toSet()
 

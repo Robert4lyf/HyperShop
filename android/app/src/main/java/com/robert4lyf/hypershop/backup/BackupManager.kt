@@ -189,7 +189,9 @@ class BackupManager(
                 c.recipePhotos.exclusive {
                     val file = snapshot()
                     val names = file.data.recipeNotes.mapNotNull { it.photo }.toSortedSet()
-                    val files = names.mapNotNull { c.recipePhotos.file(it) }
+                    // Only whole photos: one damaged file here would make the reader refuse the entire backup.
+                    // One that is not is counted as missing, and said.
+                    val files = names.mapNotNull { c.recipePhotos.file(it) }.filter { BackupArchive.isIntact(it) }
                     // "wt" truncates what was there; a provider that refuses the mode (Drive did) gets plain "w".
                     val out =
                         try {
@@ -321,7 +323,9 @@ class BackupManager(
         // harmless (the next start's sweep takes it if the restore never happens), and once the journal
         // exists, finishing the restore after a crash needs nothing that is not already in place. The
         // photos in the folder now stay too, so a rollback (or Undo) finds what the old data names.
-        for (name in photos?.names.orEmpty()) {
+        // Only the photos a recipe in the file shows: an archive listing others brings nothing in with them.
+        val named = f.data.recipeNotes.mapNotNull { it.photo }.toSet()
+        for (name in photos?.names.orEmpty().intersect(named)) {
             if (!c.recipePhotos.adopt(File(photos!!.dir, name))) {
                 Timber.e("Restore: photo %s could not be put in place", name)
                 return RestoreOutcome.Failed(rolledBack = true)

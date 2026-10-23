@@ -453,6 +453,136 @@ class PhotoBackupTest {
         assertEquals(1, (i as Inspection.Ok).summary.photos)
     }
 
+    // ---- Found by the adversarial review (S.5) ------------------------------------------------------------
+
+    @Test
+    fun anEntryNameThatIsNotTextIsADamagedFileNotACrash() {
+        // A local header whose name is the bytes C3 28 (not UTF-8) and no UTF-8 flag: the JDK throws
+        // IllegalArgumentException ("MALFORMED") for it, which is not an IOException.
+        val out = ByteArrayOutputStream()
+
+        fun le(
+            v: Long,
+            n: Int,
+        ) = repeat(n) { out.write(((v shr (8 * it)) and 0xFF).toInt()) }
+        val name = byteArrayOf(0xC3.toByte(), 0x28)
+        le(0x04034b50, 4)
+        le(20, 2)
+        le(0, 2)
+        le(0, 2)
+        le(0, 4)
+        le(0, 4)
+        le(0, 4)
+        le(0, 4)
+        le(name.size.toLong(), 2)
+        le(0, 2)
+        out.write(name)
+        val f = File.createTempFile("bad-name", ".zip").apply { writeBytes(out.toByteArray()) }
+        val b = anotherPhone()
+        b.assertRefusedAndUnchanged(f, b.photoFiles())
+    }
+
+    @Test
+    fun aDamagedPhotoOnThePhoneIsLeftOutAndSaidNotMadeTheWholeBackupUnreadable() {
+        val a = phone()
+        val good = a.saved("Chilli")
+        val bad = a.saved("Dal")
+        a.pick(good, Photos.jpeg(colour = Color.RED))
+        a.pick(bad, Photos.jpeg(colour = Color.BLUE))
+        // As a file written before writes were flushed could be after a power cut: cut short.
+        val damaged = a.recipePhotos.file(a.photoOf(bad))!!
+        damaged.writeBytes(damaged.readBytes().copyOf(100))
+        val (file, written) = a.backUp()
+        assertEquals(1, written.photos)
+        assertEquals(1, written.missingPhotos)
+        val b = anotherPhone()
+        b.restoreFrom(file)
+        assertNotNull(b.recipePhotos.file(b.photoOf(good)))
+        assertNull(b.photoOf(bad))
+        assertTrue(b.everyNamedPhotoIsThere())
+    }
+
+    @Test
+    fun aDamagedCopyAlreadyOnThePhoneIsReplacedByTheArchivesCheckedOne() {
+        val a = phone()
+        val key = a.saved("Chilli")
+        a.pick(key, Photos.jpeg())
+        val photo = a.photoOf(key)!!
+        val bytes = a.recipePhotos.file(photo)!!.readBytes()
+        val (file, _) = a.backUp()
+        // The same name on the phone, but cut short.
+        a.recipePhotos.file(photo)!!.writeBytes(bytes.copyOf(64))
+        a.restoreFrom(file)
+        assertArrayEquals(bytes, a.recipePhotos.file(photo)!!.readBytes())
+    }
+
+    @Test
+    fun aPhotoNoRecipeNamesIsNotBroughtIn() {
+        val a = phone()
+        val key = a.saved("Chilli")
+        a.pick(key, Photos.jpeg(colour = Color.RED))
+        val named = a.recipePhotos.file(a.photoOf(key))!!
+        val strayKey = a.saved("Stray")
+        a.pick(strayKey, Photos.jpeg(colour = Color.BLUE))
+        val stray = a.recipePhotos.file(a.photoOf(strayKey))!!
+        // An archive that lists a photo its backup never names.
+        val snapshot = runBlocking { a.backups.snapshot() }
+        val json =
+            a.backups.jsonOf(
+                snapshot.copy(
+                    data =
+                        snapshot.data.copy(
+                            recipeNotes =
+                                snapshot.data.recipeNotes.filter {
+                                    it.libraryKey == key
+                                },
+                        ),
+                ),
+            )
+        val f = File.createTempFile("stray", ".zip")
+        f.outputStream().use { BackupArchive.write(it, snapshot.createdAt, json.toByteArray(), listOf(named, stray)) }
+        val b = anotherPhone()
+        b.restoreFrom(f)
+        assertEquals(setOf(named.name), b.photoFiles())
+    }
+
+    @Test
+    fun aRestoreLeftForTheNextStartKeepsBothSidesPhotosWhateverIsChangedMeanwhile() {
+        val a = phone()
+        val key = a.saved("Chilli")
+        a.pick(key, Photos.jpeg(colour = Color.RED))
+        val theirs = a.photoOf(key)!!
+        val (file, _) = a.backUp()
+        val b = anotherPhone()
+        val mine = b.saved("Chilli")
+        b.pick(mine, Photos.jpeg(colour = Color.CYAN))
+        val i = b.inspect(file) as Inspection.Ok
+        // The restore fails and so does its rollback: the journal is kept for the next start.
+        b.backups.beforeStage = { if (it == BackupManager.Stage.LIBRARY) throw IllegalStateException("disk") }
+        assertEquals(RestoreOutcome.Failed(rolledBack = false), runBlocking { b.backups.restore(i.file, i.photos) })
+        // Meanwhile the photo is replaced: the file the journal's side names must not go with it.
+        b.pick(key, Photos.jpeg(colour = Color.GREEN))
+        assertEquals(BackupManager.Recovery.FINISHED, runBlocking { BackupManager(b, "test").recover() })
+        assertEquals(theirs, b.photoOf(key))
+        assertTrue(b.everyNamedPhotoIsThere())
+    }
+
+    @Test
+    fun undoAfterAPhotoChangedSinceTheRestoreStillBringsItsPhotoBack() {
+        val a = phone()
+        val key = a.saved("Chilli")
+        a.pick(key, Photos.jpeg(colour = Color.RED))
+        val original = a.photoOf(key)!!
+        val (file, _) = a.backUp()
+        val i = a.inspect(file) as Inspection.Ok
+        val done = runBlocking { a.backups.restore(i.file, i.photos) } as RestoreOutcome.Restored
+        // A different photo chosen before Undo: the old file is named only by what Undo puts back.
+        a.pick(key, Photos.jpeg(colour = Color.GREEN))
+        assertTrue(runBlocking { a.backups.restore(done.before) } is RestoreOutcome.Restored)
+        assertEquals(original, a.photoOf(key))
+        assertTrue(a.everyNamedPhotoIsThere())
+    }
+
     private companion object {
         const val MANIFEST = "manifest.json"
     }

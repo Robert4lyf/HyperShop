@@ -31,11 +31,13 @@ import kotlin.math.max
  * from, are the recipe's [RecipeNoteEntity] (written through [ListRepository]).
  *
  * Files are named by their content, so two recipes with the same picture share one,
- * and a file is never changed once written. Ownership is the database's: a file is
- * deleted only after the change that stopped using it has committed, and only when
- * no recipe still shows it ([ListRepository.photoUses]). Every change to a recipe's
- * photo, and every [sweep], runs under one lock, which a backup and a restore hold
- * too ([exclusive]): nothing can delete a file between a check and its use.
+ * and a file is never changed once written. Ownership is the database's, and nothing
+ * but [sweep] deletes a file: at start-up, before the app is ready, after any
+ * interrupted restore is resolved, it takes what no recipe names. Deleting at the
+ * moment a photo is replaced looked tidier and was not safe: the same file can be
+ * another recipe's, the other side of an interrupted restore's, or what a restore's
+ * Undo would put back. Every change to a recipe's photo, and the sweep, runs under
+ * one lock, which a backup and a restore hold too ([exclusive]).
  */
 class RecipePhotos(
     private val context: Context,
@@ -66,9 +68,10 @@ class RecipePhotos(
     suspend fun <T> exclusive(block: suspend () -> T): T = lock.withLock { block() }
 
     /**
-     * Deletes what nothing uses: files no recipe shows (left by a replacement that failed before its
-     * database write, or by a restore that brought other photos) and half-written ones. Run at start-up
-     * once any interrupted restore is resolved, never during one; [keep] is spared too.
+     * Deletes what nothing uses: files no recipe shows (replaced or removed, left by a change that failed
+     * before its database write, or by a restore that brought other photos) and half-written ones. Run at
+     * start-up once any interrupted restore is resolved and before anything can change a photo; [keep] is
+     * spared too.
      */
     suspend fun sweep(keep: Set<String> = emptySet()): Int =
         lock.withLock {
@@ -167,15 +170,9 @@ class RecipePhotos(
         name: String?,
         url: String?,
     ) {
-        val old = repository.recipeNote(key)?.photo
-        // The database first: if this write fails, the old file is still there for the row that names it.
+        // The old file stays: another recipe may show the same picture, an interrupted restore's other side
+        // or a restore's Undo may name it. The next start's [sweep] takes it once nothing does.
         repository.setRecipePhoto(key, name, url)
-        if (old != null && old != name) deleteIfUnused(old)
-    }
-
-    /** Called under [lock], after the write that stopped using [name] has committed. */
-    private suspend fun deleteIfUnused(name: String) {
-        if (repository.photoUses(name) == 0) withContext(Dispatchers.IO) { file(name)?.delete() }
     }
 
     /**
@@ -186,7 +183,9 @@ class RecipePhotos(
     fun adopt(staged: File): Boolean {
         dir.mkdirs()
         val f = File(dir, staged.name)
-        if (f.isFile) return true
+        // The same name is the same picture, unless the copy here was damaged (written before writes were
+        // flushed, and cut short by a power loss): then the archive's checked copy replaces it.
+        if (f.isFile && com.robert4lyf.hypershop.backup.BackupArchive.isIntact(f)) return true
         if (staged.renameTo(f)) return true
         val tmp = File(dir, staged.name + ".part")
         return runCatching {

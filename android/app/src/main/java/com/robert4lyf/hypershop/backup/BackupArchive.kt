@@ -139,6 +139,9 @@ object BackupArchive {
                 Read.Broken("the archive is damaged")
             } catch (e: IOException) {
                 Read.Broken("the archive could not be read to the end")
+            } catch (e: IllegalArgumentException) {
+                // An entry name that is not valid text ("MALFORMED"): thrown as this, not as an IOException.
+                Read.Broken("the archive is damaged")
             }
         if (r !is Read.Ok) staging.deleteRecursively()
         return r
@@ -257,6 +260,14 @@ object BackupArchive {
         }
         return null
     }
+
+    /**
+     * A photo file as this app wrote it: its bytes hash to its name, and it is a whole JPEG. What a
+     * backup may put in an archive (the reader would refuse the whole file over one that is not), and
+     * what a restore checks a same-named file already on the phone against.
+     */
+    fun isIntact(f: File): Boolean =
+        runCatching { isPhotoName(f.name) && sha256(f).startsWith(f.name.removeSuffix(".jpg")) && isJpeg(f) }.getOrDefault(false)
 
     /** JPEG markers at both ends, and dimensions no bigger than this app ever writes. */
     private fun isJpeg(f: File): Boolean {
