@@ -20,7 +20,7 @@ object EvalFloors {
         val acceptedWrongAtMost: Int,
     )
 
-    val RELEASE_C = Floors(right = 259, name = 259, quantity = 284, unit = 281, catalogue = 258, shown = 282, acceptedWrongAtMost = 11)
+    val RELEASE_C = Floors(right = 261, name = 261, quantity = 284, unit = 281, catalogue = 260, shown = 282, acceptedWrongAtMost = 9)
     val FINAL = Floors(right = 115, name = 117, quantity = 135, unit = 135, catalogue = 117, shown = 134, acceptedWrongAtMost = 10)
     val T = Floors(right = 113, name = 113, quantity = 134, unit = 134, catalogue = 110, shown = 131, acceptedWrongAtMost = 15)
 
