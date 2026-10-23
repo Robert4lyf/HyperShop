@@ -125,9 +125,15 @@ class AppContainer(
             today = { today() },
         )
 
+    /** Pages and recipe photos: the app's only fetches, both through the same checks. */
+    val fetcher = SafeFetcher(fetchPolicy)
+
+    /** Saved recipes' photos (the page's own, or one chosen), kept on the phone. */
+    val recipePhotos by lazy { com.robert4lyf.hypershop.importing.RecipePhotos(context, fetcher, repository) }
+
     val importer =
         Importer(
-            fetcher = SafeFetcher(fetchPolicy),
+            fetcher = fetcher,
             rules = ruleParser,
             claude = claude,
             hasKey = { apiKeyStore.get() != null },

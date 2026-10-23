@@ -674,6 +674,7 @@ class ReviewViewModel(
                 if (result?.savesToLibrary == true) {
                     val s = stored ?: return@act
                     c.repository.saveToLibrary(s.recipe.id, jobId)
+                    offerPhoto(s.recipe.id)
                     // Kept now: leaving the screen must not discard it.
                     stored = null
                     _state.value = ReviewState.Added(0, 0, result?.title ?: "Recipe")
@@ -690,6 +691,7 @@ class ReviewViewModel(
                         )
                 ) {
                     is ApplyResult.Applied -> {
+                        offerPhoto(stored?.recipe?.id)
                         _state.value = ReviewState.Added(r.added, r.useId, replacing?.let { result?.title ?: "Recipe" })
                     }
                     ApplyResult.Stale -> {
@@ -701,6 +703,16 @@ class ReviewViewModel(
                 busy = false
             }
         }
+    }
+
+    /**
+     * The page's own photo goes to the recipe's library entry once it is saved, and is fetched in the
+     * app's scope: leaving the screen straight after Add must not stop it. Never replaces a photo chosen.
+     */
+    private fun offerPhoto(recipeId: Long?) {
+        val url = result?.imageUrl ?: return
+        val id = recipeId ?: return
+        c.applicationScope.launch { c.repository.libraryKeyOf(id)?.let { c.recipePhotos.offer(it, url) } }
     }
 
     /**

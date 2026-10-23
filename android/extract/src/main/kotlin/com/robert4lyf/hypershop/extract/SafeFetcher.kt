@@ -51,6 +51,13 @@ sealed interface FetchResult {
         val contentType: String?,
     ) : FetchResult
 
+    /** An image ([SafeFetcher.fetchImage]): its bytes, at most [SafeFetcher.MAX_IMAGE_BYTES]. */
+    class Image(
+        val finalUrl: String,
+        val contentType: String,
+        val bytes: ByteArray,
+    ) : FetchResult
+
     data object TooLarge : FetchResult
 
     data class HttpError(
@@ -66,7 +73,8 @@ sealed interface FetchResult {
  * multicast addresses; raw IP hosts and ports other than 443 refused; no cookies;
  * a browser user agent; no proxy (it would resolve names past the DNS check);
  * 10 s to connect and 30 s for the whole fetch, redirects included; `text/html` or
- * `application/ld+json` only, at most 3 MB after decompression.
+ * `application/ld+json` only, at most 3 MB after decompression ([fetchImage]: a
+ * JPEG, PNG or WebP, at most 8 MB).
  */
 class SafeFetcher(
     private val policy: FetchPolicy = FetchPolicy.STRICT,
@@ -106,9 +114,33 @@ class SafeFetcher(
      * cancelling the caller (a stopped import worker) cancels the request in
      * flight rather than leaving a thread blocked for the rest of the 30 s.
      */
-    suspend fun fetch(url: String): FetchResult = withContext(Dispatchers.IO) { fetchBlocking(url) }
+    suspend fun fetch(url: String): FetchResult =
+        withContext(Dispatchers.IO) {
+            fetchBlocking(url, PAGE_ACCEPT, PAGE_TYPES, MAX_BYTES) { finalUrl, ct, buf, body ->
+                val charset = body.contentType()?.charset() ?: sniffCharset(buf) ?: Charsets.UTF_8
+                FetchResult.Ok(finalUrl, ct, buf.readString(charset))
+            }
+        }
 
-    private suspend fun fetchBlocking(url: String): FetchResult {
+    /**
+     * A recipe page's own photo: the same checks as a page (https, public addresses,
+     * redirects re-checked, the time limit), but only `image/jpeg`, `image/png` or
+     * `image/webp`, at most [MAX_IMAGE_BYTES].
+     */
+    suspend fun fetchImage(url: String): FetchResult =
+        withContext(Dispatchers.IO) {
+            fetchBlocking(url, IMAGE_ACCEPT, IMAGE_TYPES, MAX_IMAGE_BYTES) { finalUrl, ct, buf, _ ->
+                FetchResult.Image(finalUrl, ct, buf.readByteArray())
+            }
+        }
+
+    private suspend fun fetchBlocking(
+        url: String,
+        accept: String,
+        types: Set<String>,
+        maxBytes: Long,
+        read: (String, String, okio.Buffer, okhttp3.ResponseBody) -> FetchResult,
+    ): FetchResult {
         var current = url.toHttpUrlOrNull() ?: return FetchResult.Blocked("not an http(s) URL")
         // One clock for the whole chain, so redirects can't stretch it to 6 × 30 s.
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(CALL_TIMEOUT_S)
@@ -118,7 +150,7 @@ class SafeFetcher(
                 Request.Builder()
                     .url(current)
                     .header("User-Agent", USER_AGENT)
-                    .header("Accept", "text/html,application/ld+json;q=0.9,*/*;q=0.1")
+                    .header("Accept", accept)
                     .get()
                     .build()
             val left = deadline - System.nanoTime()
@@ -134,16 +166,15 @@ class SafeFetcher(
                     }
                     if (!r.isSuccessful) return FetchResult.HttpError(r.code)
                     val ct = r.header("Content-Type")?.substringBefore(';')?.trim()?.lowercase()
-                    if (ct != "text/html" && ct != "application/ld+json") return FetchResult.WrongType(ct)
+                    if (ct !in types) return FetchResult.WrongType(ct)
                     val body = r.body ?: return FetchResult.Network
                     // OkHttp gunzips transparently, so this counts decompressed bytes.
                     val source = body.source()
                     val buf = okio.Buffer()
                     while (source.read(buf, 64 * 1024) != -1L) {
-                        if (buf.size > MAX_BYTES) return FetchResult.TooLarge
+                        if (buf.size > maxBytes) return FetchResult.TooLarge
                     }
-                    val charset = body.contentType()?.charset() ?: sniffCharset(buf) ?: Charsets.UTF_8
-                    return FetchResult.Ok(current.toString(), ct, buf.readString(charset))
+                    return read(current.toString(), ct!!, buf, body)
                 }
             } catch (e: BlockedAddress) {
                 return FetchResult.Blocked(e.message ?: "blocked address")
@@ -215,6 +246,11 @@ class SafeFetcher(
         const val MAX_REDIRECTS = 5
         const val CALL_TIMEOUT_S = 30L
         const val MAX_BYTES = 3L * 1024 * 1024
+        const val MAX_IMAGE_BYTES = 8L * 1024 * 1024
+        private const val PAGE_ACCEPT = "text/html,application/ld+json;q=0.9,*/*;q=0.1"
+        private val PAGE_TYPES = setOf("text/html", "application/ld+json")
+        private const val IMAGE_ACCEPT = "image/webp,image/jpeg,image/png;q=0.9"
+        private val IMAGE_TYPES = setOf("image/jpeg", "image/png", "image/webp")
         const val USER_AGENT =
             "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Mobile Safari/537.36"
 

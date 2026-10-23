@@ -539,6 +539,9 @@ class ListRepository(
 
     suspend fun recipeNote(key: String): RecipeNoteEntity? = dao.recipeNote(key)
 
+    /** The library entry a stored recipe belongs to, as [observeLibrary] names it. */
+    suspend fun libraryKeyOf(recipeId: Long): String? = dao.recipe(recipeId)?.let { it.libraryKey ?: "r:${it.id}" }
+
     /** Stars out of 5; null (or 0) clears them. */
     suspend fun setRating(
         key: String,
