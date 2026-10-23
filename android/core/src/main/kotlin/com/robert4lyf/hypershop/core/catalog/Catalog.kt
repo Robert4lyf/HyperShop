@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.core.catalog
 
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.Rational
+import com.robert4lyf.hypershop.core.parse.Normaliser
 import java.text.Normalizer
 
 /** How an item's amount is shown on the list (PLAN §3.3 rounding). */
@@ -136,6 +137,19 @@ class Catalog(
         /** The same keys with hyphens as spaces: "self raising flour" is "self-raising flour". */
         val byLooseKey: Map<String, CatalogEntry> = byKey.entries.associate { (k, e) -> k.replace('-', ' ') to e }
 
+        /**
+         * U.3: a catalogue name written in the plural, made singular, where that is no other key and only one
+         * entry makes it: "beansprouts" is found as "140g beansprout". The lookup made only the recipe's word
+         * singular, never the catalogue's.
+         */
+        val bySingularKey: Map<String, CatalogEntry> =
+            byKey.entries
+                .map { (k, e) -> Normaliser.singularKey(k) to e }
+                .filter { (k, _) -> k !in byKey }
+                .groupBy({ it.first }, { it.second })
+                .filterValues { es -> es.distinct().size == 1 }
+                .mapValues { it.value.first() }
+
         /** Per aisle, its groups in the order they first appear. */
         val groups: Map<AisleCode, List<String>> =
             entries.filter { it.group != null }.groupBy { it.aisle }.mapValues { (_, es) -> es.mapNotNull { it.group }.distinct() }
@@ -164,7 +178,7 @@ class Catalog(
     /** The entry whose name, plural or synonym has this name's key; "self raising flour" finds "self-raising flour" too. */
     fun lookup(name: String): CatalogEntry? {
         val k = CatalogKey.of(name)
-        return s.byKey[k] ?: s.byLooseKey[k.replace('-', ' ')]
+        return s.byKey[k] ?: s.byLooseKey[k.replace('-', ' ')] ?: s.bySingularKey[k]
     }
 
     fun containsKey(key: String): Boolean = s.byKey.containsKey(key)

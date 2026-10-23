@@ -138,4 +138,22 @@ class CatalogTest {
         assertNotNull(catalog)
         if (repoTsv.exists()) assertTrue(repoTsv.readText().contains("#version\t${catalog.version}"))
     }
+
+    @Test
+    fun aPluralCatalogNameIsFoundInTheSingular() {
+        // U.3: "140g beansprout" (BBC); the lookup made only the recipe's word singular.
+        assertEquals("beansprouts", catalog.lookup("beansprout")?.id)
+        assertEquals("kidney_beans", catalog.lookup("kidney bean")?.id)
+        // A singular that is already another entry's key stays that entry's.
+        assertEquals("black_pepper", catalog.lookup("pepper")?.id)
+    }
+
+    @Test
+    fun theChilliSpellingsAndTheirPluralsAreFound() {
+        for (n in listOf("chilli", "red chili", "green chile", "chillies", "green chillies", "dried red chillies")) {
+            assertNotNull(com.robert4lyf.hypershop.core.parse.Normaliser(catalog).entry(n), n)
+        }
+        assertEquals("chilli", com.robert4lyf.hypershop.core.parse.Normaliser.singularKey("chillies"))
+        assertEquals("dried_chilli", com.robert4lyf.hypershop.core.parse.Normaliser(catalog).entry("dried red chillies")?.id)
+    }
 }
