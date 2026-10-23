@@ -2,9 +2,7 @@ package com.robert4lyf.hypershop.core.parse
 
 import com.robert4lyf.hypershop.core.catalog.Catalog
 import com.robert4lyf.hypershop.core.catalog.CatalogEntry
-import com.robert4lyf.hypershop.core.catalog.CatalogKey
 import com.robert4lyf.hypershop.core.catalog.CatalogLoader
-import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.Dimension
 import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.QtyUnit
@@ -21,6 +19,8 @@ class RuleParser(
     private val catalog: Catalog = CatalogLoader.default,
 ) {
     /** Parses a recipe's lines, tracking section headers (R8). Headers produce no ingredient. */
+    private val shelves = Shelf(catalog)
+
     fun parseLines(lines: List<String>): List<ParsedIngredient> {
         var section: String? = null
         val out = ArrayList<ParsedIngredient>()
@@ -653,35 +653,11 @@ class RuleParser(
             head += left
         }
 
-        /**
-         * Where the name alone points at the wrong shelf: tins of whole tomatoes are tinned
-         * tomatoes, not fresh ones ("canned" and "tinned" go to the note as qualifiers), and
-         * beef "(minced)" is beef mince, not a joint. Only to an entry the catalogue has.
-         */
+        /** Q.3 tins and mince ([Shelf]), from the words said about the name itself. */
         fun shelf(
             name: String,
             unit: QtyUnit?,
-        ): String {
-            // Only what was said about the name itself (its moved qualifiers, its own brackets): "4 tomatoes
-            // (or 400g tinned)" and "lamb, tossed with ground cumin" are not tins and not mince.
-            val tinWord = nameWords.firstOrNull { it == "canned" || it == "tinned" }
-            val e = entryOf(name) ?: return if (tinWord != null) "$tinWord $name" else name
-            if ((unit == QtyUnit.TIN || tinWord != null) && e.aisle == AisleCode.PRODUCE) {
-                // "canned crushed tomato": the catalogue's plural is what its tinned synonyms are made of.
-                val forms = listOf(name, e.plural).distinct()
-                forms
-                    .flatMap { listOf("tinned $it", "canned $it") }
-                    .firstOrNull { entryOf(it)?.aisle?.let { a -> a != AisleCode.PRODUCE } == true }
-                    ?.let { return it }
-            }
-            if (e.aisle == AisleCode.MEAT_FISH && ("minced" in nameWords || "ground" in nameWords)) {
-                "$name mince".takeIf { entryOf(it)?.aisle == AisleCode.MEAT_FISH }?.let { return it }
-            }
-            // "tinned salmon", "canned peaches": a tin of something the catalogue only knows fresh stays a tin,
-            // its own item, rather than becoming the fresh one.
-            if (tinWord != null && e.aisle != AisleCode.TINS_JARS) return "$tinWord $name"
-            return name
-        }
+        ): String = shelves.of(name, unit, nameWords)
 
         /**
          * R3.6 after the name: "2 tbsp butter plus 1 tbsp melted", "1 large egg, plus 1 egg yolk". The amount
@@ -775,12 +751,7 @@ class RuleParser(
         return u to 1
     }
 
-    /** The catalogue's entry for [phrase], as written or with its last word singular. */
-    private fun entryOf(phrase: String): CatalogEntry? {
-        val k = CatalogKey.of(phrase)
-        if (k.isEmpty()) return null
-        return catalog.lookup(k) ?: catalog.lookup(Normaliser.singularKey(k))
-    }
+    private fun entryOf(phrase: String): CatalogEntry? = shelves.entryOf(phrase)
 
     private fun joinWords(toks: List<Token>): String {
         val sb = StringBuilder()
