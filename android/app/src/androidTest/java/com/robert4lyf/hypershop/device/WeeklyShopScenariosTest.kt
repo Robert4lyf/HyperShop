@@ -65,14 +65,18 @@ class WeeklyShopScenariosTest {
      * An Undo snackbar can sit over part of a list for a few seconds; a person taps
      * around it, a touch injected at the control's centre would land on it.
      */
-    private fun tap(tag: String) {
+    private fun tap(
+        tag: String,
+        find: () -> Unit = { waitFor { has(tag) } },
+    ) {
         // Found, then pressed: between the two the list can be laid out again (the Plan screen's picks re-sort
-        // after the last one was planned) and the node be momentarily gone. A person looks again; so does this.
-        // The press is never made from inside waitUntil's condition: an action there can run in the middle of
-        // a frame's layout ("performMeasureAndLayout called during measure layout").
+        // after the last one was planned) and the node be momentarily gone, or moved off screen. A person looks
+        // again ([find]: for a pick, scrolling back to it); so does this. The press is never made from inside
+        // waitUntil's condition: an action there can run in the middle of a frame's layout
+        // ("performMeasureAndLayout called during measure layout").
         val end = System.currentTimeMillis() + 15_000
         while (true) {
-            waitFor { has(tag) }
+            find()
             val pressed =
                 try {
                     compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.OnClick)
@@ -89,14 +93,17 @@ class WeeklyShopScenariosTest {
     }
 
     /** Scrolls the Plan screen to [tag] (counted apart: a swipe, not a decision). */
-    private fun scrollTo(tag: String) {
+    private fun scrollTo(
+        tag: String,
+        count: Boolean = true,
+    ) {
         waitFor { has("meals") }
         // Not while the last tap's change is still being laid out (a scroll then measured mid-layout),
         // and not before the row is in the list at all (the saved recipes load after the screen opens).
         compose.waitForIdle()
         val inList = hasTestTag(tag)
         waitFor { runCatching { compose.onNodeWithTag("meals").performScrollToNode(inList) }.isSuccess }
-        scrolls++
+        if (count) scrolls++
     }
 
     private fun type(line: String) {
@@ -205,7 +212,7 @@ class WeeklyShopScenariosTest {
         val keys = runBlocking { c.planner.week(c.planner.currentWeek() - 1) }.map { it.libraryKey }
         for (k in keys) {
             scrollTo("pick-add-$k")
-            tap("pick-add-$k")
+            tap("pick-add-$k") { scrollTo("pick-add-$k", count = false) }
         }
         tap("meals-add-to-list")
         waitFor {
@@ -222,7 +229,7 @@ class WeeklyShopScenariosTest {
         val cupboard = runBlocking { c.homeCheck.view(c.repository.snapshot()) }.filter { !it.have }.map { it.mergeKey }
         for (k in cupboard) {
             scrollTo("home-have-$k")
-            tap("home-have-$k")
+            tap("home-have-$k") { scrollTo("home-have-$k", count = false) }
             waitFor { c.items().none { it.mergeKey == k } }
         }
         tap("meals-shop")
@@ -297,7 +304,7 @@ class WeeklyShopScenariosTest {
         waitFor { compose.onAllNodesWithTag("week-name").fetchSemanticsNodes().any { it.config.toString().contains("Next week") } }
         val key = runBlocking { c.db.dao().recipe(chilli)!!.libraryKey!! }
         scrollTo("pick-add-$key")
-        tap("pick-add-$key")
+        tap("pick-add-$key") { scrollTo("pick-add-$key", count = false) }
         waitFor { runBlocking { c.planner.week(c.planner.currentWeek() + 1) }.size == 1 }
         assertEquals(before, c.items().map { it.mergeKey })
         assertTrue(runBlocking { c.planner.week(c.planner.currentWeek()) }.isEmpty())
