@@ -133,4 +133,23 @@ class RecipeNotesTest {
         db.execSQL("INSERT INTO RecipeNote VALUES ('https://example.com/chilli', 4, 'notes', NULL, NULL, 1)")
         db.close()
     }
+
+    @Test
+    fun aV6InstallKeepsItsNotesAndGainsTheOrphanMark() {
+        helper.createDatabase(name, 6).apply {
+            execSQL(
+                "INSERT INTO RecipeNote VALUES ('https://example.com/chilli', 4, 'Half the chilli', 'abcdef0123456789abcdef01.jpg', NULL, 1)",
+            )
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(name, 7, true, HyperShopDatabase.MIGRATION_6_7)
+        val c = db.query("SELECT rating, notes, photo, orphanedAt FROM RecipeNote")
+        assertTrue(c.moveToFirst())
+        assertEquals(4, c.getInt(0))
+        assertEquals("Half the chilli", c.getString(1))
+        assertEquals("abcdef0123456789abcdef01.jpg", c.getString(2))
+        assertTrue("not marked as orphaned by the upgrade", c.isNull(3))
+        c.close()
+        db.close()
+    }
 }

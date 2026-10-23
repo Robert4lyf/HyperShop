@@ -257,6 +257,8 @@ class SettingsViewModel(
             _ui.update { it.copy(dataBusy = false) }
             when (i) {
                 is Inspection.Ok -> {
+                    // Another file picked while one waited: the one waiting is not going to be restored.
+                    if (pendingRestore?.photos != i.photos) backups.discardStaged(pendingRestore?.photos)
                     pendingRestore = i
                     _ui.update { it.copy(restorePrompt = i.summary) }
                 }
@@ -268,8 +270,8 @@ class SettingsViewModel(
         }
 
     fun cancelRestore() {
+        backups.discardStaged(pendingRestore?.photos)
         pendingRestore = null
-        backups.discardStaged()
         _ui.update { it.copy(restorePrompt = null) }
     }
 

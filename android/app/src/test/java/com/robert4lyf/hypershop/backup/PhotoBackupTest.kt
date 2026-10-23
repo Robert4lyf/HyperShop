@@ -12,6 +12,7 @@ import com.robert4lyf.hypershop.testutil.Photos.photoOf
 import com.robert4lyf.hypershop.testutil.Photos.saved
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.ui.list.add
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -177,7 +178,7 @@ class PhotoBackupTest {
         assertEquals("Half the chilli", note.notes)
         assertArrayEquals(bytes, b.recipePhotos.file(photo)!!.readBytes())
         // Nothing is left waiting in the cache, and the next start's sweep keeps it.
-        assertFalse(File(b.context.cacheDir, "restore-photos").exists())
+        assertFalse(ok.photos!!.dir.exists())
         runBlocking { b.recipePhotos.sweep() }
         assertTrue(b.everyNamedPhotoIsThere())
     }
@@ -393,8 +394,9 @@ class PhotoBackupTest {
         b.assertRefusedAndUnchanged(rawArchive(manifest, backup, backup, image), nothing)
         b.assertRefusedAndUnchanged(rawArchive(manifest, manifest, backup, image), nothing)
         // The raw form itself is read: the same entries once each are a good archive.
-        assertTrue(b.inspect(rawArchive(manifest, backup, image)) is Inspection.Ok)
-        b.backups.discardStaged()
+        val raw = b.inspect(rawArchive(manifest, backup, image))
+        assertTrue(raw is Inspection.Ok)
+        b.backups.discardStaged((raw as Inspection.Ok).photos)
         // Names that would reach outside the folder, or are not a photo's.
         for (evil in listOf("photos/../../databases/hypershop.db", "../$photo", "/data/$photo", "photos/sub/$photo", "photos/", "x.txt")) {
             b.assertRefusedAndUnchanged(archive(manifest, backup, image, evil to jpegBytes), nothing)
@@ -581,6 +583,101 @@ class PhotoBackupTest {
         assertTrue(runBlocking { a.backups.restore(done.before) } is RestoreOutcome.Restored)
         assertEquals(original, a.photoOf(key))
         assertTrue(a.everyNamedPhotoIsThere())
+    }
+
+    // ---- T.2: staging belongs to its inspection; integrity at the restore -------------------------------
+
+    private fun AppContainer.chosenBackup(colour: Int): Pair<File, String> {
+        val key = saved("Dish ${'$'}colour")
+        pick(key, Photos.jpeg(colour = colour))
+        return backUp().first to photoOf(key)!!
+    }
+
+    @Test
+    fun inspectingAnotherBackupNeverTouchesTheOneWaitingToBeConfirmed() {
+        val a = phone()
+        val (fileA, photoA) = a.chosenBackup(Color.RED)
+        val (fileB, _) = a.chosenBackup(Color.BLUE)
+        val b = anotherPhone()
+        val first = b.inspect(fileA) as Inspection.Ok
+        // Another file inspected, one that fails, and one inspected then cancelled.
+        val second = b.inspect(fileB) as Inspection.Ok
+        assertTrue(b.inspect(File.createTempFile("cut", ".zip").apply { writeBytes(fileB.readBytes().copyOf(200)) }) is Inspection.Broken)
+        b.backups.discardStaged(second.photos)
+        assertTrue(first.photos!!.dir != second.photos!!.dir)
+        assertTrue(runBlocking { b.backups.restore(first.file, first.photos) } is RestoreOutcome.Restored)
+        assertNotNull(b.recipePhotos.file(photoA))
+        assertTrue(b.everyNamedPhotoIsThere())
+    }
+
+    @Test
+    fun aConfirmationWhosePhotosWereDiscardedChangesNothing() {
+        val a = phone()
+        val (file, _) = a.chosenBackup(Color.RED)
+        val b = anotherPhone()
+        val mine = b.saved("Mine")
+        b.pick(mine, Photos.jpeg(colour = Color.GREEN))
+        val before = b.photoOf(mine)
+        val stale = b.inspect(file) as Inspection.Ok
+        // As after the process died between the prompt and Restore: start-up clears what was staged.
+        b.backups.discardAllStaged()
+        assertEquals(RestoreOutcome.Failed(rolledBack = true), runBlocking { b.backups.restore(stale.file, stale.photos) })
+        assertEquals(before, b.photoOf(mine))
+        assertTrue(b.everyNamedPhotoIsThere())
+    }
+
+    @Test
+    fun aStagedPhotoChangedSinceTheInspectionIsRefused() {
+        val a = phone()
+        val (file, photo) = a.chosenBackup(Color.RED)
+        val b = anotherPhone()
+        val i = b.inspect(file) as Inspection.Ok
+        File(i.photos!!.dir, photo).writeBytes(Photos.jpeg(colour = Color.BLUE))
+        assertEquals(RestoreOutcome.Failed(rolledBack = true), runBlocking { b.backups.restore(i.file, i.photos) })
+        assertNull(b.recipePhotos.file(photo))
+    }
+
+    @Test
+    fun aDamagedPhotoOnThisPhoneIsNotCountedAsThere() {
+        val a = phone()
+        val key = a.saved("Chilli")
+        a.pick(key, Photos.jpeg(colour = Color.RED))
+        val photo = a.photoOf(key)!!
+        val json =
+            File(a.context.cacheDir, "old-${'$'}{System.nanoTime()}.json").apply {
+                writeText(a.backups.jsonOf(runBlocking { a.backups.snapshot() }))
+            }
+        // The file is still there, but cut short: not a photo to restore a recipe onto.
+        val f = a.recipePhotos.file(photo)!!
+        f.writeBytes(f.readBytes().copyOf(80))
+        val i = a.inspect(json) as Inspection.Ok
+        assertEquals(1, i.summary.missingPhotos)
+        assertTrue(runBlocking { a.backups.restore(i.file) } is RestoreOutcome.Restored)
+        assertNull(a.photoOf(key))
+        assertTrue(a.everyNamedPhotoIsThere())
+    }
+
+    @Test
+    fun aBackupAndARestoreAtOnceEachStayWhole() {
+        val a = phone()
+        val (file, photo) = a.chosenBackup(Color.RED)
+        val i = a.inspect(file) as Inspection.Ok
+        val out = File(a.context.cacheDir, "during-${'$'}{System.nanoTime()}.zip")
+        a.backups.beforeStage = { kotlinx.coroutines.delay(30) }
+        val (restored, written) =
+            runBlocking {
+                kotlinx.coroutines.coroutineScope {
+                    val r = async { a.backups.restore(i.file, i.photos) }
+                    val w = async { a.backups.writeTo(a.context, Uri.fromFile(out)) }
+                    r.await() to w.await()
+                }
+            }
+        assertTrue(restored is RestoreOutcome.Restored)
+        assertTrue(written.isSuccess)
+        // The backup taken alongside is readable and whole, with the photo it names.
+        val again = a.inspect(out) as Inspection.Ok
+        assertEquals(1, again.summary.photos)
+        assertNotNull(a.recipePhotos.file(photo))
     }
 
     private companion object {

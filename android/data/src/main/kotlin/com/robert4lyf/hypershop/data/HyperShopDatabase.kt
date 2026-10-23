@@ -10,7 +10,7 @@ import com.robert4lyf.hypershop.core.catalog.CatalogLoader
 import com.robert4lyf.hypershop.core.model.AisleCode
 
 @Database(
-    version = 6,
+    version = 7,
     exportSchema = true,
     entities = [
         MetaEntity::class, ItemEntity::class, ItemAliasEntity::class, RecipeEntity::class, RecipeLineEntity::class,
@@ -128,6 +128,14 @@ abstract class HyperShopDatabase : RoomDatabase() {
                 }
             }
 
+        /** v7: when a recipe's notes and photo were last named by anything ([RecipeNoteEntity.orphanedAt]). */
+        val MIGRATION_6_7: Migration =
+            object : LiveKeyMigration(6, 7) {
+                override fun migrateTables(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `RecipeNote` ADD COLUMN `orphanedAt` INTEGER")
+                }
+            }
+
         /** Seeds aisles, the store and its aisle order, staples and Meta (PLAN §3.4, §4). */
         val CALLBACK =
             object : Callback() {
@@ -170,7 +178,8 @@ abstract class HyperShopDatabase : RoomDatabase() {
                 context,
                 HyperShopDatabase::class.java,
                 NAME,
-            ).addCallback(CALLBACK).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
+            ).addCallback(CALLBACK).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .build()
 
         /**
          * Tests: [queryExecutor] can run Room's background work (invalidation

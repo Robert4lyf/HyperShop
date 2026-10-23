@@ -567,6 +567,35 @@ class ListRepository(
         fromUrl: String?,
     ) = changeNote(key) { it.copy(photo = photo?.take(MAX_TITLE), photoUrl = fromUrl?.take(MAX_URL)) }
 
+    /**
+     * The start-up tidy of ratings, notes and photos whose recipe is gone for good. A recipe removed from the
+     * library keeps its copies until nothing uses them (the purge of forgotten copies), and a planned meal keeps
+     * naming it, so its note is kept while any of those does. Once nothing does, the note is marked, and kept
+     * [keepMs] more: saving the same page again in that time brings its stars, notes and photo back. After that
+     * it is deleted, and the photo sweep that follows takes a photo nothing else shows. Never during an
+     * interrupted restore (start-up runs this after recovery). The number deleted.
+     */
+    suspend fun retireOrphanNotes(
+        now: Long,
+        keepMs: Long = NOTE_KEEP_MS,
+    ): Int =
+        db.withTransaction {
+            val named = dao.namedLibraryKeys().toSet()
+            var deleted = 0
+            for (n in dao.recipeNotes()) {
+                val since = n.orphanedAt
+                when {
+                    n.libraryKey in named -> if (since != null) dao.setNoteOrphanedAt(n.libraryKey, null)
+                    since == null -> dao.setNoteOrphanedAt(n.libraryKey, now)
+                    now - since >= keepMs -> {
+                        dao.deleteRecipeNote(n.libraryKey)
+                        deleted++
+                    }
+                }
+            }
+            deleted
+        }
+
     /** Every photo file a recipe shows: what a sweep of the photo folder must keep. */
     suspend fun photosInUse(): Set<String> = dao.photosInUse().toSet()
 
@@ -584,7 +613,8 @@ class ListRepository(
         db.withTransaction {
             val was = dao.recipeNote(key) ?: RecipeNoteEntity(key)
             val now = f(was)
-            if (now != was) dao.putRecipeNote(now.copy(updatedAt = clock()))
+            // Rated, noted or given a photo: something cares about it, whatever the next check finds.
+            if (now != was) dao.putRecipeNote(now.copy(updatedAt = clock(), orphanedAt = null))
         }
     }
 
@@ -1465,6 +1495,9 @@ class ListRepository(
     }
 
     companion object {
+        /** How long a removed recipe's stars, notes and photo are kept once nothing names it. */
+        const val NOTE_KEEP_MS = 30L * 24 * 60 * 60 * 1000
+
         const val RESULT_HISTORY = 64
         const val MAX_BOOK = 120
         const val MAX_PAGE = 20

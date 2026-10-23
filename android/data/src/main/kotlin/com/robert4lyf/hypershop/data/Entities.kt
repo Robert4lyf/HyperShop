@@ -400,4 +400,10 @@ data class RecipeNoteEntity(
     val photo: String? = null,
     val photoUrl: String? = null,
     val updatedAt: Long = 0,
+    /**
+     * When the start-up check first found nothing naming this entry any more (no stored copy of the recipe, no
+     * planned meal): it is deleted, and its photo with it, [ListRepository.NOTE_KEEP_MS] after that. Null while
+     * something names it. See [ListRepository.retireOrphanNotes].
+     */
+    val orphanedAt: Long? = null,
 )

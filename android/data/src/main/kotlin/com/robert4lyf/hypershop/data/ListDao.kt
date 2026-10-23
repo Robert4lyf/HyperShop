@@ -537,4 +537,17 @@ interface ListDao {
 
     @Query("SELECT DISTINCT photo FROM RecipeNote WHERE photo IS NOT NULL")
     suspend fun photosInUse(): List<String>
+
+    /** Every library key something still names: a stored copy of the recipe (saved, forgotten but kept, or on the list), or a planned meal. */
+    @Query("SELECT COALESCE(libraryKey, url, 'r:' || id) FROM Recipe UNION SELECT libraryKey FROM PlannedMeal")
+    suspend fun namedLibraryKeys(): List<String>
+
+    @Query("UPDATE RecipeNote SET orphanedAt = :at WHERE libraryKey = :key")
+    suspend fun setNoteOrphanedAt(
+        key: String,
+        at: Long?,
+    )
+
+    @Query("DELETE FROM RecipeNote WHERE libraryKey = :key")
+    suspend fun deleteRecipeNote(key: String)
 }

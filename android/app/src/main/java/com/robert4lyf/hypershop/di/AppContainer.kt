@@ -310,8 +310,9 @@ class AppContainer(
             // Only now: an interrupted restore is resolved, so the photos it brought are named by the database
             // (or are not needed); and before Ready, so no restore (whose Undo needs the old photos) has started.
             runCatching {
+                repository.retireOrphanNotes(clock())
                 recipePhotos.sweep()
-                backups.discardStaged()
+                backups.discardAllStaged()
             }.onFailure { Timber.w(it, "Photo sweep failed") }
         } catch (e: Exception) {
             Timber.e(e, "Start-up failed")
