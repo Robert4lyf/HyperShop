@@ -92,7 +92,7 @@ class WeeklyShopScenariosTest {
      * the tap's `waitForIdle` has returned (Compose's idling does not cover a flow on another dispatcher).
      * Scrolling to the next pick before it lands races it: the late card pushes that pick down, out of the
      * composition, and the next tap waits for a node that is no longer there. So the plan must be in the
-     * database and in the screen's own count ("N meals") before anything else moves.
+     * database and in the screen's own count ("19–25 Oct · N meals · …") before anything else moves.
      */
     private fun planPick(
         c: AppContainer,
@@ -109,7 +109,8 @@ class WeeklyShopScenariosTest {
                 "Planned: $planned; summary: \"${weekSummary()}\"; picks on screen: ${tagsOnScreen("pick-add-")}"
             },
         ) {
-            runBlocking { c.planner.week(week) }.size == meals && weekSummary().startsWith(if (meals == 1) "1 meal" else "$meals meals")
+            val count = if (meals == 1) "1 meal" else "$meals meals"
+            runBlocking { c.planner.week(week) }.size == meals && weekSummary().split(" · ").contains(count)
         }
     }
 
