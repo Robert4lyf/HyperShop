@@ -64,6 +64,11 @@ and retry; `verify.sh` already does.
   add, Buy again's Undo and "Have it" take back only unbought shares
   (`ShoppingList.withdraw`). Never call `removeUse` on a use with a covered
   contribution to "remove a meal".
+- **A review line is known by its occurrence, never its text.** A recipe can say
+  "100 g sugar" twice. Corrections and removals are filed by `LineOrigin`
+  (source text + occurrence) and laid over Claude by `LineIdentity.reconcile`,
+  which never moves a correction it cannot line up. `rawLines` is what Claude
+  reads and stays as the recipe wrote it.
 - **Room enums are stored by name**, never ordinal.
 - **An item's amount is the sum of its contributions.** Never store a total.
   A row marked in stock on review adds nothing.
