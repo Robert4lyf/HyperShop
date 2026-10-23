@@ -4,13 +4,13 @@ import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.QtyUnit
 import com.robert4lyf.hypershop.core.model.Rational
-import com.robert4lyf.hypershop.core.parse.Shelf
+import com.robert4lyf.hypershop.core.parse.ClaudeAlignment
 
 /**
  * Turns Claude's JSON into the shared [ParsedIngredient] (spec R1). Names are
- * kept as Claude wrote them, but for the rule parser's own shelf rule ([Shelf]):
- * "tomatoes" in tins are tinned tomatoes, "minced lamb" lamb mince, whichever
- * reader read the line. The shared normaliser maps them to a mergeKey and the
+ * kept as Claude wrote them, but brought to the spec where Claude and the rule
+ * parser differ only in convention ([ClaudeAlignment]: the shelf, tins and packs,
+ * a pinch, juice), so a line is filed the same whichever reader read it. The shared normaliser maps them to a mergeKey and the
  * units to QtyBase downstream, exactly as for the rule parser.
  *
  * Numeric ranges are checked here, not in the schema: an out-of-range amount
@@ -21,7 +21,7 @@ object PostProcess {
     const val MAX_INGREDIENTS = 300
     const val MAX_LINE = 500
 
-    private val shelf by lazy { Shelf() }
+    private val alignment by lazy { ClaudeAlignment() }
 
     fun recipe(
         out: ClaudeOutput,
@@ -78,22 +78,24 @@ object PostProcess {
             qMax = null
         }
         val u = unit(i.unit)
-        return ParsedIngredient(
-            raw = i.raw.take(MAX_LINE),
-            name = shelf.ofWritten(i.name.trim().lowercase().take(MAX_LINE), u),
-            quantity = q,
-            quantityMax = qMax,
-            quantityText = i.quantityText?.take(60),
-            unit = u,
-            altQuantity = amount(i.altQuantity),
-            altUnit = unit(i.altUnit),
-            note = i.note?.trim()?.take(MAX_LINE)?.ifEmpty { null },
-            section = i.section?.trim()?.take(100)?.ifEmpty { null },
-            optional = i.optional,
-            estimated = i.estimated,
-            aisleSuggestion = i.aisleSuggestion?.let { a -> AisleCode.entries.firstOrNull { it.name == a } },
-            check = check,
-            checkReason = reason,
+        return alignment.align(
+            ParsedIngredient(
+                raw = i.raw.take(MAX_LINE),
+                name = i.name.trim().lowercase().take(MAX_LINE),
+                quantity = q,
+                quantityMax = qMax,
+                quantityText = i.quantityText?.take(60),
+                unit = u,
+                altQuantity = amount(i.altQuantity),
+                altUnit = unit(i.altUnit),
+                note = i.note?.trim()?.take(MAX_LINE)?.ifEmpty { null },
+                section = i.section?.trim()?.take(100)?.ifEmpty { null },
+                optional = i.optional,
+                estimated = i.estimated,
+                aisleSuggestion = i.aisleSuggestion?.let { a -> AisleCode.entries.firstOrNull { it.name == a } },
+                check = check,
+                checkReason = reason,
+            ),
         )
     }
 }

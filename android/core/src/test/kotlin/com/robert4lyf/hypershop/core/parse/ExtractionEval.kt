@@ -28,6 +28,11 @@ import kotlin.math.abs
 class ExtractionEval(
     /** The labels, relative to the repository root. */
     val path: String,
+    /**
+     * Another reader's reading of each label's line, null where it gave none (U.1: Claude's, recorded);
+     * the rule parser's when not given.
+     */
+    private val reader: ((Label) -> ParsedIngredient?)? = null,
 ) {
     private val catalog = CatalogLoader.default
     private val parser = RuleParser(catalog)
@@ -139,6 +144,20 @@ class ExtractionEval(
     }
 
     fun score(l: Label): Scored {
+        if (reader != null) {
+            val read = reader.invoke(l)
+            // A section header is read right when nothing is made of it; a line with no reading is wrong throughout.
+            if (read == null) {
+                val header = l.name.isEmpty()
+                val none = ParsedIngredient(raw = l.raw, name = "")
+                return Scored(
+                    l, none, null,
+                    header, header, header, false, header, header, true, true, true, header,
+                    "(no reading)", if (header) "(section header)" else l.name,
+                )
+            }
+            return scoreReading(l, read)
+        }
         // A section header inside the ingredient list (R8): right when recognised as one, and never an item.
         if (l.name.isEmpty()) {
             val header = parser.sectionHeader(l.raw) != null
@@ -149,7 +168,13 @@ class ExtractionEval(
                 if (header) "(section header)" else "${p.name} | ${p.quantity ?: ""} ${p.unit?.serial ?: ""}", "(section header)",
             )
         }
-        val p = parser.parse(l.raw)
+        return scoreReading(l, parser.parse(l.raw))
+    }
+
+    private fun scoreReading(
+        l: Label,
+        p: ParsedIngredient,
+    ): Scored {
         val loc = locale(l)
         val gotTarget = merger.target(p.name)
         val wantTarget = merger.target(l.name)
@@ -175,8 +200,10 @@ class ExtractionEval(
         // The recipe's own metric figure ("1/2 cup (113g)") is shopped by instead of a converted cup: that is right too.
         val ownMetric = p.shopUnit != null && p.shopUnit != p.unit && p.quantity != null
         val displayOk = gotDisplay == wantDisplay || equivalent || ownMetric
+        // Claude's reading is flagged by Claude's own check; the parser's by the gate that would send it to Claude.
+        val reason = if (reader != null) p.checkReason ?: "check".takeIf { p.check } else Uncertainty.reason(p)
         return Scored(
-            l, p, Uncertainty.reason(p),
+            l, p, reason,
             nameOk = norm.compareKey(p.name) == norm.compareKey(l.name),
             qtyOk = qtyOk,
             unitOk = unitOk,
