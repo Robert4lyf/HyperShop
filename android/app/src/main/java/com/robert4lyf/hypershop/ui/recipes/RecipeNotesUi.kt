@@ -66,7 +66,10 @@ fun RecipePhoto(
                     BitmapFactory.decodeFile(path, bounds)
                     var sample = 1
                     while (max(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxPx) sample *= 2
-                    BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
+                    BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })?.also {
+                        PhotoDecodes.count.incrementAndGet()
+                        PhotoDecodes.bytes.addAndGet(it.allocationByteCount.toLong())
+                    }?.asImageBitmap()
                 }.getOrNull()
             }
     }
@@ -76,6 +79,12 @@ fun RecipePhoto(
     } else {
         Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant))
     }
+}
+
+/** How many photos have been decoded, and the bitmap bytes made: what the performance probe reads. */
+internal object PhotoDecodes {
+    val count = java.util.concurrent.atomic.AtomicInteger()
+    val bytes = java.util.concurrent.atomic.AtomicLong()
 }
 
 /**

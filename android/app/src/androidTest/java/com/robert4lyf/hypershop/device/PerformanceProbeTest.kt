@@ -3,6 +3,8 @@ package com.robert4lyf.hypershop.device
 import android.os.Debug
 import android.os.StrictMode
 import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
@@ -278,6 +280,142 @@ class PerformanceProbeTest {
         violations.distinct().take(5).forEach { Log.i(TAG, "  violation: $it") }
         assertTrue("database or file work on the main thread: ${violations.distinct().take(3)}", violations.isEmpty())
     }
+
+    /** [n] saved recipes, each with its own photo, written as RecipePhotos writes them (a 1280-pixel JPEG named by its hash). */
+    private fun AppContainer.photographed(n: Int): List<Long> {
+        val dir = java.io.File(context.filesDir, com.robert4lyf.hypershop.importing.RecipePhotos.DIR).apply { mkdirs() }
+        val rnd = java.util.Random(n.toLong())
+        return (1..n).map { i ->
+            val id = saveRecipe("Recipe $i", "2 onions", "500g beef mince")
+            // A photo-like JPEG: blocks of colour with grain, about the size a real 1280-pixel photo compresses to.
+            val bmp = android.graphics.Bitmap.createBitmap(1280, 960, android.graphics.Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(bmp)
+            val paint = android.graphics.Paint()
+            for (b in 0 until 600) {
+                paint.color = android.graphics.Color.rgb(rnd.nextInt(256), rnd.nextInt(256), rnd.nextInt(256))
+                val x = rnd.nextInt(1280).toFloat()
+                val y = rnd.nextInt(960).toFloat()
+                canvas.drawRect(x, y, x + 20 + rnd.nextInt(200), y + 20 + rnd.nextInt(200), paint)
+            }
+            val bytes =
+                java.io.ByteArrayOutputStream().also {
+                    bmp.compress(
+                        android.graphics.Bitmap.CompressFormat.JPEG,
+                        85,
+                        it,
+                    )
+                }.toByteArray()
+            bmp.recycle()
+            val hash = java.security.MessageDigest.getInstance("SHA-256").digest(bytes).take(12).joinToString("") { "%02x".format(it) }
+            val name = "$hash.jpg"
+            java.io.File(dir, name).writeBytes(bytes)
+            runBlocking { repository.setRecipePhoto(repository.libraryKeyOf(id)!!, name, null) }
+            id
+        }
+    }
+
+    /** Waits until no photo has been decoded for [quietMs]: the screen has drawn what it is going to. */
+    private fun settled(quietMs: Long = 400): Int {
+        var last = -1
+        var since = System.currentTimeMillis()
+        val end = since + 30_000
+        while (System.currentTimeMillis() < end) {
+            compose.waitForIdle()
+            val now = com.robert4lyf.hypershop.ui.recipes.PhotoDecodes.count.get()
+            if (now != last) {
+                last = now
+                since = System.currentTimeMillis()
+            } else if (System.currentTimeMillis() - since >= quietMs) {
+                break
+            }
+            Thread.sleep(50)
+        }
+        return last
+    }
+
+    /**
+     * T.4: Saved with [n] photographed recipes. How long the first screen and a scroll to the end and back
+     * take, how many photos are decoded for each step and how many bitmap bytes that makes, leaving and
+     * coming back, opening a recipe, and the memory after.
+     */
+    private fun recipePhotos(n: Int) {
+        assumeTrue("run on request only", enabled)
+        val c = DeviceContainer.create()
+        c.photographed(n)
+        val decodes = com.robert4lyf.hypershop.ui.recipes.PhotoDecodes
+        decodes.count.set(0)
+        decodes.bytes.set(0)
+        var shown by androidx.compose.runtime.mutableStateOf(true)
+        // Newest first: the card at the top of Saved.
+        val newest = "lib-" + runBlocking { c.repository.observeLibrary().first() }.maxBy { it.lastAddedAt }.key
+
+        fun step(
+            what: String,
+            block: () -> Unit,
+        ) {
+            val c0 = decodes.count.get()
+            val b0 = decodes.bytes.get()
+            val (_, ms) = timed(block)
+            settled()
+            report("photos x$n: $what", ms)
+            report("photos x$n: $what, photos decoded", (decodes.count.get() - c0).toDouble(), "")
+            report("photos x$n: $what, bitmap bytes made", (decodes.bytes.get() - b0) / 1048576.0, "MB")
+        }
+        step("Saved, first screen") {
+            compose.setContent {
+                HyperShopTheme {
+                    if (shown) {
+                        com.robert4lyf.hypershop.ui.recipes.RecipesRoute(
+                            c,
+                            androidx.compose.material3.SnackbarHostState(),
+                            onReview = {},
+                        )
+                    }
+                }
+            }
+            compose.onNodeWithTag("view-library").performClick()
+            compose.waitUntil(30_000) { compose.onAllNodesWithTag(newest).fetchSemanticsNodes().isNotEmpty() }
+                compose.onAllNodesWithTag("lib-${runBlocking { c.repository.observeLibrary().first() }.last().key}").fetchSemanticsNodes().isNotEmpty() || n > 3
+            }
+        }
+        val last = n + 1
+        step("scroll to the end") {
+            compose.onNodeWithTag("recipes").performScrollToIndex(last)
+            compose.waitForIdle()
+        }
+        step("scroll back to the top") {
+            compose.onNodeWithTag("recipes").performScrollToIndex(0)
+            compose.waitForIdle()
+        }
+        step("leave the tab and come back") {
+            shown = false
+            compose.waitForIdle()
+            shown = true
+            compose.waitForIdle()
+            compose.onNodeWithTag("view-library").performClick()
+            compose.waitForIdle()
+        }
+        step("open a recipe and close it") {
+            compose.onNodeWithTag(newest).performClick()
+            compose.waitUntil(10_000) { compose.onAllNodesWithTag("recipe-photo").fetchSemanticsNodes().isNotEmpty() }
+            androidx.test.espresso.Espresso.pressBack()
+            compose.waitUntil(10_000) { compose.onAllNodesWithTag("recipe-photo").fetchSemanticsNodes().isEmpty() }
+        }
+        val mem = Debug.MemoryInfo().also { Debug.getMemoryInfo(it) }
+        report("photos x$n: memory, total PSS", mem.totalPss / 1024.0, "MB")
+        report("photos x$n: memory, graphics", (mem.getMemoryStat("summary.graphics")?.toDoubleOrNull() ?: 0.0) / 1024.0, "MB")
+        val rt = Runtime.getRuntime()
+        report("photos x$n: memory, Java heap used", (rt.totalMemory() - rt.freeMemory()) / 1048576.0, "MB")
+    }
+
+    @Test
+    fun recipePhotosAt20() = recipePhotos(20)
+
+    @Test
+    fun recipePhotosAt100() = recipePhotos(100)
+
+    @Test
+    fun recipePhotosAt300() = recipePhotos(300)
 
     private companion object {
         const val TAG = "HyperShopPerf"
