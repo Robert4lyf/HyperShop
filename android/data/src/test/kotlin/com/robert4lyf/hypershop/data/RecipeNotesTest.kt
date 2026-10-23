@@ -136,9 +136,11 @@ class RecipeNotesTest {
 
     @Test
     fun aV6InstallKeepsItsNotesAndGainsTheOrphanMark() {
+        val name = "notes-migration-7.db"
         helper.createDatabase(name, 6).apply {
             execSQL(
-                "INSERT INTO RecipeNote VALUES ('https://example.com/chilli', 4, 'Half the chilli', 'abcdef0123456789abcdef01.jpg', NULL, 1)",
+                "INSERT INTO RecipeNote VALUES " +
+                    "('https://example.com/chilli', 4, 'Half the chilli', 'abcdef0123456789abcdef01.jpg', NULL, 1)",
             )
             close()
         }

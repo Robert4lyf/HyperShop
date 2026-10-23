@@ -375,8 +375,6 @@ class PerformanceProbeTest {
             }
             compose.onNodeWithTag("view-library").performClick()
             compose.waitUntil(30_000) { compose.onAllNodesWithTag(newest).fetchSemanticsNodes().isNotEmpty() }
-                compose.onAllNodesWithTag("lib-${runBlocking { c.repository.observeLibrary().first() }.last().key}").fetchSemanticsNodes().isNotEmpty() || n > 3
-            }
         }
         val last = n + 1
         step("scroll to the end") {
@@ -398,7 +396,7 @@ class PerformanceProbeTest {
         step("open a recipe and close it") {
             compose.onNodeWithTag(newest).performClick()
             compose.waitUntil(10_000) { compose.onAllNodesWithTag("recipe-photo").fetchSemanticsNodes().isNotEmpty() }
-            androidx.test.espresso.Espresso.pressBack()
+            InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
             compose.waitUntil(10_000) { compose.onAllNodesWithTag("recipe-photo").fetchSemanticsNodes().isEmpty() }
         }
         val mem = Debug.MemoryInfo().also { Debug.getMemoryInfo(it) }
