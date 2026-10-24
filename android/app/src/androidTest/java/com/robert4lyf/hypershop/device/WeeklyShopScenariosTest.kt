@@ -239,7 +239,14 @@ class WeeklyShopScenariosTest {
         waitFor { runBlocking { c.buyAgain.view() }.regulars.all { it.onList } }
         scrollTo("home-check")
         tap("home-have-all")
-        waitFor { c.items().none { it.mergeKey.contains("cumin") } }
+        waitFor(
+            "cumin off the list after Have all",
+            {
+                val home = runBlocking { c.homeCheck.view(c.repository.snapshot()) }
+                "List: ${c.items().map { it.mergeKey }}; home check: ${home.map { "${it.mergeKey}=${it.have}" }}; " +
+                    "on screen: ${tagsOnScreen("home")}"
+            },
+        ) { c.items().none { it.mergeKey.contains("cumin") } }
         tap("meals-shop")
         waitFor { has("shop") }
         effort("weekly shop, quick way", t0)
