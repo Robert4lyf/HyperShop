@@ -137,6 +137,7 @@ class AppContainer(
             rules = ruleParser,
             claude = claude,
             hasKey = { apiKeyStore.get() != null },
+            alwaysClaude = { settings.claudeAlways.first() },
         )
 
     val importJobs = ImportJobs(db.dao(), workManager, clock)

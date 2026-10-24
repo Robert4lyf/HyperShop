@@ -57,6 +57,7 @@ class ImporterTest {
         val claude = MockWebServer().apply { start() }
         try {
             val c = TestContainer.create(claude = claude, key = "sk-ant-test")
+            runBlocking { c.settings.setClaudeAlways(false) }
             val m = ClaudeModel.HAIKU
             // Every line clear: read offline, nothing pending, no request.
             val clearLines = listOf("200g plain flour", "2 eggs", "1 tsp salt")
@@ -81,5 +82,44 @@ class ImporterTest {
         } finally {
             claude.shutdown()
         }
+    }
+
+    @Test
+    fun byDefaultClaudeReadsEveryRecipeButOnlyInTheForeground() {
+        // W.1: Claude reads fresh recipes better than the rules (U.1), so with a key it reads them all.
+        val claude = MockWebServer().apply { start() }
+        try {
+            val c = TestContainer.create(claude = claude, key = "sk-ant-test")
+            val m = ClaudeModel.HAIKU
+            val clearLines = listOf("200g plain flour", "2 eggs", "1 tsp salt")
+            // A share in the background: nothing is spent, the review will ask.
+            val later = runBlocking { c.importer.fromLines(clearLines, "Pancakes", allowClaude = false, model = m) }
+            assertTrue(later.claudePending)
+            assertFalse(later.claudeSkipped)
+            assertEquals(0, claude.requestCount)
+            // The review in the foreground: Claude reads it, clear lines and all.
+            claude.enqueue(MockResponse().setBody(ok))
+            val now = runBlocking { c.importer.fromLines(clearLines, "Pancakes", allowClaude = true, model = m) }
+            assertFalse(now.claudeSkipped)
+            assertEquals(1, claude.requestCount)
+        } finally {
+            claude.shutdown()
+        }
+    }
+
+    @Test
+    fun withNoKeyTheRulesReadAloneAndNothingIsPending() {
+        val c = TestContainer.create()
+        val r =
+            runBlocking {
+                c.importer.fromLines(
+                    listOf("200g plain flour", "2 eggs"),
+                    "Pancakes",
+                    allowClaude = true,
+                    model = ClaudeModel.HAIKU,
+                )
+            }
+        assertTrue(r.claudeSkipped)
+        assertFalse(r.claudePending)
     }
 }

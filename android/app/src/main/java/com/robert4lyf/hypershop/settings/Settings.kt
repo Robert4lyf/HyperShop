@@ -39,6 +39,9 @@ class Settings(
     val monthlyCapUsd: Flow<Double> = store.data.map { it[MONTHLY_CAP] ?: SpendGuard.DEFAULT_MONTHLY_CAP_USD }
     val dailyCalls: Flow<Int> = store.data.map { it[DAILY_CALLS] ?: SpendGuard.DEFAULT_DAILY_CALLS }
     val watchVibrate: Flow<Boolean> = store.data.map { it[WATCH_VIBRATE] ?: true }
+
+    /** W.1: with a key, Claude reads every new recipe (the rules read first and check it); off, only when the rules are unsure. */
+    val claudeAlways: Flow<Boolean> = store.data.map { it[CLAUDE_ALWAYS] ?: true }
     val debugLog: Flow<Boolean> = store.data.map { it[DEBUG_LOG] ?: false }
 
     /**
@@ -80,6 +83,8 @@ class Settings(
 
     suspend fun setWatchVibrate(on: Boolean) = store.edit { it[WATCH_VIBRATE] = on }
 
+    suspend fun setClaudeAlways(on: Boolean) = store.edit { it[CLAUDE_ALWAYS] = on }
+
     suspend fun setDebugLog(on: Boolean) = store.edit { it[DEBUG_LOG] = on }
 
     suspend fun setListView(v: ListView) = store.edit { it[LIST_VIEW] = v.name }
@@ -119,6 +124,7 @@ class Settings(
         val MONTHLY_CAP = doublePreferencesKey("claude_monthly_cap_usd")
         val DAILY_CALLS = intPreferencesKey("claude_daily_calls")
         val WATCH_VIBRATE = booleanPreferencesKey("watch_vibrate")
+        val CLAUDE_ALWAYS = booleanPreferencesKey("claude_always")
         val DEBUG_LOG = booleanPreferencesKey("debug_log")
         val LIST_CATEGORISED = booleanPreferencesKey("list_categorised")
         val LIST_VIEW = stringPreferencesKey("list_view")

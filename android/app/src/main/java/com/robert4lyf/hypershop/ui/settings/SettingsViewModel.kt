@@ -41,6 +41,7 @@ data class SettingsUi(
     val staples: List<String> = emptyList(),
     val aisles: List<AisleCode> = emptyList(),
     val watchVibrate: Boolean = true,
+    val claudeAlways: Boolean = true,
     /** The watch link in words (Settings › Watch). */
     val watchStatus: String = "",
     /** The link is down or reports a problem, so "Try again" is offered. */
@@ -115,6 +116,7 @@ class SettingsViewModel(
         watch(s.monthlyCapUsd) { copy(monthlyCapUsd = it) }
         watch(s.dailyCalls) { copy(dailyCalls = it) }
         watch(s.watchVibrate) { copy(watchVibrate = it) }
+        watch(s.claudeAlways) { copy(claudeAlways = it) }
         val link = combine(c.watchLink.state, c.watchLink.problem) { st, why -> watchStatus(st, why) to watchCanRetry(st, why) }
         watch(link) { (text, can) -> copy(watchStatus = text, watchCanRetry = can) }
         watch(s.debugLog) { copy(debugLog = it, logLines = if (it) c.log.snapshot().takeLast(LOG_LINES) else emptyList()) }
@@ -352,6 +354,8 @@ class SettingsViewModel(
         }
 
     fun setWatchVibrate(on: Boolean) = viewModelScope.launch { c.settings.setWatchVibrate(on) }
+
+    fun setClaudeAlways(on: Boolean) = viewModelScope.launch { c.settings.setClaudeAlways(on) }
 
     /** "Try again": the link starts over from wherever it stopped. */
     fun retryWatch() = c.watchLink.retry()

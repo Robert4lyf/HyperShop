@@ -138,6 +138,7 @@ data class SettingsActions(
     val onRemoveKey: () -> Unit = {},
     val onDismissKeyLost: () -> Unit = {},
     val onModel: (ClaudeModel) -> Unit = {},
+    val onClaudeAlways: (Boolean) -> Unit = {},
     val onMonthlyCap: (String) -> Boolean = { true },
     val onDailyCalls: (String) -> Boolean = { true },
     val onDebugLog: (Boolean) -> Unit = {},
@@ -192,6 +193,7 @@ fun SettingsRoute(
             onRemoveKey = { vm.removeKey() },
             onDismissKeyLost = { vm.dismissKeyLost() },
             onModel = { vm.setModel(it) },
+            onClaudeAlways = { vm.setClaudeAlways(it) },
             onMonthlyCap = vm::setMonthlyCap,
             onDailyCalls = vm::setDailyCalls,
             onDebugLog = { vm.setDebugLog(it) },
@@ -650,6 +652,14 @@ private fun ModelSection(
     actions: SettingsActions,
 ) {
     Column {
+        SwitchRow("Read every recipe with Claude", ui.claudeAlways, actions.onClaudeAlways)
+        Hint(
+            if (ui.claudeAlways) {
+                "Claude reads each new recipe; the offline reading checks it. About $0.001 a recipe on the default model."
+            } else {
+                "Claude reads a recipe only when the offline reading is unsure of a line."
+            },
+        )
         SectionLabel("Model")
         for (m in ClaudeModel.entries) {
             Row(
