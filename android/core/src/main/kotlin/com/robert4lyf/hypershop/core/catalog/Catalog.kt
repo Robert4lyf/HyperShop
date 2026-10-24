@@ -26,6 +26,8 @@ data class CatalogEntry(
     val replaceWith: String? = null,
     /** Where it sits within its aisle ("Herbs", "Fruit"), for the categorised list. */
     val group: String? = null,
+    /** W.2: what one weighs, for things bought by the each: a recipe's 910 g of onions is six onions. */
+    val gramsEach: Rational? = null,
 ) {
     val mergeKey: String get() = "cat:$id"
 }
@@ -207,7 +209,7 @@ class Catalog(
                 }
                 if (line.startsWith("#")) continue
                 val f = line.split('\t')
-                require(f.size == 11) { "catalog.tsv: expected 11 fields, got ${f.size}: $line" }
+                require(f.size == 12) { "catalog.tsv: expected 12 fields, got ${f.size}: $line" }
                 entries +=
                     CatalogEntry(
                         id = f[0],
@@ -221,6 +223,7 @@ class Catalog(
                         gramsPerCup = f[8].takeIf { it.isNotEmpty() }?.let { Rational.fromDouble(it.toDouble()) },
                         packNote = f[9].takeIf { it.isNotEmpty() },
                         group = f[10].takeIf { it.isNotEmpty() },
+                        gramsEach = f[11].takeIf { it.isNotEmpty() }?.let { Rational.fromDouble(it.toDouble()) },
                         swaps = DefaultSwaps.forId(f[0]),
                     )
             }

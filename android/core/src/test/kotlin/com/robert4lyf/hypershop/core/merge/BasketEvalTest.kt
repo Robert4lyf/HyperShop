@@ -201,7 +201,7 @@ class BasketEvalTest {
 
         val FRACTIONS = mapOf("½" to 0.5, "¼" to 0.25, "¾" to 0.75, "⅓" to 1.0 / 3, "⅔" to 2.0 / 3, "⅛" to 0.125)
 
-        /** W.0b baseline: the list before W.2 and W.3. */
-        val FLOORS = listOf(165, 143, 136, 121)
+        /** W.0b baseline [165, 143, 136, 121]; W.2, rows in the way things are bought: */
+        val FLOORS = listOf(165, 143, 154, 152)
     }
 }
