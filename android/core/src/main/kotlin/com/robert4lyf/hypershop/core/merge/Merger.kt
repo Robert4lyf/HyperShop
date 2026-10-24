@@ -2,12 +2,14 @@ package com.robert4lyf.hypershop.core.merge
 
 import com.robert4lyf.hypershop.core.catalog.Catalog
 import com.robert4lyf.hypershop.core.catalog.CatalogLoader
+import com.robert4lyf.hypershop.core.model.BaseKey
 import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.QtyUnit
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.parse.Normaliser
+import kotlin.math.ceil
 
 /** PARTIAL is no longer written (it was "I have some"); kept so stored decisions still read. */
 enum class LineStatus { ADDED, IN_STOCK, PARTIAL, EXCLUDED }
@@ -105,8 +107,49 @@ class Merger(
             servingsOriginal,
             servings,
             locale,
-            lines.map { (id, p) -> IncomingLine(id, p, target(p.name, p.aisleSuggestion, overrides, p.raw)) },
+            lines.map {
+                    (id, p) ->
+                juiceAsFruit(p, locale).let { f -> IncomingLine(id, f, target(f.name, f.aisleSuggestion, overrides, f.raw)) }
+            },
         )
+
+    /**
+     * V.2: lemon or lime juice in a recipe is bought as the fruit, unless the recipe says it comes bottled. A lemon
+     * gives about 3 tbsp (45 ml) of juice and a lime about 2 tbsp (30 ml); each line rounds up to whole fruit, so
+     * "2 tbsp lime juice" is 1 lime. The recipe's own line is unchanged: only what goes on the list is the fruit.
+     * A lemon written by the spoon ("2 tbsp lemon") is the same thing.
+     */
+    fun juiceAsFruit(
+        p: ParsedIngredient,
+        locale: UnitLocale,
+    ): ParsedIngredient {
+        val (fruit, yieldMl) = JUICE[catalogEntry(p.name)?.id] ?: return p
+        val said = (p.raw + " " + p.note.orEmpty()).lowercase()
+        if (BOTTLED.any { it in said }) return p
+        val q = p.shopBase(locale)
+        val liquid = q[BaseKey.VOLUME] + q[BaseKey.MASS]
+        val whole = q[BaseKey.ITEMS]
+        val n =
+            when {
+                !liquid.isZero -> Rational.of(ceil(liquid.toDouble() / yieldMl - SLACK).toLong().coerceAtLeast(1))
+                !whole.isZero -> return p // already counted as fruit: "juice of 2 lemons"
+                q.isPresence && !p.name.endsWith("juice") -> return p // "lemon wedges, to serve"
+                else -> Rational.ONE
+            }
+        val part = if (p.name.endsWith("juice")) "juice" else p.name.substringAfter(' ', "").ifEmpty { "it" }
+        val amount = p.quantity?.let { q -> listOfNotNull(p.quantityMax?.let { "$q-$it" } ?: "$q", p.unit?.serial).joinToString(" ") }
+        val juice = amount?.let { "for $it $part" } ?: "for the $part"
+        return p.copy(
+            name = fruit,
+            quantity = n,
+            quantityMax = null,
+            quantityText = null,
+            unit = null,
+            altQuantity = null,
+            altUnit = null,
+            note = listOfNotNull(juice, p.note).joinToString(", "),
+        )
+    }
 
     fun target(
         name: String,
@@ -210,5 +253,22 @@ class Merger(
             touched += itemId
         }
         return ApplyResult.Applied(l.bumped(touched), use.id, touched.size)
+    }
+
+    private companion object {
+        /** Catalogue id → the fruit bought for it, and the juice one gives (ml). */
+        val JUICE =
+            mapOf(
+                "lemon_juice" to ("lemon" to 45.0),
+                "lime_juice" to ("lime" to 30.0),
+                "lemon" to ("lemon" to 45.0),
+                "lime" to ("lime" to 30.0),
+            )
+
+        /** Fruit vary: a line a little over a whole fruit's juice (¼ cup of lime) is still that many fruit. */
+        const val SLACK = 0.15
+
+        /** Words saying the juice is bought as juice. */
+        val BOTTLED = listOf("bottle", "concentrate", "squeezy", "jif", "carton", "shop-bought", "store-bought")
     }
 }

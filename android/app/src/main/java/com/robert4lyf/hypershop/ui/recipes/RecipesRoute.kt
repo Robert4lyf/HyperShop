@@ -107,10 +107,7 @@ import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.review.TitleDialog
 import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
-import com.robert4lyf.hypershop.ui.theme.backdropHost
 import com.robert4lyf.hypershop.ui.theme.card
-import com.robert4lyf.hypershop.ui.theme.onBackdrop
-import com.robert4lyf.hypershop.ui.theme.rememberHeroBackdrop
 import com.robert4lyf.hypershop.ui.util.factoryFor
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -551,11 +548,10 @@ private fun LibraryCard(
     ) {
         Column {
             // The recipe's band, as on its card on the list: its photo, tall, else its own mosaic.
-            val backdrop = rememberHeroBackdrop(photo = row.photo != null)
             Box(
                 Modifier.fillMaxWidth().then(
                     if (row.photo != null) Modifier.heightIn(min = PHOTO_BAND) else Modifier,
-                ).clipToBounds().backdropHost(backdrop),
+                ).clipToBounds(),
             ) {
                 RecipeBackdrop(row.title, row.photo, Modifier.matchParentSize())
                 Text(
@@ -566,7 +562,6 @@ private fun LibraryCard(
                         Modifier
                             .align(Alignment.BottomStart)
                             .padding(start = 20.dp, end = 16.dp, top = 14.dp, bottom = 12.dp)
-                            .onBackdrop(backdrop)
                             .testTag("hero-text"),
                 )
             }
@@ -649,11 +644,10 @@ private fun UseCard(
         Column {
             // The recipe's band: its photo, tall, with the title along the bottom; else its own mosaic,
             // the same as its review screen's.
-            val backdrop = rememberHeroBackdrop(photo = photo != null)
             Box(
                 Modifier.fillMaxWidth().then(
                     if (photo != null) Modifier.heightIn(min = PHOTO_BAND) else Modifier,
-                ).clipToBounds().backdropHost(backdrop),
+                ).clipToBounds(),
             ) {
                 RecipeBackdrop(use.title, photo, Modifier.matchParentSize())
                 Column(
@@ -661,19 +655,18 @@ private fun UseCard(
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // The shade follows the words, not the whole row up to the menu.
                         Box(Modifier.weight(1f)) {
                             Text(
                                 use.title,
                                 style = MaterialTheme.typography.titleLarge,
                                 color = Brand.OnHero,
-                                modifier = Modifier.onBackdrop(backdrop).testTag("hero-text"),
+                                modifier = Modifier.testTag("hero-text"),
                             )
                         }
                         // Everything that changes the recipe, in one place; a tap on the card shows it.
                         var menu by remember { mutableStateOf(false) }
                         Box {
-                            IconButton(onClick = { menu = true }, modifier = Modifier.onBackdrop(backdrop).testTag("more-${use.useId}")) {
+                            IconButton(onClick = { menu = true }, modifier = Modifier.testTag("more-${use.useId}")) {
                                 Icon(Icons.Rounded.MoreVert, contentDescription = "More for ${use.title}", tint = Brand.OnHero)
                             }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
@@ -709,8 +702,8 @@ private fun UseCard(
                     val site = url?.let { siteName(it) }
                     val book = use.bookRef
                     when {
-                        site != null -> Meta(Icons.Rounded.Link, site, Modifier.onBackdrop(backdrop))
-                        book != null -> Meta(Icons.AutoMirrored.Rounded.MenuBook, book, Modifier.onBackdrop(backdrop))
+                        site != null -> Meta(Icons.Rounded.Link, site, Modifier)
+                        book != null -> Meta(Icons.AutoMirrored.Rounded.MenuBook, book, Modifier)
                     }
                 }
             }
