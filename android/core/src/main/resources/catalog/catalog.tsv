@@ -1,4 +1,4 @@
-#version	f455405f84c3
+#version	f5d854b82c56
 #id	name	plural	synonyms	aisleCode	staple	shoppingUnit	displayPolicy	gramsPerCup	packNote	group	gramsEach
 onion	onion	onions	yellow onion|brown onion|white onion|spanish onion	PRODUCE	false	each	count	160		Vegetables	110
 red_onion	red onion	red onions	purple onion	PRODUCE	false	each	count	160		Vegetables	110
@@ -132,7 +132,7 @@ croissant	croissant	croissants		BAKERY	false	pack	count			Rolls & pastries
 english_muffin	english muffins	english muffins	muffin	BAKERY	false	pack	count			Rolls & pastries	
 bagel	bagel	bagels		BAKERY	false	pack	count			Rolls & pastries	
 brioche	brioche	brioche		BAKERY	false	loaf	count			Bread	
-chicken	chicken	chicken	whole chicken|roasting chicken	MEAT_FISH	false	each	count	140		Poultry	1500
+chicken	chicken	chicken	whole chicken|roasting chicken	MEAT_FISH	false	each	count	140		Poultry	
 chicken_breast	chicken breast	chicken breasts	skinless chicken breast|boneless chicken breast|boneless skinless chicken breast|chicken tenderloin|chicken tenders|chicken mini fillets	MEAT_FISH	false	pack	count	140	1 × 300 g pack (2 fillets)	Poultry	150
 chicken_thigh	chicken thigh	chicken thighs	boneless chicken thigh|skinless chicken thigh	MEAT_FISH	false	pack	count	140	1 × 500 g pack (boneless)	Poultry	
 chicken_wing	chicken wings	chicken wings	chicken wing	MEAT_FISH	false	pack	mass			Poultry	

@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import timber.log.Timber
 
 /**
  * W.4: "This is wrong" at the foot of a sheet. Asks what you expected, then saves the note on the phone; "Save and
@@ -71,5 +72,7 @@ fun shareNote(
     text: String,
 ) {
     val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
-    context.startActivity(Intent.createChooser(send, "Share what was wrong"))
+    // No app to share to, or a refusal from the system: the note is saved either way, so nothing to crash over.
+    runCatching { context.startActivity(Intent.createChooser(send, "Share what was wrong")) }
+        .onFailure { Timber.w(it, "share of wrong notes failed") }
 }

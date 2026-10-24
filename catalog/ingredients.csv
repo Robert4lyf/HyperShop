@@ -131,7 +131,7 @@ croissant,croissant,croissants,,BAKERY,false,pack,count,,,Rolls & pastries,,agen
 english_muffin,english muffins,english muffins,muffin,BAKERY,false,pack,count,,,Rolls & pastries,,agent-estimate
 bagel,bagel,bagels,,BAKERY,false,pack,count,,,Rolls & pastries,,agent-estimate
 brioche,brioche,brioche,,BAKERY,false,loaf,count,,,Bread,,agent-estimate
-chicken,chicken,chicken,whole chicken|roasting chicken,MEAT_FISH,false,each,count,140,,Poultry,1500,sourced
+chicken,chicken,chicken,whole chicken|roasting chicken,MEAT_FISH,false,each,count,140,,Poultry,,sourced
 chicken_breast,chicken breast,chicken breasts,skinless chicken breast|boneless chicken breast|boneless skinless chicken breast|chicken tenderloin|chicken tenders|chicken mini fillets,MEAT_FISH,false,pack,count,140,1 × 300 g pack (2 fillets),Poultry,150,sourced
 chicken_thigh,chicken thigh,chicken thighs,boneless chicken thigh|skinless chicken thigh,MEAT_FISH,false,pack,count,140,1 × 500 g pack (boneless),Poultry,,sourced
 chicken_wing,chicken wings,chicken wings,chicken wing,MEAT_FISH,false,pack,mass,,,Poultry,,agent-estimate

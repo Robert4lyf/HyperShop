@@ -32,6 +32,27 @@ class WrongNotesTest {
     }
 
     @Test
+    fun theCapDropsWholeNotesFromTheTop() {
+        val c = TestContainer.create()
+        // A recipe's own "--- For the sauce ---" line is not where a note starts.
+        val note =
+            com.robert4lyf.hypershop.core.report.WrongReport(
+                "Review",
+                "x",
+                listOf("--- For the sauce ---" to "x"),
+                "x",
+                "y".repeat(400),
+                "v",
+                "t",
+            )
+        repeat(200) { runBlocking { c.wrongReports.save(note) } }
+        val all = runBlocking { c.wrongReports.all() }
+        assertTrue(all.length <= 50_000)
+        assertTrue(all.take(40), all.startsWith("--- This is wrong"))
+        assertEquals(all.split("--- This is wrong").size - 1, runBlocking { c.wrongReports.count() })
+    }
+
+    @Test
     fun aListNoteCarriesTheRowAsShownAndNotesAddUpUntilDeleted() {
         val c = TestContainer.create()
         c.add("3 garlic cloves")
@@ -40,7 +61,7 @@ class WrongNotesTest {
         vm.openItem(ui.aisles.flatMap { it.second }.single().id)
         val sheet = await(vm.sheet) { it != null }!!
         val text = runBlocking { vm.wrongNote(sheet, "") }
-        assertTrue(text, text.contains("Showed: 1 bulb garlic · 3 cloves\n"))
+        assertTrue(text, text.contains("Showed: 1 bulb garlic · 3 cloves in the recipe\n"))
         assertTrue(text, text.contains("Expected: (not said)\n"))
         runBlocking { vm.wrongNote(sheet, "cloves") }
         assertEquals(2, runBlocking { c.wrongReports.count() })

@@ -70,6 +70,8 @@ object Display {
         val count: Rational,
         val each: Boolean,
         val need: String?,
+        /** "1 punnet cherry tomatoes": after a container the name is plural. */
+        val pluralName: Boolean = false,
     )
 
     /**
@@ -99,7 +101,14 @@ object Display {
             val weighed = parts[BaseKey.MASS]?.let { g -> entry.gramsEach?.let { g / it } ?: return null } ?: Rational.ZERO
             if (parts.keys.any { it != BaseKey.ITEMS && it != BaseKey.MASS && it.countUnit != QtyUnit.CLOVE }) return null
             val n = roundUp(bulbs + weighed + cloves / Rational.of(CLOVES_A_BULB), Rational.ONE).coerceAtLeastOne()
-            return Buy("${fraction(n)} ${if (n > Rational.ONE) "bulbs" else "bulb"}", n, false, asWritten?.takeIf { n != bulbs })
+            return Buy(
+                "${fraction(n)} ${if (n > Rational.ONE) "bulbs" else "bulb"}",
+                n,
+                false,
+                asWritten?.takeIf {
+                    n != bulbs
+                }?.let { "$it in the recipe" },
+            )
         }
         if (unit in EACH_UNITS && entry.displayPolicy == DisplayPolicy.COUNT) {
             if (parts.isEmpty()) return null
@@ -131,30 +140,53 @@ object Display {
             val counted = parts.keys.singleOrNull()?.countUnit
             if (counted in COUNTED_CONTAINERS) {
                 val n = roundUp(parts.values.single(), Rational.ONE).coerceAtLeastOne()
-                return Buy("${fraction(n)} ${if (n > Rational.ONE) pluralOf(counted!!.serial) else counted!!.serial}", n, false, null)
+                val word = if (n > Rational.ONE) pluralOf(counted!!.serial) else counted!!.serial
+                return Buy("${fraction(n)} $word", n, false, null, pluralName = true)
             }
             // Counted as things ("2 chicken breasts", sold in packs of no fixed number), or mixed: as written.
             if (parts.keys.any { it.dimension == Dimension.COUNT }) return null
-            val size = entry.packNote?.let(::packSize)
-            val need =
-                size?.let { (base, key) ->
-                    // Every part in the pack's own dimension, a cup weighed where it can be; a part that cannot be
-                    // converted leaves the count at one and the amount needed on the sub-line.
-                    val asPack =
-                        parts.map { (k, v) ->
-                            when {
-                                k == key -> v
-                                key == BaseKey.MASS && k == BaseKey.VOLUME -> entry.gramsPerCup?.let { v * it / Rational.of(240) }
-                                else -> null
-                            }
-                        }
-                    if (asPack.isEmpty() || asPack.any { it == null }) null else asPack.fold(Rational.ZERO) { a, v -> a + v!! } / base
+            // A presence item (herbs, spirits, a paste) is one of whatever it comes in when the amount cannot be
+            // counted: the catalogue's word that a recipe's use rarely needs more, with the amount on the sub-line.
+            val fallback = if (entry.displayPolicy == DisplayPolicy.PRESENCE) Rational.ONE else null
+            // Nothing said ("basil, to serve"): one. An amount is counted in the pack's own dimension, a cup weighed
+            // (or a weight measured) with the catalogue's density. Without one, only "one pack" is safe to say, and
+            // only when the amount fits it even at an extreme density ("60ml yoghurt" in a 500 g pot); otherwise a
+            // count could come out short ("700ml passata" against a 500 g carton) and the row stays as written.
+            val n =
+                if (parts.isEmpty()) {
+                    Rational.ONE
+                } else {
+                    countIn(parts, entry) ?: fallback ?: return null
                 }
-            val n = need?.let { roundUp(it, Rational.ONE) }?.coerceAtLeastOne() ?: Rational.ONE
             val word = if (n > Rational.ONE) pluralOf(unit) else unit
-            return Buy("${fraction(n)} $word", n, false, asWritten?.let { "$it needed" })
+            return Buy("${fraction(n)} $word", n, false, asWritten?.let { "$it needed" }, pluralName = true)
         }
         return null
+    }
+
+    /** How many packs [parts] fill, rounded up; null when that cannot be said without risking too few. */
+    private fun countIn(
+        parts: Map<BaseKey, Rational>,
+        entry: CatalogEntry,
+    ): Rational? {
+        val (base, key) = entry.packNote?.let(::packSize) ?: return null
+        val perCup = entry.gramsPerCup
+        var total = Rational.ZERO
+        var guessed = false
+        for ((k, v) in parts) {
+            total +=
+                when {
+                    k == key -> v
+                    key == BaseKey.MASS && k == BaseKey.VOLUME && perCup != null -> v * perCup / Rational.of(240)
+                    key == BaseKey.VOLUME && k == BaseKey.MASS && perCup != null -> v * Rational.of(240) / perCup
+                    // Heavier than honey (1.4 g/ml), lighter than flour (0.5): the worst either way.
+                    key == BaseKey.MASS && k == BaseKey.VOLUME -> v * Rational.of(3, 2).also { guessed = true }
+                    key == BaseKey.VOLUME && k == BaseKey.MASS -> v * Rational.of(2).also { guessed = true }
+                    else -> return null
+                }
+        }
+        if (guessed && total > base) return null
+        return roundUp(total / base, Rational.ONE).coerceAtLeastOne()
     }
 
     private fun Rational.coerceAtLeastOne() = if (this < Rational.ONE) Rational.ONE else this
@@ -177,7 +209,7 @@ object Display {
     private const val CLOVES_A_BULB = 10L
     private val EACH_UNITS = setOf("each", "head", "piece", "loaf", "ball")
     private val CONTAINERS = setOf("jar", "bottle", "pot", "carton", "tub", "pack", "bag", "box", "punnet", "bunch", "tube")
-    private val COUNTED_CONTAINERS = setOf(QtyUnit.BUNCH, QtyUnit.TIN, QtyUnit.PACKET)
+    private val COUNTED_CONTAINERS = setOf(QtyUnit.BUNCH, QtyUnit.TIN, QtyUnit.PACKET, QtyUnit.SPRIG)
     private val PACK_SIZE = Regex("""(\d+(?:\.\d+)?)\s*(kg|g|ml|l)\b""", RegexOption.IGNORE_CASE)
 
     /** The row text for an item: main line "<amount> <name>", sub-line the pack note or "2 already bought". */
@@ -197,7 +229,8 @@ object Display {
         val itemsOnly = shownQty.keys.singleOrNull() == BaseKey.ITEMS
         val name =
             when {
-                bought != null -> if (bought.each && bought.count > Rational.ONE && entry != null) entry.plural else item.displayName
+                bought != null && entry != null && (bought.pluralName || bought.each && bought.count > Rational.ONE) -> entry.plural
+                bought != null -> item.displayName
                 itemsOnly && entry != null && (shownQty[BaseKey.ITEMS] > Rational.ONE) -> entry.plural
                 else -> item.displayName
             }

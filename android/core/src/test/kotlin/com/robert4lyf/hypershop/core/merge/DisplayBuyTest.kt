@@ -20,8 +20,8 @@ class DisplayBuyTest {
 
     @Test
     fun garlicIsBoughtInBulbs() {
-        assertEquals(RowText("1 bulb garlic", "3 cloves"), row("3 garlic cloves", key = "garlic"))
-        assertEquals(RowText("2 bulbs garlic", "14 cloves"), row("8 garlic cloves", "6 cloves garlic", key = "garlic"))
+        assertEquals(RowText("1 bulb garlic", "3 cloves in the recipe"), row("3 garlic cloves", key = "garlic"))
+        assertEquals(RowText("2 bulbs garlic", "14 cloves in the recipe"), row("8 garlic cloves", "6 cloves garlic", key = "garlic"))
         assertEquals("1 bulb garlic", row("1 garlic bulb", key = "garlic").main)
     }
 
@@ -37,6 +37,26 @@ class DisplayBuyTest {
     fun aPotIsCountedFromItsSizeWithTheNeedBesideIt() {
         assertEquals(RowText("1 pot double cream", "150ml needed"), row("150ml double cream", key = "double_cream"))
         assertEquals(RowText("2 pots double cream", "500ml needed"), row("500ml double cream", key = "double_cream"))
+    }
+
+    @Test
+    fun aPackSizedInAnotherDimensionIsNeverGuessedShort() {
+        // W.5 review: a 500 g carton cannot hold "700ml" without a density, so the row stays as written.
+        assertEquals("700ml passata", row("700ml passata", key = "passata").main)
+        assertEquals(RowText("2 cartons passata", "700g needed"), row("700g passata", key = "passata"))
+        // Bought for its presence: one pack, the amount beside it.
+        assertEquals("1 pack basil", row("4 cups basil leaves", key = "basil").main)
+    }
+
+    @Test
+    fun aContainerNamesThePlural() {
+        assertEquals("1 punnet cherry tomatoes", row("200g cherry tomatoes", key = "cherry_tomato").main)
+        assertEquals("2 sprigs rosemary", row("2 sprigs rosemary", key = "rosemary").main)
+    }
+
+    @Test
+    fun aWholeBirdIsNotBoughtForAWeight() {
+        assertEquals("500g chicken", row("500g chicken", key = "chicken").main)
     }
 
     @Test
