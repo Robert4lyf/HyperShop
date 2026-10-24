@@ -158,6 +158,19 @@ class RuleParserTest {
     }
 
     @Test
+    fun prepWordsBeforeTheNounDoNotEndTheName() {
+        // V.1, from a real page (Happy Foodie): the name was "soft" and the olives went to the note.
+        val olives = p.parse("100g (4oz) soft pitted black olives")
+        assertEquals("black olives", olives.name)
+        assertEquals(Rational.of(100), olives.quantity)
+        assertEquals(QtyUnit.G, olives.unit)
+        assertTrue(olives.note!!.contains("pitted"))
+        // After the noun a prep word still ends the name.
+        assertEquals("onion", p.parse("1 onion finely chopped").name)
+        assertEquals("soft brown sugar", p.parse("100g soft brown sugar").name)
+    }
+
+    @Test
     fun r36PlusInTheSameUnitIsAdded() {
         val a = p.parse("2 tbsp plus 1 tbsp butter")
         assertEquals(Rational.of(3), a.quantity)

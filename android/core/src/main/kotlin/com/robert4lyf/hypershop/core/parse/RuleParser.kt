@@ -538,6 +538,33 @@ class RuleParser(
             while (idx < words.size) {
                 val t = words[idx]
                 val w = t.text.lowercase()
+                if (kept.isNotEmpty() && w in Lexicon.prep && !startsCatalogName(words, idx)) {
+                    // "soft pitted black olives": prep words *before* the noun, after an adjective the catalogue
+                    // does not know. The name goes on past them when what follows them is a catalogue item and what
+                    // came before is not; "onion finely chopped" still ends at "finely" (V.1).
+                    var after = idx
+                    while (after < words.size && words[after].text.lowercase() in Lexicon.prep) after++
+                    var end = after
+                    while (end < words.size && words[end].text.lowercase() !in Lexicon.nameEnders &&
+                        words[end].text.lowercase() !in Lexicon.prep
+                    ) {
+                        end++
+                    }
+                    val before = joinWords(kept)
+                    val rest = words.subList(after, end).joinToString(" ") { it.text }
+                    if (after < end && entryOf(before) == null) {
+                        val whole = entryOf("$before $rest") != null
+                        if (whole || entryOf(rest) != null) {
+                            if (!whole) {
+                                moved += kept.map { it.text.lowercase() }
+                                kept.clear()
+                            }
+                            moved += words.subList(idx, after).map { it.text.lowercase() }
+                            idx = after
+                            continue
+                        }
+                    }
+                }
                 if (kept.isNotEmpty() && (w in Lexicon.nameEnders || w in Lexicon.prep) && !startsCatalogName(words, idx)) {
                     notes += span(toks.indexOf(t), toks.indexOf(words.last()) + 1)
                     break
