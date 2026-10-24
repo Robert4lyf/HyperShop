@@ -107,8 +107,11 @@ class CatalogTest {
     }
 
     @Test
-    fun packNotesOnAboutTwenty() {
-        assertTrue(catalog.entries.count { it.packNote != null } in 15..30)
+    fun everyPackNoteSaysHowBig() {
+        // W.3: pack notes are sourced and size the count of anything bought in a container.
+        val notes = catalog.entries.mapNotNull { it.packNote }
+        assertTrue(notes.size >= 15)
+        for (n in notes) assertTrue(Regex("""\d""").containsMatchIn(n), n)
     }
 
     @Test

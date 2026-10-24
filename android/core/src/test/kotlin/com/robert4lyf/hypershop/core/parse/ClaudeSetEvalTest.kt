@@ -77,7 +77,7 @@ class ClaudeSetEvalTest {
         val TOTALS =
             mapOf(
                 "t-2026" to listOf(126, 7, 0),
-                "final-2026" to listOf(123, 9, 1),
+                "final-2026" to listOf(124, 8, 1),
                 "release-c-2026" to listOf(259, 15, 2),
             )
         val SETS = listOf("t-2026", "final-2026", "release-c-2026")

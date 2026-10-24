@@ -201,7 +201,10 @@ class BasketEvalTest {
 
         val FRACTIONS = mapOf("½" to 0.5, "¼" to 0.25, "¾" to 0.75, "⅓" to 1.0 / 3, "⅔" to 2.0 / 3, "⅛" to 0.125)
 
-        /** W.0b baseline [165, 143, 136, 121]; W.2, rows in the way things are bought: */
-        val FLOORS = listOf(165, 143, 154, 152)
+        /**
+         * W.0b baseline [165, 143, 136, 121]; W.2, rows in the way things are bought, [165, 143, 154, 152]; W.3, sourced
+         * weights and packs: USDA's medium carrot and onion are smaller than a UK one, so a weight counts more of them.
+         */
+        val FLOORS = listOf(165, 143, 154, 149)
     }
 }
