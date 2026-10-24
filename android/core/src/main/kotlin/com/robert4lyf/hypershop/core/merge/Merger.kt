@@ -108,9 +108,19 @@ class Merger(
             servings,
             locale,
             lines.map { (id, p) ->
-                juiceAsFruit(p, locale).let { f -> IncomingLine(id, f, target(f.name, f.aisleSuggestion, overrides, f.raw)) }
+                juiceAsFruit(oneCountUnit(p), locale).let { f -> IncomingLine(id, f, target(f.name, f.aisleSuggestion, overrides, f.raw)) }
             },
         )
+
+    /**
+     * V.6: a stalk of celery and a stick of celery are the same thing, but two count units, so "2 stalks" and
+     * "2 sticks" from two recipes stood side by side on one row. Celery and rhubarb count in sticks, the
+     * word a British shopper uses. A stick of butter or cinnamon is something else and is left alone.
+     */
+    fun oneCountUnit(p: ParsedIngredient): ParsedIngredient {
+        if (p.unit != QtyUnit.STALK || catalogEntry(p.name)?.id !in STICKS) return p
+        return p.copy(unit = QtyUnit.STICK, quantityText = null)
+    }
 
     /**
      * V.2: lemon or lime juice in a recipe is bought as the fruit, unless the recipe says it comes bottled. A lemon
@@ -266,6 +276,9 @@ class Merger(
 
         /** Fruit vary: a line a little over a whole fruit's juice (¼ cup of lime) is still that many fruit. */
         const val SLACK = 0.15
+
+        /** Produce counted in sticks, whichever of "stalk" or "stick" the recipe says. */
+        val STICKS = setOf("celery", "rhubarb")
 
         /** Words saying the juice is bought as juice. */
         val BOTTLED = listOf("bottle", "concentrate", "squeezy", "jif", "carton", "shop-bought", "store-bought")
