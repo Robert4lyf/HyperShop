@@ -77,6 +77,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -115,11 +116,13 @@ import com.robert4lyf.hypershop.ui.common.SectionCard
 import com.robert4lyf.hypershop.ui.common.SectionLabel
 import com.robert4lyf.hypershop.ui.common.Tone
 import com.robert4lyf.hypershop.ui.common.basilSegmentedColors
+import com.robert4lyf.hypershop.ui.common.shareNote
 import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.theme.cardEdge
 import com.robert4lyf.hypershop.ui.util.factoryFor
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 data class SettingsActions(
@@ -138,6 +141,7 @@ data class SettingsActions(
     val onRemoveKey: () -> Unit = {},
     val onDismissKeyLost: () -> Unit = {},
     val onModel: (ClaudeModel) -> Unit = {},
+    val onClaudeAlways: (Boolean) -> Unit = {},
     val onMonthlyCap: (String) -> Boolean = { true },
     val onDailyCalls: (String) -> Boolean = { true },
     val onDebugLog: (Boolean) -> Unit = {},
@@ -154,6 +158,9 @@ data class SettingsActions(
     val onCancelRestore: () -> Unit = {},
     /** Data › Clear shopping history: past trips behind Buy again. */
     val onClearHistory: () -> Unit = {},
+    /** Data › the "This is wrong" notes: share them all, or delete them. */
+    val onShareWrongNotes: () -> Unit = {},
+    val onDeleteWrongNotes: () -> Unit = {},
 )
 
 @Composable
@@ -175,6 +182,8 @@ fun SettingsRoute(
         rememberLauncherForActivityResult(
             ActivityResultContracts.CreateDocument("application/zip"),
         ) { uri: Uri? -> uri?.let(vm::backupTo) }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val openBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? -> uri?.let(vm::inspectRestore) }
     SettingsScreen(
         ui,
@@ -192,6 +201,7 @@ fun SettingsRoute(
             onRemoveKey = { vm.removeKey() },
             onDismissKeyLost = { vm.dismissKeyLost() },
             onModel = { vm.setModel(it) },
+            onClaudeAlways = { vm.setClaudeAlways(it) },
             onMonthlyCap = vm::setMonthlyCap,
             onDailyCalls = vm::setDailyCalls,
             onDebugLog = { vm.setDebugLog(it) },
@@ -208,6 +218,8 @@ fun SettingsRoute(
             onConfirmRestore = vm::confirmRestore,
             onCancelRestore = vm::cancelRestore,
             onClearHistory = vm::clearHistory,
+            onShareWrongNotes = { scope.launch { shareNote(context, vm.wrongNotesText()) } },
+            onDeleteWrongNotes = { vm.deleteWrongNotes() },
         ),
         snackbar = own.takeIf { snackbar == null },
     )
@@ -509,6 +521,17 @@ private fun DataGroup(
     var confirmClear by rememberSaveable { mutableStateOf(false) }
     Hint("Buy again learns from the trips you finish. They stay on this phone and go in your backups, nowhere else.")
     TextButton(onClick = { confirmClear = true }, modifier = Modifier.testTag("clear-history")) { Text("Clear shopping history") }
+    if (ui.wrongNotes > 0) {
+        EdgeDivider()
+        Hint(
+            "${if (ui.wrongNotes == 1) "1 note" else "${ui.wrongNotes} notes"} of things read wrong, on this phone only " +
+                "until you share them.",
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilledTonalButton(onClick = actions.onShareWrongNotes, modifier = Modifier.testTag("share-wrong")) { Text("Share them") }
+            TextButton(onClick = actions.onDeleteWrongNotes, modifier = Modifier.testTag("delete-wrong")) { Text("Delete them") }
+        }
+    }
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
@@ -650,6 +673,14 @@ private fun ModelSection(
     actions: SettingsActions,
 ) {
     Column {
+        SwitchRow("Read every recipe with Claude", ui.claudeAlways, actions.onClaudeAlways)
+        Hint(
+            if (ui.claudeAlways) {
+                "Claude reads each new recipe; the offline reading checks it. About $0.001 a recipe on the default model."
+            } else {
+                "Claude reads a recipe only when the offline reading is unsure of a line."
+            },
+        )
         SectionLabel("Model")
         for (m in ClaudeModel.entries) {
             Row(

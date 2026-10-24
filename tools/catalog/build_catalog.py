@@ -28,7 +28,7 @@ TSV = ROOT / "android/core/src/main/resources/catalog/catalog.tsv"
 REVIEW = ROOT / "catalog/REVIEW.md"
 
 COLUMNS = ["id", "name", "plural", "synonyms", "aisleCode", "staple", "shoppingUnit",
-           "displayPolicy", "gramsPerCup", "packNote", "group", "src"]
+           "displayPolicy", "gramsPerCup", "packNote", "group", "gramsEach", "src"]
 AISLES = ["PRODUCE", "BAKERY", "MEAT_FISH", "DAIRY_EGGS", "CHILLED", "FROZEN", "TINS_JARS",
           "PASTA_RICE_GRAINS", "WORLD_FOODS", "BAKING", "NUTS_DRIED_FRUIT", "OILS_VINEGARS",
           "SPICES_CONDIMENTS", "FREE_FROM", "DRINKS", "HOUSEHOLD", "OTHER"]
@@ -58,6 +58,12 @@ def validate(rows: list[dict[str, str]]) -> list[str]:
             errors.append(f"{where}: staple {r['staple']}")
         if r["displayPolicy"] not in POLICIES:
             errors.append(f"{where}: displayPolicy {r['displayPolicy']}")
+        if r["gramsEach"]:
+            try:
+                if not 1 <= float(r["gramsEach"]) <= 5000:
+                    errors.append(f"{where}: gramsEach out of range")
+            except ValueError:
+                errors.append(f"{where}: gramsEach not a number")
         if r["gramsPerCup"]:
             try:
                 if not 10 <= float(r["gramsPerCup"]) <= 400:

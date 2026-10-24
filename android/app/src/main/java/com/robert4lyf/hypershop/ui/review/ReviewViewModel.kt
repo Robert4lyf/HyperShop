@@ -16,6 +16,7 @@ import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.QtyBase
+import com.robert4lyf.hypershop.core.report.WrongReport
 import com.robert4lyf.hypershop.data.ListRepository
 import com.robert4lyf.hypershop.data.StoredRecipe
 import com.robert4lyf.hypershop.di.AppContainer
@@ -807,6 +808,25 @@ class ReviewViewModel(
             row.decision.inStock,
             entry != null && row.decision.inStock,
             canRemove = p.incoming.lines.size > 1,
+        )
+    }
+
+    /** W.4: "This is wrong" on the row [key], saved on the phone; the note's text, for a share, or null when the row is gone. */
+    suspend fun wrongNote(
+        key: String,
+        expected: String,
+    ): String? {
+        val sheet = sheet(key) ?: return null
+        return c.wrongReports.save(
+            WrongReport(
+                "Review",
+                sheet.name,
+                sheet.lines.map { it.raw to it.parsed },
+                sheet.effect,
+                expected,
+                c.catalog.version,
+                java.time.Instant.ofEpochMilli(c.clock()).toString(),
+            ),
         )
     }
 

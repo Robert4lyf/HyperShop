@@ -56,6 +56,8 @@ class Importer(
     private val rules: RuleParser,
     private val claude: GuardedClaude?,
     private val hasKey: suspend () -> Boolean,
+    /** W.1: Claude reads every recipe it may, not only those the rules were unsure of. */
+    private val alwaysClaude: suspend () -> Boolean = { false },
 ) {
     suspend fun fromUrl(
         url: String,
@@ -130,8 +132,10 @@ class Importer(
         val keyed = claude != null && hasKey()
         val photo = base.photo?.takeIf { base.rawLines.isEmpty() }
         if (photo != null && !keyed) return ruled.copy(claudePending = false, error = ImportError.PHOTO_NEEDS_KEY)
-        // The gate: structured lines the rules read cleanly need no second opinion (and cost nothing).
-        if (photo == null && base.rawLines.isNotEmpty() && !base.askClaude && !Uncertainty.needsClaude(ruled.lines)) {
+        // The gate: structured lines the rules read cleanly need no second opinion (and cost nothing), unless Claude
+        // is set to read every recipe (W.1, the default: it reads fresh recipes better than the rules, measured in U.1).
+        val clear = photo == null && base.rawLines.isNotEmpty() && !base.askClaude && !Uncertainty.needsClaude(ruled.lines)
+        if (clear && !(keyed && alwaysClaude())) {
             return ruled.copy(claudePending = false, claudeSkipped = true)
         }
         val input =

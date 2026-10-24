@@ -1,0 +1,3402 @@
+[
+  {
+    "id": "bk-01",
+    "source": "bbcgf-chicken-fajitas",
+    "url": "https://www.bbcgoodfood.com/recipes/easy-chicken-fajitas",
+    "group": "uk",
+    "servings": 4,
+    "lines": [
+      "2 chicken breasts finely sliced",
+      "1 red onion finely sliced",
+      "1 red pepper sliced",
+      "1 red chilli finely sliced (optional)",
+      "1 tbsp smoked paprika",
+      "1 tbsp ground coriander",
+      "ground cumin",
+      "2 garlic cloves crushed",
+      "4 tbsp olive oil",
+      "1 lime juiced",
+      "Tabasco",
+      "8 tortillas",
+      "mixed salad",
+      "230g fresh salsa"
+    ],
+    "basket": [
+      {
+        "item": "chicken breasts",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 2,
+            "max": 2
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 250,
+            "max": 400
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          0
+        ],
+        "note": "UK breasts ~150 g each; packs of 2 are normal"
+      },
+      {
+        "item": "red onion",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          1
+        ]
+      },
+      {
+        "item": "red pepper",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          2
+        ]
+      },
+      {
+        "item": "red chilli",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": true,
+        "lines": [
+          3
+        ]
+      },
+      {
+        "item": "smoked paprika",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          4
+        ]
+      },
+      {
+        "item": "ground coriander",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          5
+        ]
+      },
+      {
+        "item": "ground cumin",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          6
+        ]
+      },
+      {
+        "item": "garlic",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          7
+        ]
+      },
+      {
+        "item": "olive oil",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          8
+        ]
+      },
+      {
+        "item": "lime",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          9
+        ]
+      },
+      {
+        "item": "Tabasco",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          },
+          {
+            "buy": "BOTTLE",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          10
+        ],
+        "note": "hot sauce, a cupboard condiment"
+      },
+      {
+        "item": "tortillas",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "EACH",
+            "min": 8,
+            "max": 8
+          }
+        ],
+        "optional": false,
+        "lines": [
+          11
+        ],
+        "note": "UK tortillas come 8 to a pack"
+      },
+      {
+        "item": "mixed salad",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          12
+        ],
+        "note": "a bag of salad leaves; not marked 'to serve' on the page, so not optional"
+      },
+      {
+        "item": "fresh salsa",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "JAR",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          13
+        ],
+        "note": "230 g is one chilled tub; a jar of salsa is an acceptable swap"
+      }
+    ]
+  },
+  {
+    "id": "bk-02",
+    "source": "bbcgf-carrot-lentil-soup",
+    "url": "https://www.bbcgoodfood.com/recipes/spiced-carrot-lentil-soup",
+    "group": "uk",
+    "servings": 4,
+    "lines": [
+      "2 tsp cumin seeds",
+      "pinch chilli flakes",
+      "2 tbsp olive oil",
+      "600g carrots washed and coarsely grated (no need to peel)",
+      "140g split red lentils",
+      "1l hot vegetable stock (from a cube is fine)",
+      "125ml milk (to make it dairy-free, see 'try' below)",
+      "plain yogurt and naan bread, to serve"
+    ],
+    "basket": [
+      {
+        "item": "cumin seeds",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          0
+        ]
+      },
+      {
+        "item": "chilli flakes",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          1
+        ]
+      },
+      {
+        "item": "olive oil",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          2
+        ]
+      },
+      {
+        "item": "carrots",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 540,
+            "max": 1000
+          },
+          {
+            "buy": "EACH",
+            "min": 6,
+            "max": 9
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          3
+        ],
+        "note": "600 g; loose carrots ~80-100 g each, or one 1 kg bag"
+      },
+      {
+        "item": "red lentils",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 126,
+            "max": 500
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          4
+        ],
+        "note": "140 g; split red lentils come in 500 g bags"
+      },
+      {
+        "item": "vegetable stock",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 2
+          }
+        ],
+        "optional": false,
+        "lines": [
+          5
+        ],
+        "note": "1 litre is a real amount, not a pinch: a pack of cubes/pots, or two 500 ml cartons"
+      },
+      {
+        "item": "milk",
+        "accept": [
+          {
+            "buy": "BOTTLE",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          6
+        ],
+        "note": "125 ml; smallest bottle is a pint"
+      },
+      {
+        "item": "natural yoghurt",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": true,
+        "lines": [
+          7
+        ],
+        "note": "'plain yogurt and naan bread, to serve' is two things"
+      },
+      {
+        "item": "naan bread",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": true,
+        "lines": [
+          7
+        ]
+      }
+    ]
+  },
+  {
+    "id": "bk-03",
+    "source": "bbcgf-thai-green-chicken-curry",
+    "url": "https://www.bbcgoodfood.com/recipes/thai-green-chicken-curry",
+    "group": "uk",
+    "servings": 6,
+    "lines": [
+      "225g new potatoes cut into chunks",
+      "100g green beans trimmed and halved",
+      "1 tbsp vegetable or sunflower oil",
+      "1 garlic clove chopped",
+      "1 rounded tbsp or 4 tsp Thai green curry paste (you can't fit the tablespoon into some of the jars)",
+      "400ml can coconut milk",
+      "2 tsp Thai fish sauce",
+      "1 tsp caster sugar",
+      "450g boneless skinless chicken (breasts or thighs), cut into bite-size pieces",
+      "2 lime leaves finely shredded, or 3 wide strips lime zest, plus extra to garnish",
+      "good handful of basil leaves",
+      "boiled rice to serve"
+    ],
+    "basket": [
+      {
+        "item": "new potatoes",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 200,
+            "max": 1000
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          0
+        ],
+        "note": "225 g; sold in 750 g-1 kg bags, so a bag is fine"
+      },
+      {
+        "item": "green beans",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 90,
+            "max": 250
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          1
+        ]
+      },
+      {
+        "item": "vegetable oil",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          2
+        ]
+      },
+      {
+        "item": "garlic",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          3
+        ]
+      },
+      {
+        "item": "Thai green curry paste",
+        "accept": [
+          {
+            "buy": "JAR",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          4
+        ]
+      },
+      {
+        "item": "coconut milk",
+        "accept": [
+          {
+            "buy": "TIN",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          5
+        ]
+      },
+      {
+        "item": "fish sauce",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          6
+        ]
+      },
+      {
+        "item": "caster sugar",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          7
+        ],
+        "note": "1 tsp: a staple, amount irrelevant"
+      },
+      {
+        "item": "chicken breasts or thighs",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 400,
+            "max": 650
+          },
+          {
+            "buy": "EACH",
+            "min": 3,
+            "max": 4
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          8
+        ],
+        "note": "450 g boneless; breasts or thigh fillets"
+      },
+      {
+        "item": "lime leaves",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          9
+        ],
+        "note": "lime leaves, or a lime for the zest alternative the line offers; one entry either way"
+      },
+      {
+        "item": "basil",
+        "accept": [
+          {
+            "buy": "BUNCH",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          10
+        ],
+        "note": "'good handful' = one pack; Thai basil also fine"
+      },
+      {
+        "item": "rice",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 400,
+            "max": 1000
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": true,
+        "lines": [
+          11
+        ],
+        "note": "'to serve' for 6, ~75 g dry each"
+      }
+    ]
+  },
+  {
+    "id": "bk-04",
+    "source": "bbcgf-victoria-sandwich",
+    "url": "https://www.bbcgoodfood.com/recipes/classic-victoria-sandwich-recipe",
+    "group": "uk",
+    "servings": 10,
+    "lines": [
+      "200g caster sugar",
+      "200g softened butter",
+      "4 eggs beaten",
+      "200g self-raising flour",
+      "1 tsp  baking powder",
+      "2 tbsp milk",
+      "100g butter softened",
+      "140g icing sugar sifted",
+      "drop vanilla extract (optional)",
+      "half a 340g jar good-quality strawberry jam",
+      "icing sugar to decorate"
+    ],
+    "basket": [
+      {
+        "item": "caster sugar",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 180,
+            "max": 500
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          0
+        ]
+      },
+      {
+        "item": "butter",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 300,
+            "max": 500
+          }
+        ],
+        "optional": false,
+        "lines": [
+          1,
+          6
+        ],
+        "note": "200 g sponge + 100 g buttercream; two 250 g blocks"
+      },
+      {
+        "item": "eggs",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 4,
+            "max": 4
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          2
+        ]
+      },
+      {
+        "item": "self-raising flour",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 180,
+            "max": 400
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          3
+        ]
+      },
+      {
+        "item": "baking powder",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          4
+        ]
+      },
+      {
+        "item": "milk",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          },
+          {
+            "buy": "BOTTLE",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          5
+        ],
+        "note": "2 tbsp: a fridge staple"
+      },
+      {
+        "item": "icing sugar",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 140,
+            "max": 500
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          7,
+          10
+        ],
+        "note": "140 g filling + dusting; one 500 g box"
+      },
+      {
+        "item": "vanilla extract",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": true,
+        "lines": [
+          8
+        ]
+      },
+      {
+        "item": "strawberry jam",
+        "accept": [
+          {
+            "buy": "JAR",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          9
+        ],
+        "note": "'half a 340g jar' → buy one jar"
+      }
+    ]
+  },
+  {
+    "id": "bk-05",
+    "source": "happyfoodie-burmese-dal",
+    "url": "https://thehappyfoodie.co.uk/recipes/dal/",
+    "group": "uk",
+    "servings": 4,
+    "lines": [
+      "250g chana dal (yellow split peas), soaked overnight or for at least 4 hours",
+      "2 garlic cloves, peeled, left whole",
+      "6 tbsp vegetable oil",
+      "3 tsp cumin seeds",
+      "4 medium onions, finely sliced",
+      "1 tsp turmeric powder",
+      "1 tsp chilli powder",
+      "1½ tsp salt",
+      "coriander leaves, to garnish (optional)"
+    ],
+    "basket": [
+      {
+        "item": "chana dal",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 225,
+            "max": 500
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          0
+        ],
+        "note": "yellow split peas; 500 g bags"
+      },
+      {
+        "item": "garlic",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          1
+        ]
+      },
+      {
+        "item": "vegetable oil",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          2
+        ]
+      },
+      {
+        "item": "cumin seeds",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          3
+        ]
+      },
+      {
+        "item": "onions",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 4,
+            "max": 5
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 550,
+            "max": 800
+          }
+        ],
+        "optional": false,
+        "lines": [
+          4
+        ],
+        "note": "4 medium ~150-180 g each"
+      },
+      {
+        "item": "ground turmeric",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          5
+        ]
+      },
+      {
+        "item": "chilli powder",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          6
+        ]
+      },
+      {
+        "item": "salt",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          7
+        ]
+      },
+      {
+        "item": "coriander",
+        "accept": [
+          {
+            "buy": "BUNCH",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": true,
+        "lines": [
+          8
+        ]
+      }
+    ]
+  },
+  {
+    "id": "bk-06",
+    "source": "mob-one-pot-tomato-orzo",
+    "url": "https://www.mob.co.uk/recipes/one-pot-tomato-orzo",
+    "group": "uk",
+    "servings": 4,
+    "lines": [
+      "5Clove Garlic",
+      "1 Red Chilli",
+      "25g Basil",
+      "4 Tomato",
+      "250g Cherry Tomatoes",
+      "800ml Vegetable Stock",
+      "500g Orzo",
+      "Salt",
+      "Black Pepper",
+      "Olive Oil"
+    ],
+    "basket": [
+      {
+        "item": "garlic",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          0
+        ],
+        "note": "5 cloves → 1 bulb"
+      },
+      {
+        "item": "red chilli",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          1
+        ]
+      },
+      {
+        "item": "basil",
+        "accept": [
+          {
+            "buy": "BUNCH",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          2
+        ],
+        "note": "25 g = one supermarket pack"
+      },
+      {
+        "item": "tomatoes",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 4,
+            "max": 4
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 350,
+            "max": 600
+          }
+        ],
+        "optional": false,
+        "lines": [
+          3
+        ]
+      },
+      {
+        "item": "cherry tomatoes",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 225,
+            "max": 400
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          4
+        ]
+      },
+      {
+        "item": "vegetable stock",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 2
+          }
+        ],
+        "optional": false,
+        "lines": [
+          5
+        ],
+        "note": "800 ml, a meal's worth: pack of cubes/pots or cartons"
+      },
+      {
+        "item": "orzo",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 450,
+            "max": 600
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          6
+        ]
+      },
+      {
+        "item": "salt",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          7
+        ]
+      },
+      {
+        "item": "black pepper",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          8
+        ]
+      },
+      {
+        "item": "olive oil",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          9
+        ]
+      }
+    ]
+  },
+  {
+    "id": "bk-07",
+    "source": "nigella-meatballs",
+    "url": "https://www.nigella.com/recipes/meatballs",
+    "group": "uk",
+    "servings": 6,
+    "lines": [
+      "250 grams minced pork",
+      "250 grams minced beef",
+      "1 large egg",
+      "2 tablespoons freshly grated Parmesan",
+      "1 clove garlic (minced)",
+      "1 teaspoon dried oregano",
+      "3 tablespoons semolina or breadcrumbs",
+      "good grinding black pepper",
+      "1 teaspoon Maldon sea salt flakes",
+      "1 onion",
+      "2 cloves garlic",
+      "1 teaspoon dried oregano",
+      "1 tablespoon unsalted butter",
+      "1 tablespoon olive oil (not extra-virgin)",
+      "700 grams tomato passata or chopped tomatoes whizzed to a puree",
+      "1 pinch of sugar",
+      "Maldon sea salt flakes",
+      "pepper",
+      "100 millilitres full fat milk"
+    ],
+    "basket": [
+      {
+        "item": "pork mince",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 225,
+            "max": 500
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          0
+        ]
+      },
+      {
+        "item": "beef mince",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 225,
+            "max": 500
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          1
+        ]
+      },
+      {
+        "item": "eggs",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          2
+        ]
+      },
+      {
+        "item": "Parmesan",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 10,
+            "max": 200
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          3
+        ],
+        "note": "2 tbsp grated ≈ 10 g, but Parmesan is bought as a wedge"
+      },
+      {
+        "item": "garlic",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          4,
+          10
+        ],
+        "note": "1 + 2 cloves across meatballs and sauce"
+      },
+      {
+        "item": "dried oregano",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          5,
+          11
+        ]
+      },
+      {
+        "item": "breadcrumbs",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 20,
+            "max": 300
+          },
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          6
+        ],
+        "note": "'semolina or breadcrumbs' is one choice; 3 tbsp"
+      },
+      {
+        "item": "black pepper",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          7,
+          17
+        ]
+      },
+      {
+        "item": "sea salt flakes",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          8,
+          16
+        ]
+      },
+      {
+        "item": "onion",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          9
+        ]
+      },
+      {
+        "item": "butter",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 10,
+            "max": 250
+          }
+        ],
+        "optional": false,
+        "lines": [
+          12
+        ],
+        "note": "1 tbsp: fridge staple"
+      },
+      {
+        "item": "olive oil",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          13
+        ]
+      },
+      {
+        "item": "passata",
+        "accept": [
+          {
+            "buy": "BOTTLE",
+            "min": 1,
+            "max": 2
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 2
+          },
+          {
+            "buy": "TIN",
+            "min": 2,
+            "max": 2
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 680,
+            "max": 1000
+          }
+        ],
+        "optional": false,
+        "lines": [
+          14
+        ],
+        "note": "700 g: a 690/700 g bottle, two 500 g cartons, or the chopped-tomatoes alternative as 2 tins"
+      },
+      {
+        "item": "sugar",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          15
+        ]
+      },
+      {
+        "item": "whole milk",
+        "accept": [
+          {
+            "buy": "BOTTLE",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          18
+        ]
+      }
+    ]
+  },
+  {
+    "id": "bk-08",
+    "source": "jamie-sticky-orange-chicken",
+    "url": "https://www.jamieoliver.com/recipes/chicken/sticky-orange-chicken/",
+    "group": "uk",
+    "servings": 2,
+    "lines": [
+      "500g sweet potatoes",
+      "1 onion (160g)",
+      "2 x 150g skinless free-range chicken breasts",
+      "½ a bunch of rosemary (10g)",
+      "2 oranges",
+      "1 teaspoon wholegrain mustard",
+      "red wine vinegar",
+      "extra virgin olive oil",
+      "60g watercress",
+      "olive oil",
+      "1 heaped tablespoon orange marmalade",
+      "50ml brandy",
+      "2 tablespoons Greek yoghurt"
+    ],
+    "basket": [
+      {
+        "item": "sweet potatoes",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 450,
+            "max": 700
+          },
+          {
+            "buy": "EACH",
+            "min": 2,
+            "max": 3
+          }
+        ],
+        "optional": false,
+        "lines": [
+          0
+        ]
+      },
+      {
+        "item": "onion",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          1
+        ]
+      },
+      {
+        "item": "chicken breasts",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 2,
+            "max": 2
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 270,
+            "max": 350
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          2
+        ],
+        "note": "'2 x 150g' is a count of 2, not 300 of anything"
+      },
+      {
+        "item": "rosemary",
+        "accept": [
+          {
+            "buy": "BUNCH",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          3
+        ],
+        "note": "half a bunch → buy one"
+      },
+      {
+        "item": "oranges",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 2,
+            "max": 2
+          }
+        ],
+        "optional": false,
+        "lines": [
+          4
+        ]
+      },
+      {
+        "item": "wholegrain mustard",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          5
+        ]
+      },
+      {
+        "item": "red wine vinegar",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          6
+        ]
+      },
+      {
+        "item": "olive oil",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          7,
+          9
+        ],
+        "note": "'extra virgin olive oil' and 'olive oil' merged: one bottle in most UK kitchens"
+      },
+      {
+        "item": "watercress",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 60,
+            "max": 100
+          }
+        ],
+        "optional": false,
+        "lines": [
+          8
+        ],
+        "note": "60 g; bags are 80-85 g"
+      },
+      {
+        "item": "orange marmalade",
+        "accept": [
+          {
+            "buy": "JAR",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          10
+        ]
+      },
+      {
+        "item": "brandy",
+        "accept": [
+          {
+            "buy": "BOTTLE",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          11
+        ]
+      },
+      {
+        "item": "Greek yoghurt",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          12
+        ]
+      }
+    ]
+  },
+  {
+    "id": "bk-09",
+    "source": "recipetin-chicken-fried-rice",
+    "url": "https://www.recipetineats.com/chicken-fried-rice/",
+    "group": "us",
+    "servings": 4,
+    "lines": [
+      "2 tbsp oil (, peanut, vegetable or canola)",
+      "2  eggs (, lightly whisked)",
+      "150g (5oz)  chicken breast (, finely sliced into small pieces)",
+      "2  garlic cloves (, minced)",
+      "1/2  onion (, finely chopped)",
+      "120g (4oz)  bacon (, excess fat trimmed, chopped (Note 1))",
+      "1  small carrot* (, peeled and diced 0.75cm / 1/3\")",
+      "1/2 cup frozen corn* ((or can or fresh))",
+      "1/2 cup frozen peas*",
+      "2 cups (packed) cooked white rice (, day old (Note 2))",
+      "3/4 cup green onions (, finely sliced)",
+      "2.5 tbsp Chinese cooking wine or Mirin ((Note 3))",
+      "1 tbsp oyster sauce ((Note 4))",
+      "3 tbsp light soy sauce ((Note 5))",
+      "1/2 tsp sesame oil (, optional)",
+      "1/4 tsp white pepper (, optional)"
+    ],
+    "basket": [
+      {
+        "item": "vegetable oil",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          0
+        ]
+      },
+      {
+        "item": "eggs",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 2,
+            "max": 2
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          1
+        ]
+      },
+      {
+        "item": "chicken breast",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 135,
+            "max": 300
+          },
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          2
+        ],
+        "note": "150 g = one breast"
+      },
+      {
+        "item": "garlic",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          3
+        ]
+      },
+      {
+        "item": "onion",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          4
+        ],
+        "note": "1/2 onion → buy 1"
+      },
+      {
+        "item": "bacon",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 110,
+            "max": 300
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          5
+        ],
+        "note": "120 g; UK packs of rashers 200-300 g"
+      },
+      {
+        "item": "carrot",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          6
+        ]
+      },
+      {
+        "item": "frozen sweetcorn",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "TIN",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 70,
+            "max": 200
+          }
+        ],
+        "optional": false,
+        "lines": [
+          7
+        ],
+        "note": "1/2 cup ≈ 80 g; frozen bag or a small tin (line allows can)"
+      },
+      {
+        "item": "frozen peas",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 60,
+            "max": 200
+          }
+        ],
+        "optional": false,
+        "lines": [
+          8
+        ]
+      },
+      {
+        "item": "long-grain rice",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 130,
+            "max": 500
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 2
+          }
+        ],
+        "optional": false,
+        "lines": [
+          9
+        ],
+        "note": "2 cups cooked ≈ 140 g dry or two 250 g cooked pouches; day-old rice still has to be bought"
+      },
+      {
+        "item": "spring onions",
+        "accept": [
+          {
+            "buy": "BUNCH",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "EACH",
+            "min": 5,
+            "max": 8
+          }
+        ],
+        "optional": false,
+        "lines": [
+          10
+        ],
+        "note": "3/4 cup sliced ≈ one bunch"
+      },
+      {
+        "item": "Shaoxing wine or mirin",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          },
+          {
+            "buy": "BOTTLE",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          11
+        ]
+      },
+      {
+        "item": "oyster sauce",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          12
+        ]
+      },
+      {
+        "item": "light soy sauce",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          13
+        ]
+      },
+      {
+        "item": "sesame oil",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": true,
+        "lines": [
+          14
+        ]
+      },
+      {
+        "item": "white pepper",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": true,
+        "lines": [
+          15
+        ]
+      }
+    ]
+  },
+  {
+    "id": "bk-10",
+    "source": "recipetin-easy-apple-cake",
+    "url": "https://www.recipetineats.com/easy-apple-cake-recipe/",
+    "group": "us",
+    "servings": 12,
+    "lines": [
+      "2 cups flour (, plain / all purpose (Note 1))",
+      "3/4 tsp baking soda ((bi-carb soda) (Note 1))",
+      "3/4 tsp EACH salt, cinnamon and ground cloves",
+      "1/2 tsp ground nutmeg ((or 1/4 tsp freshly ground))",
+      "1 1/4 cups white sugar ((Note 2))",
+      "1 cup vegetable oil (or other plain flavoured oil like canola)",
+      "2  large eggs (, at room temperature (~50-55g/2oz each in shell))",
+      "1 1/2 tsp vanilla extract",
+      "2 cups apple",
+      "1/2 cup flaked raw almonds",
+      "Icing sugar . confectioners sugar, for dusting"
+    ],
+    "basket": [
+      {
+        "item": "plain flour",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 270,
+            "max": 400
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          0
+        ],
+        "note": "2 cups × 150 g"
+      },
+      {
+        "item": "bicarbonate of soda",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          1
+        ]
+      },
+      {
+        "item": "salt",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          2
+        ],
+        "note": "'EACH salt, cinnamon and ground cloves' is three things"
+      },
+      {
+        "item": "ground cinnamon",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          2
+        ]
+      },
+      {
+        "item": "ground cloves",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          2
+        ]
+      },
+      {
+        "item": "ground nutmeg",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          3
+        ]
+      },
+      {
+        "item": "caster sugar",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 225,
+            "max": 330
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          4
+        ],
+        "note": "1 1/4 cups white sugar ≈ 250 g; caster or granulated in a UK shop"
+      },
+      {
+        "item": "vegetable oil",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          },
+          {
+            "buy": "BOTTLE",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          5
+        ],
+        "note": "1 cup is a quarter of a bottle; still a cupboard oil"
+      },
+      {
+        "item": "eggs",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 2,
+            "max": 2
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          6
+        ]
+      },
+      {
+        "item": "vanilla extract",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          7
+        ]
+      },
+      {
+        "item": "apples",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 2,
+            "max": 3
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 300,
+            "max": 500
+          }
+        ],
+        "optional": false,
+        "lines": [
+          8
+        ],
+        "note": "page says ~2 large or 3 small"
+      },
+      {
+        "item": "flaked almonds",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 40,
+            "max": 100
+          }
+        ],
+        "optional": true,
+        "lines": [
+          9
+        ],
+        "note": "under 'Optional Extra' on the page"
+      },
+      {
+        "item": "icing sugar",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": true,
+        "lines": [
+          10
+        ],
+        "note": "dusting, under 'Optional Extra'"
+      }
+    ]
+  },
+  {
+    "id": "bk-11",
+    "source": "onceuponachef-penne-alla-vodka",
+    "url": "https://www.onceuponachef.com/recipes/penne-alla-vodka.html",
+    "group": "us",
+    "servings": 4,
+    "lines": [
+      "3 tablespoons unsalted butter",
+      "¾ cup finely chopped yellow onion, (from 1 small yellow onion)",
+      "3  cloves garlic, (minced)",
+      "½ teaspoon crushed red pepper flakes",
+      "1 (28-oz) can whole peeled plum tomatoes, chopped, with their juices (see note)",
+      "2 tablespoons tomato paste",
+      "1 teaspoon salt",
+      "½ teaspoon sugar",
+      "⅓ cup vodka",
+      "16 oz penne pasta",
+      "⅔ cup heavy cream",
+      "3 tablespoons fresh chopped basil, (plus more for serving)",
+      "Finely grated Parmigiano-Reggiano cheese, (for serving)"
+    ],
+    "basket": [
+      {
+        "item": "butter",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 40,
+            "max": 250
+          }
+        ],
+        "optional": false,
+        "lines": [
+          0
+        ],
+        "note": "3 tbsp ≈ 42 g"
+      },
+      {
+        "item": "onion",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          1
+        ]
+      },
+      {
+        "item": "garlic",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          2
+        ]
+      },
+      {
+        "item": "chilli flakes",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          3
+        ]
+      },
+      {
+        "item": "plum tomatoes",
+        "accept": [
+          {
+            "buy": "TIN",
+            "min": 2,
+            "max": 2
+          }
+        ],
+        "optional": false,
+        "lines": [
+          4
+        ],
+        "note": "one 28-oz US can = two 400 g UK tins"
+      },
+      {
+        "item": "tomato purée",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "JAR",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          5
+        ],
+        "note": "2 tbsp from a tube"
+      },
+      {
+        "item": "salt",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          6
+        ]
+      },
+      {
+        "item": "sugar",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          7
+        ]
+      },
+      {
+        "item": "vodka",
+        "accept": [
+          {
+            "buy": "BOTTLE",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          8
+        ]
+      },
+      {
+        "item": "penne",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 450,
+            "max": 550
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          9
+        ],
+        "note": "16 oz = 454 g; one 500 g bag"
+      },
+      {
+        "item": "double cream",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 2
+          }
+        ],
+        "optional": false,
+        "lines": [
+          10
+        ],
+        "note": "2/3 cup ≈ 160 ml: one 300 ml pot, or two 150 ml"
+      },
+      {
+        "item": "basil",
+        "accept": [
+          {
+            "buy": "BUNCH",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          11
+        ]
+      },
+      {
+        "item": "Parmesan",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 20,
+            "max": 200
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": true,
+        "lines": [
+          12
+        ],
+        "note": "'for serving'"
+      }
+    ]
+  },
+  {
+    "id": "bk-12",
+    "source": "bonappetit-chickpea-saag",
+    "url": "https://www.bonappetit.com/recipe/chickpea-saag",
+    "group": "us",
+    "servings": 4,
+    "lines": [
+      "2 Tbsp. unsalted butter",
+      "1 large white onion, thinly sliced",
+      "8 garlic cloves, coarsely chopped",
+      "1 1\" piece ginger, peeled, coarsely chopped",
+      "2 tsp. cumin seeds",
+      "2 tsp. Diamond Crystal or 1¼ tsp. Morton kosher salt, plus more",
+      "¼ cup plain whole-milk Greek yogurt, plus more for serving",
+      "½ tsp. ground turmeric",
+      "½–1 serrano chile",
+      "1 10-oz. package frozen spinach, thawed",
+      "½ tsp. garam masala",
+      "1 15-oz. can chickpeas, rinsed",
+      "Steamed rice and/or warm naan and lime wedges (for serving)"
+    ],
+    "basket": [
+      {
+        "item": "butter",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 25,
+            "max": 250
+          }
+        ],
+        "optional": false,
+        "lines": [
+          0
+        ],
+        "note": "2 Tbsp ≈ 28 g"
+      },
+      {
+        "item": "onion",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          1
+        ]
+      },
+      {
+        "item": "garlic",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          2
+        ],
+        "note": "8 cloves → 1 bulb"
+      },
+      {
+        "item": "ginger",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 15,
+            "max": 100
+          },
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          3
+        ]
+      },
+      {
+        "item": "cumin seeds",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          4
+        ]
+      },
+      {
+        "item": "salt",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          5
+        ]
+      },
+      {
+        "item": "Greek yoghurt",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          6
+        ]
+      },
+      {
+        "item": "ground turmeric",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          7
+        ]
+      },
+      {
+        "item": "green chilli",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          8
+        ],
+        "note": "serrano → a UK green chilli"
+      },
+      {
+        "item": "frozen spinach",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 250,
+            "max": 1000
+          }
+        ],
+        "optional": false,
+        "lines": [
+          9
+        ],
+        "note": "10-oz package ≈ 283 g; UK frozen spinach bags are 450 g-1 kg"
+      },
+      {
+        "item": "garam masala",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          10
+        ]
+      },
+      {
+        "item": "chickpeas",
+        "accept": [
+          {
+            "buy": "TIN",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          11
+        ]
+      },
+      {
+        "item": "rice",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 200,
+            "max": 1000
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": true,
+        "lines": [
+          12
+        ],
+        "note": "'Steamed rice and/or warm naan and lime wedges (for serving)' is three optional things"
+      },
+      {
+        "item": "naan bread",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": true,
+        "lines": [
+          12
+        ]
+      },
+      {
+        "item": "lime",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": true,
+        "lines": [
+          12
+        ]
+      }
+    ]
+  },
+  {
+    "id": "bk-13",
+    "source": "epicurious-caramelized-onion-pasta",
+    "url": "https://www.epicurious.com/recipes/food/views/caramelized-onion-pasta",
+    "group": "us",
+    "servings": null,
+    "lines": [
+      "2 Tbsp. extra-virgin olive oil",
+      "2 Tbsp. unsalted butter",
+      "2 lb. sweet or yellow onions (about 4 large), thinly sliced",
+      "1 1/2 tsp. kosher salt, plus more",
+      "4 garlic cloves, finely chopped",
+      "8 oz. linguine or other long strand pasta",
+      "4 oz. Parmesan, finely grated (about 2 cups), plus more for serving",
+      "½ lemon",
+      "½ cup finely chopped parsley"
+    ],
+    "basket": [
+      {
+        "item": "extra virgin olive oil",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          0
+        ]
+      },
+      {
+        "item": "butter",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 25,
+            "max": 250
+          }
+        ],
+        "optional": false,
+        "lines": [
+          1
+        ]
+      },
+      {
+        "item": "onions",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 4,
+            "max": 5
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 850,
+            "max": 1100
+          }
+        ],
+        "optional": false,
+        "lines": [
+          2
+        ],
+        "note": "2 lb ≈ 900 g, 'about 4 large'"
+      },
+      {
+        "item": "salt",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          3
+        ]
+      },
+      {
+        "item": "garlic",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          4
+        ]
+      },
+      {
+        "item": "linguine",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 225,
+            "max": 500
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          5
+        ],
+        "note": "8 oz = 227 g; a 500 g bag is the smallest"
+      },
+      {
+        "item": "Parmesan",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 110,
+            "max": 250
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          6
+        ],
+        "note": "4 oz ≈ 113 g plus more for serving"
+      },
+      {
+        "item": "lemon",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          7
+        ]
+      },
+      {
+        "item": "parsley",
+        "accept": [
+          {
+            "buy": "BUNCH",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          8
+        ]
+      }
+    ]
+  },
+  {
+    "id": "bk-14",
+    "source": "pinchofyum-best-easy-fish-tacos",
+    "url": "https://pinchofyum.com/best-easy-fish-tacos",
+    "group": "us",
+    "servings": 2,
+    "lines": [
+      "3 tablespoons salted butter, melted",
+      "juice of 1 lime",
+      "1 teaspoon chili powder",
+      "1/2 teaspoon garlic powder",
+      "pinch of salt",
+      "10-15 oz. cod or other white fish, thawed",
+      "1/4 cup vegetable oil (or avocado oil)",
+      "1/2 cup chopped green onions",
+      "1/2 cup cilantro",
+      "1-2 cloves garlic",
+      "juice of 2 limes",
+      "1/2 cup sour cream or Greek yogurt",
+      "a pinch of salt",
+      "2-3 cups shredded cabbage",
+      "Flour tortillas",
+      "Avocado",
+      "Red Onion",
+      "Mango Salsa"
+    ],
+    "basket": [
+      {
+        "item": "butter",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 40,
+            "max": 250
+          }
+        ],
+        "optional": false,
+        "lines": [
+          0
+        ],
+        "note": "3 tbsp salted butter"
+      },
+      {
+        "item": "limes",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 3,
+            "max": 3
+          }
+        ],
+        "optional": false,
+        "lines": [
+          1,
+          10
+        ],
+        "note": "juice of 1 + juice of 2"
+      },
+      {
+        "item": "chilli powder",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          2
+        ]
+      },
+      {
+        "item": "garlic powder",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          3
+        ]
+      },
+      {
+        "item": "salt",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          4,
+          12
+        ]
+      },
+      {
+        "item": "cod fillets",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 280,
+            "max": 450
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          5
+        ],
+        "note": "10-15 oz ≈ 280-425 g; 'thawed' so a frozen pack is fine"
+      },
+      {
+        "item": "vegetable oil",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          6
+        ]
+      },
+      {
+        "item": "spring onions",
+        "accept": [
+          {
+            "buy": "BUNCH",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "EACH",
+            "min": 3,
+            "max": 6
+          }
+        ],
+        "optional": false,
+        "lines": [
+          7
+        ]
+      },
+      {
+        "item": "coriander",
+        "accept": [
+          {
+            "buy": "BUNCH",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          8
+        ]
+      },
+      {
+        "item": "garlic",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          9
+        ]
+      },
+      {
+        "item": "soured cream",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          11
+        ],
+        "note": "'sour cream or Greek yogurt': one tub of either"
+      },
+      {
+        "item": "cabbage",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 150,
+            "max": 600
+          }
+        ],
+        "optional": false,
+        "lines": [
+          13
+        ],
+        "note": "2-3 cups shredded: a small/pointed cabbage or a bag of shredded"
+      },
+      {
+        "item": "flour tortillas",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "EACH",
+            "min": 4,
+            "max": 8
+          }
+        ],
+        "optional": false,
+        "lines": [
+          14
+        ],
+        "note": "no count given; it's a taco, so not optional"
+      },
+      {
+        "item": "avocado",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 2
+          }
+        ],
+        "optional": true,
+        "lines": [
+          15
+        ],
+        "note": "toppings 'whatever you like' per the method"
+      },
+      {
+        "item": "red onion",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": true,
+        "lines": [
+          16
+        ]
+      },
+      {
+        "item": "mango salsa",
+        "accept": [
+          {
+            "buy": "JAR",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": true,
+        "lines": [
+          17
+        ]
+      }
+    ]
+  },
+  {
+    "id": "bk-15",
+    "source": "pinchofyum-chickpea-curry",
+    "url": "https://pinchofyum.com/chickpea-curry",
+    "group": "us",
+    "servings": 4,
+    "lines": [
+      "1 tablespoon avocado oil",
+      "2 cloves garlic, minced",
+      "1 tablespoon brown sugar (more to taste)",
+      "1 1/2 tablespoons red curry paste (currently loving Maesri or Thai Kitchen brand)",
+      "one 14-ounce can full fat coconut milk",
+      "1 1/2 tablespoons soy sauce",
+      "one 14-ounce can chickpeas, drained and rinsed",
+      "2-3 cups fresh spinach, chopped",
+      "1/2 cup cilantro, chopped",
+      "1 1/2 cups jasmine rice, uncooked"
+    ],
+    "basket": [
+      {
+        "item": "avocado oil",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          0
+        ],
+        "note": "any neutral cooking oil"
+      },
+      {
+        "item": "garlic",
+        "accept": [
+          {
+            "buy": "EACH",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          1
+        ]
+      },
+      {
+        "item": "brown sugar",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          2
+        ],
+        "note": "1 tbsp"
+      },
+      {
+        "item": "Thai red curry paste",
+        "accept": [
+          {
+            "buy": "JAR",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          3
+        ]
+      },
+      {
+        "item": "coconut milk",
+        "accept": [
+          {
+            "buy": "TIN",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          4
+        ]
+      },
+      {
+        "item": "soy sauce",
+        "accept": [
+          {
+            "buy": "PRESENCE",
+            "min": null,
+            "max": null
+          }
+        ],
+        "optional": false,
+        "lines": [
+          5
+        ]
+      },
+      {
+        "item": "chickpeas",
+        "accept": [
+          {
+            "buy": "TIN",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          6
+        ]
+      },
+      {
+        "item": "spinach",
+        "accept": [
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "WEIGHT",
+            "min": 60,
+            "max": 260
+          }
+        ],
+        "optional": false,
+        "lines": [
+          7
+        ],
+        "note": "2-3 cups fresh ≈ 60-90 g; bags are 100-260 g"
+      },
+      {
+        "item": "coriander",
+        "accept": [
+          {
+            "buy": "BUNCH",
+            "min": 1,
+            "max": 1
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          8
+        ]
+      },
+      {
+        "item": "jasmine rice",
+        "accept": [
+          {
+            "buy": "WEIGHT",
+            "min": 250,
+            "max": 500
+          },
+          {
+            "buy": "PACK",
+            "min": 1,
+            "max": 1
+          }
+        ],
+        "optional": false,
+        "lines": [
+          9
+        ],
+        "note": "1 1/2 cups uncooked ≈ 280 g; in the title, so not optional"
+      }
+    ]
+  }
+]

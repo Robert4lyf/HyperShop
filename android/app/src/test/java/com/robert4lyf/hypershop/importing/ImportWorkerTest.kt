@@ -53,10 +53,12 @@ class ImportWorkerTest {
         )
 
     @Test
-    fun aClearRecipeIsReadByRulesAloneAndNeverNeedsClaude() =
+    fun setToOnlyWhenUnsureAClearRecipeIsReadByRulesAlone() =
         runBlocking {
-            // Every line of the cake is read without doubt: the gate keeps the rule parser's reading, key or no key.
+            // Every line of the cake is read without doubt: with Claude set to read only when unsure (W.1), the gate
+            // keeps the rule parser's reading.
             val c = TestContainer.create(pages, claude, key = "sk-ant-test")
+            c.settings.setClaudeAlways(false)
             c.reviewGate.acquire()
             servePage()
             val id = c.importJobs.enqueue(ImportInput(pages.url("/recipes/easy-chocolate-cake").toString(), "Cake"))

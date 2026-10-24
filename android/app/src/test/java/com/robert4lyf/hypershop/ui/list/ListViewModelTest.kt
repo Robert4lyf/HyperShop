@@ -221,7 +221,8 @@ class ListViewModelTest {
         vm.addSuggested("2 oni", "onion")
         assertEquals("2 onions", await(vm.ui) { it.aisles.isNotEmpty() }.row("onion").main)
         vm.addSuggested("cor", "coriander")
-        assertEquals("coriander", await(vm.ui) { u -> u.aisles.flatMap { it.second }.size == 2 }.row("coriander").main)
+        // W.2: no amount is still something to buy, in the way it is bought.
+        assertEquals("1 pack coriander", await(vm.ui) { u -> u.aisles.flatMap { it.second }.size == 2 }.row("coriander").main)
     }
 
     @Test
