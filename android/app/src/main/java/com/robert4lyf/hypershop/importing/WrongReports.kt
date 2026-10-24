@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.io.File
 
 /**
@@ -20,25 +21,33 @@ class WrongReports(
     /** Appends [report] and returns its text, for a share straight after. */
     suspend fun save(report: WrongReport): String =
         io {
-            file.parentFile?.mkdirs()
             val text = report.text()
-            // Oldest dropped past the cap: a forgotten file never grows without end.
-            val kept = (read() + text).takeLast(MAX_CHARS)
-            file.writeText(kept.substring(kept.indexOf("--- ").coerceAtLeast(0)))
+            // A note that cannot be written (a full disk) is still the text to share: never a crash over a note.
+            runCatching {
+                file.parentFile?.mkdirs()
+                // Oldest dropped past the cap, at a note's own first line: a forgotten file never grows without
+                // end, and "Share them" stays well inside what one share intent can carry.
+                val all = read() + text
+                val kept = if (all.length <= MAX_CHARS) all else all.takeLast(MAX_CHARS).let { t -> t.substring(firstNote(t)) }
+                file.writeText(kept)
+            }.onFailure { Timber.w(it, "wrong note not saved") }
             text
         }
 
+    private fun firstNote(t: String): Int = t.indexOf("\n$HEADER").let { if (it < 0) t.length else it + 1 }
+
     suspend fun all(): String = io { read() }
 
-    suspend fun count(): Int = io { Regex("""(?m)^--- This is wrong""").findAll(read()).count() }
+    suspend fun count(): Int = io { Regex("(?m)^" + Regex.escape(HEADER)).findAll(read()).count() }
 
     suspend fun clear() = io { file.delete() }
 
-    private fun read() = if (file.exists()) file.readText() else ""
+    private fun read() = runCatching { if (file.exists()) file.readText() else "" }.getOrDefault("")
 
     private suspend fun <T> io(block: () -> T): T = withContext(Dispatchers.IO) { lock.withLock { block() } }
 
     private companion object {
-        const val MAX_CHARS = 200_000
+        const val MAX_CHARS = 50_000
+        const val HEADER = "--- This is wrong"
     }
 }

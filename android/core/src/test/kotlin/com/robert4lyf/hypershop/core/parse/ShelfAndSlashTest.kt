@@ -48,8 +48,6 @@ class ShelfAndSlashTest {
 
     @Test
     fun aSlashBetweenTwoProductsIsAChoiceAndFlagged() {
-        // (Also "cooking salt / kosher salt": the catalogue does not know the first name, so it cannot tell they
-        // are one thing, and the shopper is asked. A line read right before, now flagged: the price of the rule.)
         val choices =
             listOf(
                 "100g milk/dark chocolate",
@@ -57,7 +55,6 @@ class ShelfAndSlashTest {
                 "salt/pepper",
                 "1/2 cup sugar/honey",
                 "1 lb ground beef/pork",
-                "1/2 tsp cooking salt / kosher salt",
             )
         for (line in choices) {
             val p = parser.parse(line)
@@ -68,6 +65,8 @@ class ShelfAndSlashTest {
         val flax = parser.parse("2 dl flax seed/linseeds")
         assertFalse(flax.check)
         assertEquals("cat:flaxseed", merger.target(flax.name).mergeKey)
+        // W.3: "cooking salt" is the catalogue's salt now (a UK label, from a fresh page), so this is one thing too.
+        assertFalse(parser.parse("1/2 tsp cooking salt / kosher salt").check)
     }
 
     @Test

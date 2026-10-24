@@ -22,3 +22,312 @@
 
 Edit `ingredients.csv`, then run `python3 tools/catalog/build_catalog.py`.
 `verify.sh` fails if the generated files are stale.
+
+
+## W.3 — pack sizes, weights, synonyms (October 2026)
+
+Rows marked `src=sourced` in `ingredients.csv` took their pack size and/or `gramsEach` from the listings below,
+gathered by a separate agent that did not read `testdata/`. Applied as follows: a pack note only on things bought in a
+container (where it sizes the count); a weight only where the whole row is sourced and the unit is bought by the each
+(USDA "medium", edible portion: rounding up then never leaves a shopper short); US sizes that do not fit UK produce
+(aubergine, leek, sweet potato, chilli) and the garlic bulb and celery head stay estimates. Not taken: "pickle juice"
+(a liquid filed as gherkins) and "creole mustard" (low confidence).
+
+Retailer pages refused direct fetches, so pack sizes are from trolley.co.uk's copies of each retailer's own listing;
+weights from the USDA FoodData Central SR Legacy and FNDDS 2024 dataset downloads, by `fdc_id`.
+
+## Table A — existing rows (213)
+
+| id | proposed shoppingUnit | packNote | gramsEach | source URL(s) | confidence / note |
+|---|---|---|---|---|---|
+| onion | – | 1 × 1 kg bag | 110 | Pack: [Sainsbury's Onions 1kg](https://www.trolley.co.uk/product/sainsburys-onions/SHB235), [Tesco Red Onions 1kg](https://www.trolley.co.uk/product/tesco-red-onion/UGM395). Weight: USDA FDC 170000 "Onions, raw", medium (2½" dia) = 110 g, large = 150 g | pack sourced; gramsEach sourced (USDA medium). Current 160 is closer to USDA "large" (150) — UK brown onions in 3-packs run large, so 150 is defensible too |
+| red_onion | – | 1 × 1 kg bag | 110 | Pack: [Tesco Red Onions Pack 1kg](https://www.trolley.co.uk/product/tesco-red-onion/UGM395). Weight: USDA FDC 170000 (no separate red-onion portion) | sourced (same USDA row as onion) |
+| spring_onion | – | 1 × 100 g bunch | 15 (one onion); bunch = 100 g | Pack: [Tesco Bunched Spring Onions 100g](https://www.trolley.co.uk/product/tesco-bunched-spring-onions/EHK721), [Sainsbury's Spring Onions Bunch 100g](https://www.trolley.co.uk/product/jam-doughnut/OXL802) (trolley slug is wrong, listing is right). Weight: USDA FDC 170005 medium (4⅛" long) = 15 g | sourced. Note: unit is `bunch` but gramsEach is per onion — if gramsEach is meant per buying unit it should be 100 |
+| shallot | – | 1 × 400 g bag | 40 | Pack: [Tesco Shallots 400g](https://www.trolley.co.uk/product/tesco-shallots-onions/XRJ245), [Sainsbury's Shallots 400g](https://www.trolley.co.uk/product/sainsburys-shallots/GKT464). Weight: none found (USDA 170499 has only "1 tbsp chopped") | pack sourced; gramsEach estimate (kept) |
+| garlic | – | 1 × pack of 4 bulbs | 50 | Pack: [Tesco Garlic x4](https://www.trolley.co.uk/product/tesco-garlic/CUJ433); Sainsbury's sells single bulbs ([Sainsbury's Garlic](https://www.trolley.co.uk/product/sainsburys-garlic/EHJ647)). Weight: USDA FDC 169230 clove = 3 g only; no reputable whole-bulb figure found | pack sourced; gramsEach estimate (kept; 10–15 cloves × 3–4 g) |
+| leek | – | 1 × 500 g pack | 89 (USDA) | Pack: [Tesco Leeks 500g](https://www.trolley.co.uk/product/tesco-pre-packed-leeks/RLC543), [Sainsbury's Leeks 500g](https://www.trolley.co.uk/product/sainsburys-leeks/HVN311). Weight: USDA FDC 169246 "1 leek" = 89 g (bulb and lower leaf only); FNDDS 2709935 "1 whole" = 85 g | pack sourced; USDA figure is the trimmed white only — a UK trimmed leek (2–3 per 500 g pack) is ~170–250 g. Recommend keeping 200 as an estimate |
+| carrot | – | 1 × 1 kg bag | 61 | Pack: [Tesco Carrots 1kg](https://www.trolley.co.uk/product/tesco-carrots/RTM518) (also 500 g). Weight: USDA FDC 170393 medium = 61 g, large (7¼–8½") = 72 g | sourced. Current 80 is above USDA large |
+| potato | bag (currently `kg`) | 1 × 2 kg bag | 213 | Pack: [Tesco All Rounder Potatoes 2kg](https://www.trolley.co.uk/product/tesco-all-rounder-potatoes/DRX939), [Sainsbury's Baking Potatoes 2kg](https://www.trolley.co.uk/product/sainsburys-british-baking-potatoes/GQM493). Weight: USDA FDC 170026 medium (2¼–3¼" dia) = 213 g | sourced |
+| sweet_potato | – | 1 × 1 kg bag | 130 (USDA) | Pack: [Tesco Sweet Potatoes 1kg](https://www.trolley.co.uk/product/tesco-sweet-potatoes/OBB077). Weight: USDA FDC 168482 "1 sweetpotato, 5" long" = 130 g | pack sourced; USDA's is a small 5" root — UK supermarket sweet potatoes are usually larger; current 250 is an estimate worth keeping |
+| tomato | – | 1 × 650 g pack | 123 | Pack: [Tesco Salad Tomatoes 650g](https://www.trolley.co.uk/product/tesco-salad-tomatoes/NLS796). Weight: USDA FDC 170457 medium whole (2⅗" dia) = 123 g | sourced |
+| cherry_tomato | – | 1 × 300 g punnet | 17 (one) | Pack: [Tesco Cherry Tomatoes 300g](https://www.trolley.co.uk/product/tesco-cherry-tomatoes/XNI240) (Sainsbury's 500 g: [link](https://www.trolley.co.uk/product/sainsburys-cherry-tomatoes/FHU699)). Weight: USDA FDC 170457 "1 cherry" = 17 g | sourced |
+| plum_tomato | – (or `pack`) | 1 × 500 g pack | 62 | Pack: [Sainsbury's Plum Tomatoes 500g](https://www.trolley.co.uk/product/sainsburys-plum-tomatoes/DHS002). Weight: USDA FDC 170457 "1 plum tomato" = 62 g | sourced |
+| celery | – | 1 × head (sold "each", no weight stated) | 450 | Pack: [Tesco Celery (each)](https://www.trolley.co.uk/product/tesco-celery/VMJ164), [Sainsbury's Celery (each)](https://www.trolley.co.uk/product/sainsburys-celery/VFO956); Ocado's trimmed "Celery Sticks" head is 350 g (https://ocado.com/products/ocado-celery-sticks-81830011, via search listing). Weight: USDA FDC 169988 medium stalk = 40 g | estimate. No source gives a whole UK head; 350 g (Ocado, trimmed) to ~450 g untrimmed. A packNote with no grams is safer than a guessed one |
+| celeriac | – | each | – | [Tesco Celeriac Each](https://www.trolley.co.uk/product/tesco-celeriac/AGP749) | unit sourced; no weight source found — leave blank |
+| cucumber | – | each | 301 | Pack: [Tesco Whole Cucumber Each](https://www.trolley.co.uk/product/tesco-cucumber-whole-each/IDX920). Weight: USDA FDC 168409 "1 cucumber (8¼")" = 301 g | sourced (UK whole cucumbers are ~12", so likely heavier; 300 is a safe floor) |
+| courgette | – | 1 × 500 g pack | 196 | Pack: [Tesco Courgettes 500g](https://www.trolley.co.uk/product/tesco-courgettes-pre-packed/VTZ675), [Sainsbury's Courgettes 500g](https://www.trolley.co.uk/product/sainsburys-courgettes/QJP027). Weight: USDA FDC 169291 medium = 196 g | sourced |
+| aubergine | – | each | 250 (keep) | Pack: [Tesco Aubergine Each](https://www.trolley.co.uk/product/tesco-aubergine-each/RXF627). Weight: USDA FDC 169228 "1 eggplant, unpeeled (approx 1¼ lb)" = 548 g | unit sourced; USDA's is a large US globe eggplant, roughly double a UK supermarket aubergine — gramsEach stays estimate |
+| bell_pepper | – | each | 119 | Pack: [Sainsbury's Red Pepper (each)](https://www.trolley.co.uk/product/sainsburys-red-pepper/JDC334). Weight: USDA FDC 170108 red, medium = 119 g, large = 164 g | sourced (current 160 ≈ USDA large) |
+| chilli | – | 1 × 60 g pack | 15 (keep) | Pack: [Tesco Red Chillies 60g](https://www.trolley.co.uk/product/tesco-red-chillies/IIC621). Weight: USDA FDC 170106 "1 pepper" = 45 g (large US red chili); jalapeño FDC 168576 = 14 g | pack sourced; gramsEach estimate — USDA's red chili is not a UK finger chilli |
+| mushroom | – | 1 × 400 g pack | – | [Tesco Closed Cup Mushrooms 400g](https://www.trolley.co.uk/product/tesco-closed-cup-mushrooms/NUI446), [Sainsbury's Closed Cup 400g](https://www.trolley.co.uk/product/sainsburys-closed-cup-mushrooms-vitamin-d/LPX223) | sourced |
+| chestnut_mushroom | – | 1 × 250 g pack | – | [Tesco Chestnut Mushrooms 250g](https://www.trolley.co.uk/product/chestnut-mushrooms/AVP457) (Sainsbury's 300 g: [link](https://www.trolley.co.uk/product/sainsburys-chestnut-super-mushrooms/LZX732)) | sourced |
+| broccoli | – | each (loose head) | 350 (keep) | [Tesco Broccoli Loose](https://www.trolley.co.uk/product/broccoli-loose/NJZ175), [Sainsbury's Loose Broccoli](https://www.trolley.co.uk/product/sainsburys-broccoli-loose/EDE604). USDA FDC 170379 has only "bunch" 608 g / "stalk" 151 g | unit sourced; gramsEach estimate |
+| tenderstem | – | 1 × 200 g pack | – | [Tesco Tenderstem 200g](https://www.trolley.co.uk/product/tesco-tenderstem-broccoli/RGH897), [Sainsbury's 200g](https://www.trolley.co.uk/product/sainsburys-tenderstem-broccoli/FHU393) | sourced |
+| cauliflower | – | each | 588 | [Tesco Cauliflower Each](https://www.trolley.co.uk/product/tesco-cauliflower/NYM628). Weight: USDA FDC 169986 head medium (5–6" dia) = 588 g, large = 840 g | sourced (current 800 ≈ USDA large) |
+| cabbage | – | each | 908 | [Tesco Savoy Cabbage Each](https://www.trolley.co.uk/product/tesco-savoy-cabbage/PYN828), [Tesco White Cabbage Each](https://www.trolley.co.uk/product/tesco-white-cabbage/IMB938). Weight: USDA FDC 169975 head medium = 908 g | sourced |
+| red_cabbage | – | each | 839 | [Tesco Red Cabbage Each](https://www.trolley.co.uk/product/tesco-red-cabbage-each/DVH995). Weight: USDA FDC 169977 head medium = 839 g | sourced |
+| kale | – | 1 × 200 g bag | – | [Sainsbury's Kale 200g](https://www.trolley.co.uk/product/sainsburys-kale/TCQ637), [Tesco Curly Kale 180g](https://www.trolley.co.uk/product/tesco-curly-kale/PSL517) | sourced |
+| spinach | – | 1 × 250 g bag (unchanged) | – | [Tesco Baby Spinach 250g](https://www.trolley.co.uk/product/tesco-baby-spinach/QNX247), [Sainsbury's Young Spinach 260g](https://www.trolley.co.uk/product/sainsburys-young-spinach/ZUP165) | sourced — current note confirmed |
+| lettuce | pack (romaine sold as twin hearts) | 1 × twin pack | – | [Tesco Romaine Hearts Twin Pack](https://www.trolley.co.uk/product/tesco-romaine-lettuce-hearts/NVN095), [Sainsbury's Romaine Hearts x2](https://www.trolley.co.uk/product/sainsburys-romaine-lettuce-hearts-twin-pack/YTS786). USDA FDC 169247 cos head = 626 g (a full US romaine, not a UK heart) | unit sourced; current gramsEach 300 has no source |
+| little_gem | pack | 1 × twin pack | – | [Tesco Little Gem Twin Pack](https://www.trolley.co.uk/product/tesco-little-gem-lettuce/BQG578), [Sainsbury's Little Gem](https://www.trolley.co.uk/product/sainsburys-little-gem-lettuce/DAW033) | sourced |
+| iceberg | – | each | 539 | [Tesco Iceberg Lettuce Each](https://www.trolley.co.uk/product/iceberg-lettuce-each/ABM169). Weight: USDA FDC 169248 head medium (6" dia) = 539 g | sourced |
+| rocket | – | 1 × 60 g bag | – | [Tesco Wild Rocket 60g](https://www.trolley.co.uk/product/tesco-wild-rocket/GEK600), [Sainsbury's 60g](https://www.trolley.co.uk/product/sainsburys-wild-rocket/NIW120) | sourced |
+| watercress | – | 1 × 80 g bag | – | [Tesco Watercress 80g](https://www.trolley.co.uk/product/tesco-watercress/HYE535), [Sainsbury's 80g](https://www.trolley.co.uk/product/sainsburys-watercress/DWM649) | sourced |
+| salad_leaves | – | 1 × 120 g bag | – | [Tesco Mixed Leaf Salad 120g](https://www.trolley.co.uk/product/tesco-mixed-leaf-salad/BIC157) (Sainsbury's 180 g: [link](https://www.trolley.co.uk/product/sainsburys-mixed-leaf-salad/KHC268)) | sourced |
+| asparagus | pack | 1 × 250 g pack | – | [Sainsbury's Asparagus Spears 250g](https://www.trolley.co.uk/product/sainsburys-asparagus-spears/AAX792); Tesco 180 g ([link](https://www.trolley.co.uk/product/tesco-asparagus/QAN321)) | sourced (sold in packs by weight, not tied bunches) |
+| green_beans | – | 1 × 220 g pack | – | [Tesco Green Beans 220g](https://www.trolley.co.uk/product/tesco-green-beans/USL150) (Sainsbury's 300 g: [link](https://www.trolley.co.uk/product/sainsburys-green-beans/WLZ602)) | sourced |
+| mangetout | – | 1 × 180 g pack | – | [Tesco Mangetout 180g](https://www.trolley.co.uk/product/tesco-mangetout/JQP049) | sourced |
+| sweetcorn_cob | pack | 1 × twin pack | 102 (kernels per medium ear) | [Tesco Corn On The Cob Twinpack](https://www.trolley.co.uk/product/tesco-corn-on-the-cob-twinpack/WGB932). Weight: USDA FDC 169998 "ear, medium yields" = 102 g kernels | sourced; whole cob with core weighs more |
+| butternut_squash | – | each | 750 | [Sainsbury's Butternut Squash Loose](https://www.trolley.co.uk/product/sainsburys-butternut-squash-loose/NHY660). Weight: no USDA whole-squash portion; olive's recipe sizes them at "700–800 g butternut squashes" (https://www.olivemagazine.com/recipes/vegetarian/hasselback-squash-gratin-with-herby-gremolata/) | estimate (one recipe's stated size; current 1000 is heavy) |
+| beetroot | – | 1 × 250 g pack (cooked, vacuum) | 82 | [Sainsbury's Beetroot Vacuum Pack 250g](https://www.trolley.co.uk/product/sainsburys-beetroot-vacuum-pack/FNH737); Tesco cooked 500 g ([link](https://www.trolley.co.uk/product/tesco-cooked-beetroot/NXI170)). Weight: USDA FDC 169145 "1 beet (2" dia)" = 82 g | sourced |
+| parsnip | – | 1 × 500 g pack | 150 (keep) | [Tesco Parsnips 500g](https://www.trolley.co.uk/product/tesco-parsnips/AXK207), [Sainsbury's 500g](https://www.trolley.co.uk/product/sainsburys-british-parsnips/TXY033). FNDDS 2709955 "1 whole" = 100 g but that row is *cooked* | pack sourced; gramsEach estimate |
+| swede | – | each | 386 | [Tesco Swede](https://www.trolley.co.uk/product/tesco-swede/BON229). Weight: USDA FDC 168454 rutabaga medium = 386 g | sourced |
+| radish | pack | 1 × 240 g pack | – | [Tesco Radish Pack 240g](https://www.trolley.co.uk/product/tesco-radish-pack/SLK972) | sourced (UK own-brand radishes are bagged, not bunched) |
+| fennel | – | each | 234 | [Tesco Fennel Each](https://www.trolley.co.uk/product/tesco-fennel-each/BAR308). Weight: USDA FDC 169385 "1 bulb" = 234 g | sourced |
+| avocado | – | each | 150 | [Tesco Ripe & Ready Avocado](https://www.trolley.co.uk/product/tesco-ripe-ready-avocado/UNK889). Weight: FNDDS 2709223 "Avocado, raw, 1 fruit" = 150 g; SR FDC 171706 fruit without skin and seed = 136 g | sourced |
+| brussels_sprouts | – | 1 × 500 g bag | – | [Sainsbury's Brussels Sprouts 500g](https://www.trolley.co.uk/product/sainsburys-brussels-sprouts/OMS707) | sourced |
+| pak_choi | pack | 1 × 250 g pack | – | [Tesco Pak Choi 250g](https://www.trolley.co.uk/product/pak-choi/HVH801), [Sainsbury's 250g](https://www.trolley.co.uk/product/sainsburys-pak-choi/VEI569) | sourced |
+| beansprouts | – | 1 × 300 g bag | – | [Tesco Beansprouts 300g](https://www.trolley.co.uk/product/tesco-beansprouts/RFR195) | sourced |
+| ginger | – | loose piece, or 1 × 100 g pack | – | [Tesco Root Ginger Loose](https://www.trolley.co.uk/product/ginger-root-loose/ZTO412), [Tesco Ginger 100g](https://www.trolley.co.uk/product/tesco-ginger/OOL321) | sourced |
+| lemongrass | pack | 1 × pack of 2 stalks | – | [Tesco Lemongrass Minimum 2 Stems](https://www.trolley.co.uk/product/tesco-thai-lemon-grass-minimum-2-stems/GGF784), [Sainsbury's Lemongrass Sticks x2](https://www.trolley.co.uk/product/sainsburys-fresh-packed-lemongrass-sticks/HUF189) | sourced |
+| parsley | – | 1 × 30 g pack (unchanged) | – | [Tesco Fresh Cut Flat Leaf Parsley 30g](https://www.trolley.co.uk/product/tesco-fresh-cut-flat-leaf-parsley/CZJ585), [Sainsbury's Flat Leaf Parsley 30g](https://www.trolley.co.uk/product/sainsburys-fresh-packed-flat-leaf-parsley/EXL402) | sourced — current note confirmed |
+| basil | – | 1 × 30 g pack | – | [Tesco Fresh Cut Basil 30g](https://www.trolley.co.uk/product/tesco-cut-basil/WFB443) (small pack 18 g: [link](https://www.trolley.co.uk/product/tesco-basil/SJF901)) | sourced |
+| mint | – | 1 × 16 g pack | – | [Tesco Mint 16g](https://www.trolley.co.uk/product/tesco-mint/AHC912) | sourced |
+| dill | – | 1 × 20 g pack | – | [Tesco Fresh Cut Dill 20g](https://www.trolley.co.uk/product/tesco-dill/YDE628) | sourced |
+| chives | – | 1 × 20 g pack | – | [Tesco Fresh Cut Chives 20g](https://www.trolley.co.uk/product/tesco-cut-chives/NGW430), [Sainsbury's Bunched Chives 20g](https://www.trolley.co.uk/product/sainsburys-bunched-chives/EHO286) | sourced |
+| thyme | – | 1 × 20 g pack | – | [Tesco Fresh Cut Thyme 20g](https://www.trolley.co.uk/product/tesco-thyme/GRK355), [Sainsbury's Bunched Thyme 20g](https://www.trolley.co.uk/product/sainsburys-bunched-thyme/HJX745) | sourced |
+| rosemary | – | 1 × 20 g pack | – | [Tesco Fresh Cut Rosemary 20g](https://www.trolley.co.uk/product/tesco-rosemary/MTG041), [Sainsbury's 20g](https://www.trolley.co.uk/product/sainsburys-fresh-packed-rosemary/NKJ966) | sourced |
+| sage | – | 1 × 20 g pack | – | [Tesco Sage 20g](https://www.trolley.co.uk/product/tesco-sage/NUU606), [Sainsbury's 20g](https://www.trolley.co.uk/product/sainsburys-fresh-packed-sage/RCZ060) | sourced |
+| bay_leaf | – | 1 × 3 g jar (dried) | – | [Sainsbury's Bay Leaves 3g](https://www.trolley.co.uk/product/sainsburys-bay-leaves/EPW320); fresh packs also sold ([Sainsbury's Fresh Packed Bay Leaves](https://www.trolley.co.uk/product/sainsburys-fresh-packed-bay-leaves/ROS048)) | sourced |
+| lemon | – | 1 × pack of 4 (or loose) | 84 | [Tesco Lemons x4](https://www.trolley.co.uk/product/tesco-lemons/JIS457), [Tesco Lemons Each](https://www.trolley.co.uk/product/lemons-each/NBJ510). Weight: USDA FDC 167746 "fruit (2⅜" dia)" = 84 g *without peel*; FNDDS 2709168 "1 fruit" = 65 g | sourced (edible portion; whole fruit with peel is heavier, current 100 is reasonable) |
+| lime | – | 1 × pack of 5 (or loose) | 67 | [Tesco Limes Minimum x5](https://www.trolley.co.uk/product/limes-minimum/ABY547), [Sainsbury's Limes](https://www.trolley.co.uk/product/sainsburys-limes/KYL396). Weight: USDA FDC 168155 "fruit (2" dia)" = 67 g | sourced |
+| orange | – | 1 × pack of 5 (or loose) | 131 | [Sainsbury's Oranges x5](https://www.trolley.co.uk/product/sainsburys-oranges/FFP348), [Tesco Oranges Each](https://www.trolley.co.uk/product/tesco-oranges-each/JKN653). Weight: USDA FDC 169097 "fruit (2⅝" dia)" = 131 g, large = 184 g | sourced |
+| apple | – | 1 × pack of 6 | 182 | [Sainsbury's Braeburn Apples x6](https://www.trolley.co.uk/product/sainsburys-braeburn-apples/TJS982), [Tesco British Apples x5](https://www.trolley.co.uk/product/tesco-british-apple-minimum/OFU934). Weight: USDA FDC 171688 medium (3" dia) = 182 g | sourced (UK dessert apples are often USDA "small", 149 g) |
+| pear | – | 1 × pack of 4 | 178 | [Sainsbury's Conference Pears x4](https://www.trolley.co.uk/product/sainsburys-conference-pears-ripe-ready/AVE610). Weight: USDA FDC 169118 medium = 178 g | sourced |
+| banana | – | loose, or 1 × pack of 5 | 118 | [Tesco Bananas Loose](https://www.trolley.co.uk/product/bananas-loose/JOC529), [Tesco Ripe Bananas x5](https://www.trolley.co.uk/product/tesco-ripe-bananas/VZK832). Weight: USDA FDC 173944 medium (7–7⅞") = 118 g (peeled) | sourced |
+| strawberry | – | 1 × 400 g punnet | – | [Tesco Strawberries 400g](https://www.trolley.co.uk/product/tesco-strawberries/TDP116) (227 g also: [link](https://www.trolley.co.uk/product/tesco-strawberries/ATE401)) | sourced |
+| raspberry | – | 1 × 150 g punnet | – | [Tesco Raspberries 150g](https://www.trolley.co.uk/product/tesco-raspberries/APF101) | sourced |
+| blueberry | – | 1 × 150 g punnet | – | [Tesco Blueberries 150g](https://www.trolley.co.uk/product/tesco-blueberries/IBD496) | sourced |
+| mango | – | each | 336 | [Sainsbury's Giant Mango (each)](https://www.trolley.co.uk/product/sainsburys-giant-mango/BAK833). Weight: USDA FDC 169910 "fruit without refuse" = 336 g | sourced (flesh only) |
+| grape | – | 1 × 500 g pack | – | [Tesco Red Seedless Grapes 500g](https://www.trolley.co.uk/product/tesco-red-seedless-grapes-punnet/QPA117), [Sainsbury's 500g](https://www.trolley.co.uk/product/sainsburys-white-seedless-grapes/SEP057) | sourced |
+| bread | – | 1 × 800 g loaf | – | [Tesco Medium Sliced White Bread 800g](https://www.trolley.co.uk/product/tesco-white-bread/TQI665), [Sainsbury's White Bloomer 800g](https://www.trolley.co.uk/product/sainsburys-white-bloomer/HZA441) | sourced |
+| tortilla_wrap | – | 1 × pack of 8 | – | [Tesco 8 Plain Tortilla Wraps](https://www.trolley.co.uk/product/tesco-8-plain-tortilla-wraps/PJD389) | sourced |
+| pitta | – | 1 × pack of 6 | – | [Tesco 6 White Pitta Bread](https://www.trolley.co.uk/product/tesco-6-white-pitta-bread/AFF262) | sourced |
+| naan | – | 1 × pack of 2 | – | [Tesco 2 Plain Naan Breads](https://www.trolley.co.uk/product/tesco-2-plain-naan-breads/WIW443) | sourced |
+| breadcrumbs | – | 1 × 175 g pack | – | [Tesco White Breadcrumbs 175g](https://www.trolley.co.uk/product/tesco-white-breadcrumbs/SLW647) (Sainsbury's 230 g: [link](https://www.trolley.co.uk/product/sainsburys-natural-fine-breadcrumbs/UFH328)) | sourced |
+| panko | – | 1 × 150 g pack | – | [Tesco Panko Breadcrumbs 150g](https://www.trolley.co.uk/product/tesco-panko-breadcrumbs/TDQ502) | sourced |
+| chicken | – | 1 × whole chicken, about 1.5 kg | 1500 | [Tesco Medium Whole Chicken 1.3–1.7kg](https://www.trolley.co.uk/product/tesco-medium-whole-chicken-1-3-1-7kg/VEA158), [Sainsbury's Medium Whole Chicken 1.6kg](https://www.trolley.co.uk/product/sainsburys-british-fresh-medium-whole-chicken/QLT897) | sourced (midpoint of Tesco's stated medium range) |
+| chicken_breast | – | 1 × 300 g pack (2 fillets) | 150 (one fillet) | [Tesco 2 British Chicken Breast Fillets 300g](https://www.trolley.co.uk/product/tesco-2-british-chicken-breast-fillets/THJ044), [Tesco Slower Grown Chicken Breast Fillets 300g](https://www.tesco.com/groceries/en-GB/products/320666621) (search listing) | sourced (current 150 confirmed) |
+| chicken_thigh | – | 1 × 500 g pack (boneless) | – | [Tesco Boneless Chicken Thighs 500g](https://www.trolley.co.uk/product/tesco-boneless-chicken-thighs/AJL197); bone-in packs are 1.5 kg ([link](https://www.trolley.co.uk/product/tesco-british-chicken-thighs/OUE801)) | sourced |
+| beef_mince | – | 1 × 500 g pack (unchanged) | – | [Tesco 10% Fat Beef Mince 500g](https://www.trolley.co.uk/product/tesco-healthy-living-10-fat-minced-beef-steak/RZN474), [Sainsbury's 5% Beef Mince 500g](https://www.trolley.co.uk/product/sainsburys-5-fat-beef-mince/NLS333) | sourced — current note confirmed |
+| pork_mince | – | 1 × 500 g pack | – | [Tesco Pork Mince 20% 500g](https://www.trolley.co.uk/product/tesco-pork-mince-20-fat/ICJ231), [Sainsbury's 500g](https://www.trolley.co.uk/product/sainsburys-british-pork-mince-10-fat/BEN789) | sourced |
+| lamb_mince | – | 1 × 500 g pack | – | [Tesco Lamb Mince 10% 500g](https://www.trolley.co.uk/product/tesco-lamb-mince-10-fat/UQU316), [Sainsbury's 500g](https://www.trolley.co.uk/product/sainsburys-new-zealand-lamb-mince/YWS789) | sourced |
+| bacon | – | 1 × 300 g pack (10 rashers) | – | [Tesco Smoked Back Bacon Rashers 300g (10)](https://www.trolley.co.uk/product/tesco-smoked-back-bacon-10-rashers/SHE793) | sourced — current note says 8 rashers; the own-brand pack is 10 |
+| pancetta | – | 1 × 130 g pack (2 × 65 g cubes) | – | [Tesco Smoked Pancetta 2 × 65g](https://www.trolley.co.uk/product/tesco-smoked-pancetta/CLX179); Sainsbury's cubetti 200 g ([link](https://www.trolley.co.uk/product/sainsburys-italian-cubetti-di-pancetta/CDX017)) | sourced |
+| chorizo | – | 1 × 225 g ring | – | [Sainsbury's Spanish Chorizo Ring 225g](https://www.trolley.co.uk/product/sainsburys-spanish-chorizo-ring/KNO677) | sourced |
+| sausage | – | 1 × 454 g pack (8 sausages) | – | [Tesco 8 British Pork Sausages 454g](https://www.trolley.co.uk/product/tesco-8-brtish-pork-sausages/ZWA592) | sourced |
+| ham | – | 1 × 120 g pack | – | [Tesco British Cooked Ham Slices 120g](https://www.trolley.co.uk/product/tesco-british-cooked-ham/KXA658), [Sainsbury's 6 Cooked Ham Slices 120g](https://www.trolley.co.uk/product/sainsburys-british-cooked-ham-slices/ZCJ057) | sourced |
+| salmon | – | 1 × 220 g pack (2 fillets) | – | [Sainsbury's 2 Skinless Scottish Salmon Fillets 220g](https://www.trolley.co.uk/product/sainsburys-skinless-salmon-fillets/SKV313); Tesco 4 fillets 520 g ([link](https://www.trolley.co.uk/product/tesco-4-boneless-salmon-fillets/LRQ722)) | sourced |
+| smoked_salmon | – | 1 × 100 g pack | – | [Tesco Smoked Salmon 100g](https://www.trolley.co.uk/product/tesco-smoked-salmon/RNQ234) | sourced |
+| cod | – | 1 × 360 g pack | – | [Tesco Cod Fillets 360g](https://www.trolley.co.uk/product/tesco-cod-fillets/EXA354), [Sainsbury's 360g](https://www.trolley.co.uk/product/sainsburys-skinless-boneless-cod-fillets/MUH480) | sourced |
+| prawn | – | 1 × 165 g pack | – | [Tesco Raw King Prawns 165g](https://www.trolley.co.uk/product/tesco-raw-king-prawns/JBR344), [Sainsbury's 165g](https://www.trolley.co.uk/product/sainsburys-raw-king-prawns-asc/VQM508) | sourced |
+| egg | – | 1 × box of 6 (unchanged; 12s are as common) | 50 | [Sainsbury's Free Range Eggs Large x6](https://www.trolley.co.uk/product/sainsburys-british-free-range-eggs-large/FOQ103), [Tesco Medium Free Range x12](https://www.trolley.co.uk/product/tesco-medium-free-range-eggs/BTC840). Weight: USDA FDC 171287 large = 50 g, extra large = 56 g (shell off) | sourced (current 58 is a UK large in shell; USDA is edible portion — keep 58 if the app weighs recipe grams of egg, which are shell-off) |
+| milk | – | 1 × 4 pint (2.27 l) bottle (unchanged) | – | [Tesco British Semi Skimmed Milk 2.272l](https://www.trolley.co.uk/product/tesco-british-semi-skimmed-milk/DDK423) | sourced — confirmed |
+| butter | – | 1 × 250 g block (unchanged) | – | [Tesco British Unsalted Butter 250g](https://www.trolley.co.uk/product/tesco-british-unsalted-butter/MJY287), [Sainsbury's 250g](https://www.trolley.co.uk/product/sainsburys-british-butter-unsalted/DMS484) | sourced — confirmed |
+| double_cream | – | 1 × 300 ml pot (unchanged) | – | [Tesco British Double Cream 300ml](https://www.trolley.co.uk/product/tesco-fresh-double-cream/NDO245) | sourced — confirmed |
+| single_cream | – | 1 × 300 ml pot | – | [Sainsbury's British Single Cream 300ml](https://www.trolley.co.uk/product/sainsburys-british-single-cream/DZI136); Tesco 150 ml ([link](https://www.trolley.co.uk/product/tesco-fresh-single-cream/DGQ896)) | sourced |
+| creme_fraiche | – | 1 × 300 ml pot (unchanged) | – | [Tesco British Creme Fraiche 300ml](https://www.trolley.co.uk/product/tesco-full-fat-creme-fraiche/SIJ613) | sourced — confirmed |
+| sour_cream | – | 1 × 300 ml pot | – | [Tesco Soured Cream 300ml](https://www.trolley.co.uk/product/tesco-soured-cream/VDU595); 150 ml also ([link](https://www.trolley.co.uk/product/tesco-soured-cream/OWH316)) | sourced |
+| yogurt | – | 1 × 500 g pot | – | [Sainsbury's Natural Yogurt 500g](https://www.trolley.co.uk/product/sainsburys-natural-yogurt/XHF042); Tesco 1 kg ([link](https://www.trolley.co.uk/product/tesco-natural-yogurt/XCJ324)) | sourced |
+| greek_yogurt | – | 1 × 500 g pot | – | [Tesco Greek Style Yogurt 500g](https://www.trolley.co.uk/product/tesco-greek-style-yogurt/KTA988) | sourced |
+| buttermilk | pot (currently `carton`) | 1 × 300 ml pot | – | [Sainsbury's Buttermilk 300ml](https://sainsburys.co.uk/groceries/product/sainsburys-buttermilk-300ml) (search listing; site blocks direct fetch), Waitrose 284 ml ([link](https://www.trolley.co.uk/product/essential-waitrose-buttermilk/LVE664)) | sourced |
+| cheddar | – | 1 × 400 g block (unchanged) | – | [Tesco Mature Cheddar 400g](https://www.trolley.co.uk/product/tesco-mature-cheddar/QWM689) | sourced — confirmed |
+| parmesan | – | 1 × 200 g block | – | [Tesco Parmigiano Reggiano 200g](https://www.trolley.co.uk/product/tesco-parmigiano-reggiano/PIX592), [Sainsbury's 200g](https://www.trolley.co.uk/product/sainsburys-parmigiano-reggiano-cheese/XXG050) | sourced |
+| mozzarella | – | 1 × 150 g ball | – | [Sainsbury's Mozzarella Cheese 150g](https://www.trolley.co.uk/product/sainsburys-mozzarella-cheese/WDH679); Tesco lists 200 g ([link](https://www.trolley.co.uk/product/tesco-mozzarella/DCZ904)); grated 250 g bags at both ([Tesco](https://www.trolley.co.uk/product/tesco-mozzarella-grated/OKU151)) | sourced (the two own-brands disagree; 150 g is the smaller, more common ball) |
+| feta | – | 1 × 200 g pack | – | [Tesco Greek Feta 200g](https://www.trolley.co.uk/product/tesco-greek-cheese-feta/KSV369), [Sainsbury's Greek Feta 200g](https://www.trolley.co.uk/product/sainsburys-greek-feta-cheese/KQC473) | sourced |
+| goat_cheese | – | 1 × 125 g pack | – | [Tesco British Goats Cheese 125g](https://www.trolley.co.uk/product/british-goats-cheese/HJU532), [Sainsbury's Abergavenny Goats Cheese 125g](https://www.trolley.co.uk/product/sainsburys-abergavenny-goats-cheese/XCP284) | sourced |
+| ricotta | – | 1 × 250 g tub | – | [Tesco Ricotta 250g](https://www.trolley.co.uk/product/tesco-ricotta/DRO641), [Sainsbury's 250g](https://www.trolley.co.uk/product/sainsburys-ricotta-cheese/NFQ426) | sourced |
+| cream_cheese | – | 1 × 200 g tub | – | [Tesco Soft Cheese Plain Full Fat 200g](https://www.trolley.co.uk/product/tesco-soft-cheese-plain-full-fat/IDR060); Sainsbury's 300 g ([link](https://www.trolley.co.uk/product/sainsburys-white-soft-cheese/CKQ390)) | sourced |
+| mascarpone | – | 1 × 250 g tub | – | [Tesco Mascarpone 250g](https://www.trolley.co.uk/product/tesco-mascarpone/IEV537), [Sainsbury's 250g](https://www.trolley.co.uk/product/sainsburys-mascarpone-cheese/EPK864) | sourced |
+| halloumi | – | 1 × 225 g pack | – | [Tesco Halloumi 225g](https://www.trolley.co.uk/product/tesco-halloumi/ATZ998), [Sainsbury's 225g](https://www.trolley.co.uk/product/sainsburys-cypriot-halloumi-cheese/EBO913) | sourced |
+| tofu | – | 1 × 300 g pack | – | [Sainsbury's SO Organic Super Firm Tofu 300g](https://www.trolley.co.uk/product/sainsburys-so-organic-super-firm-tofu/JEH704) (no plain Tesco own-brand tofu found) | sourced (organic tier) |
+| puff_pastry | – | 1 × 320 g pack (ready-rolled) | – | [Tesco Ready Rolled Puff Pastry 320g](https://www.trolley.co.uk/product/tesco-ready-rolled-puff-pastry/NYH720), [Sainsbury's Sheet Puff Pastry 320g](https://www.trolley.co.uk/product/sainsburys-sheet-puff-pastry/NJB584) | sourced |
+| shortcrust_pastry | – | 1 × 320 g pack (ready-rolled) | – | [Tesco Shortcrust Pastry 320g](https://www.trolley.co.uk/product/tesco-savoury-crumbly-shortcrust-pastry/FZX928), [Sainsbury's 320g](https://www.trolley.co.uk/product/sainsburys-ready-rolled-shortcrust-pastry/HJC633) | sourced |
+| pesto | – | 1 × 190 g jar | – | [Tesco Classic Green Pesto 190g](https://www.trolley.co.uk/product/tesco-classic-green-pesto/TTZ350) | sourced |
+| frozen_peas | – | 1 × 910 g bag | – | [Sainsbury's Garden Peas 910g](https://www.trolley.co.uk/product/sainsburys-garden-peas/AFO060) | sourced |
+| frozen_sweetcorn | – | 1 × 1 kg bag | – | [Tesco Supersweet Sweetcorn 1kg](https://www.trolley.co.uk/product/tesco-supersweet-sweetcorn/MQG969) | sourced |
+| chopped_tomatoes | – | 1 × 400 g tin (unchanged) | – | [Tesco Italian Chopped Tomatoes 400g](https://www.trolley.co.uk/product/tesco-italian-chopped-tomatoes-ce/NXA366), [Sainsbury's 400g](https://www.trolley.co.uk/product/sainsburys-chopped-tomatoes-can/PJX293) | sourced — confirmed |
+| passata | – | 1 × 500 g carton | – | [Tesco Tomato Passata 500g](https://www.trolley.co.uk/product/tesco-sieved-tomatoes-passata-ce/APZ900), [Sainsbury's Passata 500g](https://www.trolley.co.uk/product/sainsburys-passata/KQT098) | sourced |
+| tomato_puree | – | 1 × 200 g tube | – | [Tesco Tomato Puree 200g (tube)](https://www.trolley.co.uk/product/tesco-tomato-puree-tube/FJA033), [Sainsbury's Double Concentrate 200g](https://www.trolley.co.uk/product/sainsburys-tomato-puree-double-concentrate/FWH770) | sourced |
+| chickpeas | – | 1 × 400 g tin (unchanged) | – | [Tesco Chickpeas In Water 400g](https://www.trolley.co.uk/product/tesco-chickpeas-in-water/OHA471), [Sainsbury's 400g (240 g drained)](https://www.trolley.co.uk/product/sainsburys-chickpeas-in-water-240g/DRZ282) | sourced — confirmed |
+| kidney_beans | – | 1 × 400 g tin | – | [Tesco Red Kidney Beans In Water 400g](https://www.trolley.co.uk/product/tesco-red-kidney-beans/WAZ272) | sourced |
+| black_beans | – | 1 × 400 g tin | – | [Tesco Black Beans 400g](https://www.trolley.co.uk/product/tesco-black-beans/DNV068), [Sainsbury's 400g](https://www.trolley.co.uk/product/sainsburys-black-beans-in-water/EZF866) | sourced |
+| cannellini_beans | – | 1 × 400 g tin | – | [Tesco Cannellini Beans in Water 400g](https://www.trolley.co.uk/product/tesco-cannellini-beans/UYY589), [Sainsbury's 400g](https://www.trolley.co.uk/product/sainsburys-cannellini-beans-in-water-235g/NRN344) | sourced |
+| butter_beans | – | 1 × 400 g tin | – | [Tesco Butter Beans In Water 400g](https://www.trolley.co.uk/product/tesco-butter-beans/RRL712), [Sainsbury's 400g](https://www.trolley.co.uk/product/sainsburys-butter-beans-in-water-235g/QNV764) | sourced |
+| coconut_milk | – | 1 × 400 ml tin (unchanged) | – | [Tesco Coconut Milk 400ml](https://www.trolley.co.uk/product/tesco-coconut-milk/MQX921), [Sainsbury's 400ml](https://www.trolley.co.uk/product/sainsburys-coconut-milk/ZBY672) | sourced — confirmed |
+| sweetcorn_tin | – | 1 × 198 g tin | – | [Sainsbury's Sweetcorn 3 × 198g (157 g drained)](https://www.trolley.co.uk/product/sainsburys-sweetcorn-157g/NOQ468); Tesco 3 × 200 g ([link](https://www.trolley.co.uk/product/tesco-naturally-sweet-sweetcorn-in-water/SVB909)) | sourced (own-brand singles seen only inside multipacks) |
+| tuna_tin | – | 1 × 145 g tin | – | [Tesco Tuna Chunks In Brine 145g](https://www.trolley.co.uk/product/tesco-tuna-chunks-in-brine/ZUD250), [Sainsbury's 145g](https://www.trolley.co.uk/product/sainsburys-tuna-chunks-in-water/LSX452) | sourced |
+| anchovy | – | 1 × 50 g tin | – | [Sainsbury's Anchovy Fillets in Olive Oil 50g (30 g drained)](https://www.trolley.co.uk/product/sainsburys-anchovy-fillets-in-olive-oil-30g/TZP695) | sourced |
+| olive | – | 1 × 330 g jar | – | [Tesco Pitted Black Olives 330g](https://www.trolley.co.uk/product/tesco-pitted-black-olives/IDC072), [Sainsbury's Pitted Black Olives 340g](https://www.trolley.co.uk/product/sainsburys-pitted-black-olives-150g/UUM530) | sourced (gross weight incl. brine) |
+| caper | – | 1 × 190 g jar | – | [Tesco Capers 190g](https://www.trolley.co.uk/product/tesco-capers/KGC617) | sourced |
+| honey | – | 1 × 454 g jar | – | [Tesco Clear Honey 454g](https://www.trolley.co.uk/product/tesco-clear-honey/SRX754), [Sainsbury's 454g](https://www.trolley.co.uk/product/sainsburys-clear-honey/UDX433) | sourced |
+| maple_syrup | – | 1 × 250 g bottle | – | [Sainsbury's Canadian Maple Syrup 250g](https://www.trolley.co.uk/product/sainsburys-canadian-maple-syrup-taste-the-difference/QKX991); Tesco Finest 330 g ([link](https://www.trolley.co.uk/product/tesco-finest-grade-a-dark-maple-syrup/TBR712)) | sourced (premium tiers only; no basic own-brand pure maple found) |
+| golden_syrup | bottle? (see note) | 1 × 680 g squeezy bottle | – | [Tesco Golden Syrup 680g](https://www.trolley.co.uk/product/tesco-golden-syrup/SPK294) | sourced size; the own-brand 680 g is a squeezy bottle, the tin is mostly branded (Lyle's) — unit change optional |
+| peanut_butter | – | 1 × 340 g jar | – | [Tesco Smooth Peanut Butter 340g](https://www.trolley.co.uk/product/tesco-smooth-peanut-butter/ASQ308) | sourced |
+| tahini | – | 1 × 300 g jar | – | [Tesco Tahini 300g](https://www.trolley.co.uk/product/tesco-tahini/YVL943), [Sainsbury's 300g](https://www.trolley.co.uk/product/sainsburys-tahini-inspired-to-cook/WCI560) | sourced |
+| coriander | – | 1 × 30 g pack (unchanged) | – | [Tesco Fresh Cut Coriander 30g](https://www.trolley.co.uk/product/tesco-fresh-cut-coriander/KHS570), [Sainsbury's Fresh Packed Bunch Coriander 30g](https://www.trolley.co.uk/product/sainsburys-fresh-packed-bunch-coriander/DQC253) | sourced — current note confirmed |
+| stock_cube | – | 1 × pack of 10 cubes (100 g) | – | [Tesco 10 Chicken Stock Cubes](https://www.trolley.co.uk/product/tesco-10-chicken-stock-cubes/PSD053), [Sainsbury's Chicken Stock Cubes 10 × 10g](https://www.trolley.co.uk/product/sainsburys-stock-cubes-chicken/SNQ755) | sourced |
+| vegetable_stock_cube | – | 1 × pack of 10 cubes (100 g) | – | [Tesco 10 Vegetable Stock Cubes](https://www.trolley.co.uk/product/tesco-10-vegetable-stock-cubes/DCG756), [Sainsbury's 10 × 10g](https://www.trolley.co.uk/product/sainsburys-stock-cubes-vegetable/LXI972) | sourced |
+| beef_stock_cube | – | 1 × pack of 10 cubes (100 g) | – | [Tesco 10 Beef Stock Cubes](https://www.trolley.co.uk/product/tesco-10-beef-stock-cubes/TVE873), [Sainsbury's 10 × 10g](https://www.trolley.co.uk/product/sainsburys-stock-cubes-beef/SYD229) | sourced |
+| chicken_stock | – | – | – | No plain own-brand fresh/carton chicken stock with a stated size found; own-brand alternatives are stock pots (4 × 28 g, [Tesco](https://www.trolley.co.uk/product/tesco-chicken-stockpot/OSB518)) | not found — leave blank |
+| pasta | – | 1 × 500 g bag (unchanged) | – | [Tesco Fusilli 500g](https://www.trolley.co.uk/product/tesco-fusilli-pasta/RTH758) (1 kg also: [link](https://www.trolley.co.uk/product/tesco-fusilli-pasta-twists/CYX408)) | sourced — confirmed |
+| spaghetti | – | 1 × 1 kg bag | – | [Tesco Spaghetti 1kg](https://www.trolley.co.uk/product/tesco-spaghetti-pasta/UUK663), [Sainsbury's Spaghetti 1kg](https://www.trolley.co.uk/product/sainsburys-spaghetti/ELX836) | sourced — current note says 500 g; both own-brand basics listed were 1 kg |
+| penne | – | 1 × 1 kg bag | – | [Tesco Penne 1kg](https://www.trolley.co.uk/product/tesco-pasta-quills/RPN132), [Sainsbury's Penne 1kg](https://www.trolley.co.uk/product/sainsburys-penne/UAU618) | sourced |
+| lasagne_sheets | – | 1 × 500 g box | – | [Sainsbury's Lasagne Sheets 500g](https://www.trolley.co.uk/product/sainsburys-lasagne-sheets/ESS796) | sourced |
+| egg_noodles | – | 1 × 300 g pack | – | [Tesco Egg Noodles 300g](https://www.trolley.co.uk/product/tesco-egg-noodles/BQQ035), [Sainsbury's 300g](https://www.trolley.co.uk/product/sainsburys-egg-noodles/YMY873) | sourced |
+| rice_noodles | – | 1 × 300 g pack | – | [Tesco Rice Noodles 300g](https://www.trolley.co.uk/product/tesco-rice-noodles/ISY770) | sourced |
+| rice | – | 1 × 1 kg bag (unchanged) | – | [Tesco Easy Cook Long Grain Rice 1kg](https://www.trolley.co.uk/product/tesco-easy-cook-long-grain-rice/QJY392) | sourced — confirmed |
+| basmati_rice | – | 1 × 1 kg bag | – | [Tesco Easy Cook Basmati 1kg](https://www.trolley.co.uk/product/tesco-easy-cook-basmati-rice/MWG392) | sourced |
+| risotto_rice | – | 1 × 500 g bag | – | [Sainsbury's Arborio Risotto Rice 500g](https://www.trolley.co.uk/product/sainsburys-arborio-risotto-rice/PEZ875); Tesco 1 kg ([link](https://www.trolley.co.uk/product/tesco-arborio-risotto-rice/HTY127)) | sourced |
+| red_lentils | – | 1 × 1 kg bag | – | [Tesco Red Split Lentils 1kg](https://www.trolley.co.uk/product/tesco-red-split-lentils/IAF160) | sourced |
+| oats | – | 1 × 1 kg bag | – | [Sainsbury's Scottish Porridge Oats 1kg](https://www.trolley.co.uk/product/sainsburys-scottish-porridge-oats/NMS311) | sourced |
+| quinoa | – | 1 × 300 g bag | – | [Tesco Quinoa 300g](https://www.trolley.co.uk/product/tesco-quinoa/KND625), [Sainsbury's 300g](https://www.trolley.co.uk/product/sainsburys-quinoa/NAP757) | sourced |
+| flour | – | 1 × 1.5 kg bag (unchanged) | – | [Tesco Plain Flour 1.5kg](https://www.trolley.co.uk/product/tesco-plain-flour/FYH824) | sourced — confirmed |
+| self_raising_flour | – | 1 × 1.5 kg bag | – | [Tesco Self Raising Flour 1.5kg](https://www.trolley.co.uk/product/tesco-self-raising-flour/PVB870), [Sainsbury's 1.5kg](https://www.trolley.co.uk/product/sainsburys-self-raising-flour/WFX294) | sourced |
+| strong_flour | – | 1 × 1.5 kg bag | – | [Tesco Strong White Flour 1.5kg](https://www.trolley.co.uk/product/tesco-strong-white-bread-flour/FIP456), [Sainsbury's 1.5kg](https://www.trolley.co.uk/product/sainsburys-strong-white-unbleached-bread-flour/INM267) | sourced |
+| cornflour | – | 1 × 500 g box | – | [Tesco Cornflour 500g](https://www.trolley.co.uk/product/tesco-cornflour/YZF096), [Sainsbury's 500g](https://www.trolley.co.uk/product/sainsburys-cornflour/KNK531) | sourced |
+| caster_sugar | – | 1 × 1 kg bag (unchanged) | – | [Sainsbury's White Caster Sugar 1kg](https://www.trolley.co.uk/product/sainsburys-white-caster-sugar/EVN932), [Tesco Golden Caster 1kg](https://www.trolley.co.uk/product/tesco-golden-caster-bag/MTO063) | sourced — confirmed |
+| icing_sugar | – | 1 × 500 g bag | – | [Sainsbury's Icing Sugar 500g](https://www.trolley.co.uk/product/sainsburys-icing-sugar/RVG223) | sourced |
+| brown_sugar | – | 1 × 500 g bag | – | [Tesco Light Brown Soft Sugar 500g](https://www.trolley.co.uk/product/tesco-light-soft-brown-sugar/YGY872), [Sainsbury's 500g](https://www.trolley.co.uk/product/sainsburys-fairtrade-light-soft-brown-sugar/MZV687) | sourced |
+| baking_powder | – | 1 × 160 g tub | – | [Sainsbury's Baking Powder 160g](https://www.trolley.co.uk/product/sainsburys-baking-powder/QXY971) | sourced |
+| bicarb | – | 1 × 180 g tub | – | [Sainsbury's Bicarbonate Of Soda 180g](https://www.trolley.co.uk/product/sainsburys-bicarbonate-of-soda/DGR896) | sourced |
+| yeast | – | 1 × 56 g pack (8 × 7 g sachets) | – | [Tesco Fast Action Dried Yeast 56g](https://www.trolley.co.uk/product/tesco-dried-yeast/LMK401), [Sainsbury's 8 sachets 56g](https://www.trolley.co.uk/product/sainsburys-fast-action-dried-yeast-sachets/QBG945) | sourced (current note has no total weight) |
+| vanilla_extract | – | 1 × 38 ml bottle | – | [Tesco Madagascan Vanilla 38ml](https://www.trolley.co.uk/product/tesco-madagascan-vanilla/KTB397) | sourced |
+| cocoa | – | 1 × 250 g tub | – | [Tesco Cocoa Powder 250g](https://www.trolley.co.uk/product/tesco-cocoa-powder/EDX866), [Sainsbury's 250g](https://www.trolley.co.uk/product/sainsburys-cocoa-powder/WPH317) | sourced |
+| dark_chocolate | – | 1 × 150 g bar (cooking) | – | [Tesco Dark Cooking Chocolate 150g](https://www.trolley.co.uk/product/tesco-dark-cooking-chocolate/FDD348) | sourced |
+| ground_almonds | – | 1 × 500 g bag | – | [Tesco Ground Almonds 500g](https://www.trolley.co.uk/product/tesco-ground-almonds/NMR555), [Sainsbury's 500g](https://www.trolley.co.uk/product/sainsburys-ground-almonds/JNH040) | sourced |
+| walnut | – | 1 × 200 g bag | – | [Tesco Walnuts 200g](https://www.trolley.co.uk/product/tesco-walnuts/WZS182), [Sainsbury's Walnut Pieces 200g](https://www.trolley.co.uk/product/sainsburys-walnuts-pieces/FGY203) | sourced |
+| pine_nut | – | 1 × 100 g bag | – | [Tesco Pine Nuts 100g](https://www.trolley.co.uk/product/tesco-pine-nuts/SUB178) | sourced |
+| almond | – | 1 × 300 g bag | – | [Sainsbury's Whole Almonds 300g](https://www.trolley.co.uk/product/sainsburys-whole-almonds/IQP471) | sourced |
+| sesame_seed | – | 1 × 100 g bag | – | [Tesco Sesame Seeds 100g](https://www.trolley.co.uk/product/tesco-sesame-seeds/LUB701) | sourced |
+| raisin | – | 1 × 500 g bag | – | [Sainsbury's Seedless Raisins 500g](https://www.trolley.co.uk/product/sainsburys-raisins-seedless/QEI986) | sourced |
+| olive_oil | – | 1 × 500 ml bottle | – | [Sainsbury's Olive Oil 500ml](https://www.trolley.co.uk/product/sainsburys-olive-oil/CWV205) (1 l also) | sourced |
+| evoo | – | 1 × 500 ml bottle | – | [Tesco Extra Virgin Olive Oil 500ml](https://www.trolley.co.uk/product/tesco-extra-virgin-olive-oil/VBK997) | sourced |
+| vegetable_oil | – | 1 × 1 l bottle | – | [Tesco Pure Vegetable Oil 1l](https://www.trolley.co.uk/product/tesco-pure-vegetable-oil/JQP524) | sourced |
+| sesame_oil | – | 1 × 250 ml bottle | – | [Tesco Toasted Sesame Oil 250ml](https://www.trolley.co.uk/product/tesco-toasted-sesame-oil/RRU113), [Sainsbury's 250ml](https://www.trolley.co.uk/product/sainsburys-sesame-oil-toasted/WEK194) | sourced |
+| balsamic | – | 1 × 250 ml bottle | – | [Tesco Balsamic Vinegar of Modena 250ml](https://www.trolley.co.uk/product/tesco-balsamic-vinegar-of-modena/NUE295) | sourced |
+| red_wine_vinegar | – | 1 × 350 ml bottle | – | [Tesco Red Wine Vinegar 350ml](https://www.trolley.co.uk/product/tesco-red-wine-vinegar/BCO407) (Sainsbury's 500 ml) | sourced |
+| white_wine_vinegar | – | 1 × 350 ml bottle | – | [Tesco White Wine Vinegar 350ml](https://www.trolley.co.uk/product/tesco-white-wine-vinegar/VHY538) | sourced |
+| cider_vinegar | – | 1 × 350 ml bottle | – | [Tesco Cider Vinegar 350ml](https://www.trolley.co.uk/product/tesco-cider-vinegar/QOX326) | sourced |
+| rice_vinegar | – | 1 × 150 ml bottle | – | [Tesco Rice Wine Vinegar 150ml](https://www.trolley.co.uk/product/tesco-rice-wine-vinegar/ZNO882) | sourced |
+| soy_sauce | – | 1 × 150 ml bottle | – | [Tesco Light Soy Sauce 150ml](https://www.trolley.co.uk/product/tesco-light-soy-sauce/QKJ372), [Sainsbury's 150ml](https://www.trolley.co.uk/product/sainsburys-light-soy-sauce/SAH997) | sourced |
+| worcestershire | – | 1 × 150 ml bottle | – | [Tesco Worcester Sauce 150ml](https://www.trolley.co.uk/product/tesco-worcester-sauce/JII098) | sourced |
+| dijon | – | 1 × 185 g jar | – | [Tesco Dijon Mustard 185g](https://www.trolley.co.uk/product/tesco-dijon-mustard/UFZ679), [Sainsbury's 185g](https://www.trolley.co.uk/product/sainsburys-dijon-mustard/CVK328) | sourced |
+| wholegrain_mustard | – | 1 × 180 g jar | – | [Tesco Wholegrain Mustard 180g](https://www.trolley.co.uk/product/tesco-wholegrain-mustard/XDP742) | sourced |
+| mayonnaise | – | 1 × 500 ml jar | – | [Tesco Mayonnaise 500ml](https://www.trolley.co.uk/product/tesco-mayonnaise/ZHU493) | sourced |
+| ketchup | – | 1 × 555 g bottle | – | [Tesco Tomato Ketchup 555g](https://www.trolley.co.uk/product/tesco-tomato-ketchup/DJA419) (Sainsbury's 460 g) | sourced |
+| sweet_chilli | – | 1 × 280 g bottle | – | [Sainsbury's Sweet Chilli Sauce 280g](https://www.trolley.co.uk/product/sainsburys-sweet-chilli-sauce/KUW546) | sourced |
+| hoisin | bottle (currently `jar`) | 1 × 150 ml bottle | – | [Sainsbury's Hoisin Sauce 150ml](https://www.trolley.co.uk/product/sainsburys-hoisin-sauce/FYI305) | sourced |
+| oyster_sauce | – | 1 × 150 ml bottle | – | [Tesco Oyster Sauce 150ml](https://www.trolley.co.uk/product/tesco-oyster-sauce/VFB283) | sourced |
+| salt | tub (currently `pack`) | 1 × 750 g tub | – | [Sainsbury's Table Salt 750g](https://www.trolley.co.uk/product/sainsburys-table-salt-bottle/YES425) | sourced |
+| black_pepper | – | 1 × 50 g grinder | – | [Tesco Black Peppercorn Grinder 50g](https://www.trolley.co.uk/product/tesco-black-peppercorn-grinder/OXI002) | sourced |
+| cumin | – | 1 × 43 g jar | – | [Tesco Ground Cumin 43g](https://www.trolley.co.uk/product/tesco-ground-cumin/KBN099) | sourced |
+| coriander_ground | – | 1 × 36 g jar | – | [Tesco Ground Coriander 36g](https://www.trolley.co.uk/product/tesco-ground-coriander/AEA456) | sourced |
+| paprika | – | 1 × 44 g jar | – | [Sainsbury's Paprika 44g](https://www.trolley.co.uk/product/sainsburys-paprika/KLD008) | sourced |
+| smoked_paprika | – | 1 × 48 g jar | – | [Tesco Smoked Paprika 48g](https://www.trolley.co.uk/product/tesco-smoked-paprika/MHE462) | sourced |
+| cayenne | – | 1 × 48 g jar | – | [Tesco Ground Cayenne 48g](https://www.trolley.co.uk/product/tesco-ground-cayenne-pepper/JHA717) | sourced |
+| chilli_flakes | – | 1 × 28 g jar | – | [Tesco Crushed Chillies 28g](https://www.trolley.co.uk/product/tesco-crushed-chillies/ARJ070) | sourced |
+| chilli_powder | – | 1 × 50 g jar | – | [Tesco Mild Chilli Powder 50g](https://www.trolley.co.uk/product/tesco-mild-chilli-powder/HDF493) | sourced |
+| turmeric | – | 1 × 45 g jar | – | [Tesco Ground Turmeric 45g](https://www.trolley.co.uk/product/tesco-ground-turmeric/ZKY984) | sourced |
+| cinnamon | – | 1 × 36 g jar | – | [Tesco Ground Cinnamon 36g](https://www.trolley.co.uk/product/tesco-ground-cinnamon/SYE196) | sourced |
+| nutmeg | – | 1 × 52 g jar (ground) | – | [Tesco Ground Nutmeg 52g](https://www.trolley.co.uk/product/tesco-ground-nutmeg/IKO414); whole 33 g ([link](https://www.trolley.co.uk/product/tesco-nutmeg/LKF928)) | sourced |
+| ginger_ground | – | 1 × 38 g jar | – | [Tesco Ground Ginger 38g](https://www.trolley.co.uk/product/tesco-ground-ginger-jar/IZZ461) | sourced |
+| dried_oregano | – | 1 × 14 g jar | – | [Tesco Dried Oregano 14g](https://www.trolley.co.uk/product/tesco-dried-oregano-jar/ZDK517) | sourced |
+| dried_mixed_herbs | – | 1 × 14 g jar | – | [Sainsbury's Mixed Herbs 14g](https://www.trolley.co.uk/product/sainsburys-mixed-herbs/DLJ155) | sourced |
+| garam_masala | – | 1 × 38 g jar | – | [Tesco Garam Masala 38g](https://www.trolley.co.uk/product/tesco-garam-masala-spice-blend/MNC122) | sourced |
+| curry_powder | – | 1 × 80 g jar | – | [Tesco Medium Curry Powder 80g](https://www.trolley.co.uk/product/tesco-medium-curry-powder/AYH245) | sourced |
+| cumin_seed | – | 1 × 37 g jar | – | [Tesco Whole Cumin Seeds 37g](https://www.trolley.co.uk/product/tesco-whole-cumin-seeds/MQU422) | sourced |
+| garlic_powder | – | 1 × 56 g jar | – | [Tesco Garlic Granules 56g](https://www.trolley.co.uk/product/tesco-garlic-granules/RJW679), [Sainsbury's Garlic Granules 58g](https://www.trolley.co.uk/product/sainsburys-garlic-granules/GBX190) | sourced — the UK own-brand product is called *granules* (see Table B) |
+| onion_powder | – | 1 × 58 g jar | – | [Sainsbury's Onion Granules 58g](https://www.trolley.co.uk/product/sainsburys-onion-granules/IUQ831) | sourced — UK name is *granules* (Table B) |
+| lemon_juice | – | 1 × 250 ml bottle | – | [Sainsbury's Lemon Juice 250ml](https://www.trolley.co.uk/product/sainsburys-lemon-juice/JKK977) (Tesco 500 ml) | sourced |
+| orange_juice | – | 1 × 1 l carton | – | [Tesco Pure Orange Juice 1l](https://www.trolley.co.uk/product/tesco-pure-orange-juice-with-bits/HDG939) | sourced |
+| white_wine | – | 1 × 75 cl bottle | – | [Sainsbury's House Sweet White 75cl](https://www.trolley.co.uk/product/sainsburys-house-sweet-white/KNL653) | sourced (standard UK wine bottle) |
+| red_wine | – | 1 × 75 cl bottle | – | same 75 cl standard; no own-brand red listing fetched | estimate (75 cl is the legal standard size, not checked here) |
+
+## Table B — synonyms to add to existing rows
+
+Every name below was checked with `tools/catalog/norm.py`'s `key()` against `catalog/synonyms.csv`. None of them collides with an existing key, and none of them matches today. Recipe numbers refer to the list at the end.
+
+| existing id | synonym(s) to add | recipe page it came from | note |
+|---|---|---|---|
+| curry_paste | tikka masala paste \| chicken tikka masala paste \| tikka paste | https://www.bbcgoodfood.com/recipes/chicken-tikka-masala | Sold as a jar (Patak's 283 g, [trolley](https://www.trolley.co.uk/product/pataks-tikka-masala-spice-paste/FDP791)) |
+| stock_cube | mushroom stock cube \| mushroom stock cubes | https://www.bbcgoodfood.com/recipes/braised-beef-with-carlin-peas | |
+| sausage | italian-style sausage \| italian-style sausages | https://www.bbcgoodfood.com/recipes/baked-ziti | `italian sausage` already maps here; the hyphenated form does not |
+| pasta | ziti \| acini di pepe \| mafaldine | https://www.bbcgoodfood.com/recipes/baked-ziti, https://www.bbcgoodfood.com/recipes/italian-wedding-soup, https://www.recipetineats.com/slow-cooked-lamb-ragu-pasta/ | Shapes the UK rarely stocks; generic pasta is the honest buy |
+| mozzarella | grated mozzarella | https://www.bbcgoodfood.com/recipes/baked-ziti | Or a separate row: grated mozzarella is its own 250 g product ([Tesco](https://www.trolley.co.uk/product/tesco-mozzarella-grated/OKU151)) |
+| steak | bavette \| bavette steak \| rump steak | https://www.bbcgoodfood.com/recipes/beef-broccoli, https://www.olivemagazine.com/recipes/meat-and-poultry/reverse-seared-rump-steak-with-sauce-chien/ | `onglet` is already there; `bavette` is not |
+| onion_powder | onion granules | https://www.bbcgoodfood.com/recipes/salisbury-steak | The UK own-brand product is called "Onion Granules" ([Sainsbury's](https://www.trolley.co.uk/product/sainsburys-onion-granules/IUQ831)) |
+| garlic_powder | garlic granules | https://www.bbcgoodfood.com/recipes/salisbury-steak | `granulated garlic` exists, but the UK label "garlic granules" does not ([Tesco](https://www.trolley.co.uk/product/tesco-garlic-granules/RJW679)) |
+| lemongrass | lemongrass stalk \| lemongrass stalks | https://www.bbcgoodfood.com/recipes/thai-mussels-2 | Only needed if the parser keeps "stalk" in the name |
+| bread | crusty bread | https://www.bbcgoodfood.com/recipes/thai-mussels-2 | |
+| chilli | scotch bonnet \| scotch bonnets \| scotch bonnet chilli | https://www.olivemagazine.com/recipes/meat-and-poultry/reverse-seared-rump-steak-with-sauce-chien/ | `scotch` → whisky already exists; "scotch bonnet" is a separate key with no clash. A new row would also be defensible |
+| rosemary | rosemary sprig \| rosemary sprigs | https://www.olivemagazine.com/recipes/vegetarian/hasselback-squash-gratin-with-herby-gremolata/ | Only needed if "sprigs" is not stripped as a unit |
+| salt | cooking salt | https://www.recipetineats.com/shrimp-po-boys-prawns/ (also 19, 20) | Tesco sells "Cooking Salt 1.5kg" ([link](https://www.trolley.co.uk/product/tesco-cooking-salt/GCX057)) |
+| polenta | fine cornmeal | https://www.recipetineats.com/shrimp-po-boys-prawns/ | `cornmeal` already maps to polenta |
+| mustard | creole mustard | https://www.recipetineats.com/shrimp-po-boys-prawns/ | Low confidence: it is a coarse spicy mustard, so `wholegrain_mustard` is also arguable |
+| mayonnaise | whole-egg mayonnaise | https://www.recipetineats.com/shrimp-po-boys-prawns/ | Australian term |
+| horseradish | horseradish cream | https://www.recipetineats.com/shrimp-po-boys-prawns/ | |
+| gherkin | pickle juice | https://www.recipetineats.com/shrimp-po-boys-prawns/ | Flag: you buy a jar of gherkins to get it. Skip if a liquid should not map to a solid |
+| butter | table butter | https://www.recipetineats.com/shrimp-po-boys-prawns/ | Recipe says "salted table butter" |
+| cumin | cumin powder | https://www.recipetineats.com/smashed-beef-kofta-with-cucumber-yogurt-sauce/ | |
+| coriander_ground | coriander powder | https://www.recipetineats.com/smashed-beef-kofta-with-cucumber-yogurt-sauce/ | |
+| cucumber | lebanese cucumber \| persian cucumber \| persian cucumbers | https://www.recipetineats.com/smashed-beef-kofta-with-cucumber-yogurt-sauce/ | |
+| lamb | boneless lamb shoulder | https://www.recipetineats.com/slow-cooked-lamb-ragu-pasta/ | `lamb shoulder` exists; "boneless" is probably not a stripped prep word |
+| chopped_tomatoes | crushed tomato | https://www.recipetineats.com/slow-cooked-lamb-ragu-pasta/ | Recipe says "canned crushed tomato" (singular). Only `crushed tomatoes` exists |
+
+**Not proposed, but worth knowing:**
+- BBC's baked ziti asks for "4 x 400g cans whole tomatoes". `whole tomatoes` has no key. If the parser strips "whole", the line lands on **fresh tomato**. Mapping `whole tomatoes` → chopped_tomatoes would be wrong for fresh recipes, so it needs the can unit to decide.
+- RecipeTin's kofta says "2 tsp dried mint". If "dried" is stripped, it becomes **fresh mint (pack)**. Consider a `dried_mint` row.
+- These matched only because of plural or prep-word stripping (`red peppers`, `salted peanut`, `small pasta`, `dried chilli flakes`, `light muscovado sugar`, `whipping cream`, which maps to double_cream). They are listed for completeness and need nothing.
+
+## Table C — new rows
+
+`packNote` is left empty on purpose, because of the 15–30 cap described above. The size is in the URL column. `src` is the short source tag requested, which `build_catalog.py` currently rejects. In both tables `\|` is only the Markdown escape for the CSV's `|` synonym separator. Drop the backslash when copying. gramsPerCup is blank everywhere because no source for it was checked.
+
+| CSV line | source URL(s) | from recipe |
+|---|---|---|
+| `carlin_peas,carlin peas,carlin peas,carlin pea\|black badger peas\|maple peas,TINS_JARS,false,tin,count,,,Beans & pulses,,hodmedods` | 400 g tin / 500 g dried bag: https://steenbergs.co.uk/organic-british-carlin-peas-canned-hodmedods-400g-hod001, https://www.ethicalsuperstore.com/products/hodmedods/hodmedods-organic-carlin-peas---500g/ (no supermarket own-brand found) | https://www.bbcgoodfood.com/recipes/braised-beef-with-carlin-peas |
+| `asafoetida,asafoetida,asafoetida,asafetida\|hing,SPICES_CONDIMENTS,false,jar,presence,,,Spices,,tesco` | Tesco Asafoetida 58 g: https://www.trolley.co.uk/product/tesco-asafoetida/YME580; Sainsbury's: https://www.trolley.co.uk/product/sainsburys-asafoetida/UZY654 | https://www.olivemagazine.com/recipes/vegetarian/kitchari-with-green-bean-tarka/ |
+| `nigella_seed,nigella seeds,nigella seeds,nigella seed\|kalonji\|black onion seeds\|black onion seed,SPICES_CONDIMENTS,false,jar,presence,,,Spices,,tesco` | Tesco 45 g: https://www.trolley.co.uk/product/tesco-nigella-seeds/DXL558; Sainsbury's 48 g: https://www.trolley.co.uk/product/sainsburys-nigella-seeds/TZG334 | https://www.olivemagazine.com/recipes/vegetarian/kitchari-with-green-bean-tarka/ |
+| `curry_leaves,curry leaf,curry leaves,fresh curry leaves\|kari leaves,WORLD_FOODS,false,jar,presence,,,Middle Eastern & Indian,,tesco` | Tesco Curry Leaves 2 g (dried jar): https://www.trolley.co.uk/product/tesco-curry-leaves/MOQ353; Sainsbury's 5 g: https://www.trolley.co.uk/product/sainsburys-curry-leaves/TCQ059 | https://www.olivemagazine.com/recipes/vegetarian/kitchari-with-green-bean-tarka/ |
+| `moong_dal,moong dal,moong dal,mung dal\|yellow mung dal\|yellow moong dal\|moong dhal\|split mung beans,PASTA_RICE_GRAINS,false,bag,mass,,,Pulses,,chatwals` | Chatwal's Moong Dal 200 g: https://www.trolley.co.uk/product/chatwals-moong-dal/YOO307; Laila Mung Dal Yellow 1 kg: https://www.trolley.co.uk/product/laila-mung-dal-yellow/XYR834 (no Tesco/Sainsbury's own-brand found) | https://www.olivemagazine.com/recipes/vegetarian/kitchari-with-green-bean-tarka/ |
+| `palm_sugar,palm sugar,palm sugar,coconut palm sugar,WORLD_FOODS,false,pack,mass,,,Asian,,thai-taste` | Thai Taste Palm Sugar 200 g: https://www.trolley.co.uk/product/thai-taste-palm-sugar/QYS255 | https://www.bbcgoodfood.com/recipes/thai-mussels-2 |
+| `pomegranate_molasses,pomegranate molasses,pomegranate molasses,pomegranate syrup,WORLD_FOODS,false,bottle,presence,,,Middle Eastern & Indian,,odysea` | Odysea 250 ml: https://www.trolley.co.uk/product/odysea-pomegranate-molasses/LRU983 | https://www.recipetineats.com/smashed-beef-kofta-with-cucumber-yogurt-sauce/ |
+| `balsamic_glaze,balsamic glaze,balsamic glaze,balsamic reduction,OILS_VINEGARS,false,bottle,presence,,,Vinegars,,sainsburys` | Sainsbury's Balsamic Glaze 250 ml: https://www.trolley.co.uk/product/sainsburys-balsamic-glaze/OGL088 | https://www.recipetineats.com/smashed-beef-kofta-with-cucumber-yogurt-sauce/ (alternative: a synonym on `balsamic`, though it is a different product) |
+| `bread_roll,bread roll,bread rolls,crusty roll\|crusty rolls\|crusty white rolls\|white rolls\|soft white rolls\|batch rolls,BAKERY,false,pack,count,,,Rolls & pastries,,tesco` | Tesco 6 Crusty White Rolls: https://www.trolley.co.uk/product/6pack-crusty-white-rolls/UGR022; Sainsbury's 6: https://www.trolley.co.uk/product/sainsburys-white-crusty-rolls/QML275 | https://www.recipetineats.com/shrimp-po-boys-prawns/ |
+| `cooked_chicken,cooked chicken,cooked chicken,roast chicken\|leftover roast chicken\|leftover chicken\|shredded chicken\|rotisserie chicken\|cooked chicken breast,MEAT_FISH,false,pack,mass,,,Poultry,,tesco` | Tesco Cooked Sliced Chicken 340 g: https://www.trolley.co.uk/product/tesco-cooked-sliced-chicken/JTT584 | https://www.bbcgoodfood.com/recipes/roast-chicken-soup, https://www.olivemagazine.com/recipes/entertain/roast-sprout-and-turkey-caesar-salad/ (cooked turkey). Flag: "a roast chicken" could also mean a whole bird to roast |
+
+## The 20 recipe pages read
+
+All 20 were fetched directly, and their ingredients were taken from the schema.org Recipe JSON-LD. All were published or modified 5–23 October 2026. Serious Eats and Allrecipes returned 402, and Delicious and NYT returned 403, so the set is BBC Good Food (12), olive (5) and RecipeTin Eats (3). Between them they cover British, Italian, American, Thai, Indian, Japanese-style broth, Middle Eastern and Cajun dishes.
+
+1. https://www.bbcgoodfood.com/recipes/roast-chicken-soup
+2. https://www.bbcgoodfood.com/recipes/leek-potato-soup
+3. https://www.bbcgoodfood.com/recipes/chicken-tikka-masala
+4. https://www.bbcgoodfood.com/recipes/easy-pad-thai
+5. https://www.bbcgoodfood.com/recipes/braised-beef-with-carlin-peas
+6. https://www.bbcgoodfood.com/recipes/baked-ziti
+7. https://www.bbcgoodfood.com/recipes/beef-broccoli
+8. https://www.bbcgoodfood.com/recipes/chicken-rice-casserole-with-mushrooms
+9. https://www.bbcgoodfood.com/recipes/italian-wedding-soup
+10. https://www.bbcgoodfood.com/recipes/salisbury-steak
+11. https://www.bbcgoodfood.com/recipes/american-pancakes
+12. https://www.bbcgoodfood.com/recipes/thai-mussels-2
+13. https://www.olivemagazine.com/recipes/meat-and-poultry/reverse-seared-rump-steak-with-sauce-chien/
+14. https://www.olivemagazine.com/recipes/vegetarian/hasselback-squash-gratin-with-herby-gremolata/
+15. https://www.olivemagazine.com/recipes/healthy/ginger-broth-with-pearl-barley-and-tofu/
+16. https://www.olivemagazine.com/recipes/vegetarian/kitchari-with-green-bean-tarka/
+17. https://www.olivemagazine.com/recipes/entertain/roast-sprout-and-turkey-caesar-salad/
+18. https://www.recipetineats.com/shrimp-po-boys-prawns/
+19. https://www.recipetineats.com/smashed-beef-kofta-with-cucumber-yogurt-sauce/
+20. https://www.recipetineats.com/slow-cooked-lamb-ragu-pasta/
