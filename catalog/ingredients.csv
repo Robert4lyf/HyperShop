@@ -248,9 +248,9 @@ coconut_milk,coconut milk,coconut milk,unsweetened coconut milk|light coconut mi
 coconut_cream,coconut cream,coconut cream,,TINS_JARS,false,tin,count,,,,agent-estimate
 sweetcorn_tin,tinned sweetcorn,tinned sweetcorn,canned corn,TINS_JARS,false,tin,count,,,Beans & pulses,agent-estimate
 tuna_tin,tinned tuna,tinned tuna,tuna|canned tuna|tuna in oil,TINS_JARS,false,tin,count,,,Fish,agent-estimate
-olive,olives,olives,olive|black olive|black olives,TINS_JARS,false,jar,count,,,Jars & pickles,agent-estimate
-green_olive,green olive,green olives,,TINS_JARS,false,jar,count,,,Jars & pickles,agent-estimate
-kalamata_olive,kalamata olive,kalamata olives,kalamata,TINS_JARS,false,jar,count,,,Jars & pickles,agent-estimate
+olive,olives,olives,olive|black olive|black olives,TINS_JARS,false,jar,count,135,,Jars & pickles,agent-estimate
+green_olive,green olive,green olives,,TINS_JARS,false,jar,count,135,,Jars & pickles,agent-estimate
+kalamata_olive,kalamata olive,kalamata olives,kalamata,TINS_JARS,false,jar,count,135,,Jars & pickles,agent-estimate
 caper,capers,capers,caper,TINS_JARS,false,jar,presence,,,Jars & pickles,agent-estimate
 gherkin,gherkins,gherkins,pickles|cornichons|dill pickles,TINS_JARS,false,jar,count,,,Jars & pickles,agent-estimate
 roasted_pepper,roasted red peppers,roasted red peppers,jarred roasted peppers|roasted peppers,TINS_JARS,false,jar,count,,,Jars & pickles,agent-estimate
