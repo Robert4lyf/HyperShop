@@ -44,6 +44,9 @@ data class Extraction(
  */
 object Extractor {
     const val MAX_BLOCK = 512 * 1024
+    private val METRIC_UNITS = setOf("g", "kg", "ml", "l")
+    private val PLAIN_NUMBER = Regex("""\d{1,6}(\.\d{1,3})?""")
+    private val OWN_METRIC = Regex("""\d\s*(g|kg|ml|l)\b""", RegexOption.IGNORE_CASE)
     const val MAX_DEPTH = 64
     const val MAX_RECIPES = 10
     const val MAX_LINES = 300
@@ -118,6 +121,8 @@ object Extractor {
     private fun wprm(doc: Document): ExtractedRecipe? {
         val container = doc.selectFirst(".wprm-recipe-ingredients-container") ?: return null
         val lines = ArrayList<String>()
+        val metric = wprmMetric(doc)
+        var index = 0
         val groups = container.select(".wprm-recipe-ingredient-group")
         for (g in groups.ifEmpty { listOf(container) }) {
             g.selectFirst(
@@ -125,7 +130,10 @@ object Extractor {
             )?.text()?.let { clean(it) }?.takeIf { it.isNotEmpty() }?.let { lines += "${it.trimEnd(':')}:" }
             for (li in g.select("li.wprm-recipe-ingredient")) {
                 fun part(cls: String) = li.selectFirst(".wprm-recipe-ingredient-$cls")?.text()?.trim()?.ifEmpty { null }
-                val parts = listOfNotNull(part("amount"), part("unit"), part("name"))
+                // V.4: the recipe's own metric figure, from the site's unit switch, when the line has none: written
+                // after the amount ("2 (560g) tomatoes"), where the parser reads it as the amount's alternative.
+                val own = metric.getOrNull(index++)?.takeIf { (name, _) -> name == part("name")?.let { clean(it).lowercase() } }?.second
+                val parts = listOfNotNull(part("amount"), part("unit"), own?.let { "($it)" }, part("name"))
                 // A note is set apart from the name ("chicken, cut into chunks"), not glued on
                 // ("chicken cut into chunks" would read as a "chicken cut").
                 val notes =
@@ -141,6 +149,61 @@ object Extractor {
             }
         }
         return recipe(lines, Method.WPRM)
+    }
+
+    /**
+     * V.4: WP Recipe Maker's own data for the recipe on the page (`window.wprm_recipes`): per ingredient, in
+     * order, its name and the metric amount the site's "Metric" switch shows ("560 g" for "2 tomatoes"), or
+     * null. Only an amount in g, kg, ml or l, and only for a line whose own amount has no metric figure in it
+     * already. Untrusted like the rest of the page: capped and depth-checked as JSON-LD is, and matched to a
+     * line by its name, never by position alone.
+     */
+    fun wprmMetric(doc: Document): List<Pair<String, String?>> {
+        val script = doc.select("script").firstOrNull { "window.wprm_recipes" in it.data() }?.data() ?: return emptyList()
+        val start = script.indexOf('{', script.indexOf("window.wprm_recipes")).takeIf { it >= 0 } ?: return emptyList()
+        val body = jsonObjectAt(script, start) ?: return emptyList()
+        if (body.length > MAX_BLOCK || depth(body) > MAX_DEPTH) return emptyList()
+        val recipes = runCatching { json.parseToJsonElement(body) as? JsonObject }.getOrNull() ?: return emptyList()
+        val recipe = recipes.values.firstOrNull() as? JsonObject ?: return emptyList()
+        val ingredients = recipe["ingredients"] as? JsonArray ?: return emptyList()
+        return ingredients.mapNotNull { it as? JsonObject }.filter { str(it["type"]) != "group" }.take(MAX_LINES).map { ing ->
+            val name = str(ing["name"])?.let { clean(it).lowercase() }.orEmpty()
+            val own = "${str(ing["amount"]).orEmpty()} ${str(ing["unit"]).orEmpty()}"
+            val converted = ((ing["converted"] as? JsonObject)?.get("2") as? JsonObject)
+            val amount = str(converted?.get("amount"))?.trim().orEmpty()
+            val unit = str(converted?.get("unit"))?.trim()?.lowercase().orEmpty()
+            val ok = unit in METRIC_UNITS && amount.matches(PLAIN_NUMBER) && !OWN_METRIC.containsMatchIn(own)
+            name to (if (ok) "$amount$unit" else null)
+        }
+    }
+
+    /** The JSON object starting at [from] in [s], braces matched outside strings; null if it never closes. */
+    private fun jsonObjectAt(
+        s: String,
+        from: Int,
+    ): String? {
+        var depth = 0
+        var inString = false
+        var i = from
+        val end = minOf(s.length, from + MAX_BLOCK)
+        while (i < end) {
+            val c = s[i]
+            if (inString) {
+                if (c == '\\') {
+                    i++
+                } else if (c == '"') {
+                    inString = false
+                }
+            } else {
+                when (c) {
+                    '"' -> inString = true
+                    '{' -> depth++
+                    '}' -> if (--depth == 0) return s.substring(from, i + 1)
+                }
+            }
+            i++
+        }
+        return null
     }
 
     private fun tasty(doc: Document): ExtractedRecipe? {

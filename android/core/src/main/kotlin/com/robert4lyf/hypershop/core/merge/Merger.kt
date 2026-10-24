@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.core.merge
 
 import com.robert4lyf.hypershop.core.catalog.Catalog
 import com.robert4lyf.hypershop.core.catalog.CatalogLoader
+import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.BaseKey
 import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.QtyBase
@@ -107,11 +108,31 @@ class Merger(
             servingsOriginal,
             servings,
             locale,
-            lines.map {
-                    (id, p) ->
-                juiceAsFruit(p, locale).let { f -> IncomingLine(id, f, target(f.name, f.aisleSuggestion, overrides, f.raw)) }
+            lines.map { (id, p) ->
+                juiceAsFruit(byWeight(p), locale).let { f -> IncomingLine(id, f, target(f.name, f.aisleSuggestion, overrides, f.raw)) }
             },
         )
+
+    /**
+     * V.4: fresh produce the recipe counts *and* weighs ("2 (560g) tomatoes") is bought by the weight: two
+     * cucumbers is one big one in a British shop and two small ones in an American recipe, and the grams are
+     * what the cook meant. Only produce: eggs and chicken breasts are bought by the number.
+     */
+    fun byWeight(p: ParsedIngredient): ParsedIngredient {
+        val q = p.quantity ?: return p
+        val alt = p.altQuantity ?: return p
+        if (p.unit != null || p.altUnit !in WEIGHTS || q.isZero) return p
+        if (catalogEntry(p.name)?.aisle != AisleCode.PRODUCE) return p
+        return p.copy(
+            quantity = alt,
+            quantityMax = p.quantityMax?.let { alt * it / q },
+            quantityText = null,
+            unit = p.altUnit,
+            altQuantity = null,
+            altUnit = null,
+            note = listOfNotNull("$q${p.quantityMax?.let { "-$it" }.orEmpty()} in the recipe", p.note).joinToString(", "),
+        )
+    }
 
     /**
      * V.2: lemon or lime juice in a recipe is bought as the fruit, unless the recipe says it comes bottled. A lemon
@@ -267,6 +288,8 @@ class Merger(
 
         /** Fruit vary: a line a little over a whole fruit's juice (¼ cup of lime) is still that many fruit. */
         const val SLACK = 0.15
+
+        val WEIGHTS = setOf(QtyUnit.G, QtyUnit.KG)
 
         /** Words saying the juice is bought as juice. */
         val BOTTLED = listOf("bottle", "concentrate", "squeezy", "jif", "carton", "shop-bought", "store-bought")
