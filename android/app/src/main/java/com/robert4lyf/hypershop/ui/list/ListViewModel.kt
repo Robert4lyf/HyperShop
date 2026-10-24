@@ -14,6 +14,7 @@ import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
+import com.robert4lyf.hypershop.core.report.WrongReport
 import com.robert4lyf.hypershop.data.InStockLine
 import com.robert4lyf.hypershop.data.MANUAL_TITLE
 import com.robert4lyf.hypershop.di.AppContainer
@@ -75,6 +76,8 @@ data class ItemSheet(
     val canAlways: Boolean = false,
     /** Ticked when the sheet opened: the sheet's main button is "Untick" then. */
     val done: Boolean = false,
+    /** The row as the list shows it ("1 bulb garlic · 3 cloves"), for "This is wrong". */
+    val shown: String = "",
 )
 
 /** One "From" row: "Weeknight chilli · 400 g", linked to the recipe's page when it has one. */
@@ -486,10 +489,39 @@ class ListViewModel(
             ensureActive()
             val swaps = entry?.swaps.orEmpty().mapNotNull { c.catalog.byId[it]?.name }
             val pack = entry?.packNote?.let(Display::compactUnits)
+            val row = Display.row(list, item, entry, units)
             _sheet.value =
-                ItemSheet(id, entry?.name ?: item.displayName, totals, sources, pack, item.aisle, swaps, entry != null, list.isDone(id))
+                ItemSheet(
+                    id,
+                    entry?.name ?: item.displayName,
+                    totals,
+                    sources,
+                    pack,
+                    item.aisle,
+                    swaps,
+                    entry != null,
+                    list.isDone(id),
+                    listOfNotNull(row.main, row.sub).joinToString(" · "),
+                )
         }.also { openJob = it }
     }
+
+    /** W.4: "This is wrong" on the open sheet, saved on the phone; the note's text, for a share. */
+    suspend fun wrongNote(
+        sheet: ItemSheet,
+        expected: String,
+    ): String =
+        c.wrongReports.save(
+            WrongReport(
+                "List",
+                sheet.name,
+                sheet.sources.map { it.title to (it.amount ?: "no amount") },
+                sheet.shown,
+                expected,
+                c.catalog.version,
+                java.time.Instant.ofEpochMilli(c.clock()).toString(),
+            ),
+        )
 
     /**
      * "Swap for": the item becomes [to] (merging into it if it's on the list).

@@ -42,6 +42,8 @@ data class SettingsUi(
     val aisles: List<AisleCode> = emptyList(),
     val watchVibrate: Boolean = true,
     val claudeAlways: Boolean = true,
+    /** W.4: "This is wrong" notes saved on the phone. */
+    val wrongNotes: Int = 0,
     /** The watch link in words (Settings › Watch). */
     val watchStatus: String = "",
     /** The link is down or reports a problem, so "Try again" is offered. */
@@ -117,6 +119,7 @@ class SettingsViewModel(
         watch(s.dailyCalls) { copy(dailyCalls = it) }
         watch(s.watchVibrate) { copy(watchVibrate = it) }
         watch(s.claudeAlways) { copy(claudeAlways = it) }
+        viewModelScope.launch { _ui.update { it.copy(wrongNotes = c.wrongReports.count()) } }
         val link = combine(c.watchLink.state, c.watchLink.problem) { st, why -> watchStatus(st, why) to watchCanRetry(st, why) }
         watch(link) { (text, can) -> copy(watchStatus = text, watchCanRetry = can) }
         watch(s.debugLog) { copy(debugLog = it, logLines = if (it) c.log.snapshot().takeLast(LOG_LINES) else emptyList()) }
@@ -345,6 +348,16 @@ class SettingsViewModel(
     ) = if (n == 1) "1 $word" else "$n ${word}s"
 
     // ---- Watch -----------------------------------------------------------------------------
+
+    /** Every saved "This is wrong" note, for the share sheet. */
+    suspend fun wrongNotesText(): String = c.wrongReports.all()
+
+    fun deleteWrongNotes() =
+        viewModelScope.launch {
+            c.wrongReports.clear()
+            _ui.update { it.copy(wrongNotes = 0) }
+            messages.send(UiMessage("Notes deleted"))
+        }
 
     /** Data › Clear shopping history. */
     fun clearHistory() =

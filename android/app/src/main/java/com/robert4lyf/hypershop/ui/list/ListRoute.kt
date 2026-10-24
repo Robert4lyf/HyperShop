@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalContext
@@ -17,6 +18,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.UiMessage
+import com.robert4lyf.hypershop.ui.common.shareNote
 import com.robert4lyf.hypershop.ui.util.factoryFor
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -36,6 +38,7 @@ fun ListRoute(
     val prep by vm.prep.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     // Built once per view model: a new object on every recomposition would recompose the whole header.
     val header =
         remember(vm, context, onReview, onPlan) {
@@ -90,6 +93,12 @@ fun ListRoute(
                     // The sheet shows the state it opened with, so it closes; the list (and the snackbar) show the result.
                     vm.toggle(s.id)
                     vm.closeItem()
+                },
+                onWrong = { expected, share ->
+                    scope.launch {
+                        val text = vm.wrongNote(s, expected)
+                        if (share) shareNote(context, text)
+                    }
                 },
             ),
             onDismiss = vm::closeItem,

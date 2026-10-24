@@ -128,6 +128,9 @@ class AppContainer(
     /** Pages and recipe photos: the app's only fetches, both through the same checks. */
     val fetcher = SafeFetcher(fetchPolicy)
 
+    /** W.4: "This is wrong" notes, on the phone until shared. */
+    val wrongReports = com.robert4lyf.hypershop.importing.WrongReports(File(context.filesDir, "reports/wrong.txt"))
+
     /** Saved recipes' photos (the page's own, or one chosen), kept on the phone. */
     val recipePhotos by lazy { com.robert4lyf.hypershop.importing.RecipePhotos(context, fetcher, repository) }
 

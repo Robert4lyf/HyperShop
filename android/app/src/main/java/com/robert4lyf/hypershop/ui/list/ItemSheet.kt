@@ -63,6 +63,7 @@ import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.PillShape
 import com.robert4lyf.hypershop.ui.common.SectionLabel
 import com.robert4lyf.hypershop.ui.common.SheetHeader
+import com.robert4lyf.hypershop.ui.common.WrongNote
 import com.robert4lyf.hypershop.ui.common.basilChipColors
 import com.robert4lyf.hypershop.ui.common.cardLift
 import com.robert4lyf.hypershop.ui.common.rememberOpenLink
@@ -79,6 +80,8 @@ data class ItemSheetActions(
     val onSwap: (String, Boolean) -> Unit = { _, _ -> },
     /** "Tick" / "Untick" at the top of the sheet: the same as the row's round tick. */
     val onToggle: () -> Unit = {},
+    /** W.4 "This is wrong": what was expected, and whether to share the note too. */
+    val onWrong: (String, Boolean) -> Unit = { _, _ -> },
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -144,6 +147,7 @@ fun ItemSheetContent(
                 Spacer(Modifier.size(8.dp))
                 Text("Remove from list")
             }
+            WrongNote(actions.onWrong)
         }
     }
 }

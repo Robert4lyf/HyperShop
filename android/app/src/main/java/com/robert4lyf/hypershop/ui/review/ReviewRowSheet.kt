@@ -47,10 +47,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
@@ -63,7 +65,10 @@ import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.SectionLabel
 import com.robert4lyf.hypershop.ui.common.SheetHeader
 import com.robert4lyf.hypershop.ui.common.Tone
+import com.robert4lyf.hypershop.ui.common.WrongNote
+import com.robert4lyf.hypershop.ui.common.shareNote
 import com.robert4lyf.hypershop.ui.theme.icon
+import kotlinx.coroutines.launch
 
 /** Callbacks of the row sheet. */
 data class SheetActions(
@@ -82,6 +87,8 @@ data class SheetActions(
     val onInStock: (Boolean) -> Unit = {},
     /** Where a new name would go: "Joins maple syrup in Baking". */
     val renamePreview: (String) -> String? = { null },
+    /** W.4 "This is wrong": what was expected, and whether to share the note too. */
+    val onWrong: (String, Boolean) -> Unit = { _, _ -> },
 )
 
 /**
@@ -104,6 +111,8 @@ internal fun ReviewRowSheetHost(
         LaunchedEffect(key) { onDismiss() }
         return
     }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     ModalBottomSheet(onDismissRequest = onDismiss) {
         ReviewRowSheet(
             sheet,
@@ -124,6 +133,12 @@ internal fun ReviewRowSheetHost(
                 onSetAmount = vm::setAmount,
                 onInStock = { vm.setInStock(key, it) },
                 renamePreview = vm::renamePreview,
+                onWrong = { expected, share ->
+                    scope.launch {
+                        val text = vm.wrongNote(key, expected) ?: return@launch
+                        if (share) shareNote(context, text)
+                    }
+                },
             ),
         )
     }
@@ -160,6 +175,7 @@ fun ReviewRowSheet(
             }
             // Asks "always or just this time?" on the chip, like the list's sheet; the move is announced with Undo.
             MoveAisle(sheet.aisle, actions.onMoveAisle)
+            WrongNote(actions.onWrong)
         }
     }
 }
