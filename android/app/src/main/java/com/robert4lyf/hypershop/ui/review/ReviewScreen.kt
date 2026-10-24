@@ -101,10 +101,7 @@ import com.robert4lyf.hypershop.ui.common.sectionPosition
 import com.robert4lyf.hypershop.ui.common.siteName
 import com.robert4lyf.hypershop.ui.recipes.RecipeBackdrop
 import com.robert4lyf.hypershop.ui.theme.Brand
-import com.robert4lyf.hypershop.ui.theme.backdropHost
 import com.robert4lyf.hypershop.ui.theme.card
-import com.robert4lyf.hypershop.ui.theme.onBackdrop
-import com.robert4lyf.hypershop.ui.theme.rememberHeroBackdrop
 import com.robert4lyf.hypershop.ui.theme.style
 
 /** Changes to the recipe itself: its name, its book and page, and an ingredient added by hand. */
@@ -263,15 +260,12 @@ private fun Hero(
     if (sourcing) BookDialog(ui.book, ui.page, onDismiss = { sourcing = false }, onSave = onBook)
     val open = rememberOpenLink()
     val onHero = ButtonDefaults.textButtonColors(contentColor = Brand.OnHero)
-    // White words and icons on the picture get a little shade behind them where it is bright (white pills need none).
-    val backdrop = rememberHeroBackdrop(photo = ui.photo != null)
     CompositionLocalProvider(LocalContentColor provides Brand.OnHero) {
         Box(
             Modifier
                 .fillMaxWidth()
                 .padding(start = 16.dp, end = 16.dp, top = 4.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .backdropHost(backdrop),
+                .clip(RoundedCornerShape(24.dp)),
         ) {
             // The recipe's own picture behind it, the same as its card on the Recipes tab: its photo, else its mosaic.
             RecipeBackdrop(ui.title, ui.photo, Modifier.matchParentSize())
@@ -307,7 +301,7 @@ private fun Hero(
                             onClick = onRetryClaude,
                             enabled = !ui.busy,
                             colors = onHero,
-                            modifier = centred.onBackdrop(backdrop).testTag("ask-claude"),
+                            modifier = centred.testTag("ask-claude"),
                         ) {
                             Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.size(6.dp))
@@ -318,10 +312,10 @@ private fun Hero(
                         CircularProgressIndicator(centred.size(20.dp), color = Brand.OnHero, strokeWidth = 2.dp)
                         Text(
                             "Asking Claude…",
-                            centred.onBackdrop(backdrop).progressSemantics(),
+                            centred.progressSemantics(),
                             style = MaterialTheme.typography.labelLarge,
                         )
-                        TextButton(onClick = onStopRetry, colors = onHero, modifier = centred.onBackdrop(backdrop).testTag("stop-retry")) {
+                        TextButton(onClick = onStopRetry, colors = onHero, modifier = centred.testTag("stop-retry")) {
                             Text("Stop")
                         }
                     } else if (ui.busy) {
@@ -332,14 +326,14 @@ private fun Hero(
                     ui.claudeNote?.let {
                         Text(
                             it,
-                            Modifier.onBackdrop(backdrop).testTag("claude-note"),
+                            Modifier.testTag("claude-note"),
                             style = MaterialTheme.typography.bodySmall,
                             color = Brand.OnHero,
                         )
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f, fill = false).onBackdrop(backdrop).testTag("hero-text")) {
+                    Column(Modifier.weight(1f, fill = false).testTag("hero-text")) {
                         Text(
                             ui.title,
                             style = MaterialTheme.typography.headlineMedium,
@@ -351,7 +345,7 @@ private fun Hero(
                         }
                     }
                     if (!ui.byHand) {
-                        IconButton(onClick = { renaming = true }, modifier = Modifier.onBackdrop(backdrop).testTag("edit-title")) {
+                        IconButton(onClick = { renaming = true }, modifier = Modifier.testTag("edit-title")) {
                             Icon(Icons.Rounded.Edit, contentDescription = "Rename recipe", tint = Brand.OnHero)
                         }
                     }
@@ -361,7 +355,7 @@ private fun Hero(
                         onClick = { sourcing = true },
                         colors = onHero,
                         contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp),
-                        modifier = Modifier.onBackdrop(backdrop).testTag("edit-book"),
+                        modifier = Modifier.testTag("edit-book"),
                     ) {
                         Icon(Icons.AutoMirrored.Rounded.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.size(8.dp))
@@ -383,7 +377,7 @@ private fun Hero(
                     ui.url?.let { url ->
                         TextButton(
                             onClick = { open(url) },
-                            modifier = Modifier.align(Alignment.CenterVertically).onBackdrop(backdrop).testTag("open-recipe"),
+                            modifier = Modifier.align(Alignment.CenterVertically).testTag("open-recipe"),
                             colors = onHero,
                         ) {
                             Text(

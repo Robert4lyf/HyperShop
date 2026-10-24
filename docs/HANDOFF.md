@@ -4,7 +4,7 @@
 
 Step T (PROGRESS.md › Step T, the report in docs/reports/refinement-pass.md) made white text readable on bright heroes, gave a removed recipe's notes and photo an end (kept 30 days after nothing names them), added Sort and "4★ & up" to Saved, cached photos, and made "plus" amounts add up. **Run on:** the JVM (every check below has a test) and CI's emulator (photo timings). **Not run on:** a real phone, any real Forerunner 245. These need your eyes:
 
-29. **Bright heroes.** Light mode, at your usual brightness: the recipe titles, subtitles and the menu dots on the brightest (right-hand) end of a mosaic, and on a pale photo, readable at arm's length? Any soft dark patch behind the text that looks like a smudge rather than a shadow? ___
+29. **Bright heroes.** Light mode, at your usual brightness: are the recipe titles, subtitles and menu dots readable at arm's length, even at the right-hand end of a mosaic and on a pale photo? Since V.3 there is no shade behind the text; the colours themselves are darker and richer. Too dark now, or about right? ___
 30. **Sort and 4★.** Saved › Sort: each of Recently added, Highest rated, Most planned, A–Z puts the recipe you expect first? "4★ & up" leaves only those, and searching keeps it on?
 31. **Plan the week.** The first picks are the meals you plan most (not just this week's)? A planned meal shows the cooking notes you wrote on its saved recipe?
 32. **Scroll with photos.** With 20 or more photographed recipes, scroll Saved to the end and back fast: does any photo flash grey on the way back? (It should not now.) Any stutter? ___

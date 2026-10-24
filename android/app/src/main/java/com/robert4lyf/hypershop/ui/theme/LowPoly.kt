@@ -78,7 +78,7 @@ internal fun lowPolyFacets(
                 val cy = (t[0].y + t[1].y + t[2].y) / 3f / size.height
                 val along = (cx * dirX + (cy - 0.5f) * dirY * 0.6f - reach + (rnd.nextFloat() - 0.5f) * 0.06f).coerceIn(0f, 1f)
                 val shade = (rnd.nextFloat() - 0.5f) * 0.10f
-                val base = lerp(sample(stops, along * end), Color.White, LIFT)
+                val base = sample(stops, along * end)
                 val colour = if (shade >= 0) lerp(base, Color.White, shade) else lerp(base, Color.Black, -shade)
                 val path =
                     Path().apply {
@@ -102,8 +102,27 @@ internal fun DrawScope.drawFacets(facets: List<Pair<Path, Color>>) {
     }
 }
 
-/** How far every facet is lifted toward white: the palettes as written read too dark on the phone. */
-internal const val LIFT = 0.08f
+/**
+ * The palettes as written, made darker and richer (V.3): saturation scaled by [ENRICH], and value by
+ * [DEEPEN_DARK] at the dark end running to [DEEPEN_BRIGHT] at the bright end, where white text needed it most.
+ * This replaced a shade drawn behind each piece of text, which read as a smudge, and a lift toward white
+ * before that, which washed the colours out. HeroContrastTest holds white to 3:1 everywhere and 4.5:1 on
+ * the left half, where the smaller text sits.
+ */
+internal const val ENRICH = 1.25f
+internal const val DEEPEN_DARK = 0.88f
+internal const val DEEPEN_BRIGHT = 0.64f
+
+private fun richer(
+    c: Long,
+    at: Float,
+): Color {
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(c.toInt(), hsv)
+    hsv[1] = (hsv[1] * ENRICH).coerceAtMost(1f)
+    hsv[2] = hsv[2] * (DEEPEN_DARK + (DEEPEN_BRIGHT - DEEPEN_DARK) * at)
+    return Color(android.graphics.Color.HSVToColor(hsv))
+}
 
 /** One header palette: dark at 0 (under the title), bright at 1, and [hue] for the recipe's chips. */
 internal class LowPolyPalette(
@@ -117,7 +136,7 @@ private fun palette(
 ): LowPolyPalette {
     // Dark half kept long so white text on the left keeps its contrast.
     val at = floatArrayOf(0.00f, 0.30f, 0.55f, 0.70f, 0.80f, 0.89f, 1.00f)
-    return LowPolyPalette(hue, colours.mapIndexed { i, c -> at[i] to Color(c) })
+    return LowPolyPalette(hue, colours.mapIndexed { i, c -> at[i] to richer(c, at[i]) })
 }
 
 /** All in the style guide's manner: a deep base running into a warm or bright end. */
