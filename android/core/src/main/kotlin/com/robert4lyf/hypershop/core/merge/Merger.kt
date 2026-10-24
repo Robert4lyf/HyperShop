@@ -107,8 +107,7 @@ class Merger(
             servingsOriginal,
             servings,
             locale,
-            lines.map {
-                    (id, p) ->
+            lines.map { (id, p) ->
                 juiceAsFruit(p, locale).let { f -> IncomingLine(id, f, target(f.name, f.aisleSuggestion, overrides, f.raw)) }
             },
         )

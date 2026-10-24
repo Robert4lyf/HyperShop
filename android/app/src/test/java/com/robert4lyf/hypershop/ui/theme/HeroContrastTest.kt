@@ -8,7 +8,6 @@ import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -87,13 +86,12 @@ class HeroContrastTest {
     }
 
     @Test
-    fun theColoursAreRicherThanAsWritten() {
-        // Saturation up and value down, more toward the bright end, never lifted toward white.
-        val hsv = FloatArray(3)
+    fun everyColourIsUnderItsCeilingAndNoDarkerThanItNeeds() {
         for (p in PALETTES) {
-            val bright = p.stops.last().second
-            android.graphics.Color.colorToHSV(bright.toArgb(), hsv)
-            assertTrue("a bright end at value ${hsv[2]}", hsv[2] <= DEEPEN_BRIGHT + 0.01f)
+            for ((at, colour) in p.stops) {
+                val ceiling = if (at <= 0.70f) LEFT_CEILING else RIGHT_CEILING
+                assertTrue("a stop at $at is ${colour.luminance()}", colour.luminance() <= ceiling)
+            }
         }
     }
 

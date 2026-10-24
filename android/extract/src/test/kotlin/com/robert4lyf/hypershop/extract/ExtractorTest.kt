@@ -287,4 +287,47 @@ class ExtractorTest {
             assertNull(Extractor.extract(page("{\"@type\":\"Recipe\",$lines,\"image\":\"$bad\"}"), base).image, bad)
         }
     }
+
+    private fun wprmPage(data: String): String {
+        fun li(
+            amount: String,
+            unit: String,
+            name: String,
+            notes: String,
+        ) = "<li class=\"wprm-recipe-ingredient\"><span class=\"wprm-recipe-ingredient-amount\">$amount</span>" +
+            "<span class=\"wprm-recipe-ingredient-unit\">$unit</span><span class=\"wprm-recipe-ingredient-name\">$name</span>" +
+            "<span class=\"wprm-recipe-ingredient-notes\">$notes</span></li>"
+        return "<html><body><div class=\"wprm-recipe-ingredients-container\"><ul>" +
+            li("2", "", "tomatoes", ", diced") + li("40g/ 4 cups", "", "baby rocket", "") + li("1/3", "cup", "dill", "") +
+            "</ul></div><script>window.wprm_recipes = $data</script></body></html>"
+    }
+
+    @Test
+    fun aWprmPagesOwnMetricFigureIsAddedToItsLine() {
+        // V.4, from RecipeTin Eats: "2 tomatoes" on the page, "560 g" behind its Metric switch.
+        val data =
+            """{"recipe-1":{"ingredients":[""" +
+                """{"type":"ingredient","amount":"2","unit":"","name":"tomatoes","converted":{"2":{"amount":"560","unit":"g"}}},""" +
+                """{"type":"ingredient","amount":"40g/ 4 cups","unit":"","name":"baby rocket",""" +
+                """"converted":{"2":{"amount":"40","unit":"g"}}},""" +
+                """{"type":"ingredient","amount":"1/3","unit":"cup","name":"dill","converted":null}]}};"""
+        val lines = Extractor.extract(wprmPage(data)).recipes.single().lines
+        assertEquals("2 (560g) tomatoes, diced", lines[0])
+        // A line that already gives grams, and one with no conversion, are left as written.
+        assertEquals("40g/ 4 cups baby rocket", lines[1])
+        assertEquals("1/3 cup dill", lines[2])
+    }
+
+    @Test
+    fun aWprmFigureForAnotherLineOrBrokenDataIsIgnored() {
+        val other =
+            """{"r":{"ingredients":[{"type":"ingredient","amount":"2","unit":"","name":"onions",""" +
+                """"converted":{"2":{"amount":"300","unit":"g"}}}]}};"""
+        assertEquals("2 tomatoes, diced", Extractor.extract(wprmPage(other)).recipes.single().lines[0])
+        assertEquals("2 tomatoes, diced", Extractor.extract(wprmPage("{not json")).recipes.single().lines[0])
+        val odd =
+            """{"r":{"ingredients":[{"type":"ingredient","amount":"2","unit":"","name":"tomatoes",""" +
+                """"converted":{"2":{"amount":"lots","unit":"g"}}}]}};"""
+        assertEquals("2 tomatoes, diced", Extractor.extract(wprmPage(odd)).recipes.single().lines[0])
+    }
 }

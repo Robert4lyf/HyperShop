@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import kotlin.math.ceil
 import kotlin.math.cos
@@ -103,15 +104,20 @@ internal fun DrawScope.drawFacets(facets: List<Pair<Path, Color>>) {
 }
 
 /**
- * The palettes as written, made darker and richer (V.3): saturation scaled by [ENRICH], and value by
- * [DEEPEN_DARK] at the dark end running to [DEEPEN_BRIGHT] at the bright end, where white text needed it most.
- * This replaced a shade drawn behind each piece of text, which read as a smudge, and a lift toward white
- * before that, which washed the colours out. HeroContrastTest holds white to 3:1 everywhere and 4.5:1 on
- * the left half, where the smaller text sits.
+ * The palettes as written, made richer and as light as white text allows, no darker (V.3, V.5): saturation
+ * scaled by [ENRICH], value raised by up to [LIGHTEN], but each colour held at or under a luminance ceiling —
+ * [LEFT_CEILING] for the stops that can lie under the left half's small text (4.5:1 for white, with room
+ * for the facets' own shading), [RIGHT_CEILING] for the rest (3:1, large text and icons). So every colour is
+ * as light as its place allows: the dark end lifts a lot, the bright end comes down only as far as it must.
+ * This replaced a shade drawn behind each piece of text, which read as a smudge. HeroContrastTest measures it.
  */
 internal const val ENRICH = 1.25f
-internal const val DEEPEN_DARK = 0.88f
-internal const val DEEPEN_BRIGHT = 0.64f
+internal const val LIGHTEN = 1.6f
+internal const val LEFT_CEILING = 0.13f
+internal const val RIGHT_CEILING = 0.26f
+
+/** The last stop that can fall under the left half of a hero (the run is tilted and starts a little in). */
+private const val LEFT_STOPS_UP_TO = 0.70f
 
 private fun richer(
     c: Long,
@@ -120,7 +126,11 @@ private fun richer(
     val hsv = FloatArray(3)
     android.graphics.Color.colorToHSV(c.toInt(), hsv)
     hsv[1] = (hsv[1] * ENRICH).coerceAtMost(1f)
-    hsv[2] = hsv[2] * (DEEPEN_DARK + (DEEPEN_BRIGHT - DEEPEN_DARK) * at)
+    val ceiling = if (at <= LEFT_STOPS_UP_TO) LEFT_CEILING else RIGHT_CEILING
+    var v = (hsv[2] * LIGHTEN).coerceAtMost(1f)
+    // Down in small steps until the colour is under its ceiling.
+    while (v > 0.05f && Color(android.graphics.Color.HSVToColor(floatArrayOf(hsv[0], hsv[1], v))).luminance() > ceiling) v -= 0.01f
+    hsv[2] = v
     return Color(android.graphics.Color.HSVToColor(hsv))
 }
 
