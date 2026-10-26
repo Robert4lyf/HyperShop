@@ -106,17 +106,27 @@ fun ListRoute(
     }
 }
 
-/** Shows [m] with Undo for [UiMessage.seconds], outliving the screen that asked. */
+/**
+ * Shows [m] with Undo for [UiMessage.seconds], outliving the screen that asked. A newer message replaces it, even
+ * one still waiting its turn: the request before is cancelled, so nothing queues up behind the row being tapped.
+ */
 fun show(
     container: AppContainer,
     snackbar: SnackbarHostState,
     m: UiMessage,
 ) {
-    container.applicationScope.launch(kotlinx.coroutines.Dispatchers.Main) {
-        val r = snackbar.showTimed(m.text, m.undo?.let { m.action }, m.seconds)
-        if (r == SnackbarResult.ActionPerformed) m.undo?.invoke()
-    }
+    val previous = showing[snackbar]
+    val job =
+        container.applicationScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+            previous?.cancel()
+            val r = snackbar.showTimed(m.text, m.undo?.let { m.action }, m.seconds)
+            if (r == SnackbarResult.ActionPerformed) m.undo?.invoke()
+        }
+    showing[snackbar] = job
 }
+
+/** The latest request per host (main thread only), so the next one can take its place. */
+private val showing = java.util.WeakHashMap<SnackbarHostState, kotlinx.coroutines.Job>()
 
 /**
  * Shows a snackbar for [seconds] once it is on screen. The clock starts when
@@ -130,6 +140,9 @@ suspend fun SnackbarHostState.showTimed(
     seconds: Int,
 ): SnackbarResult {
     val visuals = TimedVisuals(text, action)
+    // The newest replaces what is showing (X.4): queued, five "at home" taps played back one after another for a
+    // minute, each over the row being tapped. Its Undo goes with it; the newest action's Undo is the one shown.
+    currentSnackbarData?.dismiss()
     return coroutineScope {
         val timer =
             launch {

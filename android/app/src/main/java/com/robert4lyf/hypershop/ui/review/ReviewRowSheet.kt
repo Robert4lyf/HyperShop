@@ -25,6 +25,8 @@ import androidx.compose.material.icons.rounded.LocalMall
 import androidx.compose.material.icons.rounded.ReportProblem
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -162,6 +164,7 @@ fun ReviewRowSheet(
                 InfoBanner("Check: ${ReviewViewModel.plainReason(reason)}", Icons.Rounded.ReportProblem, tone = Tone.WARNING)
             }
             SwitchRow("At home", sheet.inStock, actions.onInStock)
+            if (sheet.swaps.isNotEmpty()) SwapFor(sheet.swaps, actions.onRename)
             key(sheet.key) { Rename(sheet.name, actions.onRename, actions.renamePreview) }
             SectionLabel(if (sheet.lines.size == 1) "From the recipe" else "From the recipe (${sheet.lines.size} lines)")
             for (line in sheet.lines) key(line.id) { LineEditor(line, actions, canRemove = sheet.canRemove) }
@@ -198,6 +201,28 @@ private fun SwitchRow(
     ) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
         Switch(checked = on, onCheckedChange = null)
+    }
+}
+
+/** X.4: the catalogue's usual swaps, one tap each: the line becomes that, for this recipe only (a rename). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SwapFor(
+    swaps: List<String>,
+    onSwap: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionLabel("Swap for")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (s in swaps) {
+                AssistChip(
+                    onClick = { onSwap(s) },
+                    label = { Text(s.replaceFirstChar { it.uppercase() }) },
+                    leadingIcon = { Icon(Icons.Rounded.SwapHoriz, contentDescription = null, Modifier.size(AssistChipDefaults.IconSize)) },
+                    modifier = Modifier.testTag("review-swap-$s"),
+                )
+            }
+        }
     }
 }
 

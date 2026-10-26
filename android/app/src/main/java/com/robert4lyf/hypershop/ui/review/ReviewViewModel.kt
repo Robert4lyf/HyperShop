@@ -94,6 +94,8 @@ data class RowSheet(
     val isStaple: Boolean,
     /** False when the recipe has one line: it can't be removed. */
     val canRemove: Boolean = true,
+    /** The catalogue's usual swaps ("Swap for" on the list's sheet), offered here before anything is bought. */
+    val swaps: List<String> = emptyList(),
 )
 
 data class ReviewUi(
@@ -806,6 +808,7 @@ class ReviewViewModel(
             row.decision.inStock,
             entry != null && row.decision.inStock,
             canRemove = p.incoming.lines.size > 1,
+            swaps = entry?.swaps.orEmpty().mapNotNull { c.catalog.byId[it]?.name },
         )
     }
 

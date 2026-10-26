@@ -414,7 +414,7 @@ cumin,ground cumin,ground cumin,cumin|cumin powder,SPICES_CONDIMENTS,false,jar,p
 cumin_seed,cumin seeds,cumin seeds,cumin seed|whole cumin seeds,SPICES_CONDIMENTS,false,jar,presence,,1 × 37 g jar,Herbs & spices,,sourced
 coriander_ground,ground coriander,ground coriander,coriander powder,SPICES_CONDIMENTS,false,jar,presence,,1 × 36 g jar,Herbs & spices,,sourced
 coriander_seed,coriander seeds,coriander seeds,coriander seed|whole coriander seeds,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,,agent-estimate
-paprika,paprika,paprika,sweet paprika|hungarian paprika|paprika powder,SPICES_CONDIMENTS,false,jar,presence,,1 × 44 g jar,Herbs & spices,,sourced
+paprika,paprika,paprika,sweet paprika|hungarian paprika|paprika powder|sweet hungarian paprika|hungarian sweet paprika,SPICES_CONDIMENTS,false,jar,presence,,1 × 44 g jar,Herbs & spices,,sourced
 smoked_paprika,smoked paprika,smoked paprika,pimenton|spanish smoked paprika|sweet smoked paprika|hot smoked paprika|smoked sweet paprika,SPICES_CONDIMENTS,false,jar,presence,,1 × 48 g jar,Herbs & spices,,sourced
 cayenne,cayenne pepper,cayenne pepper,cayenne|ground red pepper,SPICES_CONDIMENTS,false,jar,presence,,1 × 48 g jar,Herbs & spices,,sourced
 chilli_flakes,chilli flakes,chilli flakes,red pepper flakes|red-pepper flakes|crushed red pepper|crushed red pepper flakes|hot red pepper flake|chili flakes|chile flakes|red chilli flakes|red chili flakes,SPICES_CONDIMENTS,false,jar,presence,,1 × 28 g jar,Herbs & spices,,sourced
@@ -435,6 +435,7 @@ caraway_ground,ground caraway,ground caraway,,SPICES_CONDIMENTS,false,jar,presen
 mustard_seed,mustard seeds,mustard seeds,mustard seed|black mustard seeds,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,,agent-estimate
 dried_oregano,dried oregano,dried oregano,oregano,SPICES_CONDIMENTS,false,jar,presence,,1 × 14 g jar,Herbs & spices,,sourced
 dried_thyme,dried thyme,dried thyme,,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,,agent-estimate
+dried_dill,dried dill,dried dill,dill weed|dried dill weed,SPICES_CONDIMENTS,false,jar,presence,,,Herbs & spices,,agent-estimate
 dried_mixed_herbs,dried mixed herbs,dried mixed herbs,herbes de provence|italian seasoning,SPICES_CONDIMENTS,false,jar,presence,,1 × 14 g jar,Herbs & spices,,sourced
 curry_powder,curry powder,curry powder,madras curry powder|hot curry powder|mild curry powder,SPICES_CONDIMENTS,false,jar,presence,,1 × 80 g jar,Herbs & spices,,sourced
 garam_masala,garam masala,garam masala,,SPICES_CONDIMENTS,false,jar,presence,,1 × 38 g jar,Herbs & spices,,sourced

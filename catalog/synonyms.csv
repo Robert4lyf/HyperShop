@@ -493,6 +493,7 @@ dijon-style mustard,dijon
 dill,dill
 dill fronds,dill
 dill pickles,gherkin
+dill weed,dried_dill
 dish soap,washing_up
 distilled vinegar,white_vinegar
 double concentrated tomato puree,tomato_puree
@@ -511,6 +512,8 @@ dried chilli,dried_chilli
 dried chillies,dried_chilli
 dried cranberries,dried_cranberry
 dried currants,currant
+dried dill,dried_dill
+dried dill weed,dried_dill
 dried fenugreek leaves,dried_fenugreek_leaves
 dried figs,dried_fig
 dried kashmiri chillies,dried_chilli
@@ -848,6 +851,7 @@ hot water,water
 houmous,hummus
 hummus,hummus
 hungarian paprika,paprika
+hungarian sweet paprika,paprika
 ice,ice
 ice cream,ice_cream
 ice cubes,ice
@@ -1552,6 +1556,7 @@ sweet chile sauce,sweet_chilli
 sweet chili sauce,sweet_chilli
 sweet chilli sauce,sweet_chilli
 sweet corn,sweetcorn_cob
+sweet hungarian paprika,paprika
 sweet italian sausage,sausage
 sweet marsala,marsala
 sweet paprika,paprika

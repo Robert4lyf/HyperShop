@@ -159,7 +159,7 @@ fun ReviewRoute(
                 }
                 // Outlives this screen: the snackbar and its Undo belong to the list.
                 container.applicationScope.launch(Dispatchers.Main) {
-                    val r = snackbar.showTimed("Added ${s.count} items", "Undo", 10)
+                    val r = snackbar.showTimed("Added ${s.count} items", "Undo", 6)
                     if (r == SnackbarResult.ActionPerformed) container.repository.undoImport(s.useId)
                 }
             }
@@ -173,7 +173,7 @@ fun ReviewRoute(
                 }
                 // The job is only done for good once Undo has had its chance; Undo puts it back and opens it again.
                 container.applicationScope.launch(Dispatchers.Main) {
-                    val r = snackbar.showTimed("Import discarded", "Undo", 10)
+                    val r = snackbar.showTimed("Import discarded", "Undo", 6)
                     if (r == SnackbarResult.ActionPerformed) {
                         container.importJobs.restore(jobId)
                         onUndo(jobId)

@@ -160,6 +160,16 @@ class ReviewCorrectionsTest {
     }
 
     @Test
+    fun aSwapIsOneTapBeforeAnythingIsBought() {
+        // X.4: the catalogue's usual swaps are on the review's sheet; one becomes the line, for this recipe only.
+        val (_, vm) = vm("1 tsp dried thyme")
+        val swaps = vm.sheet("cat:dried_thyme")!!.swaps
+        assertTrue(swaps.toString(), "dried oregano" in swaps)
+        vm.rename("cat:dried_thyme", "dried oregano")
+        await(vm.state) { it is ReviewState.Ready && it.ui().row("cat:dried_oregano", null) != null }
+    }
+
+    @Test
     fun theAmountIsSetFromTypedText() {
         val (_, vm) = vm("2 onions")
         // The recipe is stored again after each change, so the sheet's line ids are read afresh.
