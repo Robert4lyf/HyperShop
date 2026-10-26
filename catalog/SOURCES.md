@@ -331,3 +331,9 @@ All 20 were fetched directly, and their ingredients were taken from the schema.o
 18. https://www.recipetineats.com/shrimp-po-boys-prawns/
 19. https://www.recipetineats.com/smashed-beef-kofta-with-cucumber-yogurt-sauce/
 20. https://www.recipetineats.com/slow-cooked-lamb-ragu-pasta/
+
+## Chocolate spread and jam (X.1, October 2026)
+
+- `chocolate_spread` (Nutella and the like): bought by weight in a jar, 400 g the common UK size of Nutella;
+  296 g a cup from the Nutella label's serving, 2 tbsp = 37 g. A cup of it shows in grams; spoons stay spoons.
+- `jam`: shown like honey and peanut butter (presence: one jar, the recipe's amount beside it), not as a count.

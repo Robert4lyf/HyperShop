@@ -340,6 +340,9 @@ chive,chives
 chives,chives
 chocolate,dark_chocolate
 chocolate chips,dark_chocolate
+chocolate hazelnut spread,chocolate_spread
+chocolate spread,chocolate_spread
+chocolate-hazelnut spread,chocolate_spread
 chopped frozen onion,frozen_diced_onion
 chopped tomatoes,chopped_tomatoes
 chorizo,chorizo
@@ -816,6 +819,8 @@ harissa,harissa
 harissa paste,harissa
 hass avocado,avocado
 hazelnut,hazelnut
+hazelnut chocolate spread,chocolate_spread
+hazelnut spread,chocolate_spread
 hazelnuts,hazelnut
 head of garlic,garlic
 heavy cream,double_cream
@@ -1093,6 +1098,7 @@ noodle,egg_noodles
 noodles,egg_noodles
 nori,nori
 nori sheets,nori
+nutella,chocolate_spread
 nutmeg,nutmeg
 oat drink,oat_milk
 oat milk,oat_milk

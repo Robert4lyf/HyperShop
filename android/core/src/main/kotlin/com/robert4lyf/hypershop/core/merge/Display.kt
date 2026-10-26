@@ -189,6 +189,28 @@ object Display {
         return roundUp(total / base, Rational.ONE).coerceAtLeastOne()
     }
 
+    /**
+     * The amount a review or "at home" row shows, matching what its list row will say: the buying unit where
+     * [buy] has one ("2" bananas, "1 jar"), else the amount as before. With the name, plural when it is counted.
+     */
+    fun brief(
+        q: QtyBase,
+        entry: CatalogEntry?,
+        name: String,
+        units: UnitsSetting = UnitsSetting.METRIC,
+        produce: Boolean = false,
+        hint: QtyUnit? = null,
+    ): Pair<String?, String> {
+        buy(q, entry, units, hint)?.let { b ->
+            val plural = entry != null && (b.pluralName || b.each && b.count > Rational.ONE)
+            return b.amount to (if (plural) entry!!.plural else name)
+        }
+        if (entry?.displayPolicy == DisplayPolicy.PRESENCE && units != UnitsSetting.AS_WRITTEN) {
+            return packs(q, entry.shoppingUnit) to name
+        }
+        return amount(q, units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy) to name
+    }
+
     private fun Rational.coerceAtLeastOne() = if (this < Rational.ONE) Rational.ONE else this
 
     private fun pluralOf(word: String) = if (listOf("ch", "sh", "x", "s").any { word.endsWith(it) }) word + "es" else word + "s"

@@ -354,21 +354,11 @@ class ListViewModel(
                 val name = entry?.name ?: t.displayName
                 val qty = ls.fold(QtyBase.PRESENCE) { acc, l -> acc + l.qty }
                 val presence = entry?.displayPolicy == DisplayPolicy.PRESENCE && units != UnitsSetting.AS_WRITTEN
-                val amount =
-                    if (presence) {
-                        null
-                    } else {
-                        Display.amount(
-                            qty,
-                            units,
-                            t.aisle == AisleCode.PRODUCE,
-                            Display.hintOf(ls.map { it.unitHint }),
-                            entry?.gramsPerCup,
-                            entry?.displayPolicy,
-                        )
-                    }
+                val hint = Display.hintOf(ls.map { it.unitHint })
+                // In the list's own words ("2 bananas"); a presence item at home needs no amount.
+                val (amount, shown) = Display.brief(qty, entry, name, units, t.aisle == AisleCode.PRODUCE, hint)
                 val from = ls.map { it.recipeTitle }.distinct().joinToString(", ")
-                InStockRow(key, name, listOfNotNull(amount, name).joinToString(" "), from, t.aisle)
+                InStockRow(key, name, listOfNotNull(amount.takeIf { !presence }, shown).joinToString(" "), from, t.aisle)
             }.sortedBy { it.name.lowercase() }
 
     /** "Need it": the in-stock lines go on the list after all, under their recipes. */
