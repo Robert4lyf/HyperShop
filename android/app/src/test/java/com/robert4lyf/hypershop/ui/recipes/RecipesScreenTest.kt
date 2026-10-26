@@ -22,7 +22,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
-import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.robert4lyf.hypershop.core.merge.UseProgress
@@ -31,7 +30,6 @@ import com.robert4lyf.hypershop.testutil.Shots
 import com.robert4lyf.hypershop.testutil.TestPhotos
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -294,17 +292,15 @@ class RecipesScreenTest {
     }
 
     @Test
-    fun aRecipesPhotoIsItsBandOnBothTabs() {
+    fun aRecipeWithoutAPhotoHasABandAsTallAsOneWith() {
         show()
-        // On the list: the chilli, which has a photo, gets a tall band; the cake keeps its mosaic strip.
-        val withPhoto = compose.onNodeWithTag("use-1").getUnclippedBoundsInRoot()
-        val without = compose.onNodeWithTag("use-2").getUnclippedBoundsInRoot()
-        assertTrue((withPhoto.bottom - withPhoto.top) - (without.bottom - without.top) > 60.dp)
+
+        // On the list: the chilli's photo and the cake's mosaic make bands of one height.
+        fun height(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot().let { it.bottom - it.top }
+        assertEquals(height("use-band-1").value, height("use-band-2").value, 1f)
         // Saved: the same.
         compose.onNodeWithTag("view-library").performClick()
-        val saved = compose.onNodeWithTag("lib-r:1").getUnclippedBoundsInRoot()
-        val plain = compose.onNodeWithTag("lib-r:9").getUnclippedBoundsInRoot()
-        assertTrue((saved.bottom - saved.top) - (plain.bottom - plain.top) > 60.dp)
+        assertEquals(height("lib-band-r:1").value, height("lib-band-r:9").value, 1f)
     }
 
     @Test

@@ -547,12 +547,8 @@ private fun LibraryCard(
         color = MaterialTheme.colorScheme.card,
     ) {
         Column {
-            // The recipe's band, as on its card on the list: its photo, tall, else its own mosaic.
-            Box(
-                Modifier.fillMaxWidth().then(
-                    if (row.photo != null) Modifier.heightIn(min = PHOTO_BAND) else Modifier,
-                ).clipToBounds(),
-            ) {
+            // The recipe's band, as on its card on the list: its photo, else its own mosaic, the same height either way.
+            Box(Modifier.fillMaxWidth().heightIn(min = PHOTO_BAND).clipToBounds().testTag("lib-band-${row.key}")) {
                 RecipeBackdrop(row.title, row.photo, Modifier.matchParentSize())
                 Text(
                     row.title,
@@ -642,13 +638,9 @@ private fun UseCard(
         val dark = LocalDarkTheme.current
         val hue = Brand.recipeHue(use.title)
         Column {
-            // The recipe's band: its photo, tall, with the title along the bottom; else its own mosaic,
-            // the same as its review screen's.
-            Box(
-                Modifier.fillMaxWidth().then(
-                    if (photo != null) Modifier.heightIn(min = PHOTO_BAND) else Modifier,
-                ).clipToBounds(),
-            ) {
+            // The recipe's band: its photo, else its own mosaic (the same as its review screen's), the same
+            // height either way, with the title along the bottom.
+            Box(Modifier.fillMaxWidth().heightIn(min = PHOTO_BAND).clipToBounds().testTag("use-band-${use.useId}")) {
                 RecipeBackdrop(use.title, photo, Modifier.matchParentSize())
                 Column(
                     Modifier.align(Alignment.BottomStart).padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 12.dp),
