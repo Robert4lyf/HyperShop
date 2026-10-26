@@ -2,7 +2,6 @@ package com.robert4lyf.hypershop.ui.review
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.robert4lyf.hypershop.core.catalog.DisplayPolicy
 import com.robert4lyf.hypershop.core.merge.ApplyResult
 import com.robert4lyf.hypershop.core.merge.Display
 import com.robert4lyf.hypershop.core.merge.Incoming
@@ -549,12 +548,8 @@ class ReviewViewModel(
         return ReviewRow(
             key = r.target.mergeKey,
             name = entry?.name ?: r.target.displayName,
-            quantity =
-                if (entry?.displayPolicy == DisplayPolicy.PRESENCE && units != UnitsSetting.AS_WRITTEN) {
-                    Display.packs(needed, entry.shoppingUnit)
-                } else {
-                    Display.amount(needed, units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy)
-                },
+            // What the list row will say: "2" bananas rather than "200g", "1 jar" of jam.
+            quantity = Display.brief(needed, entry, entry?.name ?: r.target.displayName, units, produce, hint).first,
             inStock = d.inStock,
             check = check != null,
             aisle = r.target.aisle,

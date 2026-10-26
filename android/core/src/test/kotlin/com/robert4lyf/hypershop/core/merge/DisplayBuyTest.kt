@@ -60,6 +60,31 @@ class DisplayBuyTest {
     }
 
     @Test
+    fun chocolateSpreadIsWeighedAndJamIsAJar() {
+        // X.1: Nutella is bought by weight in a jar (a cup is weighed; spoons stay spoons); jam is one jar.
+        assertEquals("160g chocolate spread", row("1/2 cup Nutella", key = "chocolate_spread").main)
+        assertEquals("200g chocolate spread", row("200g Nutella", key = "chocolate_spread").main)
+        assertEquals(RowText("1 jar jam", "2tbsp needed"), row("2 tbsp strawberry jam", key = "jam"))
+    }
+
+    @Test
+    fun aReviewOrAtHomeRowSaysWhatTheListWill() {
+        val l = add(ShoppingList(), listOf("200g bananas")).first
+        val item = l.itemByKey("cat:banana")!!
+        assertEquals("2" to "bananas", Display.brief(l.total(item.id), cat.byId["banana"], "banana"))
+        assertEquals(
+            "1 jar" to "jam",
+            Display.brief(
+                add(ShoppingList(), listOf("2 tbsp jam")).first.let {
+                    it.total(it.itemByKey("cat:jam")!!.id)
+                },
+                cat.byId["jam"],
+                "jam",
+            ),
+        )
+    }
+
+    @Test
     fun herbsWithNoAmountAreOnePack() {
         assertEquals("1 pack coriander", row("Fresh coriander, to serve", key = "coriander").main)
         // Counted in its own container: as written.

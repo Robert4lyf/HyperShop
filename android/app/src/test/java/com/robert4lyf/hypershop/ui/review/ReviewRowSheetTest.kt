@@ -168,9 +168,10 @@ class ReviewCorrectionsTest {
         assertFalse(vm.setAmount(id(), "a few"))
         assertTrue(vm.setAmount(id(), "5"))
         await(vm.state) { it is ReviewState.Ready && it.ui().row("cat:onion").quantity == "5" }
-        assertTrue(vm.setAmount(id(), "500 g"))
-        await(vm.state) { it is ReviewState.Ready && it.ui().row("cat:onion").quantity == "500g" }
-        assertEquals("500 g", vm.sheet("cat:onion")!!.lines.single().amount)
+        assertTrue(vm.setAmount(id(), "1 kg"))
+        // The row says what the list will: a kilo of onions is ten of them (110 g each), the line keeps the kilo.
+        await(vm.state) { it is ReviewState.Ready && it.ui().row("cat:onion").quantity == "10" }
+        assertEquals("1 kg", vm.sheet("cat:onion")!!.lines.single().amount)
     }
 
     @Test

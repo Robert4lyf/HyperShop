@@ -256,13 +256,14 @@ gherkin,gherkins,gherkins,pickles|cornichons|dill pickles,TINS_JARS,false,jar,co
 roasted_pepper,roasted red peppers,roasted red peppers,jarred roasted peppers|roasted peppers,TINS_JARS,false,jar,count,,,Jars & pickles,,agent-estimate
 artichoke_hearts,artichoke hearts,artichoke hearts,marinated artichokes,TINS_JARS,false,jar,count,,,Jars & pickles,,agent-estimate
 pumpkin_puree,pumpkin purée,pumpkin purée,canned pumpkin,WORLD_FOODS,false,tin,count,,,,,agent-estimate
-jam,jam,jam,apricot jam|raspberry jam|strawberry jam|preserves,TINS_JARS,false,jar,count,,,Spreads & syrups,,agent-estimate
+jam,jam,jam,apricot jam|raspberry jam|strawberry jam|preserves,TINS_JARS,false,jar,presence,,,Spreads & syrups,,agent-estimate
 honey,honey,honey,mild honey|runny honey|clear honey,TINS_JARS,false,jar,presence,,1 × 454 g jar,Spreads & syrups,,sourced
 maple_syrup,maple syrup,maple syrup,pure maple syrup,TINS_JARS,false,bottle,presence,,1 × 250 g bottle,Spreads & syrups,,sourced
 agave_syrup,agave syrup,agave syrup,agave|agave nectar|agave sweetener,TINS_JARS,false,bottle,presence,,,Spreads & syrups,,agent-estimate
 golden_syrup,golden syrup,golden syrup,,BAKING,false,tin,presence,,1 × 680 g squeezy bottle,Sugar & syrups,,sourced
 corn_syrup,corn syrup,corn syrup,light corn syrup|dark corn syrup,BAKING,false,bottle,presence,,,Sugar & syrups,,agent-estimate
 peanut_butter,peanut butter,peanut butter,smooth peanut butter|crunchy peanut butter,TINS_JARS,false,jar,presence,,1 × 340 g jar,Spreads & syrups,,sourced
+chocolate_spread,chocolate spread,chocolate spread,nutella|chocolate hazelnut spread|hazelnut chocolate spread|hazelnut spread|chocolate-hazelnut spread,TINS_JARS,false,jar,mass,296,1 × 400 g jar,Spreads & syrups,,sourced
 tahini,tahini,tahini,tahini paste,WORLD_FOODS,false,jar,presence,,1 × 300 g jar,Middle Eastern & Indian,,sourced
 stock_cube,stock cubes,stock cubes,bouillon cube|stock cube|bouillon|chicken stock cube|chicken stock cubes|chicken bouillon cube|lamb stock cube|mushroom stock cube|mushroom stock cubes,TINS_JARS,false,pack,presence,,1 × pack of 10 cubes (100 g),Stock,,sourced
 beef_stock_cube,beef stock cubes,beef stock cubes,beef stock cube|beef bouillon cube|beef bouillon cubes|beef bouillon,TINS_JARS,false,pack,presence,,1 × pack of 10 cubes (100 g),Stock,,sourced
