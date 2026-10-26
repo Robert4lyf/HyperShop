@@ -387,8 +387,8 @@ class RecipesViewModelTest {
         val d = await(vm.useDetail) { it != null }!!
         val lines = d.sections.flatMap { it.second }
         assertEquals(CHILLI.toList(), lines.map { it.first })
-        // Salt, olive oil and the soured-cream garnish were left out as in stock.
-        assertEquals(3, lines.count { it.second })
+        // Salt and olive oil (staples) were left out as in stock; the soured-cream garnish went on (X.3).
+        assertEquals(2, lines.count { it.second })
         vm.closeUse()
         // Hand-added: the items as they are.
         vm.openUse(uses.first { it.recipeId == null })
@@ -451,8 +451,8 @@ class RecipesViewModelTest {
         val use = await(vm.ui) { it.uses.isNotEmpty() }.uses.single()
         assertEquals("Weeknight chilli", use.title)
         assertEquals(4, use.servings)
-        // Salt, olive oil and the soured-cream garnish were left out as in stock.
-        assertEquals(3, use.inStockCount)
+        // Salt and olive oil (staples) were left out as in stock; the soured-cream garnish went on (X.3).
+        assertEquals(2, use.inStockCount)
         assertTrue(runBlocking { c.repository.snapshot() }.itemByKey("cat:salt") == null)
         vm.remove(use)
         await(vm.ui) { it.uses.isEmpty() }

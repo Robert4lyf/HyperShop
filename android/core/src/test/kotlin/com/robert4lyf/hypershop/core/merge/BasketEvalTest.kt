@@ -205,8 +205,9 @@ class BasketEvalTest {
          * W.0b baseline [165, 143, 136, 121]; W.2, rows in the way things are bought, [165, 143, 154, 152]; W.3, sourced
          * weights and packs: USDA's medium carrot and onion are smaller than a UK one, so a weight counts more of them,
          * [165, 143, 154, 149]; W.5, no pack count that could come out short (800 ml of stock with no carton size, a cup
-         * of spring onions against a 100 g bunch stay as written):
+         * of spring onions against a 100 g bunch stay as written), [165, 143, 151, 146]; X.3, meat and fish by weight
+         * (asked for from real use, not from these labels):
          */
-        val FLOORS = listOf(165, 143, 151, 146)
+        val FLOORS = listOf(165, 143, 152, 148)
     }
 }

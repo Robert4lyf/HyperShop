@@ -62,6 +62,8 @@ data class ReviewRow(
     val checkReason: String? = null,
     /** The line as the recipe wrote it, shown with the reason when [check] is set. */
     val raw: String? = null,
+    /** Every line for it is optional or a garnish ("to serve"): said on the row, one tap to leave it out. */
+    val optional: Boolean = false,
 )
 
 enum class Badge { CLAUDE, CLAUDE_PENDING, RULES }
@@ -556,6 +558,7 @@ class ReviewViewModel(
             adds = preview!!.contributions.any { it.mergeKey == r.target.mergeKey },
             checkReason = check?.parsed?.checkReason,
             raw = check?.parsed?.raw,
+            optional = lines.isNotEmpty() && lines.all { it.parsed.optional || it.parsed.garnish },
         )
     }
 

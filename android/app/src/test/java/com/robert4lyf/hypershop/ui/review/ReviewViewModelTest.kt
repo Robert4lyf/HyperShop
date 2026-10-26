@@ -51,7 +51,7 @@ class ReviewViewModelTest {
     }
 
     @Test
-    fun rowsAreGroupedByAisleWithStaplesAndGarnishPreTicked() {
+    fun rowsAreGroupedByAisleWithStaplesPreTickedAndGarnishOptional() {
         val c = TestContainer.create()
         val id = runBlocking { c.readyJob(*CHILLI) }
         val vm = ReviewViewModel(c, id)
@@ -62,7 +62,9 @@ class ReviewViewModelTest {
         val all = ui.aisles.flatMap { it.second }
         assertTrue(all.first { it.key == "cat:salt" }.inStock)
         assertTrue(all.first { it.key == "cat:olive_oil" }.inStock)
-        assertTrue("garnish pre-ticked", all.first { it.key == "cat:sour_cream" }.inStock)
+        // X.3: a garnish is added like anything else, and said to be optional.
+        assertFalse("garnish not pre-ticked", all.first { it.key == "cat:sour_cream" }.inStock)
+        assertTrue(all.first { it.key == "cat:sour_cream" }.optional)
         assertFalse(all.first { it.key == "cat:onion" }.inStock)
         assertEquals(all.count { !it.inStock }, ui.addCount)
         assertEquals("2", all.first { it.key == "cat:onion" }.quantity)

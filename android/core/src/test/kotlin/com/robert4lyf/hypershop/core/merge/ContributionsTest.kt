@@ -53,10 +53,11 @@ class ContributionsTest {
         val inc = recipe(listOf("Salt, to taste", "2 onions", "parsley, to garnish"))
         val d = merger.defaultDecisions(inc, staples = setOf("cat:salt"))
         assertTrue(d.getValue("cat:salt").inStock)
-        assertTrue(d.getValue("cat:parsley").inStock)
+        // X.3: a garnish is not "at home" by default; only your staples are.
+        assertFalse(d.getValue("cat:parsley").inStock)
         assertFalse(d.getValue("cat:onion").inStock)
         val r = merger.apply(ShoppingList(), merger.preview(ShoppingList(), inc, d), 1) as ApplyResult.Applied
-        assertEquals(listOf("cat:onion"), r.list.liveItems.map { it.mergeKey })
+        assertEquals(setOf("cat:onion", "cat:parsley"), r.list.liveItems.map { it.mergeKey }.toSet())
     }
 
     @Test
