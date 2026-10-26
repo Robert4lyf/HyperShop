@@ -5,9 +5,10 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.list.show
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -22,7 +23,8 @@ class SnackbarReplaceTest {
 
     @Test
     fun theNewestReplacesTheOneShowing() {
-        val c = TestContainer.create()
+        // A plain scope, not a test container: nothing of the app's starts up behind a test this short.
+        val c = CoroutineScope(SupervisorJob())
         val host = SnackbarHostState()
         compose.setContent { SnackbarHost(host) }
         compose.runOnIdle { show(c, host, UiMessage("rice vinegar at home", undo = {})) }
@@ -43,5 +45,6 @@ class SnackbarReplaceTest {
         compose.runOnIdle { host.currentSnackbarData?.dismiss() }
         compose.waitForIdle()
         compose.runOnIdle { assert(host.currentSnackbarData == null) { "queued: ${host.currentSnackbarData?.visuals?.message}" } }
+        c.coroutineContext[kotlinx.coroutines.Job]?.cancel()
     }
 }

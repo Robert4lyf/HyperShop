@@ -1,7 +1,7 @@
 id,name,plural,synonyms,aisleCode,staple,shoppingUnit,displayPolicy,gramsPerCup,packNote,group,gramsEach,src
 onion,onion,onions,yellow onion|brown onion|white onion|spanish onion,PRODUCE,false,each,count,160,,Vegetables,110,sourced
 red_onion,red onion,red onions,purple onion,PRODUCE,false,each,count,160,,Vegetables,110,sourced
-spring_onion,spring onion,spring onions,scallion|green onion|salad onion,PRODUCE,false,bunch,count,,1 × 100 g bunch,Salad,15,sourced
+spring_onion,spring onion,spring onions,scallion|green onion|salad onion,PRODUCE,false,bunch,count,100,1 × 100 g bunch,Salad,15,sourced
 shallot,shallot,shallots,banana shallot|eschalot,PRODUCE,false,each,count,160,,Vegetables,40,agent-estimate
 garlic,garlic,garlic,garlic clove|garlic bulb|head of garlic,PRODUCE,false,bulb,count,,,Vegetables,50,agent-estimate
 leek,leek,leeks,,PRODUCE,false,each,count,,,Vegetables,200,agent-estimate
@@ -72,11 +72,11 @@ tomatillo,tomatillo,tomatillos,,WORLD_FOODS,false,tin,count,,,Mexican,,agent-est
 horseradish_root,horseradish root,horseradish root,fresh horseradish,PRODUCE,false,each,count,,,Vegetables,,agent-estimate
 ginger,ginger,ginger,ginger root|fresh ginger|root ginger,PRODUCE,false,piece,count,,,Vegetables,,sourced
 lemongrass,lemongrass,lemongrass,lemon grass|lemongrass stalk|lemongrass stalks,PRODUCE,false,pack,count,,,Vegetables,,sourced
-parsley,parsley,parsley,flat-leaf parsley|italian parsley|curly parsley|parsley leaves,PRODUCE,false,pack,presence,,1 × 30 g pack,Herbs,,sourced
-coriander,coriander,coriander,cilantro|cilantro leaves|coriander leaves|fresh coriander,PRODUCE,false,pack,presence,,1 × 30 g pack,Herbs,,sourced
-basil,basil,basil,basil leaves|fresh basil|thai basil,PRODUCE,false,pack,presence,,1 × 30 g pack,Herbs,,sourced
+parsley,parsley,parsley,flat-leaf parsley|italian parsley|curly parsley|parsley leaves,PRODUCE,false,pack,presence,60,1 × 30 g pack,Herbs,,sourced
+coriander,coriander,coriander,cilantro|cilantro leaves|coriander leaves|fresh coriander,PRODUCE,false,pack,presence,16,1 × 30 g pack,Herbs,,sourced
+basil,basil,basil,basil leaves|fresh basil|thai basil,PRODUCE,false,pack,presence,24,1 × 30 g pack,Herbs,,sourced
 mint,mint,mint,mint leaves|fresh mint|mint leave,PRODUCE,false,pack,presence,,1 × 16 g pack,Herbs,,sourced
-dill,dill,dill,fresh dill|dill fronds,PRODUCE,false,pack,presence,,1 × 20 g pack,Herbs,,sourced
+dill,dill,dill,fresh dill|dill fronds,PRODUCE,false,pack,presence,9,1 × 20 g pack,Herbs,,sourced
 chives,chives,chives,chive,PRODUCE,false,pack,presence,,1 × 20 g pack,Herbs,,sourced
 thyme,thyme,thyme,fresh thyme|thyme leaves,PRODUCE,false,pack,presence,,1 × 20 g pack,Herbs,,sourced
 rosemary,rosemary,rosemary,fresh rosemary|rosemary leaves|rosemary sprig|rosemary sprigs,PRODUCE,false,pack,presence,,1 × 20 g pack,Herbs,,sourced
@@ -234,7 +234,7 @@ ice_cream,ice cream,ice cream,vanilla ice cream,FROZEN,false,tub,count,,,,,agent
 ice,ice,ice,ice cubes,FROZEN,false,bag,presence,,,,,agent-estimate
 chopped_tomatoes,chopped tomatoes,chopped tomatoes,canned tomatoes|tinned tomatoes|diced tomatoes|crushed tomatoes|whole peeled tomatoes|canned plum tomatoes|tinned plum tomatoes|tinned whole tomatoes|canned whole tomatoes|plum tomatoes in juice|crushed tomato,TINS_JARS,false,tin,count,,1 × 400 g tin,Tomatoes,,sourced
 passata,passata,passata,tomato sauce|strained tomatoes|sieved tomatoes|tomato passata,TINS_JARS,false,carton,volume,,1 × 500 g carton,Tomatoes,,sourced
-tomato_puree,tomato purée,tomato purée,tomato paste|double concentrated tomato puree|double-concentrated tomato paste,TINS_JARS,false,tube,presence,,1 × 200 g tube,Tomatoes,,sourced
+tomato_puree,tomato purée,tomato purée,tomato paste|double concentrated tomato puree|double-concentrated tomato paste,TINS_JARS,false,tube,presence,262,1 × 200 g tube,Tomatoes,,sourced
 sundried_tomato,sun-dried tomatoes,sun-dried tomatoes,sundried tomatoes|sun dried tomatoes,TINS_JARS,false,jar,count,,,Tomatoes,,agent-estimate
 chickpeas,chickpeas,chickpeas,chickpea|garbanzo beans|garbanzo bean|canned chickpeas,TINS_JARS,false,tin,count,,1 × 400 g tin,Beans & pulses,,sourced
 kidney_beans,kidney beans,kidney beans,red kidney beans,TINS_JARS,false,tin,count,,1 × 400 g tin,Beans & pulses,,sourced

@@ -44,8 +44,8 @@ class DisplayBuyTest {
         // W.5 review: a 500 g carton cannot hold "700ml" without a density, so the row stays as written.
         assertEquals("700ml passata", row("700ml passata", key = "passata").main)
         assertEquals(RowText("2 cartons passata", "700g needed"), row("700g passata", key = "passata"))
-        // Bought for its presence: one pack, the amount beside it.
-        assertEquals("1 pack basil", row("4 cups basil leaves", key = "basil").main)
+        // Weighed with its cup weight (24 g, X.5): four cups is four 30 g packs.
+        assertEquals("4 packs basil", row("4 cups basil leaves", key = "basil").main)
     }
 
     @Test
@@ -89,6 +89,18 @@ class DisplayBuyTest {
                 "jam",
             ),
         )
+    }
+
+    @Test
+    fun aCupOfHerbsIsWeighedNotMillilitres() {
+        // X.5: cups of herbs and pastes are weighed (USDA cup weights), so the pack is counted and "needed" is grams.
+        assertEquals(RowText("1 pack coriander", "15g needed"), row("3/4 cup coriander leaves", key = "coriander"))
+        assertEquals(RowText("1 pack parsley", "35g needed"), row("1/2 cup chopped parsley", key = "parsley"))
+        assertEquals(RowText("2 tubes tomato purée", "370g needed"), row("1 1/3 cups tomato paste", key = "tomato_puree"))
+        // Counted and measured together: weighed into bunches.
+        assertEquals("2 bunches spring onions", row("2 spring onions", "1 cup sliced spring onions", key = "spring_onion").main)
+        // A tin is counted like any container.
+        assertEquals(RowText("1 tin chopped tomatoes", "200g needed"), row("200g chopped tomatoes", key = "chopped_tomatoes"))
     }
 
     @Test

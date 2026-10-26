@@ -114,10 +114,17 @@ fun show(
     container: AppContainer,
     snackbar: SnackbarHostState,
     m: UiMessage,
+) = show(container.applicationScope, snackbar, m)
+
+/** [show] on [scope]: the app's own, so the snackbar outlives the screen that asked. */
+fun show(
+    scope: kotlinx.coroutines.CoroutineScope,
+    snackbar: SnackbarHostState,
+    m: UiMessage,
 ) {
     val previous = showing[snackbar]
     val job =
-        container.applicationScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+        scope.launch(kotlinx.coroutines.Dispatchers.Main) {
             previous?.cancel()
             val r = snackbar.showTimed(m.text, m.undo?.let { m.action }, m.seconds)
             if (r == SnackbarResult.ActionPerformed) m.undo?.invoke()
