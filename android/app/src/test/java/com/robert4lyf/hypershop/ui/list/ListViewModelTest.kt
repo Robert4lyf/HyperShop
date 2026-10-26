@@ -212,6 +212,17 @@ class ListViewModelTest {
     }
 
     @Test
+    fun limeJuiceTypedInIsLimesUnlessItSaysBottled() {
+        val c = TestContainer.create()
+        val vm = tracked(ListViewModel(c))
+        await(vm.ui) { it.isEmpty }
+        vm.addTyped("4 tbsp lime juice")
+        assertEquals("2 limes", await(vm.ui) { it.aisles.isNotEmpty() }.row("lime").main)
+        vm.addTyped("bottled lemon juice")
+        await(vm.ui) { u -> u.aisles.flatMap { it.second }.size == 2 }
+    }
+
+    @Test
     fun suggestionsSkipTheAmountAndKeepItWhenPicked() {
         val c = TestContainer.create()
         val vm = tracked(ListViewModel(c))

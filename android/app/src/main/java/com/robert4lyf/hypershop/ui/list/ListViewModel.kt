@@ -617,7 +617,7 @@ class ListViewModel(
         viewModelScope.launch {
             val lines = text.split('\n').map { it.trim() }.filter { it.isNotEmpty() }
             if (lines.size == 1) {
-                val p = c.ruleParser.parse(lines.single())
+                val p = typed(lines.single())
                 val existing = lastList.itemByKey(c.repository.target(p.name).mergeKey)
                 if (existing != null) {
                     val amount = amountOf(p)
@@ -636,18 +636,24 @@ class ListViewModel(
             if (lines.size > 1) messages.send(UiMessage("Added ${lines.size} items"))
         }
 
+    /**
+     * A typed line read as a recipe's would be on its way to the list: "lime juice" is limes (V.2), whoever
+     * typed it, unless it says it comes in a bottle.
+     */
+    private fun typed(line: String) = c.repository.merger.juiceAsFruit(c.ruleParser.parse(line), UnitLocale.METRIC)
+
     private suspend fun addLine(line: String) {
-        val p = c.ruleParser.parse(line)
+        val p = typed(line)
         if (p.name.isBlank()) return
         c.repository.manualAdd(p.name, p.shopBase(UnitLocale.METRIC), p.shopUnit)
     }
 
     /** "Add 1 more" tapped: the typed amount (or one more) goes on as a manual contribution. */
     private suspend fun addMore(line: String) {
-        val parsed = c.ruleParser.parse(line)
+        val parsed = typed(line)
         // As a typed add would: grams over spoons, the top of a range; one more when no amount was typed.
-        val typed = parsed.shopBase(UnitLocale.METRIC)
-        val q = if (parsed.quantity == null || typed.isPresence) QtyBase.of(Rational.ONE, null, UnitLocale.METRIC) else typed
+        val amount = parsed.shopBase(UnitLocale.METRIC)
+        val q = if (parsed.quantity == null || amount.isPresence) QtyBase.of(Rational.ONE, null, UnitLocale.METRIC) else amount
         c.repository.manualAdd(parsed.name, q, parsed.shopUnit.takeIf { parsed.quantity != null })
     }
 
