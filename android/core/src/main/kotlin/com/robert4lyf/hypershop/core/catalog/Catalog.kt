@@ -86,6 +86,9 @@ object DefaultSwaps {
             listOf("chilli_flakes", "chilli_powder", "cayenne"),
             listOf("dijon", "wholegrain_mustard"),
             listOf("white_wine", "vermouth"),
+            listOf("dried_thyme", "dried_oregano", "dried_mixed_herbs", "dried_dill"),
+            listOf("red_wine", "beef_stock"),
+            listOf("balsamic", "red_wine_vinegar"),
         )
 
     /** Every id named in a group (a test checks they are all in the catalogue). */

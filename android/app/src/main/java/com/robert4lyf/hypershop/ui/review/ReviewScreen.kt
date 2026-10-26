@@ -131,7 +131,7 @@ fun ReviewScreen(
     val addFocus = remember { FocusRequester() }
     // "Add an ingredient" in the menu: the field is the last item, so scroll it in, then focus it.
     var focusAdd by remember { mutableIntStateOf(0) }
-    val itemCount = 1 + (if (ui.notice != null) 1 else 0) + ui.aisles.sumOf { it.second.size + 1 } + 1
+    val itemCount = 2 + (if (ui.notice != null) 1 else 0) + ui.aisles.sumOf { it.second.size + 1 } + 1
     LaunchedEffect(focusAdd) {
         if (focusAdd == 0) return@LaunchedEffect
         list.animateScrollToItem(itemCount - 1)
@@ -152,6 +152,15 @@ fun ReviewScreen(
                             Tone.PRIMARY,
                         )
                     }
+                }
+                // X.4: the sheet behind each row is where a line is changed or swapped; say so once.
+                item(key = "edit-hint") {
+                    Text(
+                        "Tap an ingredient to change its amount, swap it or rename it.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp).testTag("edit-hint"),
+                    )
                 }
                 for ((aisle, rows) in ui.aisles) {
                     val count = rows.size + 1
