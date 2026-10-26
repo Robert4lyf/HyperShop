@@ -145,8 +145,10 @@ object Display {
                 val word = if (n > Rational.ONE) pluralOf(counted!!.serial) else counted!!.serial
                 return Buy("${fraction(n)} $word", n, false, null, pluralName = true)
             }
-            // Counted as things ("2 chicken breasts", sold in packs of no fixed number), or mixed: as written.
-            if (parts.keys.any { it.dimension == Dimension.COUNT }) return null
+            // Counted as things ("2 chicken breasts", sold in packs of no fixed number): as written. Counted things
+            // mixed with a measure ("2 + 1 cup" spring onions) are weighed together, below, when each has a weight.
+            if (parts.keys.any { it.dimension == Dimension.COUNT && it != BaseKey.ITEMS }) return null
+            if (parts.keys == setOf(BaseKey.ITEMS)) return null
             // A presence item (herbs, spirits, a paste) is one of whatever it comes in when the amount cannot be
             // counted: the catalogue's word that a recipe's use rarely needs more, with the amount on the sub-line.
             val fallback = if (entry.displayPolicy == DisplayPolicy.PRESENCE) Rational.ONE else null
@@ -179,6 +181,7 @@ object Display {
             total +=
                 when {
                     k == key -> v
+                    key == BaseKey.MASS && k == BaseKey.ITEMS && entry.gramsEach != null -> v * entry.gramsEach
                     key == BaseKey.MASS && k == BaseKey.VOLUME && perCup != null -> v * perCup / Rational.of(240)
                     key == BaseKey.VOLUME && k == BaseKey.MASS && perCup != null -> v * Rational.of(240) / perCup
                     // Heavier than honey (1.4 g/ml), lighter than flour (0.5): the worst either way.
@@ -188,7 +191,12 @@ object Display {
                 }
         }
         if (guessed && total > base) return null
-        return roundUp(total / base, Rational.ONE).coerceAtLeastOne()
+        // A herb, spice or paste measured by the cup is not exact to the gram: half a cup of parsley (31 g in a
+        // 250 ml cup) is one 30 g pack, not two. Anything else is counted strictly (X.5).
+        val packs = total / base
+        val slack = if (entry.displayPolicy == DisplayPolicy.PRESENCE) Rational.of(1, 10) else Rational.ZERO
+        val n = roundUp(packs, Rational.ONE)
+        return (if (n > Rational.ONE && packs <= n - Rational.ONE + slack) n - Rational.ONE else n).coerceAtLeastOne()
     }
 
     /**
@@ -232,7 +240,7 @@ object Display {
 
     private const val CLOVES_A_BULB = 10L
     private val EACH_UNITS = setOf("each", "head", "piece", "loaf", "ball")
-    private val CONTAINERS = setOf("jar", "bottle", "pot", "carton", "tub", "pack", "bag", "box", "punnet", "bunch", "tube")
+    private val CONTAINERS = setOf("jar", "bottle", "pot", "carton", "tub", "pack", "bag", "box", "punnet", "bunch", "tube", "tin")
     private val COUNTED_CONTAINERS = setOf(QtyUnit.BUNCH, QtyUnit.TIN, QtyUnit.PACKET, QtyUnit.SPRIG)
     private val PACK_SIZE = Regex("""(\d+(?:\.\d+)?)\s*(kg|g|ml|l)\b""", RegexOption.IGNORE_CASE)
 

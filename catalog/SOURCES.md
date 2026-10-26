@@ -337,3 +337,11 @@ All 20 were fetched directly, and their ingredients were taken from the schema.o
 - `chocolate_spread` (Nutella and the like): bought by weight in a jar, 400 g the common UK size of Nutella;
   296 g a cup from the Nutella label's serving, 2 tbsp = 37 g. A cup of it shows in grams; spoons stay spoons.
 - `jam`: shown like honey and peanut butter (presence: one jar, the recipe's amount beside it), not as a count.
+
+## Cup weights for herbs, spring onions and tomato purée (X.5, October 2026)
+
+So a recipe's "½ cup chopped coriander" is weighed (and the pack counted) rather than shown as millilitres:
+`gramsPerCup` from USDA FoodData Central's standard portions (SR Legacy): coriander leaves 16 g, parsley chopped
+60 g, dill sprigs 9 g, basil leaves 24 g, spring onions (scallions) chopped 100 g, tomato paste 262 g a cup.
+Taken from the published portions as remembered rather than re-fetched in this session; check against FDC
+before relying on one to the gram.

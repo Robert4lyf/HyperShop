@@ -66,7 +66,7 @@ def validate(rows: list[dict[str, str]]) -> list[str]:
                 errors.append(f"{where}: gramsEach not a number")
         if r["gramsPerCup"]:
             try:
-                if not 10 <= float(r["gramsPerCup"]) <= 400:
+                if not 5 <= float(r["gramsPerCup"]) <= 400:  # a cup of dill is 9 g
                     errors.append(f"{where}: gramsPerCup out of range")
             except ValueError:
                 errors.append(f"{where}: gramsPerCup not a number")
