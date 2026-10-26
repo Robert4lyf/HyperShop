@@ -725,7 +725,7 @@ private fun ReviewRowItem(
                     row.inStock -> row.quantity?.let { "needs $it" }
                     !row.adds -> "Already on your list"
                     else -> row.quantity?.let { "+$it" }
-                }
+                }.let { s -> if (row.optional && !row.inStock) listOfNotNull(s, "optional").joinToString(" · ") else s }
             sub?.let {
                 Text(
                     it,

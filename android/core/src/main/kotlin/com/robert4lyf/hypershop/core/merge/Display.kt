@@ -135,7 +135,9 @@ object Display {
             val need = if (converted || whole != n) asWritten?.let { "$it in the recipe" } else null
             return Buy(fraction(whole), whole, true, need)
         }
-        if (unit in CONTAINERS && !entry.staple && entry.displayPolicy != DisplayPolicy.MASS) {
+        // Meat and fish keep their weight (X.3): packs of chicken run from 300 g to a kilo, so "3 packs" says less
+        // than "800g" does. A count the recipe gave ("2 chicken breasts") stays as written below anyway.
+        if (unit in CONTAINERS && !entry.staple && entry.displayPolicy != DisplayPolicy.MASS && entry.aisle != AisleCode.MEAT_FISH) {
             // Counted in a container already ("1 bunch", "2 tins"): that count, which a presence row would hide.
             val counted = parts.keys.singleOrNull()?.countUnit
             if (counted in COUNTED_CONTAINERS) {

@@ -55,6 +55,13 @@ class DisplayBuyTest {
     }
 
     @Test
+    fun meatAndFishKeepTheirWeight() {
+        // X.3: packs come in too many sizes for a pack count to help.
+        assertEquals("800g chicken breast", row("800g chicken breast", key = "chicken_breast").main)
+        assertEquals("500g beef mince", row("500g beef mince", key = "beef_mince").main)
+    }
+
+    @Test
     fun aWholeBirdIsNotBoughtForAWeight() {
         assertEquals("500g chicken", row("500g chicken", key = "chicken").main)
     }

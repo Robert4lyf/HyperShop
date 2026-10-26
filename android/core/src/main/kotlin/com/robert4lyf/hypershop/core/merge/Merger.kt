@@ -191,14 +191,15 @@ class Merger(
         return found?.replaceWith?.let { catalog.byId[it] } ?: found
     }
 
-    /** Pre-ticked "in stock" rows: staples, and rows whose lines are all optional or garnish. */
+    /**
+     * Pre-ticked "in stock" rows: your staples, and nothing else. An optional or garnish line is not "at home"
+     * (X.3): pre-ticking it read as random rows marked at home; the review says "optional" on it instead.
+     */
     fun defaultDecisions(
         incoming: Incoming,
         staples: Set<String>,
     ): Map<String, RowDecision> =
-        incoming.lines.groupBy { it.target.mergeKey }.mapValues { (key, ls) ->
-            RowDecision(inStock = key in staples || ls.all { it.parsed.optional || it.parsed.garnish })
-        }
+        incoming.lines.groupBy { it.target.mergeKey }.mapValues { (key, _) -> RowDecision(inStock = key in staples) }
 
     fun preview(
         list: ShoppingList,
