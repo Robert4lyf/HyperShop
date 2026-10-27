@@ -111,11 +111,11 @@ class MealsScreenTest {
     fun theWeekSaysWhatIsCookingAndWhatTheButtonWillDo() {
         show()
         compose.onNodeWithText("This week").assertExists()
-        compose.onNodeWithText("19–25 Oct · 2 meals · 1 not on the list yet").assertExists()
+        compose.onNodeWithText("19–25 Oct · 2 meals · 1 not on the shopping list yet").assertExists()
         compose.onNodeWithText("6 still needed · bbcgoodfood.com").assertExists()
-        compose.onNodeWithText("Not on the list yet · Ottolenghi Simple · p. 142").assertExists()
-        compose.onNodeWithText("Add 1 meal to the list").assertExists()
-        compose.onNodeWithText("5 new items · 2 join the list · 1 usually at home").assertExists()
+        compose.onNodeWithText("Not on the shopping list yet · Ottolenghi Simple · p. 142").assertExists()
+        compose.onNodeWithText("Add 1 meal to the shopping list").assertExists()
+        compose.onNodeWithText("5 new items · 2 already on it · 1 usually at home").assertExists()
         compose.onNodeWithTag("meals-add-to-list").performClick()
         compose.onNodeWithTag("meal-more-1").performClick()
         // No stepper for a recipe that doesn't say how many it serves.

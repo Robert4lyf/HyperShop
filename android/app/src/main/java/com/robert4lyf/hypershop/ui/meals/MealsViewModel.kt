@@ -18,6 +18,7 @@ import com.robert4lyf.hypershop.data.bookRef
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.ui.common.UiMessage
+import com.robert4lyf.hypershop.ui.recipes.NewRecipe
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -130,6 +131,32 @@ class MealsViewModel(
 
     private val messages = Channel<UiMessage>(Channel.BUFFERED)
     val events: Flow<UiMessage> = messages.receiveAsFlow()
+
+    private val reviewQueue = Channel<Long>(Channel.BUFFERED)
+
+    /** A new recipe's review to open (a link opens its own once it is ready). */
+    val reviews: Flow<Long> = reviewQueue.receiveAsFlow()
+    private val newRecipe = NewRecipe(c)
+
+    /** X.10: "New recipe" › link. */
+    fun addLink(text: String) = newRecipe.link(text)
+
+    /** "New recipe" › type it in. */
+    fun addManual(
+        title: String,
+        servings: Int?,
+        ingredients: String,
+    ) = viewModelScope.launch { newRecipe.manual(title, servings, ingredients)?.let { reviewQueue.send(it) } }
+
+    /** "New recipe" › photo. */
+    fun addPhoto(
+        uri: android.net.Uri,
+        book: String,
+        page: String,
+    ) = viewModelScope.launch {
+        val job = newRecipe.photo(uri, book, page)
+        if (job == null) messages.send(UiMessage("Couldn't open that photo")) else reviewQueue.send(job)
+    }
 
     private val current = c.planner.currentWeek()
     private val week = MutableStateFlow(current)
@@ -369,7 +396,7 @@ class MealsViewModel(
         viewModelScope.launch {
             val added = write.await()
             if (added.isEmpty()) {
-                messages.send(UiMessage("Already on the list"))
+                messages.send(UiMessage("Already on the shopping list"))
                 return@launch
             }
             messages.send(UiMessage("Added $what", undo = { writing.withLock { c.buyAgain.undo(added) } }))
@@ -411,7 +438,7 @@ class MealsViewModel(
         viewModelScope.launch {
             val lines = write.await()
             if (lines.isEmpty()) return@launch
-            messages.send(UiMessage("${row.name} back on the list", undo = { writing.withLock { c.homeCheck.haveLines(lines) } }))
+            messages.send(UiMessage("${row.name} back on the shopping list", undo = { writing.withLock { c.homeCheck.haveLines(lines) } }))
         }
     }
 

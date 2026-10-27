@@ -122,7 +122,7 @@ class RecipesViewModelTest {
         val use = await(vm.ui) { it.uses.isNotEmpty() && it.library.isNotEmpty() }.uses.single()
         vm.remove(use)
         await(vm.ui) { it.uses.isEmpty() && got.size == 1 }
-        assertEquals("Removed Weeknight chilli from the list", got[0].text)
+        assertEquals("Removed Weeknight chilli from the shopping list", got[0].text)
         runBlocking { got[0].undo!!.invoke() }
         // Back as it was: the use, its items and the library's "on your list".
         val back = await(vm.ui) { it.uses.size == 1 && it.library.single().onList }
@@ -149,7 +149,7 @@ class RecipesViewModelTest {
         // The copy went meanwhile, as the start-up purge does once it is forgotten and old.
         runBlocking { c.db.dao().deleteRecipe(use.recipeId!!) }
         runBlocking { got[0].undo!!.invoke() }
-        assertEquals("Can't undo: the list has changed since", await(vm.ui) { got.size == 2 }.let { got[1].text })
+        assertEquals("Can't undo: the shopping list has changed since", await(vm.ui) { got.size == 2 }.let { got[1].text })
         assertTrue(vm.ui.value.uses.isEmpty())
         assertTrue(runBlocking { c.repository.snapshot() }.liveItems.isEmpty())
         watching.cancel()
