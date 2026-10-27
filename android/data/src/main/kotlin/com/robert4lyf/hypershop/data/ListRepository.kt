@@ -1286,8 +1286,12 @@ class ListRepository(
         db.withTransaction {
             val now = clock()
             val before = now - ShoppingList.SEVEN_DAYS
-            val ids = dao.deletedBefore(before)
             val old = load()
+            // A bought row of a use still being shopped for (its rescaled extra on a live row, say) waits: purging it
+            // would take the use's bought share out of its progress (review A.7). It goes once nothing of the use is
+            // needed any more, when the use is archived below.
+            val stillNeeded = old.uses.values.filter { it.archivedAt == null && old.progress(it.id).toBuy > 0 }.map { it.id }.toSet()
+            val ids = dao.deletedBefore(before).filter { id -> old.contributionsOf(id).none { c -> c.useId in stillNeeded } }
             val gone = ids.toSet()
             // A purge changes what the uses' progress says (a bought row gone), so the list is re-read.
             val purged =

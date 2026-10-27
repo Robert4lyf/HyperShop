@@ -228,6 +228,27 @@ class UseProgressTest {
         }
 
     @Test
+    fun thePurgeLeavesALiveUsesBoughtShareAlone() =
+        runBlocking {
+            // Review A.7: a use still open a week on (its extra on a live row) keeps the row it was bought on.
+            val a = r.import("2 onions")
+            r.repo.tick(id("cat:onion"))
+            r.repo.finishShopping()
+            r.repo.rescaleUse(a.useId, 8)
+            val before = progress(a.useId)
+            assertTrue(before.toBuy > 0)
+            r.now += ShoppingList.SEVEN_DAYS + 1
+            r.repo.purgeDeleted()
+            assertEquals(before, progress(a.useId))
+            // Once nothing of it is needed any more, the row goes with the use.
+            r.repo.tick(id("cat:onion"))
+            r.repo.finishShopping()
+            r.now += ShoppingList.SEVEN_DAYS + 1
+            r.repo.purgeDeleted()
+            assertTrue(r.repo.usesOnList().isEmpty())
+        }
+
+    @Test
     fun aWeekAfterwardsTheBoughtAndTheAtHomeRecipesAreArchived() =
         runBlocking {
             val a = r.import("2 onions")
