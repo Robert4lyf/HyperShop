@@ -14,8 +14,11 @@ import com.robert4lyf.hypershop.importing.Job
 import com.robert4lyf.hypershop.importing.JobState
 import com.robert4lyf.hypershop.secrets.InMemoryApiKeyStore
 import com.robert4lyf.hypershop.watch.FakeWatchLink
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.mockwebserver.MockWebServer
 import java.io.File
 
@@ -34,6 +37,13 @@ object TestContainer {
         /** Every SQL statement as it runs (QueryBudgetTest). */
         onQuery: ((String) -> Unit)? = null,
     ): AppContainer {
+        // The last test's container may still be finishing work on its own scope (a view model cleared at the end
+        // of a test discards its import, which cancels WorkManager work). Left running, that write lands in the
+        // next test's freshly reset WorkManager database and fails whichever test runs next ("Illegal connection
+        // pointer"). Wind it down first, so every test starts from quiet.
+        last?.let { previous ->
+            runBlocking { withTimeoutOrNull(5_000) { previous.applicationScope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin() } }
+        }
         val context = ApplicationProvider.getApplicationContext<Context>()
         val dir = File(context.cacheDir, "ds-${System.nanoTime()}").apply { mkdirs() }
         lateinit var container: AppContainer
@@ -57,8 +67,12 @@ object TestContainer {
         WorkManagerTestInitHelper.initializeTestWorkManager(context, config)
         // Tests that do not go through startUp start ready; StartupTest covers the barrier itself.
         if (ready) container.startup.value = com.robert4lyf.hypershop.di.Startup.Ready
+        last = container
         return container
     }
+
+    /** The container [create] made last: wound down before the next one is built. */
+    @Volatile private var last: AppContainer? = null
 }
 
 /** Waits for a background import to finish (CoroutineWorker runs off the test thread). */
