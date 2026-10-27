@@ -93,6 +93,8 @@ class ClaudeClient(
                 }
                 is Outcome.Http -> {
                     val code = outcome.code
+                    // An error event after the answer started (review C.32): the input was read, so it is metered.
+                    outcome.usage?.let { u -> withContext(NonCancellable) { usageSink.record(outcome.model ?: model.id, u) } }
                     when {
                         code == 200 -> return handle(outcome.body, input, model)
                         code == 401 || code == 403 -> return ClaudeResult.Failed(ClaudeResult.Reason.BAD_KEY)
@@ -153,11 +155,16 @@ class ClaudeClient(
             val usage: Usage?,
         ) : Outcome
 
-        /** A whole reply: [body] is the message as JSON (assembled from the stream, or as sent). */
+        /**
+         * A whole reply: [body] is the message as JSON (assembled from the stream, or as sent). An `error`
+         * event after the answer started carries the [usage] known by then, with its [model]: it is billed.
+         */
         data class Http(
             val code: Int,
             val body: String,
             val retryAfter: Long?,
+            val model: String? = null,
+            val usage: Usage? = null,
         ) : Outcome
     }
 
@@ -182,8 +189,23 @@ class ClaudeClient(
             // answer started: the generation is billed all the same, so the meter still gets
             // it, here, since a resume of a cancelled continuation reaches no one.
             fun deliver(outcome: Outcome) {
-                if (cont.isCancelled && outcome is Outcome.Interrupted && outcome.usage != null) {
-                    spill.launch { usageSink.record(outcome.model ?: model.id, outcome.usage) }
+                if (cont.isCancelled) {
+                    val cost =
+                        when (outcome) {
+                            is Outcome.Interrupted -> outcome.usage?.let { (outcome.model ?: model.id) to it }
+                            // An error after the answer started, or a whole answer that landed after the caller
+                            // left (review C.32): billed as much as any other.
+                            is Outcome.Http ->
+                                if (outcome.usage != null) {
+                                    (outcome.model ?: model.id) to outcome.usage
+                                } else if (outcome.code == 200) {
+                                    billed(outcome.body)?.let { (m, u) -> (m ?: model.id) to u }
+                                } else {
+                                    null
+                                }
+                            Outcome.Offline -> null
+                        }
+                    cost?.let { (m, u) -> spill.launch { usageSink.record(m, u) } }
                 }
                 cont.resume(outcome)
             }
@@ -315,7 +337,14 @@ class ClaudeClient(
                                         } else {
                                             500
                                         }
-                                    return Outcome.Http(code, "", null)
+                                    // After message_start the input was read and is billed: its usage goes with the error.
+                                    val usage =
+                                        if (started) {
+                                            Usage(inputTokens, outputTokens ?: estimateTokens(text), cacheWrite, cacheRead)
+                                        } else {
+                                            null
+                                        }
+                                    return Outcome.Http(code, "", null, model, usage)
                                 }
                             }
                         } catch (e: IllegalArgumentException) {
@@ -374,6 +403,13 @@ class ClaudeClient(
         )
 
     private fun JsonObject.long(key: String): Long = this[key]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
+
+    /** What a whole message cost (its model and usage), when the body is one that says. */
+    private fun billed(raw: String): Pair<String?, Usage>? {
+        val msg = runCatching { lenient.decodeFromString(MessageResponse.serializer(), raw) }.getOrNull() ?: return null
+        val u = msg.usage ?: return null
+        return msg.model to Usage(u.inputTokens, u.outputTokens, u.cacheCreationInputTokens ?: 0, u.cacheReadInputTokens ?: 0)
+    }
 
     private suspend fun handle(
         raw: String,

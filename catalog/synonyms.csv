@@ -224,11 +224,14 @@ button mushroom,mushroom
 cabbage,cabbage
 cabbages,cabbage
 cake flour,cake_flour
+cake yeast,fresh_yeast
 calamari,squid
 calvados,brandy
 candied ginger,crystallised_ginger
+canned beans,beans_tin
 canned chickpeas,chickpeas
 canned corn,sweetcorn_tin
+canned mixed beans,beans_tin
 canned new potatoes,tinned_potatoes
 canned plum tomatoes,chopped_tomatoes
 canned potatoes,tinned_potatoes
@@ -406,6 +409,7 @@ cognac,brandy
 cointreau,orange_liqueur
 cold butter,butter
 cold water,water
+compressed yeast,fresh_yeast
 conchiglie,conchiglie
 condensed milk,condensed_milk
 confectioners sugar,icing_sugar
@@ -668,6 +672,8 @@ french bread,baguette
 french green lentils,puy_lentils
 french lentils,puy_lentils
 french stick,baguette
+fresh baker's yeast,fresh_yeast
+fresh bakers yeast,fresh_yeast
 fresh basil,basil
 fresh breadcrumbs,breadcrumbs
 fresh chilli,chilli
@@ -699,6 +705,7 @@ fresh stock,fresh_stock
 fresh tagliatelle,fresh_pasta
 fresh thyme,thyme
 fresh tuna,tuna_steak
+fresh yeast,fresh_yeast
 freshly grated nutmeg,nutmeg
 freshly ground black pepper,black_pepper
 frozen berries,frozen_berries
@@ -1100,6 +1107,7 @@ minute steak,steak
 mirin,mirin
 miso,miso
 miso paste,miso
+mixed beans,beans_tin
 mixed greens,salad_leaves
 mixed herbs,mixed_herbs_fresh
 mixed peppers,bell_pepper
@@ -1673,7 +1681,10 @@ tikka masala paste,curry_paste
 tikka paste,curry_paste
 tilapia,tilapia
 tilapia fillet,tilapia
+tin of beans,beans_tin
+tinned beans,beans_tin
 tinned lentils,lentils_tin
+tinned mixed beans,beans_tin
 tinned new potatoes,tinned_potatoes
 tinned plum tomatoes,chopped_tomatoes
 tinned potatoes,tinned_potatoes

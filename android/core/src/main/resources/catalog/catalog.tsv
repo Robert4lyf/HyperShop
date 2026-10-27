@@ -1,4 +1,4 @@
-#version	fd25d5bc03df
+#version	cb7f2468105f
 #id	name	plural	synonyms	aisleCode	staple	shoppingUnit	displayPolicy	gramsPerCup	packNote	group	gramsEach
 onion	onion	onions	yellow onion|brown onion|white onion|spanish onion	PRODUCE	false	each	count	160		Vegetables	150
 red_onion	red onion	red onions	purple onion	PRODUCE	false	each	count	160		Vegetables	170
@@ -244,6 +244,7 @@ cannellini_beans	cannellini beans	cannellini beans	white beans|white bean|great 
 haricot_beans	haricot beans	haricot beans	haricot bean|navy beans|navy bean	TINS_JARS	false	tin	count			Beans & pulses	
 butter_beans	butter beans	butter beans	butter bean|lima beans|lima bean	TINS_JARS	false	tin	count		1 × 400 g tin	Beans & pulses	
 baked_beans	baked beans	baked beans		TINS_JARS	false	tin	count			Beans & pulses	
+beans_tin	tinned beans	tinned beans	canned beans|tin of beans|mixed beans|tinned mixed beans|canned mixed beans	TINS_JARS	false	tin	count		1 × 400 g tin	Beans & pulses	
 lentils_tin	tinned lentils	tinned lentils		TINS_JARS	false	tin	count			Beans & pulses	
 coconut_milk	coconut milk	coconut milk	unsweetened coconut milk|light coconut milk	TINS_JARS	false	tin	count		1 × 400 ml tin		
 coconut_cream	coconut cream	coconut cream		TINS_JARS	false	tin	count				
@@ -353,6 +354,7 @@ baking_powder	baking powder	baking powder		BAKING	false	tub	presence		1 × 160 g
 bicarb	bicarbonate of soda	bicarbonate of soda	baking soda|bicarb|sodium bicarbonate	BAKING	false	tub	presence		1 × 180 g tub	Baking aids	
 cream_of_tartar	cream of tartar	cream of tartar		BAKING	false	tub	presence			Baking aids	
 yeast	fast-action dried yeast	fast-action dried yeast	yeast|dry yeast|active dry yeast|instant yeast|dried yeast	BAKING	false	pack	presence		1 × 56 g pack (8 × 7 g sachets)	Baking aids	
+fresh_yeast	fresh yeast	fresh yeast	compressed yeast|cake yeast|fresh baker's yeast|fresh bakers yeast	CHILLED	false	pack	mass				
 vanilla_extract	vanilla extract	vanilla extract	vanilla|pure vanilla extract|vanilla essence|vanilla bean paste	BAKING	false	bottle	presence		1 × 38 ml bottle	Baking aids	
 vanilla_pod	vanilla pod	vanilla pods	vanilla bean|vanilla beans	BAKING	false	each	count			Baking aids	
 almond_extract	almond extract	almond extract		BAKING	false	bottle	presence			Baking aids	

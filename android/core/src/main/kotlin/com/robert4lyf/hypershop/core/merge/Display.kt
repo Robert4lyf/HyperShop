@@ -131,7 +131,11 @@ object Display {
                         else -> return null // counted in its own unit (sticks, slices): shown as written
                     }
             }
-            val whole = roundUp(n, Rational.ONE).coerceAtLeastOne()
+            // A weight is a typical one (an onion is 150 g, give or take): 910 g is six onions, not seven. A count is exact.
+            val up = roundUp(n, Rational.ONE)
+            val whole =
+                (if (converted && up > Rational.ONE && n <= up - Rational.ONE + Rational.of(1, 10)) up - Rational.ONE else up)
+                    .coerceAtLeastOne()
             val need = if (converted || whole != n) asWritten?.let { "$it in the recipe" } else null
             return Buy(fraction(whole), whole, true, need)
         }

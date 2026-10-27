@@ -31,6 +31,9 @@ class DisplayBuyTest {
         // 450 g at a UK onion (150 g, Waitrose's typical weight): three, never fewer than needed.
         assertEquals(RowText("3 onions", "450g in the recipe"), row("450g onions", key = "onion"))
         assertEquals(RowText("2 onions", null), row("2 onions", key = "onion"))
+        // A typical weight is not exact: 910 g is six onions, not seven (review C.31); 470 g is still four.
+        assertEquals(RowText("6 onions", "910g in the recipe"), row("910g onions", key = "onion"))
+        assertEquals(RowText("4 onions", "470g in the recipe"), row("470g onions", key = "onion"))
     }
 
     @Test

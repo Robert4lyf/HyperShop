@@ -243,6 +243,7 @@ cannellini_beans,cannellini beans,cannellini beans,white beans|white bean|great 
 haricot_beans,haricot beans,haricot beans,haricot bean|navy beans|navy bean,TINS_JARS,false,tin,count,,,Beans & pulses,,agent-estimate
 butter_beans,butter beans,butter beans,butter bean|lima beans|lima bean,TINS_JARS,false,tin,count,,1 × 400 g tin,Beans & pulses,,sourced
 baked_beans,baked beans,baked beans,,TINS_JARS,false,tin,count,,,Beans & pulses,,agent-estimate
+beans_tin,tinned beans,tinned beans,canned beans|tin of beans|mixed beans|tinned mixed beans|canned mixed beans,TINS_JARS,false,tin,count,,1 × 400 g tin,Beans & pulses,,agent-estimate
 lentils_tin,tinned lentils,tinned lentils,,TINS_JARS,false,tin,count,,,Beans & pulses,,agent-estimate
 coconut_milk,coconut milk,coconut milk,unsweetened coconut milk|light coconut milk,TINS_JARS,false,tin,count,,1 × 400 ml tin,,,sourced
 coconut_cream,coconut cream,coconut cream,,TINS_JARS,false,tin,count,,,,,agent-estimate
@@ -352,6 +353,7 @@ baking_powder,baking powder,baking powder,,BAKING,false,tub,presence,,1 × 160 g
 bicarb,bicarbonate of soda,bicarbonate of soda,baking soda|bicarb|sodium bicarbonate,BAKING,false,tub,presence,,1 × 180 g tub,Baking aids,,sourced
 cream_of_tartar,cream of tartar,cream of tartar,,BAKING,false,tub,presence,,,Baking aids,,agent-estimate
 yeast,fast-action dried yeast,fast-action dried yeast,yeast|dry yeast|active dry yeast|instant yeast|dried yeast,BAKING,false,pack,presence,,1 × 56 g pack (8 × 7 g sachets),Baking aids,,sourced
+fresh_yeast,fresh yeast,fresh yeast,compressed yeast|cake yeast|fresh baker's yeast|fresh bakers yeast,CHILLED,false,pack,mass,,,,,agent-estimate
 vanilla_extract,vanilla extract,vanilla extract,vanilla|pure vanilla extract|vanilla essence|vanilla bean paste,BAKING,false,bottle,presence,,1 × 38 ml bottle,Baking aids,,sourced
 vanilla_pod,vanilla pod,vanilla pods,vanilla bean|vanilla beans,BAKING,false,each,count,,,Baking aids,,agent-estimate
 almond_extract,almond extract,almond extract,,BAKING,false,bottle,presence,,,Baking aids,,agent-estimate

@@ -429,6 +429,20 @@ class ClaudeClientTest {
         }
 
     @Test
+    fun anErrorEventAfterTheAnswerStartedStillMetersItsInput() =
+        runTest {
+            // Review C.32: message_start was read (the input tokens are known and billed), then the server gave up.
+            val started = sse().substringBefore("event: content_block_start")
+            server.enqueue(stream(started + "event: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\"}}\n\n"))
+            server.enqueue(stream(sse()))
+            assertTrue(client().parse(input, ClaudeModel.HAIKU) is ClaudeResult.Parsed)
+            assertEquals(2, recorded.size, "$recorded")
+            assertEquals("claude-haiku-5-5", recorded.first().first)
+            assertEquals(1200, recorded.first().second.inputTokens)
+            assertEquals(10, recorded.first().second.cacheWriteTokens)
+        }
+
+    @Test
     fun ringLogKeepsTheLast500() {
         val l = RingLog()
         repeat(600) { l.log("line $it") }

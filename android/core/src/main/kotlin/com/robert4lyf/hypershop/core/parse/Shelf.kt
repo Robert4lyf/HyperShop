@@ -9,7 +9,7 @@ import com.robert4lyf.hypershop.core.model.QtyUnit
 
 /**
  * Which shelf a named thing is bought from, when the words round the name change it (Q.3): a tin of
- * something the catalogue knows fresh is its tinned item ("2 tins tomatoes" are tinned tomatoes), and
+ * something the catalogue knows fresh or dried is its tinned item ("2 tins tomatoes" are tinned tomatoes), and
  * minced or ground meat is that meat's mince. One rule for both readers, the rule parser and Claude's
  * answers (KNOWN_ISSUES #29), so a recipe is filed the same way whichever read it. Only to an entry the
  * catalogue has.
@@ -28,8 +28,9 @@ class Shelf(
     ): String {
         val tinWord = said.firstOrNull { it in TIN_WORDS }
         val e = entryOf(name) ?: return if (tinWord != null) "$tinWord $name" else name
-        if ((unit == QtyUnit.TIN || tinWord != null) && e.aisle == AisleCode.PRODUCE) {
-            // "canned crushed tomato": the catalogue's plural is what its tinned synonyms are made of.
+        if ((unit == QtyUnit.TIN || tinWord != null) && (e.aisle == AisleCode.PRODUCE || e.aisle == AisleCode.PASTA_RICE_GRAINS)) {
+            // "canned crushed tomato": the catalogue's plural is what its tinned synonyms are made of. A tin of
+            // something the catalogue knows dried ("1 tin beans", "a can of lentils") is its tinned item likewise.
             val forms = listOf(name, e.plural).distinct()
             forms
                 .flatMap { listOf("tinned $it", "canned $it") }
