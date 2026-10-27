@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -65,16 +66,47 @@ class ListViewModelTest {
     }
 
     @Test
-    fun categorisedGroupsRowsWithinTheAisle() {
+    fun groupsKeepTogetherInEveryView() {
         val c = TestContainer.create()
         c.add("1 lemon", "2 onions", "1 bunch basil", "1 carrot")
         val vm = tracked(ListViewModel(c))
+        // X.9: store order too, so the herbs are not split by what was added between them.
         val standard = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
-        assertEquals(listOf("lemon", "onion", "basil", "carrot"), standard.aisles.single().second.map { it.name })
+        assertEquals(listOf("onion", "carrot", "basil", "lemon"), standard.aisles.single().second.map { it.name })
+        assertFalse(standard.categorised)
         vm.setView(ListView.TYPE)
         val grouped = await(vm.ui) { it.categorised }
         assertEquals(listOf("onion", "carrot", "basil", "lemon"), grouped.aisles.single().second.map { it.name })
         assertEquals(listOf("Vegetables", "Vegetables", "Herbs", "Fruit"), grouped.aisles.single().second.map { it.group })
+    }
+
+    @Test
+    fun anArrangementIsKeptForTheNextTrip() {
+        val c = TestContainer.create()
+        c.add("2 onions", "1 carrot", "1 bunch basil", "1 bunch dill", "1 lemon")
+        val vm = tracked(ListViewModel(c))
+
+        fun names(u: ListUi) = u.aisles.flatMap { it.second }.map { it.name }
+        var ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
+        assertEquals(listOf("onion", "carrot", "basil", "dill", "lemon"), names(ui))
+        vm.arrange(true)
+        ui = await(vm.ui) { it.arranging }
+        assertTrue(ui.categorised)
+        // Dill above basil, then the herbs above the vegetables.
+        vm.moveItem(ui.row("dill"), -1)
+        ui = await(vm.ui) { names(it) == listOf("onion", "carrot", "dill", "basil", "lemon") }
+        vm.moveGroup(AisleCode.PRODUCE, "Herbs", -1)
+        await(vm.ui) { names(it) == listOf("dill", "basil", "onion", "carrot", "lemon") }
+        vm.arrange(false)
+        await(vm.ui) { !it.arranging }
+        // Next trip: everything bought and finished, then the same things added again in another order.
+        runBlocking {
+            for (r in vm.ui.value.aisles.single().second) c.repository.toggle(r.id)
+            c.repository.finishShopping()
+        }
+        c.add("1 lemon", "1 bunch basil", "1 carrot", "1 bunch dill", "1 bunch mint")
+        // Mint is new to the arrangement: it follows the arranged herbs.
+        await(vm.ui) { names(it) == listOf("dill", "basil", "mint", "carrot", "lemon") }
     }
 
     @Test

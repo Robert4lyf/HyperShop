@@ -12,6 +12,7 @@ import com.robert4lyf.hypershop.core.merge.Preview
 import com.robert4lyf.hypershop.core.merge.Rekey
 import com.robert4lyf.hypershop.core.merge.RemovedUse
 import com.robert4lyf.hypershop.core.merge.RowDecision
+import com.robert4lyf.hypershop.core.merge.ShelfOrder
 import com.robert4lyf.hypershop.core.merge.ShoppingList
 import com.robert4lyf.hypershop.core.merge.TickSource
 import com.robert4lyf.hypershop.core.merge.UseKind
@@ -146,6 +147,8 @@ data class WatchListView(
     val list: ShoppingList,
     val aisles: List<WatchAisle>,
     val epoch: Int,
+    /** X.9: the order within aisles, so the wrist lists things as the phone does. */
+    val shelf: ShelfOrder = ShelfOrder(),
 )
 
 /**
@@ -204,6 +207,35 @@ class ListRepository(
     /** The walking order, re-read whenever listRev changes. */
     fun observeAisleOrder(): Flow<List<AisleCode>> =
         dao.observeListRev().filterNotNull().distinctUntilChanged().map { aisleOrder() }.distinctUntilChanged()
+
+    /**
+     * X.9: the arranged order within aisles. Held here once read, so a tick (which
+     * re-reads the walking order) reads nothing more for it; [arrange] and a restore
+     * are the only writes.
+     */
+    @Volatile private var shelfCache: ShelfOrder? = null
+
+    suspend fun shelfOrder(): ShelfOrder =
+        shelfCache ?: ShelfOrder(dao.shelfRanks().associate { it.key to it.rank }).also { shelfCache = it }
+
+    /** The walking order and the order within aisles together, re-read whenever listRev changes. */
+    fun observeWalkingOrder(): Flow<Pair<List<AisleCode>, ShelfOrder>> =
+        dao.observeListRev().filterNotNull().distinctUntilChanged().map { aisleOrder() to shelfOrder() }.distinctUntilChanged()
+
+    /** Keeps an arrangement for this trip and the next. Bumps listRev, so the list (and the watch) re-read it. */
+    suspend fun arrange(order: ShelfOrder) {
+        try {
+            db.withTransaction {
+                dao.putShelfRanks(order.ranks.map { (k, r) -> ShelfRankEntity(k, r) })
+                shelfCache = order
+                val meta = dao.meta()!!
+                dao.putMeta(meta.copy(listRev = meta.listRev + 1))
+            }
+        } catch (e: Exception) {
+            shelfCache = null
+            throw e
+        }
+    }
 
     /** The units setting changed: every live item's text changed, so bump every rev and listRev once. */
     suspend fun unitsChanged() = write { it.unitsChanged() to Unit }
@@ -1328,7 +1360,7 @@ class ListRepository(
                     val e = byCode[code]
                     WatchAisle(a, e?.name ?: a.displayName, e?.hidden ?: false)
                 }
-            WatchListView(load(), aisles, dao.meta()!!.listEpoch.toInt())
+            WatchListView(load(), aisles, dao.meta()!!.listEpoch.toInt(), shelfOrder())
         }
 
     /**
@@ -1413,6 +1445,7 @@ class ListRepository(
                 tripItems = dao.allTripItems(),
                 regulars = dao.regulars(),
                 recipeNotes = dao.recipeNotes(),
+                shelfRanks = dao.shelfRanks(),
             )
         }
 
@@ -1436,6 +1469,8 @@ class ListRepository(
             dao.clearTrips()
             dao.clearRegulars()
             dao.clearRecipeNotes()
+            dao.clearShelfRanks()
+            shelfCache = null
             dao.clearDecisions()
             dao.clearContributions()
             dao.clearTicks()
@@ -1482,6 +1517,7 @@ class ListRepository(
             dao.pruneTrips(MAX_TRIPS)
             dao.insertRegulars(b.regulars)
             dao.insertRecipeNotes(b.recipeNotes)
+            dao.putShelfRanks(b.shelfRanks)
             // A file from before the plan: its recipes on the list become planned meals, as the 4→5 migration did.
             if (b.planVersion == 0) PlanSeed.fromUses(db.openHelper.writableDatabase)
             val meta = dao.meta()!!
@@ -1496,6 +1532,7 @@ class ListRepository(
                 ),
             )
         }
+        shelfCache = null
         // The database holds the new marker already; a file that can't be written now means one more
         // new epoch at the next start-up (checkEpoch), never a restore reported as failed.
         runCatching { marker.write(fresh) }

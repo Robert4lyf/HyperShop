@@ -30,6 +30,8 @@ import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Inventory2
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.ShoppingCart
@@ -109,6 +111,10 @@ data class ListActions(
     /** X.8: "Not available" on this trip, and "Found it" to take that back. */
     val onUnavailable: (ListRow) -> Unit = {},
     val onAvailable: (ListRow) -> Unit = {},
+    /** X.9: "Arrange items" and its "Done"; a row or a group moved one place (-1 up, +1 down). */
+    val onArrange: (Boolean) -> Unit = {},
+    val onMoveItem: (ListRow, Int) -> Unit = { _, _ -> },
+    val onMoveGroup: (AisleCode, String?, Int) -> Unit = { _, _, _ -> },
 )
 
 /**
@@ -135,7 +141,14 @@ fun ListScreen(
             Box(Modifier.weight(1f)) {
                 if (ui.loaded) ListBody(ui, actions, header, empty) else Loading()
             }
-            if (ui.doneCount > 0) {
+            if (ui.arranging) {
+                BottomActionBar(navigationBarInset = false) {
+                    Button(
+                        onClick = { actions.onArrange(false) },
+                        modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("arrange-done"),
+                    ) { Text("Done arranging") }
+                }
+            } else if (ui.doneCount > 0) {
                 // The screen sits above the tab bar, so the bar needs no navigation-bar inset of its own.
                 BottomActionBar(navigationBarInset = false) {
                     Button(onClick = actions.onFinish, modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("finish")) {
@@ -211,7 +224,19 @@ private fun ListBody(
             .testTag("list"),
         contentPadding = PaddingValues(bottom = 24.dp + keyboard),
     ) {
-        header()
+        if (ui.arranging) {
+            item(key = "arrange-hint") {
+                Text(
+                    "Move things into the order you find them in the shop. Groups move together; " +
+                        "the order is kept for every trip.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp).testTag("arrange-hint"),
+                )
+            }
+        } else {
+            header()
+        }
         if (ui.isEmpty) item { empty() }
         if (byRecipe) {
             for (section in ui.recipes) {
@@ -242,7 +267,8 @@ private fun ListBody(
         for ((aisle, rows) in if (byRecipe) emptyList() else ui.aisles) {
             val open = aisle.name !in collapsed
             // Categorised: a label above each group, when the aisle has more than one.
-            val labelled = ui.categorised && rows.map { it.group }.distinct().size > 1
+            val groups = rows.map { it.group }.distinct()
+            val labelled = ui.categorised && groups.size > 1
             val cells = if (labelled) withLabels(rows) else rows.map { Cell.Item(it) }
             val count = if (open) cells.size + 1 else 1
             item(key = "aisle-${aisle.name}", contentType = "aisle") {
@@ -263,13 +289,24 @@ private fun ListBody(
                             Modifier.animateItem()
                         }.sectionItem(sectionPosition(i + 1, count), card)
                     when (c) {
-                        is Cell.Item -> ListRowItem(c.row, actions, tile)
-                        is Cell.Label -> GroupLabel(c.name, tile)
+                        is Cell.Item ->
+                            if (ui.arranging) {
+                                val inGroup = rows.filter { it.group == c.row.group }
+                                ArrangeRow(c.row, inGroup.first() != c.row, inGroup.last() != c.row, actions, tile)
+                            } else {
+                                ListRowItem(c.row, actions, tile)
+                            }
+                        is Cell.Label ->
+                            if (ui.arranging) {
+                                ArrangeGroup(aisle, c, groups.first() != c.group, groups.last() != c.group, actions, tile)
+                            } else {
+                                GroupLabel(c.name, tile)
+                            }
                     }
                 }
             }
         }
-        if (ui.inStock.isNotEmpty()) inStockSection(ui.inStock, card, actions.onNeed)
+        if (ui.inStock.isNotEmpty() && !ui.arranging) inStockSection(ui.inStock, card, actions.onNeed)
     }
 }
 
@@ -360,6 +397,7 @@ private sealed interface Cell {
 
     data class Label(
         val name: String,
+        val group: String?,
     ) : Cell {
         override fun key(aisle: AisleCode): Any = "group-${aisle.name}-$name"
     }
@@ -371,7 +409,7 @@ private fun withLabels(rows: List<ListRow>): List<Cell> =
         var last: String? = null
         rows.forEachIndexed { i, r ->
             val name = r.group ?: "Other"
-            if (i == 0 || name != last) add(Cell.Label(name))
+            if (i == 0 || name != last) add(Cell.Label(name, r.group))
             last = name
             add(Cell.Item(r))
         }
@@ -393,6 +431,70 @@ private fun GroupLabel(
                 .padding(start = 20.dp, top = 12.dp, bottom = 4.dp)
                 .semantics { heading() },
     )
+}
+
+/** X.9: a group's label while arranging, with arrows that move the whole group. */
+@Composable
+private fun ArrangeGroup(
+    aisle: AisleCode,
+    label: Cell.Label,
+    canUp: Boolean,
+    canDown: Boolean,
+    actions: ListActions,
+    tile: Modifier,
+) {
+    Row(
+        tile.fillMaxWidth().background(MaterialTheme.colorScheme.card).padding(start = 20.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label.name,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f).semantics { heading() },
+        )
+        MoveArrows("${label.name} group", "group-${aisle.name}-${label.name}", canUp, canDown) {
+            actions.onMoveGroup(aisle, label.group, it)
+        }
+    }
+}
+
+/** X.9: a row while arranging: what it is, and arrows instead of the tick. */
+@Composable
+private fun ArrangeRow(
+    row: ListRow,
+    canUp: Boolean,
+    canDown: Boolean,
+    actions: ListActions,
+    tile: Modifier,
+) {
+    Row(
+        tile.fillMaxWidth().heightIn(min = 56.dp).padding(start = 20.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            displayMain(row.main, row.name),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f).padding(vertical = 8.dp),
+        )
+        MoveArrows(row.name, "${row.id}", canUp, canDown) { actions.onMoveItem(row, it) }
+    }
+}
+
+@Composable
+private fun MoveArrows(
+    what: String,
+    tag: String,
+    canUp: Boolean,
+    canDown: Boolean,
+    onMove: (Int) -> Unit,
+) {
+    IconButton(onClick = { onMove(-1) }, enabled = canUp, modifier = Modifier.testTag("up-$tag")) {
+        Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "Move $what up")
+    }
+    IconButton(onClick = { onMove(+1) }, enabled = canDown, modifier = Modifier.testTag("down-$tag")) {
+        Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Move $what down")
+    }
 }
 
 /** The left-to-buy count per aisle as last seen; deliberately not snapshot state. */
@@ -457,6 +559,15 @@ private fun ListTop(
                         )
                     }
                     HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text("Arrange items") },
+                        enabled = !ui.isEmpty && ui.view != ListView.RECIPE,
+                        onClick = {
+                            menu = false
+                            actions.onArrange(true)
+                        },
+                        modifier = Modifier.testTag("arrange"),
+                    )
                     DropdownMenuItem(text = { Text("Share list as text") }, enabled = !ui.isEmpty, onClick = {
                         menu = false
                         actions.onShare()

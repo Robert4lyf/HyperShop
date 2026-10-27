@@ -6,6 +6,7 @@ import com.robert4lyf.hypershop.catalog.EntryEdit
 import com.robert4lyf.hypershop.core.catalog.CatalogEntry
 import com.robert4lyf.hypershop.core.catalog.DisplayPolicy
 import com.robert4lyf.hypershop.core.merge.Display
+import com.robert4lyf.hypershop.core.merge.ShelfOrder
 import com.robert4lyf.hypershop.core.merge.ShoppingList
 import com.robert4lyf.hypershop.core.merge.UnitsSetting
 import com.robert4lyf.hypershop.core.merge.UseKind
@@ -60,7 +61,11 @@ data class ListRow(
     val from: String? = null,
     /** X.8: set aside as not available on this trip; still needed, back on the next one. */
     val unavailable: Boolean = false,
-)
+    /** Its merge key: what an arranged place ([ShelfOrder]) is kept under. */
+    val key: String = "",
+) {
+    internal fun slot() = ShelfOrder.Slot(aisle, group, key, 0)
+}
 
 /** The item sheet (PLAN §3.5). */
 data class ItemSheet(
@@ -112,9 +117,11 @@ data class ListUi(
     val recipes: List<RecipeSection> = emptyList(),
     /** Planning or shopping (Settings.listMode). */
     val mode: ListMode = ListMode.PLAN,
+    /** X.9: putting things in the order they are found, with arrows on every row and group. */
+    val arranging: Boolean = false,
 ) {
     /** Rows grouped within each aisle, with a label per group. */
-    val categorised: Boolean get() = view == ListView.TYPE
+    val categorised: Boolean get() = view == ListView.TYPE || arranging
 
     val isEmpty: Boolean get() = loaded && aisles.isEmpty()
 
@@ -179,8 +186,10 @@ data class RecipeSection(
 class ListViewModel(
     private val c: AppContainer,
 ) : ViewModel() {
-    /** Re-read on every list change, so a new walking order from Settings shows straight away. */
-    private val order = c.repository.observeAisleOrder()
+    /** Re-read on every list change, so a new walking order from Settings (or an arrangement) shows straight away. */
+    private val order = c.repository.observeWalkingOrder()
+
+    private val arranging = MutableStateFlow(false)
     private val messages = Channel<UiMessage>(Channel.BUFFERED)
     val events: Flow<UiMessage> = messages.receiveAsFlow()
 
@@ -195,8 +204,17 @@ class ListViewModel(
     /** The item sheet being loaded: a newer open, or a close, cancels it. */
     private var openJob: Job? = null
 
-    /** The walking order, the layout and the mode. */
-    private val view = combine(order, c.settings.listView, c.settings.listMode) { o, v, m -> Triple(o, v, m) }
+    /** The walking order, the layout and the mode, and whether the list is being arranged. */
+    private val view =
+        combine(order, c.settings.listView, c.settings.listMode, arranging) { o, v, m, a -> View(o.first, o.second, v, m, a) }
+
+    private data class View(
+        val aisles: List<AisleCode>,
+        val shelf: ShelfOrder,
+        val layout: ListView,
+        val mode: ListMode,
+        val arranging: Boolean,
+    )
 
     /**
      * The list with its in-stock lines and recipe titles, read together on every
@@ -213,20 +231,23 @@ class ListViewModel(
             view,
             c.importJobs.ready,
             c.recipePhotos.paths(),
-        ) { (list, lines, src), units, (ord, v, m), ready, photos ->
+        ) { (list, lines, src), units, v, ready, photos ->
             lastList = list
             lastUnits = units
             build(
                 list,
                 units,
-                ord,
-                v,
+                v.aisles,
+                v.layout,
                 src,
+                v.shelf,
             ).let { ui ->
                 ui.copy(
                     readyJobs = ready.map { it.id },
                     inStock = inStockRows(lines, units),
-                    mode = m,
+                    mode = v.mode,
+                    // Arranging is a planning job: the shop screen leaves it.
+                    arranging = v.arranging && v.mode == ListMode.PLAN && v.layout != ListView.RECIPE,
                     recipes = ui.recipes.map { r -> r.libraryKey?.let { r.copy(photo = photos[it]) } ?: r },
                 )
             }
@@ -380,8 +401,8 @@ class ListViewModel(
         ord: List<AisleCode>,
         view: ListView = ListView.STORE,
         src: Sources = Sources(emptyMap(), emptyMap(), emptyMap()),
+        shelf: ShelfOrder = ShelfOrder(),
     ): ListUi {
-        val categorised = view == ListView.TYPE
         val from = fromTitles(list, src)
         val rows =
             list.liveItems.map { item ->
@@ -403,19 +424,18 @@ class ListViewModel(
                     entry?.group,
                     from[item.id],
                     unavailable = list.isUnavailable(item.id),
+                    key = item.mergeKey,
                 ) to item.position
             }
-        // Categorised: by group (the catalogue's order), then as usual within it.
+        // X.9: groups keep together in every view (the herbs, the salad), as arranged or in the catalogue's
+        // order; within a group what was arranged first, then the rest as added. Bought rows sink in their group.
         val order =
-            if (categorised) {
-                compareBy<Pair<ListRow, Int>>(
-                    { c.catalog.groupRank(it.first.aisle, it.first.group) },
-                    { it.first.state == TickState.DONE },
-                    { it.second },
-                )
-            } else {
-                compareBy({ it.first.state == TickState.DONE }, { it.second })
-            }
+            compareBy<Pair<ListRow, Int>>(
+                { shelf.groupSort(it.first.aisle, it.first.group, c.catalog.groupRank(it.first.aisle, it.first.group)) },
+                { it.first.state == TickState.DONE },
+                { shelf.itemSort(it.first.slot()) },
+                { it.second },
+            )
         val grouped =
             rows.groupBy { it.first.aisle }
                 .toList()
@@ -456,6 +476,35 @@ class ListViewModel(
                 }),
             )
         }
+
+    /** X.9: "Arrange items" from the menu, and "Done". */
+    fun arrange(on: Boolean) {
+        arranging.value = on
+    }
+
+    /** Moves [row] one place up ([by] -1) or down (+1) among its group's rows, for this trip and the next. */
+    fun moveItem(
+        row: ListRow,
+        by: Int,
+    ) = viewModelScope.launch {
+        val rows = ui.value.aisles.firstOrNull { it.first == row.aisle }?.second.orEmpty().filter { it.group == row.group }
+        val next = c.repository.shelfOrder().movedItem(rows.map { it.slot() }, row.slot(), by) ?: return@launch
+        c.repository.arrange(next)
+    }
+
+    /** Moves the group [group] one place up or down within [aisle], past the group shown next to it. */
+    fun moveGroup(
+        aisle: AisleCode,
+        group: String?,
+        by: Int,
+    ) = viewModelScope.launch {
+        val present = ui.value.aisles.firstOrNull { it.first == aisle }?.second.orEmpty().map { it.group }.distinct()
+        val known: List<String?> = c.catalog.groupsIn(aisle) + null
+        val next =
+            c.repository.shelfOrder().movedGroup(aisle, present, known, group, by) { c.catalog.groupRank(aisle, it) }
+                ?: return@launch
+        c.repository.arrange(next)
+    }
 
     /** "Found it after all": back among what is left. */
     fun available(row: ListRow) = viewModelScope.launch { c.repository.markAvailable(row.id) }

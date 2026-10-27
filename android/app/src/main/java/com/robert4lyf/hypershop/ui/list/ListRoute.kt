@@ -71,6 +71,9 @@ fun ListRoute(
             onMode = vm::setMode,
             onUnavailable = vm::unavailable,
             onAvailable = vm::available,
+            onArrange = vm::arrange,
+            onMoveItem = { r, by -> vm.moveItem(r, by) },
+            onMoveGroup = { a, g, by -> vm.moveGroup(a, g, by) },
             onShare = {
                 val send =
                     Intent(Intent.ACTION_SEND)

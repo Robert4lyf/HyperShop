@@ -50,6 +50,8 @@ data class BackupData(
     val regulars: List<RegularEntity> = emptyList(),
     /** Ratings, cooking notes and photo addresses (not the photos: see [RecipeNoteEntity]). Absent from older files. */
     val recipeNotes: List<RecipeNoteEntity> = emptyList(),
+    /** X.9: the arranged order within aisles. Absent from older files. */
+    val shelfRanks: List<ShelfRankEntity> = emptyList(),
 )
 
 /**
@@ -253,6 +255,9 @@ object BackupValidator {
         check(b.regulars.map { it.mergeKey }.toSet().size == b.regulars.size, "duplicate regulars")
         check(b.recipeNotes.size <= MAX_ROWS, "recipeNotes: ${b.recipeNotes.size} rows is more than a backup can hold")
         check(b.recipeNotes.map { it.libraryKey }.toSet().size == b.recipeNotes.size, "duplicate recipe notes")
+        check(b.shelfRanks.size <= MAX_ROWS, "shelfRanks: ${b.shelfRanks.size} rows is more than a backup can hold")
+        check(b.shelfRanks.map { it.key }.toSet().size == b.shelfRanks.size, "duplicate shelf ranks")
+        check(b.shelfRanks.all { it.key.length in 1..MAX_TEXT && it.rank >= 0 }, "shelf rank: bad key or rank")
         for (n in b.recipeNotes) {
             check(n.libraryKey.length in 1..ListRepository.MAX_URL, "recipe note: bad recipe key")
             check(n.rating == null || n.rating in 1..ListRepository.MAX_STARS, "recipe note: rating out of range")
