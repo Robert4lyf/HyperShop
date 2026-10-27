@@ -283,7 +283,13 @@ class WatchSync {
             adoptEpoch(ep as Lang.Number);
         }
 
-        if (acked > ackedThrough || inFlight) {
+        // An ack for a seq this watch never issued is another install's (the phone pushed to the
+        // install it last knew) or stale: nothing of ours is settled by it, and a hello puts the
+        // phone right. Settling on it would drop an op in flight unapplied, and the next hello's
+        // "at" would then make every later op a duplicate (review D.34).
+        if (acked >= nextSeq) {
+            helloDue = true;
+        } else if (acked > ackedThrough || inFlight) {
             settle(acked, ax as Lang.Dictionary<Lang.Number, Lang.String>, pageRev);
         }
 

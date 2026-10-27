@@ -108,6 +108,9 @@ class WatchSyncCoordinatorTest {
             val pages = link.sent.map { requireNotNull(WatchCodec.decodePage(it)) }
             assertTrue("the list went without a hello", pages.first().pages > 0)
             assertTrue(pages.flatMap { it.items }.any { it.name.contains("milk", ignoreCase = true) })
+            // The install has not spoken since this process started: the page carries no acks (review D.34).
+            assertEquals(0, pages.first().ackedThrough)
+            assertTrue(pages.first().ackExceptions.isEmpty())
 
             // No install on record (a new epoch forgets them all): nothing to push to.
             c.repository.checkEpoch(com.robert4lyf.hypershop.data.EpochMarker(java.nio.file.Files.createTempDirectory("epoch").toFile()))

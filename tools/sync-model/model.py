@@ -218,7 +218,10 @@ def watch_receive(s: S, m) -> S:
     if ep != s.w_ep:
         s = replace(s, w_ep=ep, outbox=(), cache=None, cache_lr=0, settled=(), inflight=False,
                     acked=s.next_seq - 1, hello_due=True)
-    if at > s.acked or s.inflight:
+    if at >= s.next_seq:
+        # an ack for a seq the watch never issued: another install's, or stale (review D.34)
+        s = replace(s, hello_due=True)
+    elif at > s.acked or s.inflight:
         settled = list(s.settled)
         acked_ok = set(s.acked_ok)
         for o in s.outbox:

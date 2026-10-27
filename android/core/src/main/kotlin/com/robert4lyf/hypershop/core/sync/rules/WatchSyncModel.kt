@@ -127,7 +127,10 @@ class WatchSyncModel(
     fun receive(page: SnapshotPage) {
         if (page.epoch != epoch) adoptEpoch(page.epoch)
 
-        if (page.ackedThrough > ackedThrough || inFlight) {
+        // An ack for a seq this watch never issued is another install's or stale: nothing is settled, hello.
+        if (page.ackedThrough >= nextSeq) {
+            helloDue = true
+        } else if (page.ackedThrough > ackedThrough || inFlight) {
             for (p in outbox.filter { (it.seq ?: Int.MAX_VALUE) <= page.ackedThrough }) {
                 val r = page.ackExceptions.firstOrNull { it.first == p.seq }?.second ?: OpResult.OK
                 results[p.seq!!] = r

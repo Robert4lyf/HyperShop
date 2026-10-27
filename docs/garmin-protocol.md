@@ -58,6 +58,11 @@ otherwise. It also pushes a snapshot when the list changes
 1. **Install tracking.** An unknown install starts at `lastSeq = hello.at`, or
    `firstSeq − 1` for a batch. A `hello` whose `at` exceeds `lastSeq`
    fast-forwards it (the watch voided seqs when it adopted a new epoch).
+   Acks belong to the install that sent the ops: a push to an install that has
+   not spoken since the phone started carries `at = 0` and no `ax` (Connect IQ
+   delivers to the device, whatever install runs there), and the watch treats
+   an `at` for a seq it never issued (`at ≥ nextSeq`) as another install's or
+   stale: nothing is settled, `helloDue`.
 2. **Sequence.** For each op: `seq ≤ lastSeq` → duplicate, ignored (its result
    is re-sent from the results kept per install); `seq ≠ lastSeq + 1` → stop,
    the watch goes back to `at + 1`; else apply, record the result, `lastSeq = seq`.

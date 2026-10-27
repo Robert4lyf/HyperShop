@@ -66,6 +66,9 @@ class WatchSyncCoordinator(
 
     /** The install that spoke last (or was last recorded): unsolicited snapshots go to it. */
     @Volatile var install: Int? = null
+
+    /** The install heard from since this process started: the only one whose acks are known to be its own. */
+    @Volatile private var spoken: Int? = null
         private set
 
     /** The listRev of the last full snapshot sent, so a reply and a change push are not both sent. */
@@ -114,6 +117,7 @@ class WatchSyncCoordinator(
     suspend fun handle(payload: Map<*, *>) {
         WatchCodec.decodeProbe(payload)?.let { probe ->
             install = probe.installId
+            spoken = probe.installId
             log("watch: probe in ${probe.received} B, reply ${probe.want} B")
             sending.withLock { link.send(WatchCodec.encodeProbeReply(probe)) }
             return
@@ -124,6 +128,7 @@ class WatchSyncCoordinator(
             return
         }
         install = m.installId
+        spoken = m.installId
         val reply = repository.applyWatch(m)
         when {
             m is WatchMessage.Bye -> Unit
@@ -145,7 +150,10 @@ class WatchSyncCoordinator(
         if (link.state.value != WatchLinkState.APP_READY) return
         val to = install ?: repository.lastInstall()?.also { install = it } ?: return
         if (!force && repository.epochAndRev().second.toInt() == sentRev) return
-        sendSnapshot(to, onlyIfNew = !force) { repository.watchAck(to) }
+        // Connect IQ delivers to the device, whatever install runs there. Acks belong to the install that
+        // sent the ops; one that has not spoken since this process started gets the list and no acks
+        // (nothing has seq <= 0), rather than another install's ackedThrough (review D.34).
+        sendSnapshot(to, onlyIfNew = !force) { if (spoken == to) repository.watchAck(to) else WatchReply(0, emptyList(), true) }
     }
 
     private suspend fun sendAckOnly(reply: WatchReply) {
@@ -197,7 +205,8 @@ class WatchSyncCoordinator(
         val items =
             list.liveItems
                 // Set aside on the phone for this trip (X.8): not something to look for on the wrist either.
-                .filter { it.aisle in order && it.unavailableAt == null }
+                // Ids and revs travel as 32-bit numbers; a row beyond that (a crafted backup) is left off.
+                .filter { it.aisle in order && it.unavailableAt == null && it.id <= Int.MAX_VALUE && it.rev <= Int.MAX_VALUE }
                 .sortedWith(
                     compareBy(
                         { order.getValue(it.aisle) },

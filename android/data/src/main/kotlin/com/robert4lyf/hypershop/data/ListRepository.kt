@@ -1344,7 +1344,9 @@ class ListRepository(
             when (m) {
                 is WatchMessage.Hello -> {
                     val i = dao.install(m.installId)
-                    val last = maxOf(i?.lastSeq ?: m.ackedThrough, m.ackedThrough)
+                    // A claim at the top of the range would make the next seq overflow (a malicious watch only).
+                    val claimed = minOf(m.ackedThrough, Int.MAX_VALUE - 1)
+                    val last = maxOf(i?.lastSeq ?: claimed, claimed)
                     val offset = clock() - m.watchNow * 1000
                     dao.putInstall(WatchInstallEntity(m.installId, last, offset))
                     // Results the watch has settled are never asked for again.
