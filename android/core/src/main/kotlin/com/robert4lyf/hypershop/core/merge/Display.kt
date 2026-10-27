@@ -299,7 +299,8 @@ object Display {
                         entry?.gramsPerCup,
                         entry?.displayPolicy,
                     )?.let { "$it already bought" }
-                else -> entry?.packNote?.let(::compactUnits)
+                // "400g tin", not "1 × 400 g tin": beside "2 tins" the one read as the count (UX review 16).
+                else -> entry?.packNote?.let { compactUnits(it.removePrefix("1 × ")) }
             }
         return RowText(main, sub)
     }

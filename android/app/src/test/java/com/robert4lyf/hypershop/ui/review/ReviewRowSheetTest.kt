@@ -62,7 +62,7 @@ class ReviewRowSheetViewModelTest {
         val vm = ReviewViewModel(c, runBlocking { c.readyJob("200 ml milk") })
         await(vm.state) { it is ReviewState.Ready }
         assertEquals("milk: +200ml → 700ml on the shopping list", vm.sheet("cat:milk")!!.effect)
-        assertEquals("1 × 4 pint (2.27l) bottle", vm.sheet("cat:milk")!!.packNote)
+        assertEquals("4 pint (2.27l) bottle", vm.sheet("cat:milk")!!.packNote)
         assertEquals("200 ml milk", vm.sheet("cat:milk")!!.lines.single().raw)
     }
 

@@ -96,7 +96,8 @@ class DisplayTest {
         val onion = l.itemByKey("cat:onion")!!
         val butter = l.itemByKey("cat:butter")!!
         assertEquals(RowText("2 onions", null), Display.row(l, onion, cat.byId["onion"]))
-        assertEquals(RowText("250g butter", "1 × 250g block"), Display.row(l, butter, cat.byId["butter"]))
+        // The pack note without its "1 ×" (UX review 16): beside a count it read as the count.
+        assertEquals(RowText("250g butter", "250g block"), Display.row(l, butter, cat.byId["butter"]))
         l = l.tick(onion.id, 1)!!
         l = add(l, listOf("1 onion")).first
         assertEquals(RowText("1 more onion", "2 already bought"), Display.row(l, l.items.getValue(onion.id), cat.byId["onion"]))

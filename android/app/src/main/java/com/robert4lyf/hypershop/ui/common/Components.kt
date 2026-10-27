@@ -52,10 +52,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
@@ -195,11 +197,18 @@ fun ScreenHeader(
                             // Soft white, not citrus: citrus only clears 3:1 on the brighter hero.
                             Text(it.uppercase(), style = MaterialTheme.typography.labelMedium, color = Brand.OnHeroSoft)
                         }
+                        // Three lines at most (a long title at 200 % pushed the screen below the fold); TalkBack gets it whole.
                         Text(
                             title,
                             style = MaterialTheme.typography.headlineLarge,
                             color = Brand.OnHero,
-                            modifier = Modifier.semantics { heading() },
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier =
+                                Modifier.semantics {
+                                    heading()
+                                    contentDescription = title
+                                },
                         )
                         subtitle?.let {
                             Text(it, style = MaterialTheme.typography.bodyMedium, color = Brand.OnHeroSoft)

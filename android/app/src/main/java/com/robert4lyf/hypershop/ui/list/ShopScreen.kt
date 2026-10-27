@@ -20,8 +20,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DoneAll
-import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.RemoveShoppingCart
@@ -217,11 +217,11 @@ private fun ShopTop(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                // Not "Plan": that is the week screen. This goes back to the list you can add to and edit.
+                // Not "Plan" (that is the week screen) and not "Edit" (leaving is not editing, UX review 24): back to the list.
                 TextButton(onClick = onPlan, modifier = Modifier.testTag("shop-plan")) {
-                    Icon(Icons.Rounded.EditNote, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.size(6.dp))
-                    Text("Edit list")
+                    Text("Done")
                 }
             }
             Spacer(Modifier.height(6.dp))

@@ -357,7 +357,13 @@ private fun Hero(
                             ui.title,
                             style = MaterialTheme.typography.headlineMedium,
                             color = Brand.OnHero,
-                            modifier = Modifier.semantics { heading() },
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier =
+                                Modifier.semantics {
+                                    heading()
+                                    contentDescription = ui.title
+                                },
                         )
                         if (ui.summary.isNotEmpty()) {
                             Text(ui.summary, Modifier.testTag("summary"), style = MaterialTheme.typography.bodyMedium, color = Brand.OnHero)

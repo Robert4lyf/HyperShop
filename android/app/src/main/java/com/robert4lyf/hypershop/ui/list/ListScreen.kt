@@ -638,21 +638,15 @@ private fun AisleTitle(
 }
 
 /**
- * The main line as shown: the item's name gets a capital wherever it starts
- * ("2 Onions", "700 ml Milk", "Coriander"), so rows with and without an
- * amount read alike. A plural the name isn't a prefix of ("leaves") gets the
- * first letter capitalised instead.
+ * The main line as shown: a capital at the start of the row and nowhere else ("2 tins chopped tomatoes",
+ * "700 ml milk", "Coriander"): a capital mid-line read as a typo (UX review 9). [name] is the item's name, kept
+ * for callers; it no longer moves the capital.
  */
+@Suppress("UNUSED_PARAMETER")
 internal fun displayMain(
     main: String,
     name: String,
-): String {
-    val at =
-        main.indexOf(name, ignoreCase = true).takeIf { it >= 0 && name.isNotEmpty() }
-            ?: main.indexOfFirst { it.isLetter() }.takeIf { it >= 0 }
-            ?: return main
-    return main.substring(0, at) + main[at].uppercaseChar() + main.substring(at + 1)
-}
+): String = main.replaceFirstChar { it.uppercaseChar() }
 
 /**
  * The row's sub-lines: "2 already ticked" or the pack note, and the recipe the

@@ -51,7 +51,6 @@ class SettingsScreenTest {
             onMoveAisle = { a, d -> events += "aisle $a $d" },
             onMoveAisleTo = { a, i -> events += "aisle $a to $i" },
             onResetAisles = { events += "reset aisles" },
-            onWatchVibrate = { events += "vibrate $it" },
             onWatchRetry = { events += "watch retry" },
             onSaveKey = { events += "key ${it.length}" },
             onRemoveKey = { events += "remove key" },

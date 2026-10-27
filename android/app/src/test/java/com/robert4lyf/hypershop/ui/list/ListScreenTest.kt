@@ -144,15 +144,16 @@ class ListScreenTest {
             )
         val ui = SAMPLE_LIST.copy(aisles = listOf(AisleCode.DAIRY_EGGS to rows))
         compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions) } }
-        compose.onNodeWithText("700 ml Milk").assertExists()
-        compose.onNodeWithText("1 more Onion").assertExists()
+        compose.onNodeWithText("700 ml milk").assertExists()
+        compose.onNodeWithText("1 more onion").assertExists()
         compose.onNodeWithText("2 already bought · Weeknight chilli").assertExists()
         compose.onNodeWithText("1 × 250 g block").assertExists()
         // The pack note keeps its line; the recipe goes under it.
         assertEquals(listOf("1 × 250 g block", "Weeknight chilli"), subLines(rows[2]))
+        // A capital at the start of the row only (UX review 9): mid-line capitals read as typos.
         assertEquals("Coriander", displayMain("coriander", "coriander"))
-        assertEquals("2 Leaves", displayMain("2 leaves", "leaf"))
-        assertEquals("2 tins Chopped tomatoes", displayMain("2 tins chopped tomatoes", "chopped tomatoes"))
+        assertEquals("2 leaves", displayMain("2 leaves", "leaf"))
+        assertEquals("2 tins chopped tomatoes", displayMain("2 tins chopped tomatoes", "chopped tomatoes"))
     }
 
     @Test

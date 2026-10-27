@@ -532,7 +532,10 @@ class ListViewModel(
             // A finished trip ends in planning whatever is still on the list (set aside as not available, or
             // never found): the shop screen would count that as "left" (review B.14).
             c.settings.setListMode(ListMode.PLAN)
-            val text = if (n == 1) "Finished: 1 bought item removed" else "Finished: $n bought items removed"
+            val left = c.repository.snapshot().liveItems.size
+            val text =
+                (if (n == 1) "Finished: 1 bought item removed" else "Finished: $n bought items removed") +
+                    (if (left > 0) " · $left still needed" else "")
             messages.send(UiMessage(text, undo = { c.repository.undoDelete(stamp) }))
         }
 

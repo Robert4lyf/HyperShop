@@ -208,7 +208,7 @@ class ListViewModelTest {
         await(vm.ui) { it.doneCount == 1 }
         vm.finishShopping()
         m = nextMessage(vm)
-        assertEquals("Finished: 1 bought item removed", m.text)
+        assertEquals("Finished: 1 bought item removed · 1 still needed", m.text)
         await(vm.ui) { it.left == 1 && it.doneCount == 0 }
         vm.clearAll()
         m = nextMessage(vm)
@@ -330,7 +330,7 @@ class ListViewModelTest {
         // Straight after the tick: the screen may not show it yet; the count comes from the write.
         runBlocking { c.repository.tick(ui.row("onion").id) }
         vm.finishShopping()
-        assertEquals("Finished: 1 bought item removed", nextMessage(vm).text)
+        assertEquals("Finished: 1 bought item removed · 1 still needed", nextMessage(vm).text)
     }
 
     @Test
@@ -402,7 +402,7 @@ class ListViewModelTest {
         assertTrue(await(again.ui) { it.loaded && it.aisles.isNotEmpty() }.shopping)
         // Finishing takes the bought rows away and the shop screen with them, whatever is left (review B.14).
         again.finishShopping()
-        assertEquals("Finished: 2 bought items removed", nextMessage(again).text)
+        assertEquals("Finished: 2 bought items removed · 1 still needed", nextMessage(again).text)
         assertEquals(ListMode.PLAN, await(again.ui) { !it.shopping }.mode)
         val after = await(again.ui) { it.doneCount == 0 && it.left == 1 }
         assertTrue(!after.shopping)

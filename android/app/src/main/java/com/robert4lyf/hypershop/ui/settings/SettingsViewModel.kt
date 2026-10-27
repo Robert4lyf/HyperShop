@@ -40,7 +40,6 @@ data class SettingsUi(
     val theme: ThemeMode = ThemeMode.SYSTEM,
     val staples: List<String> = emptyList(),
     val aisles: List<AisleCode> = emptyList(),
-    val watchVibrate: Boolean = true,
     val claudeAlways: Boolean = true,
     /** W.4: "This is wrong" notes saved on the phone. */
     val wrongNotes: Int = 0,
@@ -117,7 +116,6 @@ class SettingsViewModel(
         watch(s.model) { copy(model = it) }
         watch(s.monthlyCapUsd) { copy(monthlyCapUsd = it) }
         watch(s.dailyCalls) { copy(dailyCalls = it) }
-        watch(s.watchVibrate) { copy(watchVibrate = it) }
         watch(s.claudeAlways) { copy(claudeAlways = it) }
         viewModelScope.launch { _ui.update { it.copy(wrongNotes = c.wrongReports.count()) } }
         val link = combine(c.watchLink.state, c.watchLink.problem) { st, why -> watchStatus(st, why) to watchCanRetry(st, why) }
@@ -365,8 +363,6 @@ class SettingsViewModel(
             c.buyAgain.clearHistory()
             messages.send(UiMessage("Shopping history cleared"))
         }
-
-    fun setWatchVibrate(on: Boolean) = viewModelScope.launch { c.settings.setWatchVibrate(on) }
 
     fun setClaudeAlways(on: Boolean) = viewModelScope.launch { c.settings.setClaudeAlways(on) }
 

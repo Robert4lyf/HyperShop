@@ -288,7 +288,8 @@ class ReviewViewModelTest {
             vm.stopRetry()
             val ui = (await(vm.state) { it is ReviewState.Ready && !it.ui.retrying } as ReviewState.Ready).ui
             assertFalse(ui.busy)
-            assertEquals(Badge.CLAUDE_PENDING, ui.badge)
+            // Not in flight any more: read offline, with "Ask Claude" one tap away (UX review 5).
+            assertEquals(Badge.RULES, ui.badge)
         } finally {
             claude.shutdown()
         }
@@ -401,7 +402,7 @@ class ReviewViewModelTest {
         assertEquals("\"A or B\": one of two", flagged.checkReason)
         assertTrue(ui.row("cat:onion").adds)
         assertTrue("a staple, pre-ticked", ui.row("cat:salt").inStock)
-        assertEquals("3 to add · 1 at home · 1 to check", ui.summary)
+        assertEquals("Planned for this week · 3 to add · 1 at home · 1 to check", ui.summary)
     }
 
     @Test

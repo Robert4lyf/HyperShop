@@ -42,6 +42,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -61,6 +62,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -371,6 +373,10 @@ fun RecipesScreen(
 
 private const val DAY = DateUtils.DAY_IN_MILLIS
 
+/** "yesterday", "3 days ago", but "Nov 14, 2023": a date keeps its month's capital (UX review 21). */
+internal fun addedWhen(relative: String): String =
+    if (relative.any { it.isDigit() }) relative else relative.replaceFirstChar { it.lowercase() }
+
 /** "Search your recipes": what's typed, the terms already chips, and what changes them. */
 data class SearchBox(
     val text: String = "",
@@ -534,7 +540,7 @@ private fun LibraryCard(
                             row.rating?.let { "★ $it/5" },
                             if (row.lines == 1) "1 ingredient" else "${row.lines} ingredients",
                             row.timesPlanned.takeIf { showPlanned && it > 0 }?.let { if (it == 1) "planned once" else "planned $it times" },
-                            "added " + DateUtils.getRelativeTimeSpanString(row.lastAddedAt, now, DAY).toString().lowercase(),
+                            "added " + addedWhen(DateUtils.getRelativeTimeSpanString(row.lastAddedAt, now, DAY).toString()),
                         )
                     Text(
                         bits.joinToString(" · "),
@@ -787,7 +793,6 @@ fun RecipeDetailContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 DetailButtons(onAdd, url?.let { { open(it) } }, onList = detail.row.onList)
-                OutlinedButton(onClick = onRemove, modifier = Modifier.testTag("detail-remove")) { Text("Remove from your recipes") }
             }
         }
         item(key = "yours") {
@@ -822,6 +827,14 @@ fun RecipeDetailContent(
                     Text(lines[j], style = MaterialTheme.typography.bodyLarge)
                 }
             }
+        }
+        // Last, away from Plan: a destructive button under the primary one invited the wrong tap (UX review 15).
+        item(key = "remove") {
+            TextButton(
+                onClick = onRemove,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                modifier = Modifier.padding(top = 16.dp).testTag("detail-remove"),
+            ) { Text("Remove from your recipes") }
         }
     }
 }

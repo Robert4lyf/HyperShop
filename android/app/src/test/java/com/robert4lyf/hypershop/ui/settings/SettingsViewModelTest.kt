@@ -203,9 +203,6 @@ class SettingsViewModelTest {
         assertEquals(second, runBlocking { c.repository.aisleOrder() }.first())
         vm.moveAisle(second, -1)
         assertEquals(second, await(vm.ui) { true }.aisles.first())
-        vm.setWatchVibrate(false)
-        await(vm.ui) { !it.watchVibrate }
-        assertFalse(runBlocking { c.settings.watchVibrate.first() })
         assertTrue(AisleCode.PRODUCE in ui.aisles)
     }
 

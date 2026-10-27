@@ -46,7 +46,7 @@ class DisplayBuyTest {
         val weighed = add(ShoppingList(), listOf("30g basil")).first
         assertEquals("1 pack" to "basil", Display.brief(weighed.total(weighed.itemByKey("cat:basil")!!.id), cat.byId["basil"], "basil"))
         // Review C.25: two cups of honey (about 680 g) do not fit a 454 g jar; without a density nothing is said.
-        assertEquals(RowText("honey", "1 × 454g jar"), row("2 cups honey", key = "honey"))
+        assertEquals(RowText("honey", "454g jar"), row("2 cups honey", key = "honey"))
         val honey = add(ShoppingList(), listOf("2 cups honey")).first
         assertEquals(null to "honey", Display.brief(honey.total(honey.itemByKey("cat:honey")!!.id), cat.byId["honey"], "honey"))
         // A spoonful still fits: one jar.

@@ -133,7 +133,6 @@ data class SettingsActions(
     /** "Move to top" (0) / "Move to bottom" (last). */
     val onMoveAisleTo: (AisleCode, Int) -> Unit = { _, _ -> },
     val onResetAisles: () -> Unit = {},
-    val onWatchVibrate: (Boolean) -> Unit = {},
     /** "Try again" under the watch status, offered while the link is down. */
     val onWatchRetry: () -> Unit = {},
     val onSaveKey: (String) -> Unit = {},
@@ -147,8 +146,8 @@ data class SettingsActions(
     val onDebugLog: (Boolean) -> Unit = {},
     val onRefreshLog: () -> Unit = {},
     val onLibrary: () -> Unit = {},
-    /** Advanced › Voice test. */
-    val onVoiceTest: () -> Unit = {},
+    /** Advanced › Voice test: a developer harness, offered in debug builds only (null hides it). */
+    val onVoiceTest: (() -> Unit)? = null,
     /** Debug builds only. */
     val onDebug: (() -> Unit)? = null,
     /** Data: the file pickers (Storage Access Framework) are the route's; the view model gets the Uri. */
@@ -168,7 +167,7 @@ fun SettingsRoute(
     container: AppContainer,
     onDebug: (() -> Unit)?,
     onLibrary: () -> Unit = {},
-    onVoiceTest: () -> Unit = {},
+    onVoiceTest: (() -> Unit)? = null,
     /** The app's snackbar host; without one the screen shows its own. */
     snackbar: SnackbarHostState? = null,
 ) {
@@ -194,7 +193,6 @@ fun SettingsRoute(
             onMoveAisle = { a, d -> vm.moveAisle(a, d) },
             onMoveAisleTo = { a, i -> vm.moveAisleTo(a, i) },
             onResetAisles = { vm.resetAisleOrder() },
-            onWatchVibrate = { vm.setWatchVibrate(it) },
             onWatchRetry = { vm.retryWatch() },
             onSaveKey = { vm.saveKey(it) },
             onTestKey = { vm.testKey() },
@@ -259,12 +257,16 @@ fun SettingsScreen(
                 card("Claude", Icons.Rounded.AutoAwesome, hue = 265f) {
                     KeySection(ui, actions)
                     EdgeDivider()
-                    ModelSection(ui, actions)
+                    ClaudeAlwaysSection(ui, actions)
                     EdgeDivider()
                     CapsSection(ui, actions)
                 }
                 card("Data", Icons.Rounded.SaveAlt, hue = 45f) { DataGroup(ui, actions) }
-                card("Advanced", Icons.Rounded.Code, hue = 180f) { AdvancedGroup(ui, actions) }
+                card("Advanced", Icons.Rounded.Code, hue = 180f) {
+                    AdvancedGroup(ui, actions)
+                    EdgeDivider()
+                    ModelSection(ui, actions)
+                }
             }
             snackbar?.let { SnackbarHost(it, Modifier.align(Alignment.BottomCenter)) }
         }
@@ -428,6 +430,7 @@ private fun ListGroup(
             for (s in ui.staples) StapleChip(s) { actions.onRemoveStaple(s) }
         }
     }
+    Hint("Set one from an item's sheet on the shopping list, or from a row on a review. A review leaves these off the list.")
 }
 
 /** A staple: its name, and an × that is the only way to remove it (a full 48 dp target). */
@@ -668,7 +671,7 @@ private val MODEL_NOTES =
     )
 
 @Composable
-private fun ModelSection(
+private fun ClaudeAlwaysSection(
     ui: SettingsUi,
     actions: SettingsActions,
 ) {
@@ -676,12 +679,26 @@ private fun ModelSection(
         SwitchRow("Read every recipe with Claude", ui.claudeAlways, actions.onClaudeAlways)
         Hint(
             if (ui.claudeAlways) {
-                "Claude reads each new recipe; the offline reading checks it. About $0.001 a recipe on the default model."
+                "Claude reads each new recipe; the offline reading checks it. About $0.001 a recipe."
             } else {
                 "Claude reads a recipe only when the offline reading is unsure of a line."
             },
         )
+    }
+}
+
+/**
+ * Under Advanced (cut 4 of the review): the reading was evaluated on Haiku, and a bigger model costs 20–40× as
+ * much against the same monthly cap, so the choice is kept but out of the way.
+ */
+@Composable
+private fun ModelSection(
+    ui: SettingsUi,
+    actions: SettingsActions,
+) {
+    Column {
         SectionLabel("Model")
+        Hint("The reading was tuned on Haiku. A bigger model costs 20–40× as much against the same monthly cap.")
         for (m in ClaudeModel.entries) {
             Row(
                 Modifier
@@ -830,6 +847,8 @@ private fun AdvancedGroup(
             TextButton(onClick = actions.onRefreshLog) { Text("Refresh") }
         }
     }
-    OutlinedButton(onClick = actions.onVoiceTest, modifier = Modifier.testTag("open-voice-test")) { Text("Voice test") }
+    actions.onVoiceTest?.let { open ->
+        OutlinedButton(onClick = open, modifier = Modifier.testTag("open-voice-test")) { Text("Voice test") }
+    }
     actions.onDebug?.let { open -> OutlinedButton(onClick = open) { Text("Debug tools") } }
 }

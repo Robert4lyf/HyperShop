@@ -64,6 +64,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.robert4lyf.hypershop.BuildConfig
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.di.ShareOutcome
 import com.robert4lyf.hypershop.di.Startup
@@ -176,9 +177,12 @@ private fun AppShell(
         if (startChosen) return@LaunchedEffect
         startChosen = true
         val empty = container.repository.list.first().liveItems.isEmpty()
+        // Someone who has shopped here before (saved recipes, or a finished trip): a first run stays on Shopping,
+        // where the Add field and the sample list are, not on "No saved recipes yet" (UX review 3).
+        val returning = container.repository.observeLibrary().first().isNotEmpty() || container.buyAgain.observe().first().hasHistory
         // Navigation's state belongs to the main thread, wherever the list was read.
         withContext(Dispatchers.Main) {
-            if (empty && nav.currentBackStackEntry?.destination?.route == Routes.LIST) selectTab(Routes.MEALS)
+            if (empty && returning && nav.currentBackStackEntry?.destination?.route == Routes.LIST) selectTab(Routes.MEALS)
         }
     }
     Scaffold(
@@ -249,7 +253,8 @@ private fun AppShell(
                     container,
                     onDebug = debugScreen?.let { { nav.navigate(Routes.DEBUG) } },
                     onLibrary = { nav.navigate(Routes.LIBRARY) { launchSingleTop = true } },
-                    onVoiceTest = { nav.navigate(Routes.VOICE_TEST) { launchSingleTop = true } },
+                    // A developer harness with a microphone service: not in a release until voice mode exists.
+                    onVoiceTest = if (BuildConfig.DEBUG) ({ nav.navigate(Routes.VOICE_TEST) { launchSingleTop = true } }) else null,
                     snackbar = snackbar,
                 )
             }

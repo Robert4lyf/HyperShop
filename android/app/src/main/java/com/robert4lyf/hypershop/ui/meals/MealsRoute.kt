@@ -405,6 +405,12 @@ private fun BuyAgainSection(
             }
         }
         if (ui.buyAgain.regulars.isNotEmpty()) {
+            Text(
+                "Hold one to pin it or hide it.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 6.dp),
+            )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (r in ui.buyAgain.regulars) RegularChip(r, actions)
             }

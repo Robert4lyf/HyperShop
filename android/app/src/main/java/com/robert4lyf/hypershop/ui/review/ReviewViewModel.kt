@@ -128,6 +128,8 @@ data class ReviewUi(
     val byHand: Boolean = false,
     /** A saved recipe being edited: nothing goes on the list, so no in-stock or servings. */
     val savedOnly: Boolean = false,
+    /** Adding plans the recipe as a meal of this week (a new import; not an edit, a save for later or a by-hand list). */
+    val plans: Boolean = false,
     /** A key is saved and Claude hasn't read this recipe: "Ask Claude" is offered. */
     val canAskClaude: Boolean = false,
     /** No web page: a cookbook recipe, which can carry its book and page. */
@@ -157,6 +159,8 @@ data class ReviewUi(
     private val summaryForList: String
         get() =
             listOfNotNull(
+                // The meal goes on This week with the add (CLAUDE.md: an import plans itself): said here, not found later.
+                "Planned for this week".takeIf { plans && rows.isNotEmpty() },
                 // Said here in full contrast, not only by the disabled button at the bottom.
                 "Nothing to add".takeIf { addCount == 0 && rows.isNotEmpty() && !editing },
                 addCount.takeIf { it > 0 }?.let { "$it to add" },
@@ -522,7 +526,8 @@ class ReviewViewModel(
                     badge =
                         when {
                             r.parsedBy == ParsedBy.CLAUDE -> Badge.CLAUDE
-                            r.claudePending -> Badge.CLAUDE_PENDING
+                            // Only while a call is in flight: a reading Claude never got to is "Read offline", with why (UX review 5).
+                            retrying -> Badge.CLAUDE_PENDING
                             else -> Badge.RULES
                         },
                     notice = notice,
@@ -536,6 +541,7 @@ class ReviewViewModel(
                     cookbook = webLink(r.url) == null && !r.byHand,
                     byHand = r.byHand,
                     savedOnly = r.savesToLibrary,
+                    plans = r.editsUse == null && !r.savesToLibrary && !r.byHand,
                     canAskClaude = r.parsedBy != ParsedBy.CLAUDE && !r.byHand && c.apiKeyStore.hasKey.value,
                     book = r.book,
                     page = r.page,
@@ -862,7 +868,7 @@ class ReviewViewModel(
             key,
             name,
             effect,
-            entry?.packNote?.let(Display::compactUnits),
+            entry?.packNote?.removePrefix("1 × ")?.let(Display::compactUnits),
             lines,
             row.target.aisle,
             row.decision.inStock,
