@@ -1,7 +1,9 @@
 package com.robert4lyf.hypershop.ui.list
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,16 +27,20 @@ import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.RemoveShoppingCart
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -92,12 +99,21 @@ fun ShopScreen(
     // within the moment keeps the full moment from the last tap.
     var stamps by remember { mutableStateOf(emptyMap<Long, Int>()) }
     val lingering = stamps.keys
-    val groups = remember(ui.aisles, lingering) { groups(ui, lingering) }
+    // Missing 6: find a thing on a long list, across aisles.
+    var finding by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
+    val groups = remember(ui.aisles, lingering, query, finding) { groups(ui, lingering, query.takeIf { finding }.orEmpty()) }
     // Aisles whose bought rows are shown: kept across tab switches and rotation.
     var shownBought by rememberSaveable { mutableStateOf(emptyList<String>()) }
     val cells = remember(groups, shownBought) { cells(groups, shownBought.toSet()) }
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    // Missing 1: a list that locks every 30 s is the first thing a shopper notices. On while this screen shows.
+    val view = LocalView.current
+    DisposableEffect(view) {
+        view.keepScreenOn = true
+        onDispose { view.keepScreenOn = false }
+    }
     val shopActions =
         remember(actions) {
             actions.copy(onToggle = { row ->
@@ -119,7 +135,26 @@ fun ShopScreen(
     val current = nowState.value
     Surface(Modifier.fillMaxSize().testTag("shop"), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
-            ShopTop(ui, current, onPlan = { actions.onMode(ListMode.PLAN) })
+            ShopTop(
+                ui,
+                current,
+                onPlan = { actions.onMode(ListMode.PLAN) },
+                finding = finding,
+                onFind = {
+                    finding = !finding
+                    if (!finding) query = ""
+                },
+            )
+            if (finding) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = { Text("Find on the list") },
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).testTag("shop-find"),
+                )
+            }
             val card = MaterialTheme.colorScheme.card
             LazyColumn(
                 Modifier.weight(1f).fillMaxWidth().testTag("list"),
@@ -182,6 +217,8 @@ private fun ShopTop(
     ui: ListUi,
     now: ShopGroup?,
     onPlan: () -> Unit,
+    finding: Boolean = false,
+    onFind: () -> Unit = {},
 ) {
     val total = ui.left + ui.doneCount + ui.unavailable
     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
@@ -212,9 +249,17 @@ private fun ShopTop(
                             "${ui.doneCount} of $total bought",
                             ui.unavailable.takeIf { it > 0 }?.let { "$it not available" },
                             now?.let { "Now: ${it.title}" },
+                            // UX review 23: whether the watch has this list, said where the shop happens.
+                            ui.watch,
                         ).joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(onClick = onFind, modifier = Modifier.testTag("shop-find-toggle")) {
+                    Icon(
+                        if (finding) Icons.Rounded.SearchOff else Icons.Rounded.Search,
+                        contentDescription = if (finding) "Stop finding" else "Find on the list",
                     )
                 }
                 // Not "Plan" (that is the week screen) and not "Edit" (leaving is not editing, UX review 24): back to the list.
@@ -267,10 +312,15 @@ internal data class ShopGroup(
 internal fun groups(
     ui: ListUi,
     lingering: Set<Long> = emptySet(),
+    /** Missing 6: only rows whose name or line has this (any case); blank for all of them. */
+    query: String = "",
 ): List<ShopGroup> {
+    val q = query.trim()
+
+    fun found(r: ListRow) = q.isEmpty() || r.name.contains(q, ignoreCase = true) || r.main.contains(q, ignoreCase = true)
     val aisles =
         ui.aisles.mapNotNull { (a, rows) ->
-            rows.filter { !it.unavailable }.takeIf { it.isNotEmpty() }?.let {
+            rows.filter { !it.unavailable && found(it) }.takeIf { it.isNotEmpty() }?.let {
                 ShopGroup(
                     "aisle-${a.name}",
                     a.displayName,
@@ -280,7 +330,7 @@ internal fun groups(
                 )
             }
         }
-    val setAside = ui.aisles.flatMap { it.second }.filter { it.unavailable }
+    val setAside = ui.aisles.flatMap { it.second }.filter { it.unavailable && found(it) }
     return if (setAside.isEmpty()) {
         aisles
     } else {
@@ -453,6 +503,7 @@ private fun BoughtRow(
  * already bought" under it. TalkBack reads the tick as a checkbox named after
  * the item, then the row.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ShopRow(
     row: ListRow,
@@ -496,7 +547,14 @@ private fun ShopRow(
             Modifier
                 .weight(1f)
                 .heightIn(min = 52.dp)
-                .clickable(onClickLabel = "Details") { actions.onOpenItem(row) }
+                // UX review 2: in a supermarket the whole row is the tick, under either thumb; the lingering moment
+                // (LINGER_MS) makes a stray tap a second tap away from undone. Details are a long press.
+                .combinedClickable(
+                    onClickLabel = if (done) "Mark not bought" else "Mark bought",
+                    onLongClickLabel = "Details",
+                    onLongClick = { actions.onOpenItem(row) },
+                    onClick = { actions.onToggle(row) },
+                )
                 .semantics(mergeDescendants = true) {
                     testTag = "item-${row.id}"
                     stateDescription = state

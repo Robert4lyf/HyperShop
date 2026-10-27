@@ -24,6 +24,7 @@ import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.common.webLink
+import com.robert4lyf.hypershop.watch.WatchLinkState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -122,6 +123,8 @@ data class ListUi(
     val mode: ListMode = ListMode.PLAN,
     /** X.9: putting things in the order they are found, with arrows on every row and group. */
     val arranging: Boolean = false,
+    /** "Watch synced" / "Watch updating…" / "Watch not connected", or null with no watch to speak of (UX review 23). */
+    val watch: String? = null,
 ) {
     /** Rows grouped within each aisle, with a label per group. */
     val categorised: Boolean get() = view == ListView.TYPE || arranging
@@ -232,14 +235,17 @@ class ListViewModel(
      */
     private val listWithInStock = c.repository.list.map { Triple(it, c.repository.inStockOnList(it, stillShopping = true), sources(it)) }
 
+    /** The watch link's state and the listRev it last got, for the shop header's word. */
+    private val watchSent = combine(c.watchLink.state, c.watchSync.sent) { st, rev -> st to rev }
+
     val ui: StateFlow<ListUi> =
         combine(
             listWithInStock,
             c.settings.units,
             view,
-            c.importJobs.ready,
+            combine(c.importJobs.ready, watchSent) { r, w -> r to w },
             c.recipePhotos.paths(),
-        ) { (list, lines, src), units, v, ready, photos ->
+        ) { (list, lines, src), units, v, (ready, watch), photos ->
             lastList = list
             lastUnits = units
             build(
@@ -257,6 +263,7 @@ class ListViewModel(
                     // Arranging is a planning job: the shop screen leaves it.
                     arranging = v.arranging && v.mode == ListMode.PLAN && v.layout != ListView.RECIPE,
                     recipes = ui.recipes.map { r -> r.libraryKey?.let { r.copy(photo = photos[it]) } ?: r },
+                    watch = watchWord(watch.first, watch.second, list.listRev),
                 )
             }
         }.flowOn(Dispatchers.Default)
@@ -457,6 +464,32 @@ class ListViewModel(
     /** The menu's choice of layout. */
     fun setView(v: ListView) = viewModelScope.launch { c.settings.setListView(v) }
 
+    /** Whether the watch has this list, in a word for the shop header; null when there is no watch to speak of. */
+    private fun watchWord(
+        state: WatchLinkState,
+        sentRev: Int,
+        listRev: Long,
+    ): String? =
+        when (state) {
+            WatchLinkState.NO_SDK, WatchLinkState.NOT_INSTALLED -> null
+            WatchLinkState.DISCONNECTED, WatchLinkState.CONNECTED -> "Watch not connected"
+            WatchLinkState.APP_READY -> if (sentRev.toLong() == listRev) "Watch synced" else "Watch updating…"
+        }
+
+    /** After Finish with rows unbought: how many, while the "keep or drop?" prompt is up; null otherwise. */
+    val carryOver = MutableStateFlow<Int?>(null)
+
+    /** "Keep them": the prompt goes, the rows stay for the next trip. */
+    fun keepLeftovers() {
+        carryOver.value = null
+    }
+
+    /** "Remove them": everything left (all unbought after a finish) goes, with the clear's Undo. */
+    fun dropLeftovers() {
+        carryOver.value = null
+        clearAll()
+    }
+
     /** "Shop" / "Plan": the mode is a setting, so it survives a restart mid-shop. Nothing on the list changes. */
     fun setMode(m: ListMode) = viewModelScope.launch { c.settings.setListMode(m) }
 
@@ -537,6 +570,8 @@ class ListViewModel(
                 (if (n == 1) "Finished: 1 bought item removed" else "Finished: $n bought items removed") +
                     (if (left > 0) " · $left still needed" else "")
             messages.send(UiMessage(text, undo = { c.repository.undoDelete(stamp) }))
+            // Missing 3: what was not bought is asked about once, rather than carried over unnoticed.
+            if (left > 0 && n > 0) carryOver.value = left
         }
 
     // ---- the item sheet (5.7) ---------------------------------------------------------------

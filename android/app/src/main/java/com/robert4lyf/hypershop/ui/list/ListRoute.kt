@@ -2,10 +2,13 @@ package com.robert4lyf.hypershop.ui.list
 
 import android.content.ClipboardManager
 import android.content.Intent
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SnackbarVisuals
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -13,7 +16,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.di.AppContainer
@@ -85,6 +90,16 @@ fun ListRoute(
         header = { listHeader(ui, header, prep) },
         empty = { EmptyState(header.onSample, header.onPasteLink, prep, header.onPlan, header.onLastShop) },
     )
+    val carry by vm.carryOver.collectAsStateWithLifecycle()
+    carry?.let { n ->
+        AlertDialog(
+            onDismissRequest = vm::keepLeftovers,
+            title = { Text(if (n == 1) "1 item not bought" else "$n items not bought") },
+            text = { Text("Keep it on the list for the next trip, or take it off?") },
+            confirmButton = { TextButton(onClick = vm::keepLeftovers, modifier = Modifier.testTag("carry-keep")) { Text("Keep") } },
+            dismissButton = { TextButton(onClick = vm::dropLeftovers, modifier = Modifier.testTag("carry-drop")) { Text("Remove") } },
+        )
+    }
     val sheet by vm.sheet.collectAsStateWithLifecycle()
     sheet?.let { s ->
         ItemSheetHost(

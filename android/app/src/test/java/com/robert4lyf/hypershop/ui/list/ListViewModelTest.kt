@@ -403,6 +403,10 @@ class ListViewModelTest {
         // Finishing takes the bought rows away and the shop screen with them, whatever is left (review B.14).
         again.finishShopping()
         assertEquals("Finished: 2 bought items removed · 1 still needed", nextMessage(again).text)
+        // Missing 3: the unbought row is asked about once; "Keep" leaves it for the next trip.
+        assertEquals(1, await(again.carryOver) { it != null })
+        again.keepLeftovers()
+        assertEquals(null, again.carryOver.value)
         assertEquals(ListMode.PLAN, await(again.ui) { !it.shopping }.mode)
         val after = await(again.ui) { it.doneCount == 0 && it.left == 1 }
         assertTrue(!after.shopping)

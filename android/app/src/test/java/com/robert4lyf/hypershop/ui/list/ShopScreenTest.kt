@@ -15,10 +15,12 @@ import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -133,9 +135,12 @@ class ShopScreenTest {
         tick.assertHeightIsAtLeast(48.dp)
         tick.assertWidthIsAtLeast(48.dp)
         assertEquals(Role.Checkbox, tick.fetchSemanticsNode().config.getOrNull(SemanticsProperties.Role))
-        compose.onNodeWithTag("item-4").performClick()
+        // UX review 2: in the shop the row is the tick too; details are a long press.
+        compose.onNodeWithTag("item-4").performTouchInput { longClick() }
         tick.performClick()
         assertEquals(listOf("open 4", "toggle 4"), events)
+        compose.onNodeWithTag("item-4").performClick()
+        assertEquals(listOf("open 4", "toggle 4", "toggle 4"), events)
     }
 
     @Test

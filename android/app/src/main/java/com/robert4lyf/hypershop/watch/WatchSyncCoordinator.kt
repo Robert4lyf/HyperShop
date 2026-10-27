@@ -19,6 +19,8 @@ import com.robert4lyf.hypershop.data.WatchListView
 import com.robert4lyf.hypershop.data.WatchReply
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -72,7 +74,15 @@ class WatchSyncCoordinator(
         private set
 
     /** The listRev of the last full snapshot sent, so a reply and a change push are not both sent. */
-    @Volatile private var sentRev: Int = -1
+    private val sentRevFlow = MutableStateFlow(-1)
+    private var sentRev: Int
+        get() = sentRevFlow.value
+        set(v) {
+            sentRevFlow.value = v
+        }
+
+    /** The listRev the watch last got in full (-1 for none this process): the shop header's "Watch synced". */
+    val sent: StateFlow<Int> get() = sentRevFlow
 
     fun start() {
         link.onReceive { payload ->
