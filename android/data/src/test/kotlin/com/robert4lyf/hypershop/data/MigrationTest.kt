@@ -60,6 +60,7 @@ class MigrationTest {
                     HyperShopDatabase.MIGRATION_6_7,
                     HyperShopDatabase.MIGRATION_7_8,
                     HyperShopDatabase.MIGRATION_8_9,
+                    HyperShopDatabase.MIGRATION_9_10,
                 )
                 .allowMainThreadQueries()
                 .build()
@@ -93,6 +94,7 @@ class MigrationTest {
                     HyperShopDatabase.MIGRATION_6_7,
                     HyperShopDatabase.MIGRATION_7_8,
                     HyperShopDatabase.MIGRATION_8_9,
+                    HyperShopDatabase.MIGRATION_9_10,
                 )
                 .allowMainThreadQueries()
                 .build()
@@ -185,6 +187,25 @@ class MigrationTest {
         uses.moveToFirst()
         assertEquals(5, uses.getInt(0))
         uses.close()
+        db.close()
+    }
+
+    @Test
+    fun aNoteKeepsItsStarsAndStartsUncookedAtV10() {
+        helper.createDatabase(name, 9).apply {
+            execSQL(
+                "INSERT INTO RecipeNote (libraryKey, rating, notes, photo, photoUrl, updatedAt, orphanedAt) " +
+                    "VALUES ('r:1', 4, 'more chilli', NULL, NULL, 5, NULL)",
+            )
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(name, 10, true, HyperShopDatabase.MIGRATION_9_10)
+        val c = db.query("SELECT rating, timesCooked, lastCookedAt FROM RecipeNote WHERE libraryKey = 'r:1'")
+        assertTrue(c.moveToFirst())
+        assertEquals(4, c.getInt(0))
+        assertEquals(0, c.getInt(1))
+        assertTrue(c.isNull(2))
+        c.close()
         db.close()
     }
 

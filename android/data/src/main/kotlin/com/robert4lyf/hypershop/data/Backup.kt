@@ -270,6 +270,7 @@ object BackupValidator {
             check(n.libraryKey.length in 1..ListRepository.MAX_URL, "recipe note: bad recipe key")
             check(n.rating == null || n.rating in 1..ListRepository.MAX_STARS, "recipe note: rating out of range")
             check((n.notes?.length ?: 0) <= ListRepository.MAX_COOKING_NOTES, "recipe note: notes too long")
+            check(n.timesCooked >= 0, "recipe note: cooked a negative number of times")
             check((n.photo?.length ?: 0) <= MAX_TEXT && (n.photoUrl?.length ?: 0) <= ListRepository.MAX_URL, "recipe note: photo too long")
             // A file name, never a path: a restore must not point the app at a file outside its photo folder.
             check(n.photo == null || PHOTO_NAME.matches(n.photo), "recipe note: bad photo name")

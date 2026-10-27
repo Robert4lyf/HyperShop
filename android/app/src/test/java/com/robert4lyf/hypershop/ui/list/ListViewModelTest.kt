@@ -425,4 +425,20 @@ class ListViewModelTest {
             Thread.sleep(10)
         }
     }
+
+    @Test
+    fun shoppingAtTheSecondStoreWalksItsOrder() {
+        // Missing 4 of the review: the list follows the store picked when the shop starts.
+        val c = TestContainer.create()
+        c.add("2 onions", "300ml milk")
+        val mine = runBlocking { c.repository.aisleOrder(1) }
+        runBlocking { c.repository.setAisleOrder(mine.reversed(), 2) }
+        val vm = tracked(ListViewModel(c))
+        val ui = await(vm.ui) { it.loaded && it.aisles.size == 2 }
+        assertTrue(ui.secondStore)
+        assertEquals(listOf(AisleCode.PRODUCE, AisleCode.DAIRY_EGGS), ui.aisles.map { it.first })
+        vm.startShopping(2)
+        val second = await(vm.ui) { it.activeStore == 2L && it.shopping }
+        assertEquals(listOf(AisleCode.DAIRY_EGGS, AisleCode.PRODUCE), second.aisles.map { it.first })
+    }
 }

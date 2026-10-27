@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AddShoppingCart
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
@@ -129,6 +130,10 @@ data class SettingsActions(
     val onUnits: (UnitsSetting) -> Unit = {},
     val onTheme: (ThemeMode) -> Unit = {},
     val onRemoveStaple: (String) -> Unit = {},
+    /** "Ran out" on a staple: on the list once, still always at home (missing 5 of the review). */
+    val onRanOut: (String) -> Unit = {},
+    /** Aisles: which store's order is being edited (missing 4 of the review). */
+    val onEditStore: (Long) -> Unit = {},
     val onMoveAisle: (AisleCode, Int) -> Unit = { _, _ -> },
     /** "Move to top" (0) / "Move to bottom" (last). */
     val onMoveAisleTo: (AisleCode, Int) -> Unit = { _, _ -> },
@@ -193,6 +198,7 @@ fun SettingsRoute(
             onUnits = { vm.setUnits(it) },
             onTheme = { vm.setTheme(it) },
             onRemoveStaple = { vm.removeStaple(it) },
+            onRanOut = { vm.ranOut(it) },
             onMoveAisle = { a, d -> vm.moveAisle(a, d) },
             onMoveAisleTo = { a, i -> vm.moveAisleTo(a, i) },
             onResetAisles = { vm.resetAisleOrder() },
@@ -431,16 +437,20 @@ private fun ListGroup(
         Hint("None")
     } else {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (s in ui.staples) StapleChip(s) { actions.onRemoveStaple(s) }
+            for (s in ui.staples) StapleChip(s, onRanOut = { actions.onRanOut(s) }) { actions.onRemoveStaple(s) }
         }
     }
-    Hint("Set one from an item's sheet on the shopping list, or from a row on a review. A review leaves these off the list.")
+    Hint(
+        "Set one from an item's sheet on the shopping list, or from a row on a review. A review leaves these off the list; " +
+            "the cart puts one on once.",
+    )
 }
 
 /** A staple: its name, and an × that is the only way to remove it (a full 48 dp target). */
 @Composable
 private fun StapleChip(
     name: String,
+    onRanOut: () -> Unit = {},
     onRemove: () -> Unit,
 ) {
     // A soft green, not grey: these are live settings, not disabled chips.
@@ -451,6 +461,14 @@ private fun StapleChip(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 14.dp)) {
             Text(name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelLarge)
+            // Missing 5 of the review: out of it this once, without un-stapling it.
+            IconButton(onClick = onRanOut, modifier = Modifier.testTag("ran-out-$name")) {
+                Icon(
+                    Icons.Rounded.AddShoppingCart,
+                    contentDescription = "Ran out of $name: add to the list",
+                    modifier = Modifier.size(18.dp),
+                )
+            }
             IconButton(onClick = onRemove) {
                 Icon(Icons.Rounded.Close, contentDescription = "Remove $name", modifier = Modifier.size(18.dp))
             }

@@ -41,6 +41,8 @@ fun ListRoute(
     onReview: (Long) -> Unit,
     /** "Plan this week's shop": the Plan screen. */
     onPlan: () -> Unit = {},
+    /** Bumped when the launcher shortcut asks for the Add field (missing 7 of the review). */
+    focusAdd: Int = 0,
 ) {
     val vm: ListViewModel = viewModel(factory = factoryFor { ListViewModel(container) })
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -79,6 +81,7 @@ fun ListRoute(
             onNeed = vm::needIt,
             onView = vm::setView,
             onMode = vm::setMode,
+            onShop = vm::startShopping,
             onUnavailable = vm::unavailable,
             onAvailable = vm::available,
             onArrange = vm::arrange,
@@ -97,7 +100,7 @@ fun ListRoute(
                 context.startActivity(Intent.createChooser(send, "Share list"))
             },
         ),
-        header = { listHeader(ui, header, prep) },
+        header = { listHeader(ui, header, prep, focusAdd) },
         empty = { EmptyState(header.onSample, header.onPasteLink, prep, header.onPlan, header.onLastShop) },
     )
     val carry by vm.carryOver.collectAsStateWithLifecycle()

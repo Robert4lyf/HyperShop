@@ -52,6 +52,8 @@ class WatchSyncCoordinator(
     private val catalog: Catalog,
     private val units: suspend () -> UnitsSetting,
     private val scope: CoroutineScope,
+    /** Which store's walking order the watch gets (missing 4 of the review). */
+    private val store: suspend () -> Long = { 1L },
     private val log: (String) -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
     /** Raised from the probe's measurement at Hand-off B. */
@@ -178,7 +180,7 @@ class WatchSyncCoordinator(
         onlyIfNew: Boolean,
         reply: suspend () -> WatchReply,
     ) = sending.withLock {
-        val v = repository.watchView()
+        val v = repository.watchView(store())
         if (onlyIfNew && v.list.listRev.toInt() == sentRev) return@withLock
         val pages = SnapshotPager.build(input(v, installId, reply()), cap)
         if (sendPages(pages)) sentRev = v.list.listRev.toInt()

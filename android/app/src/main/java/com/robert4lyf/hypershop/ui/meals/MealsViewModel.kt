@@ -60,6 +60,8 @@ data class Meal(
     val photo: String? = null,
     /** Your cooking notes for the recipe, to read while planning and cooking (written on the recipe's sheet). */
     val notes: String? = null,
+    /** The recipe's library entry, for "Cooked it". */
+    val libraryKey: String = "",
 )
 
 /** A saved recipe that could be planned. */
@@ -75,8 +77,9 @@ data class Pick(
     /** When it was saved, and how many meals it has been planned as in other weeks: what puts "your usual" first. */
     val addedAt: Long = 0,
     val timesPlanned: Int = 0,
+    val timesCooked: Int = 0,
 ) {
-    val facts get() = com.robert4lyf.hypershop.ui.recipes.RecipeFacts(key, title, addedAt, rating, timesPlanned)
+    val facts get() = com.robert4lyf.hypershop.ui.recipes.RecipeFacts(key, title, addedAt, rating, timesPlanned, timesCooked)
 }
 
 data class MealsUi(
@@ -230,6 +233,7 @@ class MealsViewModel(
                         // The other weeks' only: planning it now must not move it under the thumb that planned it.
                         // Never below none: the two counts come from two flows, and this week's can arrive first.
                         ((planned[r.key] ?: 0) - (counts[r.key] ?: 0)).coerceAtLeast(0),
+                        notes[r.key]?.timesCooked ?: 0,
                     )
                 }.filter { term.isEmpty() || it.title.lowercase().contains(term) }
                     // Your usual first: planned most, then rated best, then newest (LibraryOrder).
@@ -277,7 +281,8 @@ class MealsViewModel(
         val repeatTitles: List<String>,
     )
 
-    private fun PlannedMeal.toMeal() = Meal(id, title, servings, shopping, progress, url?.let { siteOf(it) } ?: bookRef, saved)
+    private fun PlannedMeal.toMeal() =
+        Meal(id, title, servings, shopping, progress, url?.let { siteOf(it) } ?: bookRef, saved, libraryKey = libraryKey)
 
     private fun siteOf(url: String): String? =
         com.robert4lyf.hypershop.ui.common.webLink(url)?.let {
@@ -313,6 +318,24 @@ class MealsViewModel(
     private fun <T> written(block: suspend () -> T) =
         c.applicationScope.async(start = CoroutineStart.UNDISPATCHED) { writing.withLock { block() } }
 
+    /**
+     * "Cooked it" on a meal (missing 2 of the review): the recipe's note counts one more time, which puts it ahead
+     * in "your usual"; the message asks for stars, which live on the recipe's sheet.
+     */
+    fun cooked(meal: Meal) {
+        if (meal.libraryKey.isEmpty()) return
+        val write = written { c.repository.cooked(meal.libraryKey) }
+        viewModelScope.launch {
+            write.await()
+            messages.send(
+                UiMessage(
+                    "Cooked ${meal.title} · rate it on its recipe",
+                    undo = { writing.withLock { c.repository.uncooked(meal.libraryKey) } },
+                ),
+            )
+        }
+    }
+
     /** A saved recipe joins the week shown. Twice is allowed: a second chilli is a choice. */
     fun plan(pick: Pick) {
         val w = week.value
@@ -343,9 +366,14 @@ class MealsViewModel(
         val write = written { c.planner.addWeekToList(w) }
         viewModelScope.launch {
             val added = write.await() ?: return@launch
+            // UX review 8: "Already at home?" sits below the picks; what it still asks about is said here.
+            val toCheck = c.homeCheck.view(c.repository.snapshot()).count { !it.have }
             messages.send(
                 UiMessage(
-                    "Added ${plural(added.meals.size, "meal")} · ${plural(added.items, "item")}",
+                    listOfNotNull(
+                        "Added ${plural(added.meals.size, "meal")} · ${plural(added.items, "item")}",
+                        toCheck.takeIf { it > 0 }?.let { "$it to check at home" },
+                    ).joinToString(" · "),
                     undo = { writing.withLock { c.planner.undoAddWeek(added) } },
                 ),
             )

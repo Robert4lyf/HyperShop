@@ -18,6 +18,11 @@ import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        /** The launcher shortcut's action (res/xml/shortcuts.xml). */
+        const val ACTION_ADD = "com.robert4lyf.hypershop.action.ADD"
+    }
+
     private val container get() = (application as HyperShopApplication).container
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,6 +60,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handle(intent: Intent?) {
+        if (intent?.action == ACTION_ADD) {
+            // The launcher shortcut (missing 7 of the review): the Shopping tab with the Add field focused.
+            if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0) container.addRequests.tryEmit(Unit)
+            return
+        }
         if (intent?.action != Intent.ACTION_SEND) return
         // Reopened from Recents: the share was imported when it first arrived.
         if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return

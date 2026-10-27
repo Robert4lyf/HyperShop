@@ -64,6 +64,16 @@ class Settings(
 
     suspend fun setKeyWasSet(on: Boolean) = store.edit { it[KEY_SET] = on }
 
+    /** Missing 4 of the review: which store's walking order the list and the watch follow (1, or 2 for the second store). */
+    val activeStore: Flow<Long> = store.data.map { it[ACTIVE_STORE]?.toLong() ?: 1L }.distinctUntilChanged()
+
+    suspend fun setActiveStore(id: Long) = store.edit { it[ACTIVE_STORE] = id.toInt().coerceIn(1, 2) }
+
+    /** Missing 8 of the review: the one-time "add a Claude key" nudge on a review read offline has been shown. */
+    val keyNudged: Flow<Boolean> = store.data.map { it[KEY_NUDGED] ?: false }
+
+    suspend fun setKeyNudged() = store.edit { it[KEY_NUDGED] = true }
+
     /** How often a review row's sheet has been opened: the review's "tap an ingredient" hint stops after a few. */
     val reviewSheetOpens: Flow<Int> = store.data.map { it[REVIEW_SHEET_OPENS] ?: 0 }
 
@@ -126,6 +136,8 @@ class Settings(
         val KEY_LOST = booleanPreferencesKey("claude_key_lost_notice")
         val KEY_SET = booleanPreferencesKey("claude_key_was_set")
         val REVIEW_SHEET_OPENS = intPreferencesKey("review_sheet_opens")
+        val ACTIVE_STORE = intPreferencesKey("active_store")
+        val KEY_NUDGED = booleanPreferencesKey("claude_key_nudged")
     }
 }
 

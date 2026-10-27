@@ -93,6 +93,7 @@ class MealsScreenTest {
             onPlan = { events += "plan ${it.title}" },
             onServings = { m, n -> events += "serves ${m.id} $n" },
             onRemove = { events += "remove ${it.id}" },
+            onCooked = { events += "cooked ${it.id}" },
             onAddToList = { events += "add week" },
             onRegular = { events += "regular ${it.name}" },
             onAllRegulars = { events += "all regulars" },

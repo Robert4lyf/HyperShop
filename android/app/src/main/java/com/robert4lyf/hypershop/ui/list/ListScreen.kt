@@ -109,6 +109,8 @@ data class ListActions(
     val onView: (ListView) -> Unit = {},
     /** "Shop" on the planning screen, "Plan" on the shop screen. */
     val onMode: (ListMode) -> Unit = {},
+    /** "Shop" with a store picked, when a second store has a walking order (missing 4 of the review). */
+    val onShop: (Long) -> Unit = {},
     /** X.8: "Not available" on this trip, and "Found it" to take that back. */
     val onUnavailable: (ListRow) -> Unit = {},
     val onAvailable: (ListRow) -> Unit = {},
@@ -554,11 +556,26 @@ private fun ListTop(
             },
         actions = {
             if (shopping) {
-                // The way into the shop screen: one tap, in reach of either thumb.
-                HeroButton(onClick = { actions.onMode(ListMode.SHOP) }, modifier = Modifier.testTag("start-shopping")) {
-                    Icon(Icons.Rounded.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(6.dp))
-                    Text("Shop")
+                // The way into the shop screen: one tap, in reach of either thumb. With a second store's order on
+                // record, the tap asks which store (missing 4 of the review).
+                var pickStore by remember { mutableStateOf(false) }
+                Box {
+                    HeroButton(
+                        onClick = { if (ui.secondStore) pickStore = true else actions.onMode(ListMode.SHOP) },
+                        modifier = Modifier.testTag("start-shopping"),
+                    ) {
+                        Icon(Icons.Rounded.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(6.dp))
+                        Text("Shop")
+                    }
+                    DropdownMenu(expanded = pickStore, onDismissRequest = { pickStore = false }) {
+                        for ((id, name) in STORES) {
+                            DropdownMenuItem(text = { Text(name) }, onClick = {
+                                pickStore = false
+                                actions.onShop(id)
+                            }, modifier = Modifier.testTag("shop-store-$id"))
+                        }
+                    }
                 }
             }
             var menu by remember { mutableStateOf(false) }
@@ -773,6 +790,9 @@ private fun ListRowItem(
 }
 
 private val VIEWS = listOf(ListView.STORE to "Store order", ListView.RECIPE to "Group by recipe")
+
+/** The two stores a walking order can be kept for (missing 4 of the review). */
+internal val STORES = listOf(1L to "My store", 2L to "Second store")
 
 /** A recipe card's header: in the recipe's own colour, or plain for shared and hand-added items. */
 @Composable

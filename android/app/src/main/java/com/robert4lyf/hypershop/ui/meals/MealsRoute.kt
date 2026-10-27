@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Replay
+import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.Button
@@ -93,6 +94,8 @@ data class MealsActions(
     /** One more (+1) or one fewer (-1) serving. */
     val onServings: (Meal, Int) -> Unit = { _, _ -> },
     val onRemove: (Meal) -> Unit = {},
+    /** "Cooked it" on a meal (missing 2 of the review). */
+    val onCooked: (Meal) -> Unit = {},
     val onSearch: (String) -> Unit = {},
     val onPreviousWeek: () -> Unit = {},
     val onNextWeek: () -> Unit = {},
@@ -144,6 +147,7 @@ fun MealsRoute(
             onPlan = vm::plan,
             onServings = { m, d -> vm.stepServings(m, d) },
             onRemove = vm::remove,
+            onCooked = vm::cooked,
             onSearch = vm::search,
             onPreviousWeek = vm::previousWeek,
             onNextWeek = vm::nextWeek,
@@ -191,7 +195,13 @@ fun MealsScreen(
                 if (ui.meals.isNotEmpty()) {
                     item(key = "planned") { SectionLabel("Meals", Modifier.padding(horizontal = 20.dp)) }
                     items(ui.meals, key = { "meal-${it.id}" }) { m ->
-                        MealCard(m, past = ui.isPast, onServings = { actions.onServings(m, it) }, onRemove = { actions.onRemove(m) })
+                        MealCard(
+                            m,
+                            past = ui.isPast,
+                            onServings = { actions.onServings(m, it) },
+                            onRemove = { actions.onRemove(m) },
+                            onCooked = { actions.onCooked(m) },
+                        )
                     }
                 } else if (ui.loaded && ui.repeatFrom != null && !ui.isPast) {
                     item(key = "repeat") { RepeatCard(ui, actions.onRepeat) }
@@ -316,6 +326,7 @@ private fun MealCard(
     past: Boolean,
     onServings: (Int) -> Unit,
     onRemove: () -> Unit,
+    onCooked: () -> Unit = {},
 ) {
     Surface(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp).cardLift(MaterialTheme.shapes.large).testTag("meal-${m.id}"),
@@ -373,6 +384,12 @@ private fun MealCard(
                             Icon(Icons.Rounded.Add, contentDescription = "More servings")
                         }
                     }
+                }
+            }
+            // "Cooked it": counts for "your usual" and asks for stars; any week's meal, since last week's got cooked too.
+            if (m.saved) {
+                IconButton(onClick = onCooked, modifier = Modifier.testTag("meal-cooked-${m.id}")) {
+                    Icon(Icons.Rounded.Restaurant, contentDescription = "Cooked ${m.title}")
                 }
             }
             if (!past) {

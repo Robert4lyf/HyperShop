@@ -433,6 +433,7 @@ private fun LibraryCard(
                             webLink(row.url)?.let { siteName(it) } ?: row.bookRef,
                             row.rating?.let { "★ $it/5" },
                             if (row.lines == 1) "1 ingredient" else "${row.lines} ingredients",
+                            row.timesCooked.takeIf { it > 0 }?.let { if (it == 1) "cooked once" else "cooked $it times" },
                             row.timesPlanned.takeIf { showPlanned && it > 0 }?.let { if (it == 1) "planned once" else "planned $it times" },
                             "added " + addedWhen(DateUtils.getRelativeTimeSpanString(row.lastAddedAt, now, DAY).toString()),
                         )

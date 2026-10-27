@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Missing 7 of the review of 2026-10-27: long-press the icon, straight to the Add field. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="add"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_add_short"
+        android:shortcutLongLabel="@string/shortcut_add_long">
+        <intent
+            android:action="com.robert4lyf.hypershop.action.ADD"
+            android:targetPackage="com.robert4lyf.hypershop"
+            android:targetClass="com.robert4lyf.hypershop.MainActivity" />
+    </shortcut>
+</shortcuts>

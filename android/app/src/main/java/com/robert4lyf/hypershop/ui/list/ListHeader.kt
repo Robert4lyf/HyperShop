@@ -28,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +37,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -78,8 +81,12 @@ fun AddItemField(
     onAdd: (String) -> Unit,
     suggestions: (String) -> List<String>,
     onPick: (String, String) -> Unit = { _, s -> onAdd(s) },
+    /** Bumped to focus the field from outside (the launcher shortcut, missing 7 of the review). */
+    focus: Int = 0,
 ) {
     var text by rememberSaveable { mutableStateOf("") }
+    val requester = remember { FocusRequester() }
+    LaunchedEffect(focus) { if (focus > 0) runCatching { requester.requestFocus() } }
     val submit = {
         if (text.isNotBlank()) onAdd(text)
         text = ""
@@ -113,7 +120,7 @@ fun AddItemField(
             colors = pillFieldColors(),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { submit() }),
-            modifier = Modifier.fillMaxWidth().fieldLift().testTag("add-item"),
+            modifier = Modifier.fillMaxWidth().focusRequester(requester).fieldLift().testTag("add-item"),
         )
         if (shown.isNotEmpty()) {
             Surface(
@@ -253,8 +260,10 @@ fun androidx.compose.foundation.lazy.LazyListScope.listHeader(
     ui: ListUi,
     actions: HeaderActions,
     prep: PlanPrep = PlanPrep(),
+    /** Bumped to focus the Add field (the launcher shortcut). */
+    focusAdd: Int = 0,
 ) {
-    item(key = "add") { AddItemField(actions.onAdd, actions.suggestions, actions.onPick) }
+    item(key = "add") { AddItemField(actions.onAdd, actions.suggestions, actions.onPick, focus = focusAdd) }
     item(key = "ready") { ReadyCard(ui.readyJobs, actions.onReview) }
     // No "Plan this week's shop" card above the list (cut 2 of the review): This week is a tab of its own.
 }

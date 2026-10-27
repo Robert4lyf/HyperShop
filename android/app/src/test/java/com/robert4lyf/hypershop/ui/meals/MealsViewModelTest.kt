@@ -137,6 +137,22 @@ class MealsViewModelTest {
     }
 
     @Test
+    fun cookedItCountsOnTheRecipeAndCanBeTakenBack() {
+        val c = container()
+        val key = save(c, "Chilli", "2 onions")
+        val vm = MealsViewModel(c).shown()
+        val got = messages(vm)
+        vm.plan(await(vm.ui) { it.picks.isNotEmpty() }.picks.single())
+        val meal = await(vm.ui) { it.meals.isNotEmpty() }.meals.single()
+        assertEquals(key, meal.libraryKey)
+        vm.cooked(meal)
+        awaitTrue { runBlocking { c.repository.recipeNote(key) }?.timesCooked == 1 }
+        val m = got.first { it.text.startsWith("Cooked Chilli") }
+        runBlocking { m.undo!!.invoke() }
+        awaitTrue { runBlocking { c.repository.recipeNote(key) }?.timesCooked == 0 }
+    }
+
+    @Test
     fun aRepeatedTapOnAddAddsTheWeekOnce() {
         val c = container()
         save(c, "Chilli", "2 onions")

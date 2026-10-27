@@ -191,22 +191,45 @@ class ListRepository(
     /** Claude usage rows, re-emitted whenever one changes (Settings' spend). */
     fun observeUsage(): Flow<List<ClaudeUsageEntity>> = dao.observeUsage()
 
-    suspend fun aisleOrder(): List<AisleCode> {
+    /**
+     * The walking order of [storeId] (1 is the store the app starts with; 2 the second store, missing 4 of the
+     * review). A store with no order of its own yet walks like store 1.
+     */
+    suspend fun aisleOrder(storeId: Long = 1): List<AisleCode> {
         val hidden = dao.aisles().filter { it.hidden }.map { it.code }.toSet()
-        return dao.aisleOrder().map { AisleCode.valueOf(it.aisleCode) }.filter { it.name !in hidden }
+        val rows = dao.aisleOrder(storeId).ifEmpty { dao.aisleOrder(1) }
+        return rows.map { AisleCode.valueOf(it.aisleCode) }.filter { it.name !in hidden }
     }
 
-    /** Settings › Aisles: the store's walking order. Bumps listRev, so the list (and the watch) re-read it. */
-    suspend fun setAisleOrder(order: List<AisleCode>) =
+    /** Whether a second store has a walking order of its own. Held once read: a tick must not re-ask (QueryBudgetTest). */
+    @Volatile private var secondStoreCache: Boolean? = null
+
+    suspend fun hasSecondStore(): Boolean = secondStoreCache ?: dao.aisleOrder(2).isNotEmpty().also { secondStoreCache = it }
+
+    /**
+     * Settings › Aisles: the store's walking order. Bumps listRev, so the list (and the watch) re-read it. A second
+     * store gets its StoreProfile row with its first order (the backup carries both).
+     */
+    suspend fun setAisleOrder(
+        order: List<AisleCode>,
+        storeId: Long = 1,
+    ) = db.withTransaction {
+        if (storeId != 1L && dao.stores().none { it.id == storeId }) dao.insertStores(listOf(StoreProfileEntity(storeId, "Second store")))
+        dao.putAisleOrder(order.mapIndexed { i, a -> AisleOrderEntity(storeId, a.name, i) })
+        secondStoreCache = null
+        touchListRev()
+    }
+
+    /** Something the list is drawn from changed outside it (the store to walk): the list and the watch re-read. */
+    suspend fun touchListRev() =
         db.withTransaction {
-            dao.putAisleOrder(order.mapIndexed { i, a -> AisleOrderEntity(1, a.name, i) })
             val meta = dao.meta()!!
             dao.putMeta(meta.copy(listRev = meta.listRev + 1))
         }
 
     /** The walking order, re-read whenever listRev changes. */
-    fun observeAisleOrder(): Flow<List<AisleCode>> =
-        dao.observeListRev().filterNotNull().distinctUntilChanged().map { aisleOrder() }.distinctUntilChanged()
+    fun observeAisleOrder(storeId: Long = 1): Flow<List<AisleCode>> =
+        dao.observeListRev().filterNotNull().distinctUntilChanged().map { aisleOrder(storeId) }.distinctUntilChanged()
 
     /**
      * X.9: the arranged order within aisles. Held here once read, so a tick (which
@@ -219,8 +242,8 @@ class ListRepository(
         shelfCache ?: ShelfOrder(dao.shelfRanks().associate { it.key to it.rank }).also { shelfCache = it }
 
     /** The walking order and the order within aisles together, re-read whenever listRev changes. */
-    fun observeWalkingOrder(): Flow<Pair<List<AisleCode>, ShelfOrder>> =
-        dao.observeListRev().filterNotNull().distinctUntilChanged().map { aisleOrder() to shelfOrder() }.distinctUntilChanged()
+    fun observeWalkingOrder(storeId: Long = 1): Flow<Pair<List<AisleCode>, ShelfOrder>> =
+        dao.observeListRev().filterNotNull().distinctUntilChanged().map { aisleOrder(storeId) to shelfOrder() }.distinctUntilChanged()
 
     /**
      * Read-move-write in one transaction (review A.8): two quick taps on the arrows each move from the
@@ -238,6 +261,7 @@ class ListRepository(
             }
         } catch (e: Exception) {
             shelfCache = null
+            secondStoreCache = null
             throw e
         }
 
@@ -263,6 +287,7 @@ class ListRepository(
             }
         } catch (e: Exception) {
             shelfCache = null
+            secondStoreCache = null
             throw e
         }
     }
@@ -629,6 +654,11 @@ class ListRepository(
         key: String,
         stars: Int?,
     ) = changeNote(key) { it.copy(rating = stars?.takeIf { s -> s in 1..MAX_STARS }) }
+
+    /** "Cooked it" on a meal: one more time, now. [uncooked] takes an accidental tap back. */
+    suspend fun cooked(key: String) = changeNote(key) { it.copy(timesCooked = it.timesCooked + 1, lastCookedAt = clock()) }
+
+    suspend fun uncooked(key: String) = changeNote(key) { it.copy(timesCooked = (it.timesCooked - 1).coerceAtLeast(0)) }
 
     /** The cook's own notes ("10 min longer", "half the chilli"); blank clears them. */
     suspend fun setCookingNotes(
@@ -1405,10 +1435,10 @@ class ListRepository(
         }
 
     /** The list, the aisles in walking order (hidden ones flagged) and the epoch, for a snapshot. */
-    suspend fun watchView(): WatchListView =
+    suspend fun watchView(storeId: Long = 1): WatchListView =
         db.withTransaction {
             val byCode = dao.aisles().associateBy { it.code }
-            val ordered = dao.aisleOrder().map { it.aisleCode }
+            val ordered = dao.aisleOrder(storeId).ifEmpty { dao.aisleOrder(1) }.map { it.aisleCode }
             val rest = byCode.values.sortedBy { it.defaultOrder }.map { it.code }.filter { it !in ordered }
             val aisles =
                 (ordered + rest).mapNotNull { code ->
@@ -1528,6 +1558,7 @@ class ListRepository(
             dao.clearRecipeNotes()
             dao.clearShelfRanks()
             shelfCache = null
+            secondStoreCache = null
             dao.clearDecisions()
             dao.clearContributions()
             dao.clearTicks()
@@ -1590,6 +1621,7 @@ class ListRepository(
             )
         }
         shelfCache = null
+        secondStoreCache = null
         // The database holds the new marker already; a file that can't be written now means one more
         // new epoch at the next start-up (checkEpoch), never a restore reported as failed.
         runCatching { marker.write(fresh) }

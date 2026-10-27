@@ -7,8 +7,8 @@ enum class LibrarySort(
     RECENT("Recently added"),
     RATING("Highest rated"),
 
-    /** By how many meals it has been planned as: what the app knows. It does not know what was cooked. */
-    PLANNED("Most planned"),
+    /** Cooked most ("Cooked it" on a meal), then planned most: your usual. */
+    PLANNED("Your usual"),
     NAME("A–Z"),
 }
 
@@ -19,6 +19,7 @@ data class RecipeFacts(
     val addedAt: Long,
     val rating: Int?,
     val timesPlanned: Int,
+    val timesCooked: Int = 0,
 )
 
 /**
@@ -40,9 +41,10 @@ object LibraryOrder {
 
     private val byName = compareBy<RecipeFacts> { it.title.lowercase() }.thenBy { it.title }.thenBy { it.key }
 
-    /** Planned most, then rated best, then newest: "your usual", what the planner offers first. */
+    /** Cooked most, then planned most, then rated best, then newest: "your usual", what the planner offers first. */
     private val usual =
-        compareByDescending<RecipeFacts> { it.timesPlanned }
+        compareByDescending<RecipeFacts> { it.timesCooked }
+            .thenByDescending { it.timesPlanned }
             .thenByDescending { it.rating ?: 0 }
             .then(newestFirst)
 

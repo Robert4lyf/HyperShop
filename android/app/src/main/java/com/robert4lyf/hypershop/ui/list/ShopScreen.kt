@@ -251,6 +251,8 @@ private fun ShopTop(
                             now?.let { "Now: ${it.title}" },
                             // UX review 23: whether the watch has this list, said where the shop happens.
                             ui.watch,
+                            // Missing 4: which store's order this is, when there is a choice.
+                            STORES.firstOrNull { it.first == ui.activeStore }?.second?.takeIf { ui.secondStore },
                         ).joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

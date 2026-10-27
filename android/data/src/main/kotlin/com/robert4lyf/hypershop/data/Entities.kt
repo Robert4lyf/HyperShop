@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -414,6 +415,9 @@ data class RecipeNoteEntity(
      * something names it. See [ListRepository.retireOrphanNotes].
      */
     val orphanedAt: Long? = null,
+    /** "Cooked it" on a meal (missing 2 of the review of 2026-10-27): how often, and when last. What "your usual" counts. */
+    @ColumnInfo(defaultValue = "0") val timesCooked: Int = 0,
+    val lastCookedAt: Long? = null,
 )
 
 /**

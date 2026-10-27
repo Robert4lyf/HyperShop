@@ -43,6 +43,7 @@ import com.robert4lyf.hypershop.ui.list.showTimed
 import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.util.factoryFor
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -56,6 +57,8 @@ fun ReviewRoute(
     onReopen: (Long) -> Unit = {},
     /** Undo after Cancel: opens the review again, unless another is showing by then. */
     onUndo: (Long) -> Unit = onReopen,
+    /** The nudge's "Settings" (missing 8 of the review). */
+    onSettings: () -> Unit = {},
 ) {
     // Claude may only run while this screen is in the foreground. One hold on the gate per
     // screen: adding the observer replays ON_START when already started, hence the flag.
@@ -82,6 +85,18 @@ fun ReviewRoute(
     val vm: ReviewViewModel = viewModel(key = "review-$jobId", factory = factoryFor { ReviewViewModel(container, jobId) })
     val state by vm.state.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
+    // Missing 8 of the review: the first recipe read offline with no key says, once, what a key would do.
+    val hasKey by container.apiKeyStore.hasKey.collectAsStateWithLifecycle()
+    val readOffline = (state as? ReviewState.Ready)?.ui?.let { it.badge == Badge.RULES && !it.byHand && !it.retrying } == true
+    LaunchedEffect(readOffline, hasKey) {
+        if (!readOffline || hasKey || container.settings.keyNudged.first()) return@LaunchedEffect
+        container.settings.setKeyNudged()
+        show(
+            container,
+            snackbar,
+            UiMessage("Read offline. A Claude key in Settings reads recipes better.", undo = { onSettings() }, action = "Settings"),
+        )
+    }
     var sheetKey by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmDiscard by rememberSaveable { mutableStateOf(false) }
     if (confirmDiscard) {

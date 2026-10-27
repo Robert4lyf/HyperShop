@@ -534,7 +534,7 @@ class ReviewViewModel(
             withContext(Dispatchers.Default) {
                 val p = c.repository.preview(s, servings, decisions.toMap(), aisleMoves.toMap(), replacing)
                 preview = p
-                val order = c.repository.aisleOrder()
+                val order = c.repository.aisleOrder(c.settings.activeStore.first())
                 p.rows.map { row(it) }.groupBy { it.aisle }.toList().sortedBy { (a, _) ->
                     order.indexOf(a).let { i -> if (i < 0) Int.MAX_VALUE else i }
                 }

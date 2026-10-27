@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">HyperShop</string>
+    <string name="shortcut_add_short">Add item</string>
+    <string name="shortcut_add_long">Add an item to the shopping list</string>
 </resources>

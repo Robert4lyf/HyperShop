@@ -46,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -172,6 +173,14 @@ private fun AppShell(
             restoreState = true
         }
     }
+    // The launcher shortcut (missing 7 of the review): Shopping, with the Add field focused.
+    var addFocus by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        container.addRequests.collect {
+            selectTab(Routes.LIST)
+            addFocus++
+        }
+    }
     // X.10: with nothing to buy the app opens on This week, where a shop starts; otherwise on the shopping list.
     // Once per launch (not on rotation), and only if nothing has navigated yet (a share's review).
     var startChosen by rememberSaveable { mutableStateOf(false) }
@@ -231,7 +240,7 @@ private fun AppShell(
             popExitTransition = { fadeOut(tween(100)) },
         ) {
             composable(Routes.LIST) {
-                ListRoute(container, snackbar, onReview = openReview, onPlan = { selectTab(Routes.MEALS) })
+                ListRoute(container, snackbar, onReview = openReview, onPlan = { selectTab(Routes.MEALS) }, focusAdd = addFocus)
             }
             composable(Routes.RECIPES) {
                 RecipesRoute(
@@ -277,6 +286,7 @@ private fun AppShell(
                     },
                     // "Try again" opens the new job only while the review is still on screen; left already, the job
                     // waits on the Shopping tab's card (review B.20).
+                    onSettings = { selectTab(Routes.SETTINGS) },
                     onReopen = { id ->
                         if (nav.currentBackStackEntry?.destination?.route == Routes.REVIEW) {
                             nav.navigate(Routes.review(id)) {

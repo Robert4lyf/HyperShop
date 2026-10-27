@@ -128,6 +128,9 @@ data class ListUi(
     val arranging: Boolean = false,
     /** "Watch synced" / "Watch updating…" / "Watch not connected", or null with no watch to speak of (UX review 23). */
     val watch: String? = null,
+    /** The store whose walking order the list follows, and whether a second store has one (missing 4 of the review). */
+    val activeStore: Long = 1,
+    val secondStore: Boolean = false,
 ) {
     val isEmpty: Boolean get() = loaded && aisles.isEmpty()
 
@@ -198,7 +201,22 @@ class ListViewModel(
     private val c: AppContainer,
 ) : ViewModel() {
     /** Re-read on every list change, so a new walking order from Settings (or an arrangement) shows straight away. */
-    private val order = c.repository.observeWalkingOrder()
+    private val order = c.settings.activeStore.flatMapLatest { c.repository.observeWalkingOrder(it) }
+
+    /** Which store is walked, and whether a second one has an order to choose (missing 4 of the review). */
+    private val stores =
+        combine(c.settings.activeStore, c.repository.observeListRev()) { s, _ -> s to c.repository.hasSecondStore() }
+            .distinctUntilChanged()
+
+    /** "Shop" with a store picked: the list and the watch walk it, and the shop screen opens. */
+    fun startShopping(storeId: Long) =
+        viewModelScope.launch {
+            if (c.settings.activeStore.first() != storeId) {
+                c.settings.setActiveStore(storeId)
+                c.repository.touchListRev()
+            }
+            c.settings.setListMode(ListMode.SHOP)
+        }
 
     private val arranging = MutableStateFlow(false)
     private val messages = Channel<UiMessage>(Channel.BUFFERED)
@@ -281,9 +299,9 @@ class ListViewModel(
             listWithInStock,
             c.settings.units,
             view,
-            combine(c.importJobs.ready, watchSent) { r, w -> r to w },
+            combine(c.importJobs.ready, watchSent, stores) { r, w, s -> Triple(r, w, s) },
             c.recipePhotos.paths(),
-        ) { (list, lines, src), units, v, (ready, watch), photos ->
+        ) { (list, lines, src), units, v, (ready, watch, store), photos ->
             lastList = list
             lastUnits = units
             build(
@@ -302,6 +320,8 @@ class ListViewModel(
                     arranging = v.arranging && v.mode == ListMode.PLAN && v.layout != ListView.RECIPE,
                     recipes = ui.recipes.map { r -> r.libraryKey?.let { r.copy(photo = photos[it]) } ?: r },
                     watch = watchWord(watch.first, watch.second, list.listRev),
+                    activeStore = store.first,
+                    secondStore = store.second,
                 )
             }
         }.flowOn(Dispatchers.Default)

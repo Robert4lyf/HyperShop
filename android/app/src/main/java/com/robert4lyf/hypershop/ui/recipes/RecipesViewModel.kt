@@ -92,8 +92,10 @@ data class LibraryRow(
     val photo: String? = null,
     /** How many meals it has been planned as. */
     val timesPlanned: Int = 0,
+    /** "Cooked it" taps on its meals. */
+    val timesCooked: Int = 0,
 ) {
-    val facts get() = RecipeFacts(key, title, lastAddedAt, rating, timesPlanned)
+    val facts get() = RecipeFacts(key, title, lastAddedAt, rating, timesPlanned, timesCooked)
 }
 
 /** The Recipes tab (PLAN §3.5): the uses on the list. */
@@ -170,6 +172,7 @@ class RecipesViewModel(
                         notes = notes[it.key]?.notes,
                         photo = photos[it.key],
                         timesPlanned = planned[it.key] ?: 0,
+                        timesCooked = notes[it.key]?.timesCooked ?: 0,
                     )
                 }
             val shown =

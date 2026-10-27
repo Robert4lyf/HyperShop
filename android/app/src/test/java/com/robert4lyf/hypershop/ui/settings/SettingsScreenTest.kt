@@ -49,6 +49,7 @@ class SettingsScreenTest {
     private val actions =
         SettingsActions(
             onRemoveStaple = { events += "staple $it" },
+            onRanOut = { events += "ran out $it" },
             onMoveAisle = { a, d -> events += "aisle $a $d" },
             onMoveAisleTo = { a, i -> events += "aisle $a to $i" },
             onResetAisles = { events += "reset aisles" },
@@ -67,6 +68,7 @@ class SettingsScreenTest {
     fun groupsKeyFieldAndControls() {
         show()
         compose.onNodeWithContentDescription("Remove salt").performClick()
+        compose.onNodeWithTag("ran-out-salt").performClick()
         val list = compose.onNodeWithTag("settings")
         list.performScrollToNode(hasTestTag("watch-retry"))
         compose.onNodeWithTag("watch-retry").performClick()
@@ -80,7 +82,7 @@ class SettingsScreenTest {
         compose.onNodeWithText("Spent this month: $0.04 of $2.00 · 3 of 50 calls today").assertExists()
         list.performScrollToNode(hasText("Show the debug log"))
         compose.onNodeWithText("Show the debug log").assertIsOff().performClick()
-        assertEquals(listOf("staple salt", "watch retry", "key 6", "log true"), events)
+        assertEquals(listOf("staple salt", "ran out salt", "watch retry", "key 6", "log true"), events)
     }
 
     @Test
