@@ -1,5 +1,19 @@
 # Hand-off notes
 
+## Status: Step Y (the review of 2026-10-27, implemented) — ⏸ Hand-off H, plus checks 35–43
+
+Step Y (PROGRESS.md › Step Y, the review in docs/reports/review-2026-10-27.md, what was done about each item in docs/reports/review-2026-10-27-implementation.md) fixed the 37 bugs the review found and made its 25 improvements, 6 cuts and 8 additions, with the judgement calls listed in the report's § 3. **Run on:** the JVM (every check below has a test) and the sync model checker. **Not run on:** a real phone, any real Forerunner 245. **Back up first**; the database moves to version 10. These need your eyes:
+
+35. **The shop's tick.** In shop mode tap a row anywhere: it ticks (and a second tap within two seconds unticks)? A long press opens its sheet? The header says "Watch synced" with the watch app open, "Watch not connected" with Bluetooth off, and nothing at all with no watch paired? Does the screen stay on through a slow aisle?
+36. **Finish with leftovers.** Finish with two things unbought: the message says "· 2 still needed" and a prompt asks Keep or Remove? Keep leaves them; Remove takes them off with Undo?
+37. **Find.** On a list of 40+, the magnifier in the header, type three letters: only matching rows, across aisles; clear it and everything is back?
+38. **Two stores.** Settings › Aisles › Walking order › Second store: move two aisles. On the Shopping tab, Shop: does it ask which store? Pick the second: the list and the watch in the second store's order within a few seconds? Pick the first next time: back?
+39. **Cooked it.** On This week, the fork on a meal: "Cooked …" with Undo; on Recipes › Sort › Your usual that recipe moves up; its card says "cooked once"?
+40. **The shortcut.** Long-press the launcher icon › Add item: the app opens on Shopping with the keyboard up in the Add field, from cold and from the background?
+41. **The nudge.** With no Claude key, share a recipe: the review says "Read offline" with the reason, and a message offers Settings once (not again on the next recipe)?
+42. **Bright mosaics.** Light mode, usual brightness: titles readable on the lightest mosaic header and card you can find? (A soft shade now sits under them.)
+43. **A reinstalled watch app (D.34).** Tick on the watch with the phone away; on the phone, Plan a meal (the list changes) while the watch app is reinstalled or its data cleared; bring them together: the new install gets the list, and a tick made on it lands on the phone? (Before Step Y an ack meant for the old install could void the new one's ticks until the next restore.)
+
 ## Status: Step T (refinement) — ⏸ Hand-off H, plus checks 29–34
 
 Step T (PROGRESS.md › Step T, the report in docs/reports/refinement-pass.md) made white text readable on bright heroes, gave a removed recipe's notes and photo an end (kept 30 days after nothing names them), added Sort and "4★ & up" to Saved, cached photos, and made "plus" amounts add up. **Run on:** the JVM (every check below has a test) and CI's emulator (photo timings). **Not run on:** a real phone, any real Forerunner 245. These need your eyes:
