@@ -92,7 +92,9 @@ class HomeCheckTest {
             r.repo.finish()
             val pasta = rows().single { !it.have }.mergeKey
             val moved = home.have(listOf(pasta))
-            assertTrue(rows().single { it.mergeKey == pasta }.have)
+            // X.13: that was the last thing to buy, so the meal's shopping is done and its cupboard
+            // question goes from the screen; the Undo still puts the line back.
+            assertTrue(rows().none { it.mergeKey == pasta })
             assertEquals(moved, home.needLines(moved))
             val l = r.repo.snapshot()
             assertEquals(Rational.of(500), l.total(l.itemByKey(pasta)!!.id)[BaseKey.MASS])
@@ -111,5 +113,21 @@ class HomeCheckTest {
             assertTrue(home.have(listOf(pasta.mergeKey)).isEmpty())
             val l = r.repo.snapshot()
             assertEquals(Rational.of(1000), l.total(pasta.id)[BaseKey.MASS])
+        }
+
+    @Test
+    fun aFinishedShopAsksNothingMoreAboutTheCupboard() =
+        runBlocking {
+            // X.13: the week bought and finished; "at home" lines were asking about it under an empty list.
+            r.import("2 onions", "500 g spaghetti")
+            val pasta = rows().single { !it.have }.mergeKey
+            home.have(listOf(pasta))
+            assertTrue(rows().single { it.mergeKey == pasta }.have)
+            r.repo.tick(r.repo.snapshot().itemByKey("cat:onion")!!.id)
+            r.repo.finish()
+            assertTrue(rows().isEmpty())
+            assertTrue(r.repo.inStockOnList(r.repo.snapshot(), stillShopping = true).isEmpty())
+            // Still there for Need it and Undo, which read every line.
+            assertEquals(listOf(pasta), r.repo.inStockOnList(r.repo.snapshot()).map { it.target.mergeKey })
         }
 }

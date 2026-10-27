@@ -494,15 +494,23 @@ class ListRepository(
      * recipes), line by line: one query for the decisions, one for the recipes
      * and one for their lines (chunked), each line parsed once.
      */
-    suspend fun inStockOnList(l: ShoppingList): List<InStockLine> {
+    suspend fun inStockOnList(
+        l: ShoppingList,
+        /** For display: leave out recipes whose shopping is done. Undo and "Need it" read every line. */
+        stillShopping: Boolean = false,
+    ): List<InStockLine> {
         val live = l.liveItems.map { it.id }.toSet()
         // The recipes the Recipes tab shows ([usesOnList]'s rule): something on the list, or its shopping
         // done (bought, finished, or every line at home) — its at-home lines are still there to put back.
-        // A recipe taken off the list unbought ("Clear all") takes them with it.
+        // A recipe taken off the list unbought ("Clear all") takes them with it. [stillShopping] (what the
+        // screens show, X.13) drops a recipe whose shopping is done: its at-home lines are a question about a
+        // trip already made, and they kept asking about the cupboard under "Nothing on the list".
         val uses =
             l.uses.values.filter { u ->
-                u.archivedAt == null && u.recipeId != null &&
-                    (l.contributionsOfUse(u.id).any { it.itemId in live } || l.progress(u.id).state in KEPT)
+                if (u.archivedAt != null || u.recipeId == null) return@filter false
+                val state = l.progress(u.id).state
+                if (stillShopping && (state == UseState.ALL_BOUGHT || state == UseState.BOUGHT_THE_REST)) return@filter false
+                l.contributionsOfUse(u.id).any { it.itemId in live } || state in KEPT
             }
         if (uses.isEmpty()) return emptyList()
         val inStock =

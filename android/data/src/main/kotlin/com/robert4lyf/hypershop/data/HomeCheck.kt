@@ -55,7 +55,7 @@ class HomeCheck(
                     )
                 }
             val have =
-                repo.inStockOnList(l).groupBy { it.target.mergeKey }.map { (key, lines) ->
+                repo.inStockOnList(l, stillShopping = true).groupBy { it.target.mergeKey }.map { (key, lines) ->
                     HomeRow(
                         key,
                         lines.first().target.displayName,

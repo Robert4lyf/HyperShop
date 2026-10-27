@@ -18,6 +18,7 @@ import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.report.WrongReport
 import com.robert4lyf.hypershop.data.InStockLine
 import com.robert4lyf.hypershop.data.MANUAL_TITLE
+import com.robert4lyf.hypershop.data.MealShopping
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.settings.ListView
@@ -150,7 +151,12 @@ data class PlanPrep(
     val toCheck: Int = 0,
     /** Has saved recipes or a finished trip: someone who has shopped here before. */
     val returning: Boolean = false,
+    /** This week's meals whose shopping is done (bought, or nothing to buy). */
+    val bought: Int = 0,
 ) {
+    /** Every meal of the week planned and bought: the empty list is a finished shop, not one to start. */
+    val weekDone: Boolean get() = meals > 0 && pending == 0 && bought == meals
+
     /** "2 meals · 1 not on the list · 5 to buy again · 3 to check at home". */
     fun summary(): String =
         listOfNotNull(
@@ -222,7 +228,7 @@ class ListViewModel(
      * change, so the aisles and the "In stock" section never show two different
      * lists for a frame.
      */
-    private val listWithInStock = c.repository.list.map { Triple(it, c.repository.inStockOnList(it), sources(it)) }
+    private val listWithInStock = c.repository.list.map { Triple(it, c.repository.inStockOnList(it, stillShopping = true), sources(it)) }
 
     val ui: StateFlow<ListUi> =
         combine(
@@ -283,6 +289,7 @@ class ListViewModel(
                 lastShop = buy.lastShop.size,
                 toCheck = home.count { !it.have },
                 returning = saved || buy.hasHistory,
+                bought = meals.count { it.shopping == MealShopping.BOUGHT || it.shopping == MealShopping.NOTHING_TO_BUY },
             )
         }
 
