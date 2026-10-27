@@ -353,6 +353,8 @@ data class ShoppingList(
             copy(
                 ticks = ticks + t,
                 contributions = contributions.map { if (it.id in toCover) it.copy(coveredBy = t.id) else it },
+                // Found after all, as a phone tick says: a wrist tick on an item set aside here brings it back.
+                items = items.mapValues { (id, i) -> if (id == itemId) i.copy(unavailableAt = null) else i },
                 nextId = nextId + 1,
             ).bumped(setOf(itemId))
         return l to if (later > 0) WatchTickResult.PARTIAL else WatchTickResult.OK
@@ -470,18 +472,14 @@ data class ShoppingList(
         val touched = HashSet<Long>()
         val oldItems = r.items.associateBy { it.id }
         val carried = r.ticks.associateBy { it.id }
-        val mine = contributions.filter { it.useId == useId }.groupBy { items.getValue(it.itemId).mergeKey }
-        for ((oldItemId, cs) in bought.groupBy { it.itemId }) {
-            val oldItem = oldItems[oldItemId] ?: continue
-            val boughtQty = cs.fold(QtyBase.PRESENCE) { a, c -> a + c.qty }
-            // Where the purchase stays: its row if still there or finished; else the live row for the key; else its row back.
-            val row = items[oldItemId] ?: if (oldItem.deletedAt != null) oldItem else (itemByKey(oldItem.mergeKey) ?: oldItem)
-            if (row.id !in items) items = items + (row.id to row)
-            for (t in cs.mapNotNull { carried[it.coveredBy] }.distinctBy { it.id }) {
-                if (ticks.none { it.id == t.id }) ticks = ticks + t.copy(itemId = row.id)
-            }
-            val coveredBy = cs.first().coveredBy!!.takeIf { id -> ticks.any { it.id == id } } ?: continue
-            val news = mine[oldItem.mergeKey].orEmpty()
+        // Per ingredient, not per old row: a purchase can sit on two rows (a finished row and the
+        // live row its extra went on), and the new shares are reduced once by the whole of it.
+        for ((key, rows) in bought.groupBy { oldItems[it.itemId]?.mergeKey }) {
+            if (key == null) continue
+            val byRow = rows.groupBy { it.itemId }
+            val boughtQty = rows.fold(QtyBase.PRESENCE) { a, c -> a + c.qty }
+            // The new use's shares for this ingredient, as they stand now (an earlier key may have changed them).
+            val news = contributions.filter { it.useId == useId && items[it.itemId]?.mergeKey == key }
             val target = news.fold(QtyBase.PRESENCE) { a, c -> a + c.qty }
             val keep =
                 when {
@@ -503,13 +501,47 @@ data class ShoppingList(
                     }
                 touched += c.itemId
             }
-            val first = cs.first()
-            contributions = contributions +
-                Contribution(
-                    nextId++, useId, news.firstOrNull()?.recipeLineId, row.id, keep, first.noScale, rev,
-                    coveredBy = coveredBy, unitHint = news.firstOrNull()?.unitHint ?: first.unitHint,
-                )
-            touched += row.id
+            // What is kept bought goes back row by row (in full in the usual case; when the new amount is
+            // smaller than was bought, the first rows keep theirs and the last keeps the rest).
+            var toKeep = keep
+            for ((oldItemId, cs) in byRow) {
+                val oldItem = oldItems[oldItemId] ?: continue
+                val rowBought = cs.fold(QtyBase.PRESENCE) { a, c -> a + c.qty }
+                val rowKeep =
+                    if (keep == boughtQty || toKeep.isPresence || rowBought.isPresence) {
+                        rowBought
+                    } else {
+                        // The smaller of the row's purchase and what is left to keep.
+                        rowBought.minusClamped(rowBought.minusClamped(toKeep))
+                    }
+                toKeep = toKeep.minusClamped(rowKeep)
+                // Where the purchase stays: its row if still there or finished; else the live row for the key; else its row back.
+                val row = items[oldItemId] ?: if (oldItem.deletedAt != null) oldItem else (itemByKey(oldItem.mergeKey) ?: oldItem)
+                if (row.id !in items) items = items + (row.id to row)
+                for (t in cs.mapNotNull { carried[it.coveredBy] }.distinctBy { it.id }) {
+                    if (ticks.none { it.id == t.id }) ticks = ticks + t.copy(itemId = row.id)
+                }
+                val coveredBy = cs.first().coveredBy!!.takeIf { id -> ticks.any { it.id == id } } ?: continue
+                val first = cs.first()
+                contributions = contributions +
+                    Contribution(
+                        nextId++, useId, news.firstOrNull()?.recipeLineId, row.id, rowKeep,
+                        // A bought share with no line in the new recipe is not rescaled: a servings change
+                        // must not put the dropped ingredient back on the list.
+                        noScale = if (news.isEmpty()) true else first.noScale,
+                        createdListRev = rev,
+                        coveredBy = coveredBy, unitHint = news.firstOrNull()?.unitHint ?: first.unitHint,
+                    )
+                touched += row.id
+            }
+        }
+        // A live row the inheritance left with nothing on it (the new amount is within what was bought on a
+        // finished row) goes, with any tick that covered only it: there is nothing to buy or to keep.
+        val holding = contributions.map { it.itemId }.toSet()
+        val emptied = touched.filter { id -> id !in holding && items[id]?.deletedAt == null }.toSet()
+        if (emptied.isNotEmpty()) {
+            items = items - emptied
+            ticks = ticks.filter { it.itemId !in emptied }
         }
         return copy(items = items, contributions = contributions, ticks = ticks, nextId = nextId).bumped(touched)
     }
