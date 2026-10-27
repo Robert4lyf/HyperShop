@@ -28,8 +28,8 @@ class DisplayBuyTest {
     @Test
     fun halfAnOnionIsOneAndAWeightIsCounted() {
         assertEquals(RowText("1 onion", "½ in the recipe"), row("½ onion", key = "onion"))
-        // 450 g at USDA's medium onion (110 g): five, rounded up, never fewer than needed.
-        assertEquals(RowText("5 onions", "450g in the recipe"), row("450g onions", key = "onion"))
+        // 450 g at a UK onion (150 g, Waitrose's typical weight): three, never fewer than needed.
+        assertEquals(RowText("3 onions", "450g in the recipe"), row("450g onions", key = "onion"))
         assertEquals(RowText("2 onions", null), row("2 onions", key = "onion"))
     }
 

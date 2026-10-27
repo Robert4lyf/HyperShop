@@ -207,8 +207,8 @@ class BasketEvalTest {
          * [165, 143, 154, 149]; W.5, no pack count that could come out short (800 ml of stock with no carton size, a cup
          * of spring onions against a 100 g bunch stay as written), [165, 143, 151, 146]; X.3, meat and fish by weight
          * (asked for from real use, not from these labels), [165, 143, 152, 148]; X.5, cup weights for herbs, spring
-         * onions and tomato purée, and tins counted:
+         * onions and tomato purée, and tins counted, [165, 143, 154, 150]; X.6, UK item weights and names from fresh pages:
          */
-        val FLOORS = listOf(165, 143, 154, 150)
+        val FLOORS = listOf(165, 143, 154, 152)
     }
 }
