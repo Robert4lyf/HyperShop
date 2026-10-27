@@ -90,6 +90,18 @@ data class ShelfOrder(
         return moved(all, shownKeys, itemKey(item.aisle, item.group, item.mergeKey), by)
     }
 
+    /** Moves [item] to the top or the bottom of its group as shown ([present]); null when it is there already. */
+    fun movedItemToEnd(
+        present: List<Slot>,
+        item: Slot,
+        top: Boolean,
+    ): ShelfOrder? {
+        val at = present.indexOf(item)
+        if (at < 0) return null
+        val by = if (top) -at else present.lastIndex - at
+        return if (by == 0) null else movedItem(present, item, by)
+    }
+
     private fun moved(
         all: List<String>,
         shown: List<String>,

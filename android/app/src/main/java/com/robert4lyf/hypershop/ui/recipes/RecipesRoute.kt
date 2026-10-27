@@ -25,21 +25,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Inventory
-import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.People
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -56,9 +50,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -77,7 +68,6 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -85,16 +75,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.robert4lyf.hypershop.core.merge.UseState
-import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.EmptyHero
-import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.PillShape
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
-import com.robert4lyf.hypershop.ui.common.basilSegmentedColors
 import com.robert4lyf.hypershop.ui.common.cardLift
-import com.robert4lyf.hypershop.ui.common.chip
 import com.robert4lyf.hypershop.ui.common.fieldLift
 import com.robert4lyf.hypershop.ui.common.label
 import com.robert4lyf.hypershop.ui.common.pillFieldColors
@@ -104,7 +89,6 @@ import com.robert4lyf.hypershop.ui.common.webLink
 import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.review.TitleDialog
 import com.robert4lyf.hypershop.ui.theme.Brand
-import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.util.factoryFor
 
@@ -124,10 +108,6 @@ fun RecipesRoute(
     val hasKey by container.apiKeyStore.hasKey.collectAsStateWithLifecycle()
     RecipesScreen(
         ui,
-        onRemove = vm::remove,
-        onEdit = vm::edit,
-        onRename = { use, title -> vm.rename(use, title) },
-        onOpenUse = vm::openUse,
         library =
             LibraryActions(
                 onAdd = vm::addFromLibrary,
@@ -156,24 +136,6 @@ fun RecipesRoute(
         hasKey = hasKey,
         onMeals = onMeals,
     )
-    val useDetail by vm.useDetail.collectAsStateWithLifecycle()
-    useDetail?.let { d ->
-        ModalBottomSheet(onDismissRequest = vm::closeUse) {
-            UseDetailContent(
-                d,
-                photo = d.use.libraryKey?.let { ui.photos[it] },
-                notes = d.use.libraryKey?.let { ui.notes[it] },
-                onEdit = {
-                    vm.closeUse()
-                    vm.edit(d.use)
-                },
-                onRemove = {
-                    vm.closeUse()
-                    vm.remove(d.use)
-                },
-            )
-        }
-    }
     val detail by vm.detail.collectAsStateWithLifecycle()
     // The photo picker: the system's, so no permission; the recipe it is for is kept across the trip there.
     var photoFor by rememberSaveable { mutableStateOf<String?>(null) }
@@ -220,11 +182,6 @@ private fun RecipesUi.libraryRow(key: String?): LibraryRow? = key?.let { k -> li
 @Composable
 fun RecipesScreen(
     ui: RecipesUi,
-    onRemove: (UseSummary) -> Unit,
-    onEdit: (UseSummary) -> Unit = {},
-    onRename: (UseSummary, String) -> Unit = { _, _ -> },
-    /** A card tapped: its ingredients. */
-    onOpenUse: (UseSummary) -> Unit = {},
     add: AddRecipeActions = AddRecipeActions(),
     library: LibraryActions = LibraryActions(),
     search: SearchBox = SearchBox(),
@@ -233,21 +190,9 @@ fun RecipesScreen(
     /** "Meals this week": pick saved recipes for the list. */
     onMeals: () -> Unit = {},
 ) {
-    // Which use or saved recipe a dialog is about, by id or key, so it survives a rotation.
-    var renaming by rememberSaveable { mutableStateOf<Long?>(null) }
+    // Which saved recipe a dialog is about, by key, so it survives a rotation.
     var renamingSaved by rememberSaveable { mutableStateOf<String?>(null) }
     var adding by rememberSaveable { mutableStateOf(false) }
-    // Null until a toggle is tapped: your saved recipes (X.12: this tab is the recipe book; the week is its own tab).
-    var picked by rememberSaveable { mutableStateOf<Boolean?>(null) }
-    val showLibrary = ui.hasLibrary && (picked ?: true)
-    // A recipe landing on the shopping list (from the library, a link or a photo) is shown there.
-    var seen by remember { mutableStateOf<Int?>(null) }
-    LaunchedEffect(ui.loaded, ui.uses.size) {
-        if (!ui.loaded) return@LaunchedEffect
-        val before = seen
-        if (before != null && ui.uses.size > before) picked = false
-        seen = ui.uses.size
-    }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxSize()) {
             LazyColumn(
@@ -256,71 +201,29 @@ fun RecipesScreen(
                 contentPadding = PaddingValues(bottom = 112.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                // The recipe book (cut 1 of the review): what is in this shop is on the Shopping tab's recipe view
+                // and on This week, each with the recipe's own actions.
                 item(key = "top") {
-                    val n = ui.uses.count { it.recipeId != null }
+                    val n = ui.library.size
                     ScreenHeader(
                         title = "Recipes",
                         subtitle =
                             when {
-                                !ui.loaded || n == 0 -> null
-                                n == 1 -> "1 recipe in this shop"
-                                else -> "$n recipes in this shop"
+                                !ui.loaded || n == 0 || ui.terms.isNotEmpty() || ui.highlyRated -> null
+                                n == 1 -> "1 saved recipe"
+                                else -> "$n saved recipes"
                             },
                     )
                 }
-                if (ui.loaded && ui.uses.isEmpty() && !ui.hasLibrary) {
+                if (ui.loaded && !ui.hasLibrary) {
                     item(key = "empty") {
                         EmptyHero(
-                            "No recipes yet",
+                            "No saved recipes yet",
                             body = "Share a recipe link to HyperShop, or tap + to paste a link, type one in or photograph a cookbook page.",
                         )
                     }
                 }
                 if (ui.hasLibrary) {
-                    item(key = "view") {
-                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                            SegmentedButton(
-                                selected = showLibrary,
-                                // No checkmark: it would push the label sideways on every switch; the fill says which is on.
-                                icon = {},
-                                onClick = { picked = true },
-                                shape = SegmentedButtonDefaults.itemShape(0, 2),
-                                colors = basilSegmentedColors(),
-                                modifier = Modifier.testTag("view-library"),
-                            ) { Text("Saved recipes") }
-                            SegmentedButton(
-                                selected = !showLibrary,
-                                icon = {},
-                                onClick = { picked = false },
-                                shape = SegmentedButtonDefaults.itemShape(1, 2),
-                                colors = basilSegmentedColors(),
-                                modifier = Modifier.testTag("view-list"),
-                            ) { Text("In this shop") }
-                        }
-                    }
-                }
-                if (ui.loaded && ui.uses.isEmpty() && ui.hasLibrary && !showLibrary) {
-                    item(key = "nothing-yet") {
-                        InfoBanner(
-                            "No recipes in this shop. Plan meals on This week, or tap + for a new recipe.",
-                            Icons.AutoMirrored.Rounded.MenuBook,
-                            Modifier.padding(horizontal = 16.dp).testTag("nothing-yet"),
-                        )
-                    }
-                }
-                if (!showLibrary) {
-                    items(ui.uses, key = { it.useId }) { use ->
-                        UseCard(
-                            use,
-                            photo = use.libraryKey?.let { ui.photos[it] },
-                            onRemove = { onRemove(use) },
-                            onEdit = { onEdit(use) },
-                            onRename = { renaming = use.useId },
-                            onOpen = { onOpenUse(use) },
-                        )
-                    }
-                }
-                if (showLibrary) {
                     item(key = "library-search") {
                         Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             RecipeSearchBox(search)
@@ -357,15 +260,6 @@ fun RecipesScreen(
         }
     }
     if (adding) AddRecipeSheet(add, onDismiss = { adding = false }, hasKey = hasKey, lastBook = ui.lastBook)
-    renaming?.let { id -> ui.uses.firstOrNull { it.useId == id } }?.let { use ->
-        val byHand = use.recipeId == null
-        TitleDialog(
-            use.title,
-            onDismiss = { renaming = null },
-            heading = if (byHand) "Rename" else "Rename recipe",
-            label = if (byHand) "Name, e.g. Household" else "Recipe name",
-        ) { onRename(use, it) }
-    }
     ui.libraryRow(renamingSaved)?.let { row ->
         TitleDialog(row.title, onDismiss = { renamingSaved = null }) { library.onRename(row, it) }
     }
@@ -516,7 +410,7 @@ private fun LibraryCard(
     ) {
         Column {
             // The recipe's band, as on its card on the list: its photo, else its own mosaic, the same height either way.
-            Box(Modifier.fillMaxWidth().heightIn(min = PHOTO_BAND).clipToBounds().testTag("lib-band-${row.key}")) {
+            Box(Modifier.fillMaxWidth().heightIn(min = LIBRARY_BAND).clipToBounds().testTag("lib-band-${row.key}")) {
                 RecipeBackdrop(row.title, row.photo, Modifier.matchParentSize())
                 Text(
                     row.title,
@@ -577,132 +471,6 @@ private fun LibraryCard(
                             menu = false
                             onRemove()
                         })
-                    }
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun UseCard(
-    use: UseSummary,
-    photo: String?,
-    onRemove: () -> Unit,
-    onEdit: () -> Unit,
-    onRename: () -> Unit,
-    onOpen: () -> Unit,
-) {
-    val url = webLink(use.url)
-    val open = rememberOpenLink()
-    Surface(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .cardLift(MaterialTheme.shapes.large)
-            .clip(MaterialTheme.shapes.large)
-            .clickable(onClickLabel = "Show ingredients", onClick = onOpen)
-            .testTag("use-${use.useId}"),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.card,
-    ) {
-        val dark = LocalDarkTheme.current
-        val hue = Brand.recipeHue(use.title)
-        Column {
-            // The recipe's band: its photo, else its own mosaic (the same as its review screen's), the same
-            // height either way, with the title along the bottom.
-            Box(Modifier.fillMaxWidth().heightIn(min = PHOTO_BAND).clipToBounds().testTag("use-band-${use.useId}")) {
-                RecipeBackdrop(use.title, photo, Modifier.matchParentSize())
-                Column(
-                    Modifier.align(Alignment.BottomStart).padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.weight(1f)) {
-                            Text(
-                                use.title,
-                                style = MaterialTheme.typography.titleLarge,
-                                color = Brand.OnHero,
-                                modifier = Modifier.testTag("hero-text"),
-                            )
-                        }
-                        // Everything that changes the recipe, in one place; a tap on the card shows it.
-                        var menu by remember { mutableStateOf(false) }
-                        Box {
-                            IconButton(onClick = { menu = true }, modifier = Modifier.testTag("more-${use.useId}")) {
-                                Icon(Icons.Rounded.MoreVert, contentDescription = "More for ${use.title}", tint = Brand.OnHero)
-                            }
-                            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                                if (url != null) {
-                                    DropdownMenuItem(text = {
-                                        Text(
-                                            "Open recipe",
-                                        )
-                                    }, modifier = Modifier.testTag("open-${use.useId}"), onClick = {
-                                        menu = false
-                                        open(url)
-                                    })
-                                }
-                                DropdownMenuItem(text = { Text("Rename") }, modifier = Modifier.testTag("rename-${use.useId}"), onClick = {
-                                    menu = false
-                                    onRename()
-                                })
-                                DropdownMenuItem(text = { Text("Edit") }, modifier = Modifier.testTag("edit-${use.useId}"), onClick = {
-                                    menu = false
-                                    onEdit()
-                                })
-                                DropdownMenuItem(text = {
-                                    Text(
-                                        "Remove from shopping list",
-                                    )
-                                }, modifier = Modifier.testTag("remove-${use.useId}"), onClick = {
-                                    menu = false
-                                    onRemove()
-                                })
-                            }
-                        }
-                    }
-                    val site = url?.let { siteName(it) }
-                    val book = use.bookRef
-                    when {
-                        site != null -> Meta(Icons.Rounded.Link, site, Modifier)
-                        book != null -> Meta(Icons.AutoMirrored.Rounded.MenuBook, book, Modifier)
-                    }
-                }
-            }
-            Column(
-                Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                // The facts as one sentence for TalkBack, chips on screen.
-                val bits =
-                    listOfNotNull(
-                        use.servings?.let { "Serves $it" },
-                        use.progress.label(),
-                        use.inStockCount.takeIf { it > 0 && use.progress.state != UseState.NOTHING_TO_BUY }?.let { "$it at home" },
-                    )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.clearAndSetSemantics { contentDescription = bits.joinToString(" · ") },
-                ) {
-                    val bg = Brand.tint(hue, dark)
-                    val fg = Brand.strong(hue, dark)
-                    use.servings?.let { Fact(Icons.Rounded.People, "Serves $it", bg, fg) }
-                    val p = use.progress
-                    Fact(
-                        when (p.state) {
-                            UseState.STILL_NEEDED -> Icons.Rounded.ShoppingCart
-                            UseState.NOTHING_TO_BUY -> Icons.Rounded.Inventory
-                            else -> Icons.Rounded.DoneAll
-                        },
-                        p.chip(),
-                        bg,
-                        fg,
-                    )
-                    if (use.inStockCount > 0 && p.state != UseState.NOTHING_TO_BUY) {
-                        Fact(Icons.Rounded.Inventory, "${use.inStockCount} at home", bg, fg)
                     }
                 }
             }
@@ -967,5 +735,5 @@ fun UseDetailContent(
     }
 }
 
-/** How tall a card's band is when it shows the recipe's photo. */
-private val PHOTO_BAND = 168.dp
+/** How tall a saved recipe's band is (photo or mosaic): compact, so a library shows four or five to a screen (UX review 14). */
+private val LIBRARY_BAND = 96.dp

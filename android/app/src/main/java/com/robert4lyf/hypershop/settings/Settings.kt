@@ -43,15 +43,9 @@ class Settings(
     val claudeAlways: Flow<Boolean> = store.data.map { it[CLAUDE_ALWAYS] ?: true }
     val debugLog: Flow<Boolean> = store.data.map { it[DEBUG_LOG] ?: false }
 
-    /**
-     * How the list is laid out. Read from the older on/off switch when it has
-     * never been set, so "Group by type" survives the update.
-     */
+    /** How the list is laid out. A "TYPE" from before the review of 2026-10-27 (cut 5) reads as the store order. */
     val listView: Flow<ListView> =
-        store.data.map { p ->
-            p[LIST_VIEW]?.let { runCatching { ListView.valueOf(it) }.getOrNull() }
-                ?: if (p[LIST_CATEGORISED] == true) ListView.TYPE else ListView.STORE
-        }
+        store.data.map { p -> p[LIST_VIEW]?.let { runCatching { ListView.valueOf(it) }.getOrNull() } ?: ListView.STORE }
 
     /** Planning the list, or shopping with it: kept across process death, so a shop survives a restart. */
     val listMode: Flow<ListMode> =
@@ -127,7 +121,6 @@ class Settings(
         val DAILY_CALLS = intPreferencesKey("claude_daily_calls")
         val CLAUDE_ALWAYS = booleanPreferencesKey("claude_always")
         val DEBUG_LOG = booleanPreferencesKey("debug_log")
-        val LIST_CATEGORISED = booleanPreferencesKey("list_categorised")
         val LIST_VIEW = stringPreferencesKey("list_view")
         val LIST_MODE = stringPreferencesKey("list_mode")
         val KEY_LOST = booleanPreferencesKey("claude_key_lost_notice")
@@ -136,8 +129,8 @@ class Settings(
     }
 }
 
-/** The list's layouts: aisles in walking order, aisles split by type, or one card per recipe. */
-enum class ListView { STORE, TYPE, RECIPE }
+/** The list's layouts: aisles in walking order (groups labelled when an aisle has more than one), or one card per recipe. */
+enum class ListView { STORE, RECIPE }
 
 /** What the List tab is for right now: planning (add, review, edit) or shopping (tick, next aisle, finish). */
 enum class ListMode { PLAN, SHOP }

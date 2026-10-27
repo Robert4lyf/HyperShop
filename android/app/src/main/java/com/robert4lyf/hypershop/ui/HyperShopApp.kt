@@ -75,6 +75,7 @@ import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.meals.MealsRoute
 import com.robert4lyf.hypershop.ui.recipes.RecipesRoute
 import com.robert4lyf.hypershop.ui.review.ReviewRoute
+import com.robert4lyf.hypershop.ui.settings.AislesRoute
 import com.robert4lyf.hypershop.ui.settings.SettingsRoute
 import com.robert4lyf.hypershop.ui.voicetest.VoiceTestRoute
 import kotlinx.coroutines.Dispatchers
@@ -88,6 +89,7 @@ object Routes {
     const val REVIEW = "review/{job}"
     const val DEBUG = "debug"
     const val LIBRARY = "library"
+    const val AISLES = "aisles"
     const val VOICE_TEST = "voice-test"
     const val MEALS = "meals"
 
@@ -253,6 +255,7 @@ private fun AppShell(
                     container,
                     onDebug = debugScreen?.let { { nav.navigate(Routes.DEBUG) } },
                     onLibrary = { nav.navigate(Routes.LIBRARY) { launchSingleTop = true } },
+                    onAisles = { nav.navigate(Routes.AISLES) { launchSingleTop = true } },
                     // A developer harness with a microphone service: not in a release until voice mode exists.
                     onVoiceTest = if (BuildConfig.DEBUG) ({ nav.navigate(Routes.VOICE_TEST) { launchSingleTop = true } }) else null,
                     snackbar = snackbar,
@@ -260,6 +263,7 @@ private fun AppShell(
             }
             composable(Routes.VOICE_TEST) { VoiceTestRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.LIBRARY) { LibraryRoute(container, snackbar, onBack = { nav.popBackStack() }) }
+            composable(Routes.AISLES) { AislesRoute(container, onBack = { nav.popBackStack() }) }
             composable(Routes.REVIEW, arguments = listOf(navArgument("job") { type = NavType.LongType })) { e ->
                 ReviewRoute(
                     container,
@@ -322,7 +326,7 @@ internal fun CompactNavBar(
                 // The ingredient library and the voice test are part of Settings, so its tab stays lit there.
                 val selected =
                     route == r ||
-                        (r == Routes.SETTINGS && (route == Routes.LIBRARY || route == Routes.VOICE_TEST))
+                        (r == Routes.SETTINGS && (route == Routes.LIBRARY || route == Routes.AISLES || route == Routes.VOICE_TEST))
                 Column(
                     Modifier
                         .weight(1f)

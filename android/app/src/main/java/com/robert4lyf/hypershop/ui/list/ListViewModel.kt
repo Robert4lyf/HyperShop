@@ -19,11 +19,14 @@ import com.robert4lyf.hypershop.core.report.WrongReport
 import com.robert4lyf.hypershop.data.InStockLine
 import com.robert4lyf.hypershop.data.MANUAL_TITLE
 import com.robert4lyf.hypershop.data.MealShopping
+import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.common.webLink
+import com.robert4lyf.hypershop.ui.recipes.UseActions
+import com.robert4lyf.hypershop.ui.recipes.UseDetail
 import com.robert4lyf.hypershop.watch.WatchLinkState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -126,9 +129,6 @@ data class ListUi(
     /** "Watch synced" / "Watch updating…" / "Watch not connected", or null with no watch to speak of (UX review 23). */
     val watch: String? = null,
 ) {
-    /** Rows grouped within each aisle, with a label per group. */
-    val categorised: Boolean get() = view == ListView.TYPE || arranging
-
     val isEmpty: Boolean get() = loaded && aisles.isEmpty()
 
     /** The shop screen is showing: shopping mode, with something to shop for (an empty list is planned, never shopped). */
@@ -203,6 +203,44 @@ class ListViewModel(
     private val arranging = MutableStateFlow(false)
     private val messages = Channel<UiMessage>(Channel.BUFFERED)
     val events: Flow<UiMessage> = messages.receiveAsFlow()
+
+    /** Job ids to open on the review screen: "Edit" on a recipe's card (cut 1 of the review). */
+    private val reviewsOut = Channel<Long>(Channel.BUFFERED)
+    val reviews: Flow<Long> = reviewsOut.receiveAsFlow()
+
+    /** The recipe's own actions on its card in the recipe view, shared with the Recipes tab's model. */
+    private val useActions by lazy { UseActions(c, viewModelScope, messages, reviewsOut) }
+
+    /** The recipe whose ingredients are open in a sheet, or null. */
+    val useDetail: StateFlow<UseDetail?> get() = useActions.detail
+
+    fun closeUse() = useActions.closeDetail()
+
+    /** The use a card of the recipe view stands for: the recipe's, or the hand-added one. */
+    private suspend fun useOf(section: RecipeSection): UseSummary? {
+        val uses = c.repository.usesOnList(c.repository.snapshot())
+        return if (section.kind == RecipeSection.Kind.BY_HAND) {
+            uses.firstOrNull { it.recipeId == null }
+        } else {
+            val id = section.key.removePrefix("use-").toLongOrNull()
+            uses.firstOrNull { it.useId == id }
+        }
+    }
+
+    fun openUse(section: RecipeSection) = viewModelScope.launch { useOf(section)?.let { useActions.open(it) } }
+
+    fun editUse(section: RecipeSection) = viewModelScope.launch { useOf(section)?.let { useActions.edit(it) } }
+
+    fun editUse(use: UseSummary) = useActions.edit(use)
+
+    fun renameUse(
+        section: RecipeSection,
+        title: String,
+    ) = viewModelScope.launch { useOf(section)?.let { useActions.rename(it, title) } }
+
+    fun removeUse(section: RecipeSection) = viewModelScope.launch { useOf(section)?.let { useActions.remove(it) } }
+
+    fun removeUse(use: UseSummary) = useActions.remove(use)
 
     private val _sheet = MutableStateFlow<ItemSheet?>(null)
     val sheet: StateFlow<ItemSheet?> = _sheet
@@ -531,6 +569,15 @@ class ListViewModel(
     ) = viewModelScope.launch {
         val rows = ui.value.aisles.firstOrNull { it.first == row.aisle }?.second.orEmpty().filter { it.group == row.group }
         c.repository.arrangeWith { it.movedItem(rows.map { r -> r.slot() }, row.slot(), by) }
+    }
+
+    /** UX review 17: a row to the top or bottom of its group, as shown. */
+    fun moveItemToEnd(
+        row: ListRow,
+        top: Boolean,
+    ) = viewModelScope.launch {
+        val rows = ui.value.aisles.firstOrNull { it.first == row.aisle }?.second.orEmpty().filter { it.group == row.group }
+        c.repository.arrangeWith { it.movedItemToEnd(rows.map { r -> r.slot() }, row.slot(), top) }
     }
 
     /** Moves the group [group] one place up or down within [aisle], past the group shown next to it. */

@@ -21,7 +21,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -73,11 +72,8 @@ class ListViewModelTest {
         // X.9: store order too, so the herbs are not split by what was added between them.
         val standard = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
         assertEquals(listOf("onion", "carrot", "basil", "lemon"), standard.aisles.single().second.map { it.name })
-        assertFalse(standard.categorised)
-        vm.setView(ListView.TYPE)
-        val grouped = await(vm.ui) { it.categorised }
-        assertEquals(listOf("onion", "carrot", "basil", "lemon"), grouped.aisles.single().second.map { it.name })
-        assertEquals(listOf("Vegetables", "Vegetables", "Herbs", "Fruit"), grouped.aisles.single().second.map { it.group })
+        // Each row carries its group; the screen labels them when an aisle has more than one (cut 5 of the review).
+        assertEquals(listOf("Vegetables", "Vegetables", "Herbs", "Fruit"), standard.aisles.single().second.map { it.group })
     }
 
     @Test
@@ -91,7 +87,6 @@ class ListViewModelTest {
         assertEquals(listOf("onion", "carrot", "basil", "dill", "lemon"), names(ui))
         vm.arrange(true)
         ui = await(vm.ui) { it.arranging }
-        assertTrue(ui.categorised)
         // Dill above basil, then the herbs above the vegetables.
         vm.moveItem(ui.row("dill"), -1)
         ui = await(vm.ui) { names(it) == listOf("onion", "carrot", "dill", "basil", "lemon") }

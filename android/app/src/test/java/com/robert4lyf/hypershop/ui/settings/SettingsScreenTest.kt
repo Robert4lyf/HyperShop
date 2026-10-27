@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -66,7 +67,6 @@ class SettingsScreenTest {
     fun groupsKeyFieldAndControls() {
         show()
         compose.onNodeWithContentDescription("Remove salt").performClick()
-        compose.onNodeWithContentDescription("Move ${AisleCode.entries[1].displayName} up").performClick()
         val list = compose.onNodeWithTag("settings")
         list.performScrollToNode(hasTestTag("watch-retry"))
         compose.onNodeWithTag("watch-retry").performClick()
@@ -80,7 +80,7 @@ class SettingsScreenTest {
         compose.onNodeWithText("Spent this month: $0.04 of $2.00 · 3 of 50 calls today").assertExists()
         list.performScrollToNode(hasText("Show the debug log"))
         compose.onNodeWithText("Show the debug log").assertIsOff().performClick()
-        assertEquals(listOf("staple salt", "aisle ${AisleCode.entries[1]} -1", "watch retry", "key 6", "log true"), events)
+        assertEquals(listOf("staple salt", "watch retry", "key 6", "log true"), events)
     }
 
     @Test
@@ -106,18 +106,19 @@ class SettingsScreenTest {
 
     @Test
     fun aislesMoveToTheEndsAndResetAfterAsking() {
-        show()
+        // The walking order is its own screen (UX review 22).
+        compose.setContent { HyperShopTheme(dynamicColor = false) { AislesScreen(UI, actions) } }
         val second = AisleCode.entries[1]
+        compose.onNodeWithContentDescription("Move ${second.displayName} up").performClick()
         compose.onNodeWithContentDescription("More for ${second.displayName}").performClick()
         compose.onNodeWithText("Move to bottom").performClick()
         compose.onNodeWithContentDescription("More for ${second.displayName}").performClick()
         compose.onNodeWithText("Move to top").performClick()
-        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("reset-aisles"))
-        compose.onNodeWithTag("reset-aisles").performClick()
+        compose.onNodeWithTag("reset-aisles").performScrollTo().performClick()
         compose.onNodeWithText("Keep").performClick()
         compose.onNodeWithTag("reset-aisles").performClick()
         compose.onNodeWithText("Reset").performClick()
-        assertEquals(listOf("aisle $second to 3", "aisle $second to 0", "reset aisles"), events)
+        assertEquals(listOf("aisle $second -1", "aisle $second to 3", "aisle $second to 0", "reset aisles"), events)
     }
 
     @Test

@@ -3,6 +3,8 @@ package com.robert4lyf.hypershop.ui.list
 import android.content.ClipboardManager
 import android.content.Intent
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -24,12 +26,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.common.shareNote
+import com.robert4lyf.hypershop.ui.recipes.UseDetailContent
 import com.robert4lyf.hypershop.ui.util.factoryFor
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ListRoute(
     container: AppContainer,
@@ -42,6 +46,7 @@ fun ListRoute(
     val ui by vm.ui.collectAsStateWithLifecycle()
     val prep by vm.prep.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
+    LaunchedEffect(vm) { vm.reviews.collect(onReview) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     // Built once per view model: a new object on every recomposition would recompose the whole header.
@@ -78,7 +83,12 @@ fun ListRoute(
             onAvailable = vm::available,
             onArrange = vm::arrange,
             onMoveItem = { r, by -> vm.moveItem(r, by) },
+            onMoveItemTo = { r, top -> vm.moveItemToEnd(r, top) },
             onMoveGroup = { a, g, by -> vm.moveGroup(a, g, by) },
+            onUseOpen = vm::openUse,
+            onUseEdit = vm::editUse,
+            onUseRename = { s, t -> vm.renameUse(s, t) },
+            onUseRemove = vm::removeUse,
             onShare = {
                 val send =
                     Intent(Intent.ACTION_SEND)
@@ -99,6 +109,23 @@ fun ListRoute(
             confirmButton = { TextButton(onClick = vm::keepLeftovers, modifier = Modifier.testTag("carry-keep")) { Text("Keep") } },
             dismissButton = { TextButton(onClick = vm::dropLeftovers, modifier = Modifier.testTag("carry-drop")) { Text("Remove") } },
         )
+    }
+    val useDetail by vm.useDetail.collectAsStateWithLifecycle()
+    useDetail?.let { d ->
+        ModalBottomSheet(onDismissRequest = vm::closeUse) {
+            UseDetailContent(
+                d,
+                photo = ui.recipes.firstOrNull { it.libraryKey != null && it.libraryKey == d.use.libraryKey }?.photo,
+                onEdit = {
+                    vm.closeUse()
+                    vm.editUse(d.use)
+                },
+                onRemove = {
+                    vm.closeUse()
+                    vm.removeUse(d.use)
+                },
+            )
+        }
     }
     val sheet by vm.sheet.collectAsStateWithLifecycle()
     sheet?.let { s ->

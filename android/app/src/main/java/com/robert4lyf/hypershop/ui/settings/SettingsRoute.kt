@@ -146,6 +146,8 @@ data class SettingsActions(
     val onDebugLog: (Boolean) -> Unit = {},
     val onRefreshLog: () -> Unit = {},
     val onLibrary: () -> Unit = {},
+    /** Aisles › Walking order: its own screen (UX review 22). */
+    val onAisles: () -> Unit = {},
     /** Advanced › Voice test: a developer harness, offered in debug builds only (null hides it). */
     val onVoiceTest: (() -> Unit)? = null,
     /** Debug builds only. */
@@ -167,6 +169,7 @@ fun SettingsRoute(
     container: AppContainer,
     onDebug: (() -> Unit)?,
     onLibrary: () -> Unit = {},
+    onAisles: () -> Unit = {},
     onVoiceTest: (() -> Unit)? = null,
     /** The app's snackbar host; without one the screen shows its own. */
     snackbar: SnackbarHostState? = null,
@@ -206,6 +209,7 @@ fun SettingsRoute(
             onRefreshLog = { vm.refreshLog() },
             onDebug = onDebug,
             onLibrary = onLibrary,
+            onAisles = onAisles,
             onVoiceTest = onVoiceTest,
             onBackup = { createBackup.launch(BackupManager.suggestedName(container.clock())) },
             onRestore = {
@@ -251,7 +255,7 @@ fun SettingsScreen(
                 }
                 card("Appearance", Icons.Rounded.Palette, hue = 300f) { AppearanceGroup(ui, actions) }
                 card("List", Icons.Rounded.Tune, hue = 140f) { ListGroup(ui, actions) }
-                card("Aisles", Icons.Rounded.Route, hue = 30f) { AislesGroup(ui, actions) }
+                card("Aisles", Icons.Rounded.Route, hue = 30f) { AislesRow(actions) }
                 card("Ingredients", Icons.Rounded.LocalDining, hue = 95f) { IngredientsGroup(actions) }
                 card("Watch", Icons.Rounded.Watch, hue = 205f) { WatchGroup(ui, actions) }
                 card("Claude", Icons.Rounded.AutoAwesome, hue = 265f) {
@@ -454,8 +458,32 @@ private fun StapleChip(
     }
 }
 
+/** The way to the walking order: a 16-row reorder list made Settings long (UX review 22), so it has its own screen. */
 @Composable
-private fun AislesGroup(
+private fun AislesRow(actions: SettingsActions) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .clickable(role = Role.Button, onClick = actions.onAisles)
+            .testTag("open-aisles"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Walking order", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "The order you walk the store; the list and the watch follow it.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** The aisles in walking order with arrows, "Move to top/bottom" and Reset: the body of [AislesScreen]. */
+@Composable
+internal fun AislesGroup(
     ui: SettingsUi,
     actions: SettingsActions,
 ) {

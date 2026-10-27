@@ -11,13 +11,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.History
@@ -195,53 +193,6 @@ fun ReadyCard(
 }
 
 /**
- * "This week": the way into planning a weekly shop, above the list while
- * planning. One line says how far the shop is prepared; the card opens the Plan
- * screen. Shown to someone who has shopped here before (saved recipes, or a
- * finished trip): a first list starts with the field above, nothing else.
- */
-@Composable
-fun PlanCard(
-    prep: PlanPrep,
-    onPlan: () -> Unit,
-) {
-    Surface(
-        Modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp)
-            .cardLift(MaterialTheme.shapes.large)
-            .clip(MaterialTheme.shapes.large)
-            .clickable(onClickLabel = "Plan", role = Role.Button, onClick = onPlan)
-            .testTag("plan-card"),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.card,
-    ) {
-        Row(
-            Modifier.padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Box(
-                Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Rounded.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
-            }
-            Column(Modifier.weight(1f)) {
-                Text("Plan this week's shop", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    prep.summary(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.testTag("plan-card-summary"),
-                )
-            }
-            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-/**
  * An empty list. The first time: a sample to try, and a paste of a copied link.
  * Someone who has shopped before gets their own shortcuts instead: plan the week,
  * or put last shop's household items straight back on.
@@ -305,6 +256,5 @@ fun androidx.compose.foundation.lazy.LazyListScope.listHeader(
 ) {
     item(key = "add") { AddItemField(actions.onAdd, actions.suggestions, actions.onPick) }
     item(key = "ready") { ReadyCard(ui.readyJobs, actions.onReview) }
-    // Not over an empty list: its own shortcuts say the same.
-    if (prep.returning && !ui.isEmpty) item(key = "plan") { PlanCard(prep, actions.onPlan) }
+    // No "Plan this week's shop" card above the list (cut 2 of the review): This week is a tab of its own.
 }
