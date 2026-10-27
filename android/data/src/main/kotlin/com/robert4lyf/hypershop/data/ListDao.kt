@@ -539,6 +539,15 @@ interface ListDao {
     @Query("DELETE FROM RecipeNote")
     suspend fun clearRecipeNotes()
 
+    @Query("SELECT * FROM ShelfRank")
+    suspend fun shelfRanks(): List<ShelfRankEntity>
+
+    @Upsert
+    suspend fun putShelfRanks(rows: List<ShelfRankEntity>)
+
+    @Query("DELETE FROM ShelfRank")
+    suspend fun clearShelfRanks()
+
     @Query("SELECT DISTINCT photo FROM RecipeNote WHERE photo IS NOT NULL")
     suspend fun photosInUse(): List<String>
 

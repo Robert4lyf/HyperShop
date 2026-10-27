@@ -2,6 +2,8 @@ package com.robert4lyf.hypershop.watch
 
 import com.robert4lyf.hypershop.core.catalog.Catalog
 import com.robert4lyf.hypershop.core.merge.Display
+import com.robert4lyf.hypershop.core.merge.ListItem
+import com.robert4lyf.hypershop.core.merge.ShelfOrder
 import com.robert4lyf.hypershop.core.merge.TickSource
 import com.robert4lyf.hypershop.core.merge.UnitsSetting
 import com.robert4lyf.hypershop.core.sync.PagerAisle
@@ -176,6 +178,8 @@ class WatchSyncCoordinator(
         return true
     }
 
+    private fun groupOf(item: ListItem): String? = item.catalogId?.let { catalog.byId[it] }?.group
+
     private suspend fun input(
         v: WatchListView,
         installId: Int,
@@ -194,7 +198,14 @@ class WatchSyncCoordinator(
             list.liveItems
                 // Set aside on the phone for this trip (X.8): not something to look for on the wrist either.
                 .filter { it.aisle in order && it.unavailableAt == null }
-                .sortedWith(compareBy({ order.getValue(it.aisle) }, { it.position }))
+                .sortedWith(
+                    compareBy(
+                        { order.getValue(it.aisle) },
+                        { v.shelf.groupSort(it.aisle, groupOf(it), catalog.groupRank(it.aisle, groupOf(it))) },
+                        { v.shelf.itemSort(ShelfOrder.Slot(it.aisle, groupOf(it), it.mergeKey, it.position)) },
+                        { it.position },
+                    ),
+                )
                 .map { item ->
                     val text = Display.row(list, item, item.catalogId?.let { catalog.byId[it] }, u)
                     PagerItem(

@@ -415,3 +415,15 @@ data class RecipeNoteEntity(
      */
     val orphanedAt: Long? = null,
 )
+
+/**
+ * X.9: where a group or an item sits within its aisle, as the shopper arranged it.
+ * Keys are [com.robert4lyf.hypershop.core.merge.ShelfOrder.groupKey] and `itemKey`;
+ * kept across trips, like the walking order.
+ */
+@Serializable
+@Entity(tableName = "ShelfRank")
+data class ShelfRankEntity(
+    @PrimaryKey val key: String,
+    val rank: Int,
+)

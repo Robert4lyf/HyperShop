@@ -10,7 +10,7 @@ import com.robert4lyf.hypershop.core.catalog.CatalogLoader
 import com.robert4lyf.hypershop.core.model.AisleCode
 
 @Database(
-    version = 8,
+    version = 9,
     exportSchema = true,
     entities = [
         MetaEntity::class, ItemEntity::class, ItemAliasEntity::class, RecipeEntity::class, RecipeLineEntity::class,
@@ -19,6 +19,7 @@ import com.robert4lyf.hypershop.core.model.AisleCode
         CategoryOverrideEntity::class, StapleEntity::class, ClaudeUsageEntity::class, DeletedItemEntity::class,
         WatchInstallEntity::class, WatchOpResultEntity::class, PlannedMealEntity::class, TripEntity::class,
         TripItemEntity::class, RegularEntity::class, RecipeNoteEntity::class,
+        ShelfRankEntity::class,
     ],
 )
 abstract class HyperShopDatabase : RoomDatabase() {
@@ -144,6 +145,14 @@ abstract class HyperShopDatabase : RoomDatabase() {
                 }
             }
 
+        /** v9: the order things are found in within an aisle, as arranged ([ShelfRankEntity]). */
+        val MIGRATION_8_9: Migration =
+            object : LiveKeyMigration(8, 9) {
+                override fun migrateTables(db: SupportSQLiteDatabase) {
+                    db.execSQL("CREATE TABLE IF NOT EXISTS `ShelfRank` (`key` TEXT NOT NULL, `rank` INTEGER NOT NULL, PRIMARY KEY(`key`))")
+                }
+            }
+
         /** Seeds aisles, the store and its aisle order, staples and Meta (PLAN §3.4, §4). */
         val CALLBACK =
             object : Callback() {
@@ -188,7 +197,16 @@ abstract class HyperShopDatabase : RoomDatabase() {
                 NAME,
             ).addCallback(
                 CALLBACK,
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+            ).addMigrations(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+                MIGRATION_6_7,
+                MIGRATION_7_8,
+                MIGRATION_8_9,
+            )
                 .build()
 
         /**

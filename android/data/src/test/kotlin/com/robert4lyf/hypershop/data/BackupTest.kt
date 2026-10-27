@@ -40,6 +40,7 @@ class BackupTest {
         r.repo.moveAisle(onion, AisleCode.FROZEN, always = true)
         r.repo.setStaple("cat:milk", true)
         r.repo.setAisleOrder(AisleCode.entries.reversed())
+        r.repo.arrange(com.robert4lyf.hypershop.core.merge.ShelfOrder(mapOf("g:PRODUCE:Herbs" to 0, "i:PRODUCE:Herbs:cat:dill" to 0)))
         r.repo.renameUse(applied.useId, "Sunday soup")
         r.repo.recordUsage("2026-10-20", "claude-haiku-5-5", 100, 50, 0, 0)
         return r.repo.exportBackup()
@@ -61,6 +62,7 @@ class BackupTest {
                 assertEquals(emptyList<String>(), fresh.repo.restoreBackup(back, m))
                 assertEquals(before, fresh.dump())
                 assertEquals(AisleCode.entries.reversed(), fresh.repo.aisleOrder())
+                assertEquals(0, fresh.repo.shelfOrder().ranks["i:PRODUCE:Herbs:cat:dill"])
                 assertEquals("Sunday soup", fresh.db.dao().allRecipes().single().title)
                 assertEquals(1, fresh.db.dao().usage().single().calls)
                 // The list is a new one to the watch: a new epoch, the marker file written to match.

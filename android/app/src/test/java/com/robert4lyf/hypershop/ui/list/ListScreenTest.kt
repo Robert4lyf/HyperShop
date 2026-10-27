@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
@@ -71,6 +72,9 @@ class ListScreenTest {
             onFinish = { events += "finish" },
             onClearAll = { events += "clear" },
             onNeed = { events += "need ${it.key}" },
+            onArrange = { events += "arrange $it" },
+            onMoveItem = { r, by -> events += "move ${r.id} $by" },
+            onMoveGroup = { a, g, by -> events += "group $a $g $by" },
         )
 
     private fun show(dark: Boolean = false) =
@@ -93,6 +97,33 @@ class ListScreenTest {
         compose.onNodeWithTag("finish").assertExists()
         compose.onNodeWithText("5 left").fetchSemanticsNode()
         assertEquals(listOf("open 1", "toggle 1", "finish"), events)
+    }
+
+    @Test
+    fun arrangingMovesRowsWithinTheirGroupAndGroupsWhole() {
+        val produce =
+            listOf(
+                ListRow(1, "onion", "2 onions", null, TickState.OPEN, AisleCode.PRODUCE, "Vegetables", key = "cat:onion"),
+                ListRow(2, "carrot", "1 carrot", null, TickState.OPEN, AisleCode.PRODUCE, "Vegetables", key = "cat:carrot"),
+                ListRow(3, "lettuce", "1 lettuce", null, TickState.OPEN, AisleCode.PRODUCE, "Salad", key = "cat:lettuce"),
+                ListRow(4, "basil", "1 pack basil", null, TickState.OPEN, AisleCode.PRODUCE, "Herbs", key = "cat:basil"),
+                ListRow(5, "dill", "1 pack dill", null, TickState.OPEN, AisleCode.PRODUCE, "Herbs", key = "cat:dill"),
+            )
+        val ui = SAMPLE_LIST.copy(aisles = listOf(AisleCode.PRODUCE to produce), arranging = true)
+        compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions) } }
+        compose.onNodeWithTag("arrange-hint").assertExists()
+        // Arrows instead of ticks; the first of a group cannot go up, the last cannot go down.
+        compose.onNodeWithTag("tick-1").assertDoesNotExist()
+        compose.onNodeWithTag("up-1").assertIsNotEnabled()
+        compose.onNodeWithTag("down-2").assertIsNotEnabled()
+        compose.onNodeWithTag("up-group-PRODUCE-Vegetables").assertIsNotEnabled()
+        compose.onNodeWithTag("down-group-PRODUCE-Herbs").assertIsNotEnabled()
+        compose.onNodeWithTag("up-5").performClick()
+        compose.onNodeWithTag("up-group-PRODUCE-Herbs").performClick()
+        compose.onNodeWithContentDescription("Move lettuce down").assertIsNotEnabled()
+        compose.onRoot().captureRoboImage(Shots.path("list-arrange-light.png"))
+        compose.onNodeWithTag("arrange-done").performClick()
+        assertEquals(listOf("move 5 -1", "group PRODUCE Herbs -1", "arrange false"), events)
     }
 
     @Test

@@ -166,6 +166,9 @@ class Catalog(
     val entries: List<CatalogEntry> get() = s.entries
     val byId: Map<String, CatalogEntry> get() = s.byId
 
+    /** Every group [aisle] has in the catalogue, in its order. */
+    fun groupsIn(aisle: AisleCode): List<String> = s.groups[aisle].orEmpty()
+
     /**
      * Where [group] sorts within [aisle] on the categorised list: the catalogue's
      * order, then groups it doesn't know (yours) by name, then no group at all.
