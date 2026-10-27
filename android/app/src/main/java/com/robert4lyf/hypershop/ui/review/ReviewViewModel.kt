@@ -130,6 +130,8 @@ data class ReviewUi(
     val savedOnly: Boolean = false,
     /** Adding plans the recipe as a meal of this week (a new import; not an edit, a save for later or a by-hand list). */
     val plans: Boolean = false,
+    /** "Tap an ingredient to…": shown while the sheet is new to the user, or while a line needs checking (UX review 20). */
+    val hint: Boolean = true,
     /** A key is saved and Claude hasn't read this recipe: "Ask Claude" is offered. */
     val canAskClaude: Boolean = false,
     /** No web page: a cookbook recipe, which can carry its book and page. */
@@ -247,6 +249,15 @@ class ReviewViewModel(
     private var retrying = false
     private var retryJob: Job? = null
 
+    /** How often a row's sheet has been opened, ever: the "tap an ingredient" hint goes once that is a few. */
+    private var sheetOpens = 0
+
+    /** A row's sheet opened (the route says): counted for the hint. */
+    fun noteSheetOpened() {
+        sheetOpens++
+        viewModelScope.launch { c.settings.bumpReviewSheetOpens() }
+    }
+
     /** The import as it failed, for the lines picked or pasted in its place. */
     private var failedFrom: ImportResult? = null
 
@@ -353,12 +364,14 @@ class ReviewViewModel(
             return fail(ImportError.NO_RECIPE, emptyList())
         }
         failedFrom = r
+        sheetOpens = c.settings.reviewSheetOpens.first()
         // Once per import: a failure or refusal in the worker isn't retried on open ("Retry with Claude" is).
-        if (r.claudePending && !r.claudeTried && c.reviewGate.visible.value) {
+        val pending = r.claudePending && !r.claudeTried && c.reviewGate.visible.value
+        if (pending && r.lines.isEmpty()) {
+            // Nothing to show meanwhile (a photo): wait for Claude. Kept on the job, so reopening this review
+            // neither pays for Claude again nor retries a failure (claudeTried is set on those). Pending means
+            // the worker already found a line worth asking about: the gate is not asked twice.
             _state.value = ReviewState.Loading(STAGE_CLAUDE)
-            // Kept on the job, so reopening this review neither pays for Claude again nor
-            // retries a failure (claudeTried is set on those). Pending means the worker
-            // already found a line worth asking about: the gate is not asked twice.
             r = parseWithClaude(r.copy(askClaude = true))
         }
         if (r.lines.isEmpty()) return fail(r.error ?: ImportError.NO_RECIPE, candidates(r))
@@ -369,10 +382,21 @@ class ReviewViewModel(
             return
         }
         begin(r)
+        // UX review 1: the rules' reading is on screen at once, with "Asking Claude…" and Stop in the hero; Claude's
+        // is laid over when it lands (as "Ask Claude" does), and Stop keeps the import as read offline.
+        if (pending && r.lines.isNotEmpty()) askClaude({ it.copy(askClaude = true) }) { true }
     }
 
     /** "Add again" on [ReviewState.AlreadyOnList]. */
-    fun addAgain() = act { if (_state.value is ReviewState.AlreadyOnList) result?.let { begin(it) } }
+    fun addAgain() =
+        act {
+            if (_state.value is ReviewState.AlreadyOnList) {
+                result?.let { r ->
+                    begin(r)
+                    if (r.claudePending && !r.claudeTried && c.reviewGate.visible.value) askClaude({ it.copy(askClaude = true) }) { true }
+                }
+            }
+        }
 
     private suspend fun begin(from: ImportResult) {
         corrections.clear()
@@ -542,6 +566,7 @@ class ReviewViewModel(
                     byHand = r.byHand,
                     savedOnly = r.savesToLibrary,
                     plans = r.editsUse == null && !r.savesToLibrary && !r.byHand,
+                    hint = sheetOpens < HINT_OPENS || grouped.any { (_, rows) -> rows.any { it.check && !it.inStock } },
                     canAskClaude = r.parsedBy != ParsedBy.CLAUDE && !r.byHand && c.apiKeyStore.hasKey.value,
                     book = r.book,
                     page = r.page,
@@ -642,7 +667,17 @@ class ReviewViewModel(
         }
 
     /** "Retry with Claude" / "Ask Claude": called whatever the hybrid gate says. */
-    fun retryWithClaude() {
+    fun retryWithClaude() = askClaude({ it.copy(claudePending = true, askClaude = true) }) { it.parsedBy == ParsedBy.CLAUDE }
+
+    /**
+     * Claude's reading, laid over the review when it lands, with "Asking Claude…" and Stop meanwhile. [ask] shapes
+     * the request from the review as it is; [keep] says whether the answer is saved on the job (a retry keeps only
+     * an answer, the first read keeps a failure too, as "tried").
+     */
+    private fun askClaude(
+        ask: (ImportResult) -> ImportResult,
+        keep: (ImportResult) -> Boolean,
+    ) {
         // A second tap while the first is still queued behind the lock would ask twice.
         if (retryJob?.isActive == true) return
         retryJob =
@@ -654,7 +689,7 @@ class ReviewViewModel(
                 retrying = true
                 (state.value as? ReviewState.Ready)?.let { _state.value = it.copy(ui = it.ui.copy(busy = true, retrying = true)) }
                 try {
-                    val again = parseWithClaude(r.copy(claudePending = true, askClaude = true)) { it.parsedBy == ParsedBy.CLAUDE }
+                    val again = parseWithClaude(ask(r), keep)
                     // Laid over the review as it is now, not as it was when the call started: a second Ask
                     // Claude after Stop and an edit joins the first call (AppContainer.claudeParse).
                     val kept = keepCorrections(again, result ?: r, corrections.toMap())
@@ -1202,6 +1237,9 @@ class ReviewViewModel(
             }
 
         const val STAGE_OPENING = "Opening…"
+
+        /** Sheet openings after which the "tap an ingredient" hint is no longer needed. */
+        const val HINT_OPENS = 3
         const val STAGE_FETCHING = "Fetching the page…"
         const val STAGE_CLAUDE = "Reading with Claude…"
         const val STAGE_LINES = "Reading the lines…"

@@ -291,8 +291,10 @@ class ReviewRowSheetScreenTest {
         compose.onNodeWithText("milk: +200ml → 700ml on the shopping list").fetchSemanticsNode()
         compose.onNodeWithText("Usually sold as 1 × 4 pint (2.27 l) bottle").fetchSemanticsNode()
         compose.onNodeWithText("Use oat milk instead").performClick()
-        compose.onNodeWithText("Always at home").performClick()
-        compose.onNodeWithTag("line-7").performTextReplacement("300ml milk")
+        compose.onNodeWithText("Always at home").performScrollTo().performClick()
+        // The line's words and name sit behind "Edit the line" (UX review 6).
+        compose.onNodeWithTag("edit-line").performScrollTo().performClick()
+        compose.onNodeWithTag("line-7").performScrollTo().performTextReplacement("300ml milk")
         compose.onNodeWithText("Read as: parsed:300ml milk").fetchSemanticsNode()
         compose.onNodeWithText("Use this line").performClick()
         compose.onNodeWithTag("amount-7").performTextReplacement("300 ml")

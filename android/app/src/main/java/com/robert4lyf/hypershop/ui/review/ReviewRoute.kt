@@ -111,7 +111,10 @@ fun ReviewRoute(
             ReviewScreen(
                 ui = s.ui,
                 onInStock = vm::setInStock,
-                onRow = { sheetKey = it },
+                onRow = {
+                    sheetKey = it
+                    vm.noteSheetOpened()
+                },
                 onServings = vm::setServings,
                 onAdd = vm::confirm,
                 onSaveForLater = vm::saveForLater,
@@ -122,6 +125,8 @@ fun ReviewRoute(
                 onClearInStock = vm::clearInStock,
                 edits = ReviewEdits(onTitle = vm::setTitle, onAddLine = vm::addLine, onBook = vm::setBook),
                 onStopRetry = vm::stopRetry,
+                // A shared import can wait on the card; an edit or a library re-add cannot (nothing to come back to).
+                onLater = if (vm.isThrowaway) null else onDone,
             )
         is ReviewState.Failed ->
             ManualLinesView(

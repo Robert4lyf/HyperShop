@@ -70,6 +70,11 @@ class Settings(
 
     suspend fun setKeyWasSet(on: Boolean) = store.edit { it[KEY_SET] = on }
 
+    /** How often a review row's sheet has been opened: the review's "tap an ingredient" hint stops after a few. */
+    val reviewSheetOpens: Flow<Int> = store.data.map { it[REVIEW_SHEET_OPENS] ?: 0 }
+
+    suspend fun bumpReviewSheetOpens() = store.edit { it[REVIEW_SHEET_OPENS] = (it[REVIEW_SHEET_OPENS] ?: 0) + 1 }
+
     suspend fun setUnits(u: UnitsSetting) = store.edit { it[UNITS] = u.name }
 
     suspend fun setTheme(t: ThemeMode) = store.edit { it[THEME] = t.name }
@@ -127,6 +132,7 @@ class Settings(
         val LIST_MODE = stringPreferencesKey("list_mode")
         val KEY_LOST = booleanPreferencesKey("claude_key_lost_notice")
         val KEY_SET = booleanPreferencesKey("claude_key_was_set")
+        val REVIEW_SHEET_OPENS = intPreferencesKey("review_sheet_opens")
     }
 }
 

@@ -144,7 +144,10 @@ class ReviewViewModelTest {
             val c = TestContainer.create(claude = claude, key = "sk-ant-test")
             c.reviewGate.acquire()
             val job = runBlocking { c.readyJob("200g golden caster sugar", claudePending = true) }
-            val ui = ready(ReviewViewModel(c, job))
+            // UX review 1: the rules' reading shows at once, Claude's is laid over when it lands.
+            val vm = ReviewViewModel(c, job)
+            assertTrue(ready(vm).badge != Badge.CLAUDE || claude.requestCount == 1)
+            val ui = (await(vm.state) { it is ReviewState.Ready && it.ui.badge == Badge.CLAUDE && !it.ui.busy } as ReviewState.Ready).ui
             assertEquals(Badge.CLAUDE, ui.badge)
             assertEquals(1, claude.requestCount)
             // Left with Back and opened again from the card: Claude's parse was kept, not paid for twice.
@@ -254,11 +257,11 @@ class ReviewViewModelTest {
             c.reviewGate.acquire()
             val job = runBlocking { c.readyJob("200g golden caster sugar", claudePending = true) }
             val first = ReviewViewModel(c, job)
-            await(first.state) { it is ReviewState.Loading && it.stage == ReviewViewModel.STAGE_CLAUDE }
+            await(first.state) { it is ReviewState.Ready && it.ui.retrying }
             // Back and straight in again while Claude is still answering.
             val second = ReviewViewModel(c, job)
-            assertEquals(Badge.CLAUDE, ready(first).badge)
-            assertEquals(Badge.CLAUDE, ready(second).badge)
+            await(first.state) { it is ReviewState.Ready && it.ui.badge == Badge.CLAUDE }
+            await(second.state) { it is ReviewState.Ready && it.ui.badge == Badge.CLAUDE }
             assertEquals(1, claude.requestCount)
         } finally {
             claude.shutdown()
