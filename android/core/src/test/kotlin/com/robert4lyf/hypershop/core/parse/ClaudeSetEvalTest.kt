@@ -76,9 +76,9 @@ class ClaudeSetEvalTest {
         /** U.2: right, accepted wrong, right but flagged — Claude Haiku 5.5's recording, through today's alignment. */
         val TOTALS =
             mapOf(
-                "t-2026" to listOf(126, 7, 0),
-                "final-2026" to listOf(124, 8, 1),
-                "release-c-2026" to listOf(259, 15, 2),
+                "t-2026" to listOf(127, 6, 0),
+                "final-2026" to listOf(125, 7, 1),
+                "release-c-2026" to listOf(260, 14, 2),
             )
         val SETS = listOf("t-2026", "final-2026", "release-c-2026")
     }

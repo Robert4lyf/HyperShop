@@ -345,3 +345,179 @@ So a recipe's "½ cup chopped coriander" is weighed (and the pack counted) rathe
 60 g, dill sprigs 9 g, basil leaves 24 g, spring onions (scallions) chopped 100 g, tomato paste 262 g a cup.
 Taken from the published portions as remembered rather than re-fetched in this session; check against FDC
 before relying on one to the gram.
+
+## UK item weights, cup weights checked, names from fresh pages (X.6, October 2026)
+
+`gramsEach` is now a UK item as sold, replacing USDA "medium" (US produce, often smaller): Waitrose and M&S
+"typical weight" per item, WRAP's stated averages (potato 160 g, banana 180 g), egginfo.co.uk's Large egg band
+(63–73 g, 68 used). Where no UK figure was found (plum tomato, chilli, cucumber, cabbages, iceberg, round lettuce,
+avocado, spring onion) the figure is an estimate and says so below. Taken over the table's own suggestion: lemon
+130 g (M&S's single 155 g looked nominal) and lime 80 g (M&S's 105 g looked doubtful). Waitrose figures came
+through search listings (its pages refused direct fetches). The six cup weights added in X.5 were checked against
+the USDA FoodData Central SR Legacy portions and all stand.
+
+Names: 32 synonyms and 12 new rows from 30 recipe pages published 15 Sep – 26 Oct 2026 (BBC Good Food,
+Sainsbury's Magazine, olive, RecipeTin Eats, Bon Appétit); no evaluation set was read. The udon pack note is
+written as its total (300 g) so it is counted as one pack.
+
+### UK weights
+: UK grams each
+
+| id | UK grams each | source URL | how derived | confidence |
+|---|---|---|---|---|
+| onion | 150 | https://www.waitrose.com/ecom/products/essential-onions/085115-43203-43204 | Waitrose Onions "Typical weight 0.15kg". WRAP's implied edible weight is about 99 g (peeled). | sourced |
+| red_onion | 170 | https://www.waitrose.com/ecom/products/essential-waitrose-red-onions/085111-43197-43198 | Waitrose Red Onions "Typical weight 0.17kg" | sourced |
+| shallot | 40 | https://www.waitrose.com/ecom/shop/browse/groceries/fresh_and_chilled/fresh_vegetables/loose_vegetables | Waitrose loose shallots typical weight 39 g (16p each at £4.05/kg agrees). Echalion (banana) shallots are about 70 g. | sourced |
+| garlic (bulb) | 55 | https://www.marksandspencer.com/food/smoked-garlic/p/fdp60769930 ; https://www.marksandspencer.com/food/large-garlic/p/fdp21002916 | M&S single bulbs: Smoked Garlic 55 g, Large Garlic 60 g. A standard bulb is probably 50–55 g. | sourced (single retailer) |
+| leek | 210 | https://www.waitrose.com/ecom/shop/Browse/Groceries/Fresh_and_Chilled/Fresh_Vegetables/Leeks ; https://www.marksandspencer.com/food/leeks/p/fdp21006193 | Waitrose Essential Leeks typical 0.21 kg (63p each at £3/kg). M&S Leeks 200 g. | sourced |
+| carrot | 100 | https://www.marksandspencer.com/food/loose-carrots/p/fdp21002622 ; https://www.waitrose.com/ecom/products/waitrose-british-loose-carrots/085125-43221-43222 | M&S Loose Carrots 100 g. Waitrose British Loose Carrots typical 0.14 kg (large loose). WRAP's implied edible weight is 54 g. Sources range 54–140 g, and 100 g is the middle. | sourced (wide spread) |
+| potato | 160 | WRAP Key Facts (see above) | WRAP: "Assuming an average weight of 160 g per potato". For comparison, Waitrose British Large White (baking) is typical 0.28 kg. | sourced |
+| sweet_potato | 295 | https://www.waitrose.com/ecom/shop/Browse/Groceries/Fresh_and_Chilled/Fresh_Vegetables/Potatoes_and_Sweet_Potatoes | Waitrose Sweet Potatoes "Typical weight 294g" (37p each at £1.25/kg agrees) | sourced |
+| tomato | 80 | https://www.tesco.com/shop/en-GB/products/314098829 | Tesco Classic Round Tomatoes 6 pack: nutrition "1 typical tomato (80g)". WRAP's implied edible weight is 81 g. Caveat: 80 g is also the 5-a-day portion size. | sourced (moderate) |
+| plum_tomato | 62 | none found | No UK fresh plum tomato count plus weight found. Keep the USDA figure. | estimate |
+| celery (head) | 450 | https://www.marksandspencer.com/food/l/fruit-and-vegetables/fresh-vegetables | M&S Eat Well celery 450 g (whole head) | sourced (single retailer) |
+| cucumber | 400 | https://www.marksandspencer.com/food/whole-cucumber/p/fdp21007311 | M&S Whole Cucumber is labelled 500 g, which looks like a nominal upper figure. UK retailers sell small, standard and large whole cucumbers. 400 g is my midpoint, not a stated number. | estimate (M&S 500 g sourced) |
+| courgette | 210 | https://www.waitrose.com/ecom/products/essential-courgettes/085437-43488-43489 | Waitrose Essential Courgettes "Typical weight 0.21kg" | sourced |
+| aubergine | 300 | https://www.marksandspencer.com/food/aubergine/p/fdp21007099 | M&S Aubergine (single) 300 g. Other figures: a Waitrose recipe uses "2 Essential Aubergines (about 500g)" (250 g each), and the catering wholesaler Hoole lists 357 g (https://www.hoolefoodmarket.com/product/aubergine-catchweight/3621). | sourced |
+| bell_pepper | 160 | https://www.waitrose.com/ecom/shop/browse/groceries/fresh_and_chilled/fresh_salad_and_herbs/peppers | Waitrose Red Peppers and Yellow Peppers "Typical weight 0.16kg" | sourced |
+| chilli | 15 | none found | UK red chillies are sold in 60–65 g packs (Tesco, Sainsbury's) with no count given. No per-chilli figure was found. | estimate |
+| broccoli (head) | 370 | https://www.marksandspencer.com/food/broccoli/p/fdp21007112 ; https://www.waitrose.com/ecom/shop/browse/groceries/fresh_and_chilled/fresh_vegetables/broccoli_and_cauliflower/broccoli | M&S Broccoli 368 g. Waitrose Broccoli typical about 0.4 kg. | sourced |
+| cauliflower (head) | 600 | https://www.hoolefoodmarket.com/product/cauliflower-each/3332 ; https://www.marksandspencer.com/food/cauliflower/p/fdp21002970 | Hoole (UK wholesaler, Lancashire) "Cauliflower/each" average item weight 0.688 kg. M&S Cauliflower 400 g, King Cauliflower 1 kg. A Waitrose recipe says "1 large cauliflower (around 650g)". Ocado sells by head diameter (12 cm minimum), not weight. | estimate (bracketed by sources) |
+| cabbage (white, head) | 900 | https://www.marksandspencer.com/food/whole-white-cabbage/p/fdp60028169 | M&S Whole White Cabbage 1200 g. Waitrose Duchy Organic White Cabbage typical 0.69 kg. The current 908 sits between the two. Savoy and sweetheart cabbages are much smaller (M&S lists both at 400 g). | estimate (bracketed) |
+| red_cabbage (head) | 800 | https://www.marksandspencer.com/food/organic-red-cabbage/p/fdp60038615 | M&S Organic Red Cabbage 1200 g. Waitrose Duchy Organic Red Cabbage typical 0.5 kg. | estimate (bracketed) |
+| iceberg (head) | 500 | https://www.marksandspencer.com/food/iceberg-lettuce/p/fdp21007235 | M&S lists iceberg lines at 240 g and 400 g. Waitrose Essential Iceberg is listed at 250 g, which looks small for a whole head. No solid UK figure was found. | estimate |
+| lettuce (round) | 300 | none found | UK round and butterhead lettuces are sold each with no weight given. | estimate |
+| butternut_squash | 1000 | https://www.waitrose.com/ecom/shop/browse/groceries/fresh_and_chilled/fresh_vegetables/squashes_and_pumpkins/squash | Waitrose Golden Butternut typical 1.15 kg, Duchy Organic 1.04 kg. M&S Butternut Squash lists 600 g. The current 1000 is within that range. | sourced |
+| parsnip | 220 | https://www.waitrose.com/ecom/shop/browse/groceries/fresh_and_chilled/fresh_vegetables/carrots_and_parsnips | Waitrose Parsnips (loose) "Typical weight 0.22kg". Bagged parsnips are probably smaller. | sourced (single retailer) |
+| swede | 600 | https://www.ocado.com/webshop/product/Watts-Farms-Whole-Swede/91551011 ; https://www.marksandspencer.com/food/british-swede/p/fdp60065769 | Ocado whole swede "Class 1; Weight 600g - 900g". M&S British Swede 500 g. Brakes (catering) says its normal minimum head weight is 500 g. | sourced (range) |
+| fennel (bulb) | 330 | https://www.waitrose.com/ecom/products/waitrose-loose-fennel/672137-693810-693811 | Waitrose Loose Fennel "Typical weight 327g" | sourced |
+| avocado | 170 | https://www.marksandspencer.com/food/large-avocado/p/fdp21007326 | Only large sizes were found (M&S Large Avocado 305 g). UK "medium" or standard Hass avocados are smaller. 170 is my estimate. | estimate |
+| lemon | 155 | https://www.marksandspencer.com/food/lemon/p/fdp21007129 | M&S "Lemon" (single) 155 g. This may be a generous nominal figure, and 120–130 g is plausible for a standard loose lemon. | sourced (single retailer) |
+| lime | 105 | https://www.marksandspencer.com/food/loose-limes/p/fdp21007158 | M&S Loose Limes 105 g (single). This looks high. The USDA medium lime is 67 g. | sourced (single retailer, doubtful) |
+| orange | 180 | https://www.marksandspencer.com/food/loose-oranges/p/fdp21007136 | M&S Loose Oranges 180 g. WRAP's implied edible weight is 112 g, which works out to about 150–160 g whole. | sourced |
+| apple | 160 | https://www.waitrose.com/ecom/shop/browse/groceries/fresh_and_chilled/fresh_fruit | Waitrose Royal Gala "Typical weight 0.16kg". WRAP's implied edible weight is 146 g. Bramley cooking apples are 0.24 kg. | sourced |
+| pear | 200 | https://www.waitrose.com/ecom/shop/browse/groceries/fresh_and_chilled/fresh_fruit | Waitrose Conference pears typical 0.2 kg | sourced |
+| banana | 180 | WRAP Key Facts (see above) ; https://www.waitrose.com/ecom/shop/browse/groceries/fresh_and_chilled/fresh_fruit | WRAP: "We assume average weight of 180g per banana". Waitrose Fairtrade Loose Bananas typical 0.18 kg. M&S single banana 150 g. | sourced |
+| mango | 360 | https://www.marksandspencer.com/food/mango/p/fdp21002565 | M&S Mango (single) 360 g | sourced (single retailer) |
+| egg (large) | 68 | https://www.egginfo.co.uk/egg-facts-and-figures/industry-information/egg-sizes | British Egg Information Service: Large is 63–73 g in shell, Medium is 53–63 g. 68 is the midpoint of the Large band. The current 58 is a UK *medium* or US large egg. | sourced (band midpoint) |
+| chicken_breast | 150 | https://www.ocado.com/products/ocado-2-skinless-british-chicken-breast-fillets-269067011 ; https://www.ocado.com/products/m-s-select-farms-british-free-range-2-chicken-breast-fillets/516449011 | Two-fillet packs: Sainsbury's 300 g (150 each), M&S 295 g (148 each), Ocado 350 g (175 each) | sourced |
+| spring_onion | 12 | https://www.marksandspencer.com/food/spring-onions/p/fdp21003126 | UK bunches are 100 g (M&S, Tesco, Sainsbury's), but no retailer states a count. Assuming about 8 per bunch gives about 12 g. The USDA medium is 15 g. | estimate |
+
+## 
+### Names
+: synonyms on existing rows
+
+| existing id | synonym | recipe URL |
+|---|---|---|
+| potato | maris piper potatoes | https://www.sainsburysmagazine.co.uk/recipes/mains/beef-massaman-pie |
+| shallot | echalion shallots | https://www.sainsburysmagazine.co.uk/recipes/mains/cider-braised-chicken-with-kale-and-pear-salad |
+| pear | conference pears | https://www.sainsburysmagazine.co.uk/recipes/mains/cider-braised-chicken-with-kale-and-pear-salad |
+| green_beans | fine green beans | https://www.sainsburysmagazine.co.uk/recipes/mains/beef-massaman-pie |
+| chicken_thigh | chicken thigh fillets | https://www.recipetineats.com/chicken-beans-casserole-chicken-cassoulet-recipe/ |
+| spaghetti | dried spaghetti | https://www.bbcgoodfood.com/recipes/creamy-tuna-sweetcorn-pasta-sauce |
+| egg_noodles | dried egg noodles | https://www.bbcgoodfood.com/recipes/crispy-beef-noodle-stir-fry |
+| chilli_flakes | dried chilli flakes | https://www.olivemagazine.com/recipes/vegetarian/hasselback-squash-gratin-with-herby-gremolata/ |
+| creme_fraiche | lighter crème fraîche | https://www.sainsburysmagazine.co.uk/recipes/mains/cider-braised-chicken-with-kale-and-pear-salad |
+| creme_fraiche | half-fat crème fraîche | (same line; the other UK label for it) |
+| puff_pastry | lighter puff pastry | https://www.sainsburysmagazine.co.uk/recipes/mains/beef-massaman-pie |
+| puff_pastry | light puff pastry | (same line; Jus-Rol's label) |
+| puff_pastry | ready-rolled lighter puff pastry | https://www.sainsburysmagazine.co.uk/recipes/mains/beef-massaman-pie |
+| dark_brown_sugar | dark brown soft sugar | https://www.sainsburysmagazine.co.uk/recipes/desserts/scandi-spice-cake |
+| salt | sea salt flakes | https://www.bbcgoodfood.com/recipes/helenas-chocolate-chip-cookies ; https://www.sainsburysmagazine.co.uk/recipes/mains/pasta-with-walnut-sauce |
+| miso | white miso paste | https://www.sainsburysmagazine.co.uk/recipes/mains/shiitake-chicken-and-miso-noodle-soup |
+| stock_cube | chicken stock pot | https://www.bbcgoodfood.com/recipes/hot-honey-harissa-chicken |
+| stock_cube | stock pot | (same; precedent: 'vegetable stock pot' is already on vegetable_stock_cube) |
+| beef_stock_cube | beef stock pot | (same precedent) |
+| bread | rustic bread | https://www.sainsburysmagazine.co.uk/recipes/mains/pasta-with-walnut-sauce |
+| baguette | french baguette | https://www.sainsburysmagazine.co.uk/recipes/mains/brown-butter-squash-soup-with-gorgonzola-toasts |
+| baguette | stonebaked baguette | https://www.sainsburysmagazine.co.uk/recipes/mains/brown-butter-squash-soup-with-gorgonzola-toasts |
+| butternut_squash | prepared butternut squash | https://www.sainsburysmagazine.co.uk/recipes/mains/brown-butter-squash-soup-with-gorgonzola-toasts |
+| butternut_squash | butternut squash chunks | (same line; UK pack name) |
+| white_wine | chardonnay | https://www.recipetineats.com/chicken-beans-casserole-chicken-cassoulet-recipe/ |
+| kale | baby kale | https://www.bonappetit.com/recipe/toasted-orzo-chicken-soup |
+| rice_vinegar | unseasoned rice vinegar | https://www.bonappetit.com/recipe/broiled-salmon-teriyaki |
+| salmon | center-cut salmon fillet | https://www.bonappetit.com/recipe/broiled-salmon-teriyaki |
+| salmon | centre-cut salmon fillet | (UK spelling of the same) |
+| chestnut_mushroom | crimini mushrooms | https://www.bonappetit.com/recipe/creamy-miso-mushroom-pasta |
+| chestnut_mushroom | crimini | https://www.bonappetit.com/recipe/creamy-miso-mushroom-pasta |
+| egg | soft-boiled eggs | https://www.bbcgoodfood.com/recipes/crispy-beef-noodle-stir-fry |
+
+Plural forms are given where the recipe wrote a plural. The catalogue-side singular lookup (bySingularKey) also catches the singular.
+
+## Table C: new rows
+
+| CSV line | source URL | recipe URL |
+|---|---|---|
+| `garlic_puree,garlic purée,garlic purée,garlic paste,SPICES_CONDIMENTS,false,tube,presence,,1 × 90 g tube,Sauces & condiments,,sourced` | https://www.trolley.co.uk/product/gia-garlic-puree/JDD651 | https://www.bbcgoodfood.com/recipes/creamy-tuna-sweetcorn-pasta-sauce |
+| `harissa_seasoning,harissa seasoning,harissa seasoning,harissa spice blend|harissa spice mix,SPICES_CONDIMENTS,false,jar,presence,,1 × 48 g jar,Herbs & spices,,sourced` | https://www.trolley.co.uk/product/schwartz-harissa-seasoning/ICX762 | https://www.bbcgoodfood.com/recipes/hot-honey-harissa-chicken |
+| `mooli,mooli,mooli,daikon|daikon radish|white radish|mouli,PRODUCE,false,each,count,,,Vegetables,,sourced` | (no UK pack source found; packNote left blank, gramsEach blank) | https://www.sainsburysmagazine.co.uk/recipes/mains/shiitake-chicken-and-miso-noodle-soup |
+| `udon_noodles,udon noodles,udon noodles,udon|thick udon noodles,WORLD_FOODS,false,pack,count,,1 × 2 × 150 g pack,Asian,,sourced` | https://www.trolley.co.uk/product/amoy-straight-to-wok-udon-thick-noodles/FAZ305 | https://www.sainsburysmagazine.co.uk/recipes/mains/shiitake-chicken-and-miso-noodle-soup |
+| `pear_cider,pear cider,pear cider,perry,DRINKS,false,bottle,count,,1 × 500 ml bottle,Wine & spirits,,sourced` | https://www.trolley.co.uk/product/kopparberg-pear-cider-bottle/YMX961 | https://www.sainsburysmagazine.co.uk/recipes/mains/cider-braised-chicken-with-kale-and-pear-salad |
+| `kefir,kefir,kefir,kefir drink|kefir milk drink|milk kefir,DAIRY_EGGS,false,bottle,volume,,1 × 500 ml bottle,Yogurt,,sourced` | https://www.trolley.co.uk/product/biotiful-kefir-original/JFY133 | https://www.sainsburysmagazine.co.uk/recipes/desserts/scandi-spice-cake |
+| `massaman_curry_paste,massaman curry paste,massaman curry paste,thai massaman curry paste|massaman paste,WORLD_FOODS,false,jar,presence,,1 × 190 g jar,Asian,,sourced` | https://www.trolley.co.uk/product/sainsburys-massaman-curry-paste-inspired-to-cook/XFR915 | https://www.sainsburysmagazine.co.uk/recipes/mains/beef-massaman-pie |
+| `chilli_crisp,crispy chilli oil,crispy chilli oil,chilli crisp|chili crisp|crispy chili oil|chilli oil crunch|crispy chilli in oil,WORLD_FOODS,false,jar,presence,,1 × 210 g jar,Asian,,sourced` | https://www.trolley.co.uk/product/laoganma-crispy-chilli-in-oil/NUH431 | https://www.bonappetit.com/recipe/chili-crisp-yogurt-chicken |
+| `chilli_oil,chilli oil,chilli oil,chili oil|chile oil,WORLD_FOODS,false,jar,presence,,1 × 170 g jar,Asian,,sourced` | https://www.trolley.co.uk/product/lee-kum-kee-chiu-chow-chilli-oil/NBW342 | https://www.bbcgoodfood.com/recipes/crispy-beef-noodle-stir-fry |
+| `tipo_00_flour,00 flour,00 flour,tipo 00 flour|type 00 flour|00 grade pasta flour|pasta flour,BAKING,false,bag,mass,,1 × 1 kg bag,Flour,,sourced` | https://www.trolley.co.uk/product/sainsburys-00-grade-pasta-flour-taste-the-difference/CCT285 | https://www.sainsburysmagazine.co.uk/recipes/mains/tagliatelle-with-lentil-ragu |
+| `tinned_potatoes,tinned potatoes,tinned potatoes,canned potatoes|tinned new potatoes|canned new potatoes|new potatoes in water,TINS_JARS,false,tin,count,,1 × 567 g tin,Beans & pulses,,sourced` | https://www.trolley.co.uk/product/growers-harvest-new-potatoes-in-water/MUF255 | https://www.bbcgoodfood.com/recipes/sticky-sausage-traybake |
+| `smoked_sausage,smoked sausage,smoked sausages,smoked pork sausage|kielbasa|polish sausage|smoked polish sausage|smoked german sausage,MEAT_FISH,false,pack,count,,1 × 260 g pack,Meat,,sourced` | https://www.trolley.co.uk/product/mattessons-smoked-pork-sausage-original/VRR103 | https://www.bonappetit.com/recipe/cider-braised-sausage-lentils |
+
+## Risky names, not proposed
+
+| name | recipe | why |
+|---|---|---|
+| sweetcorn (bare, "200g can sweetcorn") | https://www.bbcgoodfood.com/recipes/creamy-tuna-sweetcorn-pasta-sauce | No key today. Three rows want it: sweetcorn_tin, frozen_sweetcorn, sweetcorn_cob. Putting it on sweetcorn_tin steals every frozen-sweetcorn line written plainly. Better fix: have Shelf turn unit=TIN + bare name into "tinned sweetcorn" (it skips this today because entryOf("sweetcorn") is null). |
+| apple cider | https://www.bonappetit.com/recipe/cider-braised-sausage-lentils | US: cloudy apple juice. UK: alcoholic cider. On `cider` it buys the wrong drink for US recipes; on `apple_juice` it steals UK lines. Leave it to Claude. Note that `apple cider vinegar` is already on cider_vinegar. |
+| bone-in / skin-on chicken thighs | https://www.bbcgoodfood.com/recipes/hot-honey-harissa-chicken | "bone-in" and "skin-on" are not stripped. chicken_thigh's packNote reads "(boneless)", so these synonyms would put bone-in thighs on a boneless pack. Needs a bone-in row, or a packNote change, first. |
+| pickle juice | https://www.recipetineats.com/shrimp-po-boys-prawns/ | It comes out of the gherkin jar. As a gherkin synonym it adds a jar the recipe doesn't otherwise need, and the line also offers white vinegar instead. |
+| parmesan rind | https://www.sainsburysmagazine.co.uk/recipes/mains/tagliatelle-with-lentil-ragu | Marked optional. It's a leftover; on parmesan it would buy a block for a rind. |
+| short-grain rice | https://www.bonappetit.com/recipe/chili-crisp-yogurt-chicken | Could be sushi, pudding or risotto rice. The line offers jasmine first, and that already matches. |
+| mixed mushrooms | https://www.bonappetit.com/recipe/creamy-miso-mushroom-pasta | Could mean wild_mushrooms (an exotic mix) or button+chestnut. Ambiguous. |
+| egg pasta / egg-based pasta | https://www.bonappetit.com/recipe/creamy-miso-mushroom-pasta | Fresh chilled pasta or dried nests. On `pasta` it would also catch "fresh egg pasta", because 'fresh' is stripped. |
+| ham stock | https://www.bbcgoodfood.com/recipes/scottish-lentil-soup | No UK retail product; it's hock cooking liquor. The line says "or vegetable stock". |
+| light chicken stock | https://www.bbcgoodfood.com/recipes/leek-potato-soup | 'light' is not stripped, and must not be (light soy sauce, light brown sugar). Leave it to Claude. |
+| chilli oil vs crispy chilli oil | https://www.bbcgoodfood.com/recipes/crispy-beef-noodle-stir-fry | Proposed as two rows. UK writers use "chilli oil" loosely for the crisp-style jar too. Check that both rows are wanted. |
+| Diamond Crystal / Morton kosher salt | https://www.bonappetit.com/recipe/toasted-orzo-chicken-soup | A brand-led line. Nothing to add; Claude yields 'kosher salt', which already matches salt. |
+| creole mustard | https://www.recipetineats.com/shrimp-po-boys-prawns/ | A parenthetical alternative to Dijon, which already matches. US-only; not worth a row. |
+
+## Notes
+
+- "dried" is an identity word (Lexicon.identityOverrides), not prep, so "dried spaghetti / dried egg noodles / dried chilli flakes" miss even though spaghetti, egg noodles and chilli flakes are keys. The three synonyms in Table B fix these cases. A parser rule (drop 'dried' when '<rest>' is a key and 'dried <rest>' is not) would fix the class.
+- "200g 00 flour": '00' tokenises as a number, so the rule parser may read it as a leftover amount before the name reaches lookup. The tipo_00_flour row helps Claude's path; check RuleParser separately.
+- Today "2 x 567g tins potatoes" (BBC sticky sausage traybake) falls through Shelf to fresh `potato`: Shelf looks for 'tinned potatoes', and no such key exists. The tinned_potatoes row fixes that, and Shelf will find it.
+- Existing mappings I noticed (not changed): 'whipping cream' -> double_cream.
+- Parenthetical potato varieties (Golden Wonder, Kerr Pinks) in the BBC leek & potato soup: not proposed.
+
+
+### Pages read
+
+
+1. https://www.bbcgoodfood.com/recipes/leek-potato-soup
+2. https://www.bbcgoodfood.com/recipes/easy-pad-thai
+3. https://www.bbcgoodfood.com/recipes/sticky-sausage-traybake
+4. https://www.bbcgoodfood.com/recipes/creamy-tuna-sweetcorn-pasta-sauce
+5. https://www.bbcgoodfood.com/recipes/creamy-coconut-dal
+6. https://www.bbcgoodfood.com/recipes/scottish-lentil-soup
+7. https://www.bbcgoodfood.com/recipes/hot-honey-harissa-chicken
+8. https://www.bbcgoodfood.com/recipes/crispy-beef-noodle-stir-fry
+9. https://www.bbcgoodfood.com/recipes/helenas-chocolate-chip-cookies
+10. https://www.bbcgoodfood.com/recipes/texas-sheet-cake
+11. https://www.bbcgoodfood.com/recipes/ground-beef-stroganoff
+12. https://www.olivemagazine.com/recipes/vegetarian/kitchari-with-green-bean-tarka/
+13. https://www.olivemagazine.com/recipes/healthy/ginger-broth-with-pearl-barley-and-tofu/
+14. https://www.olivemagazine.com/recipes/vegetarian/verna-gaos-spinach-and-feta-burek/
+15. https://www.olivemagazine.com/recipes/vegetarian/hasselback-squash-gratin-with-herby-gremolata/
+16. https://www.sainsburysmagazine.co.uk/recipes/mains/shiitake-chicken-and-miso-noodle-soup
+17. https://www.sainsburysmagazine.co.uk/recipes/mains/pasta-with-walnut-sauce
+18. https://www.sainsburysmagazine.co.uk/recipes/mains/tagliatelle-with-lentil-ragu
+19. https://www.sainsburysmagazine.co.uk/recipes/mains/brown-butter-squash-soup-with-gorgonzola-toasts
+20. https://www.sainsburysmagazine.co.uk/recipes/mains/cider-braised-chicken-with-kale-and-pear-salad
+21. https://www.sainsburysmagazine.co.uk/recipes/desserts/scandi-spice-cake
+22. https://www.sainsburysmagazine.co.uk/recipes/mains/beef-massaman-pie
+23. https://www.recipetineats.com/chicken-beans-casserole-chicken-cassoulet-recipe/
+24. https://www.recipetineats.com/shrimp-po-boys-prawns/
+25. https://www.recipetineats.com/smashed-beef-kofta-with-cucumber-yogurt-sauce/
+26. https://www.bonappetit.com/recipe/toasted-orzo-chicken-soup
+27. https://www.bonappetit.com/recipe/chili-crisp-yogurt-chicken
+28. https://www.bonappetit.com/recipe/broiled-salmon-teriyaki
+29. https://www.bonappetit.com/recipe/cider-braised-sausage-lentils
+30. https://www.bonappetit.com/recipe/creamy-miso-mushroom-pasta

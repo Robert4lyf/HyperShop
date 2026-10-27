@@ -4,6 +4,7 @@ import com.robert4lyf.hypershop.core.catalog.Catalog
 import com.robert4lyf.hypershop.core.catalog.CatalogEntry
 import com.robert4lyf.hypershop.core.catalog.CatalogKey
 import com.robert4lyf.hypershop.core.catalog.CatalogLoader
+import com.robert4lyf.hypershop.core.model.AisleCode
 
 /**
  * Names to identities (spec R5), shared by the rule parser and Claude's
@@ -19,7 +20,21 @@ class Normaliser(
         catalog.lookup(k)?.let { return it }
         val singular = singularKey(k)
         if (singular != k) catalog.lookup(singular)?.let { return it }
-        return cheese(k)
+        return cheese(k) ?: dried(k)
+    }
+
+    /**
+     * X.6: "dried spaghetti", "dried egg noodles": "dried" is how pasta and noodles are sold anyway, so when the
+     * catalogue has no "dried …" of its own the rest of the name is the thing. Never for fresh produce (dried
+     * mint is not a pack of fresh mint) or a tin (dried chickpeas are not tinned ones): those stay an unknown
+     * "dried …", which takes the right aisle from the categoriser and is asked about.
+     */
+    private fun dried(k: String): CatalogEntry? {
+        if (!k.startsWith("dried ")) return null
+        val rest = k.removePrefix("dried ")
+        return (catalog.lookup(rest) ?: catalog.lookup(singularKey(rest)))?.takeIf {
+            it.aisle != AisleCode.PRODUCE && it.aisle != AisleCode.TINS_JARS
+        }
     }
 
     /**

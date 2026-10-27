@@ -179,8 +179,8 @@ class ReviewCorrectionsTest {
         assertTrue(vm.setAmount(id(), "5"))
         await(vm.state) { it is ReviewState.Ready && it.ui().row("cat:onion").quantity == "5" }
         assertTrue(vm.setAmount(id(), "1 kg"))
-        // The row says what the list will: a kilo of onions is ten of them (110 g each), the line keeps the kilo.
-        await(vm.state) { it is ReviewState.Ready && it.ui().row("cat:onion").quantity == "10" }
+        // The row says what the list will: a kilo of onions is seven UK ones (150 g each), the line keeps the kilo.
+        await(vm.state) { it is ReviewState.Ready && it.ui().row("cat:onion").quantity == "7" }
         assertEquals("1 kg", vm.sheet("cat:onion")!!.lines.single().amount)
     }
 
