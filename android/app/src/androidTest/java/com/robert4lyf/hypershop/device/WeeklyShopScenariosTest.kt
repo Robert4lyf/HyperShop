@@ -219,16 +219,16 @@ class WeeklyShopScenariosTest {
         "%-28s taps=%d typed=%d scrolls=%d time=%dms".format(how, taps, typed, scrolls, System.currentTimeMillis() - startMs),
     )
 
-    /** A: a first list is just as quick as before: no plan card, no new step between typing and shopping. */
+    /** A: a first list is just as quick as before: no planning prompt, no new step between typing and shopping. */
     @Test
     fun a_firstTimeShoppingNeedsNoPlanning() {
         val c = DeviceContainer.create()
         show(c)
         waitFor { has("empty") }
-        assertTrue(!has("plan-card") && !has("empty-plan"))
+        assertTrue(!has("empty-plan"))
         for (line in listOf("milk", "bread", "6 eggs")) type(line)
         waitFor { c.items().size == 3 }
-        assertTrue(!has("plan-card"))
+        assertTrue(!has("empty-plan"))
         tap("start-shopping")
         waitFor { has("shop") }
     }
@@ -288,7 +288,8 @@ class WeeklyShopScenariosTest {
         // Over to the shopping list and type the usual items.
         tap("tab-list")
         for (line in regulars) type(line)
-        tap("plan-card")
+        // Back to This week for the cupboard check (the list's plan card went in Y.7d: the tab is the way there).
+        tap("tab-meals")
         val cupboard = runBlocking { c.homeCheck.view(c.repository.snapshot()) }.filter { !it.have }.map { it.mergeKey }
         for (k in cupboard) {
             scrollTo("home-have-$k")
@@ -320,7 +321,7 @@ class WeeklyShopScenariosTest {
         }
         show(c)
         type("1 onion")
-        tap("plan-card")
+        tap("tab-meals")
         tap("meals-add-to-list")
         waitFor { c.total("cat:onion") == Rational.of(3) }
         // The onion regular is on the list already: shown there, and Add all has nothing to double.
@@ -347,7 +348,7 @@ class WeeklyShopScenariosTest {
         // A new container over the same database: what a restart sees.
         val c = DeviceContainer.create(db = first.db)
         show(c)
-        tap("plan-card")
+        tap("tab-meals")
         val meal = runBlocking { c.planner.week(c.planner.currentWeek()) }.single()
         tap("meal-more-${meal.id}")
         tap("meal-more-${meal.id}")
@@ -366,7 +367,7 @@ class WeeklyShopScenariosTest {
         runBlocking { c.repository.manualAdd("milk", QtyBase.of(Rational.ONE, null, UnitLocale.METRIC), null) }
         val before = c.items().map { it.mergeKey }
         show(c)
-        tap("plan-card")
+        tap("tab-meals")
         tap("week-next")
         waitFor { compose.onAllNodesWithTag("week-name").fetchSemanticsNodes().any { it.config.toString().contains("Next week") } }
         val key = runBlocking { c.db.dao().recipe(chilli)!!.libraryKey!! }
