@@ -32,6 +32,22 @@ data class ShelfOrder(
 
     fun itemSort(s: Slot): Long = ranks[itemKey(s.aisle, s.group, s.mergeKey)]?.toLong() ?: UNRANKED
 
+    /** The same order with every rank of [from] (an item key, in any aisle and group) now under [to]. Null when nothing changed. */
+    fun renamed(
+        from: String,
+        to: String,
+    ): ShelfOrder? {
+        val suffix = ":$from"
+        val moved = ranks.keys.filter { it.startsWith("i:") && it.endsWith(suffix) }
+        if (moved.isEmpty() || from == to) return null
+        val next = ranks.toMutableMap()
+        for (k in moved) {
+            val r = next.remove(k) ?: continue
+            next.putIfAbsent(k.removeSuffix(suffix) + ":$to", r)
+        }
+        return ShelfOrder(next)
+    }
+
     /**
      * Moves the group [group] past its neighbour among [present] (the aisle's groups
      * as shown), [by] -1 for up and +1 for down. [known] is every group the aisle can

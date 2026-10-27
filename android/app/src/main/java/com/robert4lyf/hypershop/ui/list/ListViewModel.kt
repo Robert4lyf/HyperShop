@@ -495,8 +495,7 @@ class ListViewModel(
         by: Int,
     ) = viewModelScope.launch {
         val rows = ui.value.aisles.firstOrNull { it.first == row.aisle }?.second.orEmpty().filter { it.group == row.group }
-        val next = c.repository.shelfOrder().movedItem(rows.map { it.slot() }, row.slot(), by) ?: return@launch
-        c.repository.arrange(next)
+        c.repository.arrangeWith { it.movedItem(rows.map { r -> r.slot() }, row.slot(), by) }
     }
 
     /** Moves the group [group] one place up or down within [aisle], past the group shown next to it. */
@@ -507,10 +506,7 @@ class ListViewModel(
     ) = viewModelScope.launch {
         val present = ui.value.aisles.firstOrNull { it.first == aisle }?.second.orEmpty().map { it.group }.distinct()
         val known: List<String?> = c.catalog.groupsIn(aisle) + null
-        val next =
-            c.repository.shelfOrder().movedGroup(aisle, present, known, group, by) { c.catalog.groupRank(aisle, it) }
-                ?: return@launch
-        c.repository.arrange(next)
+        c.repository.arrangeWith { it.movedGroup(aisle, present, known, group, by) { g -> c.catalog.groupRank(aisle, g) } }
     }
 
     /** "Found it after all": back among what is left. */

@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.data
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.robert4lyf.hypershop.core.merge.ShoppingList
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
@@ -75,6 +76,30 @@ class BackupTest {
                 assertEquals(Rational.of(6), l.total(l.itemByKey("cat:egg")!!.id)[com.robert4lyf.hypershop.core.model.BaseKey.ITEMS])
                 assertTrue(fresh.repo.untick(l.itemByKey("cat:onion")!!.id))
                 assertEquals(1, fresh.repo.usesOnList().count { it.recipeId != null })
+            } finally {
+                fresh.close()
+            }
+        }
+
+    @Test
+    fun anExportAfterRowsWentForGoodStillRestores() =
+        runBlocking {
+            // Review A.2. A soft-deleted row hard-deleted by its use's removal left its DeletedItem row; a row
+            // merged by "use instead" left an alias whose survivor then went for good at the purge.
+            val applied = r.import("2 onions", "1 carrot")
+            r.repo.softDelete(r.repo.snapshot().itemByKey("cat:onion")!!.id)
+            r.repo.removeUse(applied.useId)
+            r.repo.manualAdd("milk", QtyBase.of(Rational.ONE, null, UnitLocale.METRIC), null)
+            r.repo.manualAdd("oat milk", QtyBase.of(Rational.ONE, null, UnitLocale.METRIC), null)
+            r.repo.swapItem(r.repo.snapshot().itemByKey("cat:oat_milk")!!.id, "milk")
+            r.repo.softDelete(r.repo.snapshot().itemByKey("cat:milk")!!.id)
+            r.now += ShoppingList.SEVEN_DAYS + 1
+            r.repo.purgeDeleted()
+            val b = r.repo.exportBackup()
+            assertEquals(emptyList<String>(), BackupValidator.validate(b))
+            val fresh = DbRule().also { it.open() }
+            try {
+                assertEquals(emptyList<String>(), fresh.repo.restoreBackup(b, marker()))
             } finally {
                 fresh.close()
             }

@@ -222,6 +222,36 @@ class ListRepository(
     fun observeWalkingOrder(): Flow<Pair<List<AisleCode>, ShelfOrder>> =
         dao.observeListRev().filterNotNull().distinctUntilChanged().map { aisleOrder() to shelfOrder() }.distinctUntilChanged()
 
+    /**
+     * Read-move-write in one transaction (review A.8): two quick taps on the arrows each move from the
+     * order the other left, instead of the second overwriting the first. False when [move] had nothing to do.
+     */
+    suspend fun arrangeWith(move: (ShelfOrder) -> ShelfOrder?): Boolean =
+        try {
+            db.withTransaction {
+                val next = move(shelfOrder()) ?: return@withTransaction false
+                dao.putShelfRanks(next.ranks.map { (k, r) -> ShelfRankEntity(k, r) })
+                shelfCache = next
+                val meta = dao.meta()!!
+                dao.putMeta(meta.copy(listRev = meta.listRev + 1))
+                true
+            }
+        } catch (e: Exception) {
+            shelfCache = null
+            throw e
+        }
+
+    /** An item's ranks follow its key when the key changes (a catalogue re-key, "use instead"; review A.6). Inside a transaction. */
+    private suspend fun renameShelfRanks(
+        from: String,
+        to: String,
+    ) {
+        val next = shelfOrder().renamed(from, to) ?: return
+        dao.deleteShelfRanks(shelfOrder().ranks.keys.filter { it.startsWith("i:") && it.endsWith(":$from") })
+        dao.putShelfRanks(next.ranks.map { (k, r) -> ShelfRankEntity(k, r) })
+        shelfCache = next
+    }
+
     /** Keeps an arrangement for this trip and the next. Bumps listRev, so the list (and the watch) re-read it. */
     suspend fun arrange(order: ShelfOrder) {
         try {
@@ -292,7 +322,13 @@ class ListRepository(
         // Items gone from the list go first (their ticks and contributions cascade): an
         // edit can drop an item and create another with the same key, and keys are
         // unique among live items.
-        (old.items.keys - new.items.keys).toList().takeIf { it.isNotEmpty() }?.let { dao.deleteItems(it) }
+        (old.items.keys - new.items.keys).toList().takeIf { it.isNotEmpty() }?.let { gone ->
+            dao.deleteItems(gone)
+            // Nothing may point at a row that is gone for good: its soft-delete stamp and the aliases
+            // that led to or from it go with it, or the backup validator refuses the export (review A.2).
+            dao.undelete(gone)
+            dao.deleteAliasesTouching(gone)
+        }
         val changedItems = new.items.values.filter { old.items[it.id] != it }
         val (rekeyed, others) = changedItems.partition { i -> old.items[i.id]?.let { it.mergeKey != i.mergeKey } == true }
         dao.upsertItems(others.map { Mapping.item(it, now) })
@@ -1189,9 +1225,15 @@ class ListRepository(
         itemId: Long,
         name: String,
     ): String? =
-        write { l ->
-            val target = merger.target(name, null, overrides())
-            l.swapItem(itemId, target)?.let { it to target.displayName }
+        db.withTransaction {
+            val from = load().items[itemId]?.mergeKey
+            val shown =
+                write { l ->
+                    val target = merger.target(name, null, overrides())
+                    l.swapItem(itemId, target)?.let { it to target.displayName }
+                }
+            if (shown != null && from != null) load().items[itemId]?.mergeKey?.let { to -> renameShelfRanks(from, to) }
+            shown
         }
 
     /** [swapItem] for the item with this key, if one is on the list ("always use instead" set in the library). */
@@ -1230,6 +1272,9 @@ class ListRepository(
                 dao.undelete(ids)
             }
             dao.deleteForgottenRecipes(before, Week.of(now).startEpochDay)
+            // Rows older versions left pointing at items gone for good (review A.2).
+            dao.deleteDanglingAliases()
+            dao.deleteDanglingDeleted()
         }
 
     /** Move to another aisle; "Always put X in Y?" yes → a user override. */
@@ -1280,6 +1325,7 @@ class ListRepository(
                 if (existing == null || (existing.source != "USER" && st.source == "USER")) dao.putStaple(st.copy(key = to))
                 dao.deleteStaple(from)
             }
+            for ((from, to) in r.renamed) renameShelfRanks(from, to)
             dao.putMeta(dao.meta()!!.copy(catalogVersion = snap.version))
             true
         }
@@ -1427,13 +1473,14 @@ class ListRepository(
     suspend fun exportBackup(): BackupData =
         db.withTransaction {
             val meta = dao.meta()!!
+            val itemIds = dao.items().map { it.id }.toSet()
             BackupData(
                 listRev = meta.listRev,
                 nextId = meta.nextId,
                 catalogVersion = meta.catalogVersion,
                 manualTitle = meta.manualTitle,
                 items = dao.items(),
-                aliases = dao.aliases(),
+                aliases = dao.aliases().filter { a -> itemIds.contains(a.newId) && !itemIds.contains(a.oldId) },
                 recipes = dao.allRecipes(),
                 lines = dao.allLines(),
                 uses = dao.uses(),
@@ -1446,7 +1493,7 @@ class ListRepository(
                 overrides = dao.overrides(),
                 staples = dao.staples(),
                 usage = dao.usage(),
-                deleted = dao.allDeleted(),
+                deleted = dao.allDeleted().filter { it.id in itemIds },
                 planVersion = 1,
                 plannedMeals = dao.allPlannedMeals(),
                 trips = dao.trips(),
