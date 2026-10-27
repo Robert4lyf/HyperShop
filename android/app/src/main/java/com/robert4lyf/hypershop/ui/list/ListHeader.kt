@@ -254,6 +254,16 @@ fun EmptyState(
     onPlan: () -> Unit = {},
     onLastShop: () -> Unit = {},
 ) {
+    if (prep.weekDone) {
+        EmptyHero(
+            title = "This week's shopping is done",
+            body = "All ${if (prep.meals == 1) "1 meal" else "${prep.meals} meals"} bought. Type an item above for anything else.",
+            modifier = Modifier.padding(top = 8.dp).testTag("empty"),
+        ) {
+            OutlinedButton(onClick = onPlan, modifier = Modifier.testTag("empty-plan")) { Text("See this week") }
+        }
+        return
+    }
     if (prep.returning) {
         EmptyHero(
             title = "Nothing on the list",
