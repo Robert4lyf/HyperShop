@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -59,6 +60,8 @@ data class Meal(
     val photo: String? = null,
     /** Your cooking notes for the recipe, to read while planning and cooking (written on the recipe's sheet). */
     val notes: String? = null,
+    /** The recipe's library entry, for "Cooked it". */
+    val libraryKey: String = "",
 )
 
 /** A saved recipe that could be planned. */
@@ -74,8 +77,9 @@ data class Pick(
     /** When it was saved, and how many meals it has been planned as in other weeks: what puts "your usual" first. */
     val addedAt: Long = 0,
     val timesPlanned: Int = 0,
+    val timesCooked: Int = 0,
 ) {
-    val facts get() = com.robert4lyf.hypershop.ui.recipes.RecipeFacts(key, title, addedAt, rating, timesPlanned)
+    val facts get() = com.robert4lyf.hypershop.ui.recipes.RecipeFacts(key, title, addedAt, rating, timesPlanned, timesCooked)
 }
 
 data class MealsUi(
@@ -158,8 +162,12 @@ class MealsViewModel(
         if (job == null) messages.send(UiMessage("Couldn't open that photo")) else reviewQueue.send(job)
     }
 
-    private val current = c.planner.currentWeek()
-    private val week = MutableStateFlow(current)
+    /** The week the clock says it is, read when used: the view model lives for the process, across Sunday midnight. */
+    private val current: Week get() = c.planner.currentWeek()
+
+    /** What "this week" was when the week shown was last pinned to it. */
+    private var pinned = current
+    private val week = MutableStateFlow(pinned)
 
     /** Plan, list and Buy again writes, one at a time and in tap order. */
     private val writing = Mutex()
@@ -170,7 +178,7 @@ class MealsViewModel(
     private val announce = HashMap<Long, Job>()
 
     private val weekView =
-        week.flatMapLatest { w ->
+        week.onStart { refreshWeek() }.flatMapLatest { w ->
             c.planner.observeWeek(w).map { meals ->
                 val pending = meals.any { it.shopping.pending }
                 val preview = if (pending && w >= current) c.planner.previewWeek(w) else null
@@ -225,6 +233,7 @@ class MealsViewModel(
                         // The other weeks' only: planning it now must not move it under the thumb that planned it.
                         // Never below none: the two counts come from two flows, and this week's can arrive first.
                         ((planned[r.key] ?: 0) - (counts[r.key] ?: 0)).coerceAtLeast(0),
+                        notes[r.key]?.timesCooked ?: 0,
                     )
                 }.filter { term.isEmpty() || it.title.lowercase().contains(term) }
                     // Your usual first: planned most, then rated best, then newest (LibraryOrder).
@@ -272,7 +281,8 @@ class MealsViewModel(
         val repeatTitles: List<String>,
     )
 
-    private fun PlannedMeal.toMeal() = Meal(id, title, servings, shopping, progress, url?.let { siteOf(it) } ?: bookRef, saved)
+    private fun PlannedMeal.toMeal() =
+        Meal(id, title, servings, shopping, progress, url?.let { siteOf(it) } ?: bookRef, saved, libraryKey = libraryKey)
 
     private fun siteOf(url: String): String? =
         com.robert4lyf.hypershop.ui.common.webLink(url)?.let {
@@ -288,12 +298,43 @@ class MealsViewModel(
     fun nextWeek() = week.update { it + 1 }
 
     fun thisWeek() {
-        week.value = current
+        pinned = current
+        week.value = pinned
+    }
+
+    /**
+     * The screen showing again (the tab, or the app, after a while): a week pinned as "this week" that the clock
+     * has since left is moved on, so Monday does not show last week as this one (review B.12). A week chosen
+     * with the arrows stays.
+     */
+    fun refreshWeek() {
+        val now = current
+        if (now == pinned) return
+        if (week.value == pinned) week.value = now
+        pinned = now
     }
 
     /** Write in the app's scope, in tap order; the message is the screen's. */
     private fun <T> written(block: suspend () -> T) =
         c.applicationScope.async(start = CoroutineStart.UNDISPATCHED) { writing.withLock { block() } }
+
+    /**
+     * "Cooked it" on a meal (missing 2 of the review): the recipe's note counts one more time, which puts it ahead
+     * in "your usual"; the message asks for stars, which live on the recipe's sheet.
+     */
+    fun cooked(meal: Meal) {
+        if (meal.libraryKey.isEmpty()) return
+        val write = written { c.repository.cooked(meal.libraryKey) }
+        viewModelScope.launch {
+            write.await()
+            messages.send(
+                UiMessage(
+                    "Cooked ${meal.title} · rate it on its recipe",
+                    undo = { writing.withLock { c.repository.uncooked(meal.libraryKey) } },
+                ),
+            )
+        }
+    }
 
     /** A saved recipe joins the week shown. Twice is allowed: a second chilli is a choice. */
     fun plan(pick: Pick) {
@@ -325,9 +366,14 @@ class MealsViewModel(
         val write = written { c.planner.addWeekToList(w) }
         viewModelScope.launch {
             val added = write.await() ?: return@launch
+            // UX review 8: "Already at home?" sits below the picks; what it still asks about is said here.
+            val toCheck = c.homeCheck.view(c.repository.snapshot()).count { !it.have }
             messages.send(
                 UiMessage(
-                    "Added ${plural(added.meals.size, "meal")} · ${plural(added.items, "item")}",
+                    listOfNotNull(
+                        "Added ${plural(added.meals.size, "meal")} · ${plural(added.items, "item")}",
+                        toCheck.takeIf { it > 0 }?.let { "$it to check at home" },
+                    ).joinToString(" · "),
                     undo = { writing.withLock { c.planner.undoAddWeek(added) } },
                 ),
             )

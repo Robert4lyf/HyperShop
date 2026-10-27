@@ -21,7 +21,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -73,11 +72,8 @@ class ListViewModelTest {
         // X.9: store order too, so the herbs are not split by what was added between them.
         val standard = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
         assertEquals(listOf("onion", "carrot", "basil", "lemon"), standard.aisles.single().second.map { it.name })
-        assertFalse(standard.categorised)
-        vm.setView(ListView.TYPE)
-        val grouped = await(vm.ui) { it.categorised }
-        assertEquals(listOf("onion", "carrot", "basil", "lemon"), grouped.aisles.single().second.map { it.name })
-        assertEquals(listOf("Vegetables", "Vegetables", "Herbs", "Fruit"), grouped.aisles.single().second.map { it.group })
+        // Each row carries its group; the screen labels them when an aisle has more than one (cut 5 of the review).
+        assertEquals(listOf("Vegetables", "Vegetables", "Herbs", "Fruit"), standard.aisles.single().second.map { it.group })
     }
 
     @Test
@@ -91,7 +87,6 @@ class ListViewModelTest {
         assertEquals(listOf("onion", "carrot", "basil", "dill", "lemon"), names(ui))
         vm.arrange(true)
         ui = await(vm.ui) { it.arranging }
-        assertTrue(ui.categorised)
         // Dill above basil, then the herbs above the vegetables.
         vm.moveItem(ui.row("dill"), -1)
         ui = await(vm.ui) { names(it) == listOf("onion", "carrot", "dill", "basil", "lemon") }
@@ -208,7 +203,7 @@ class ListViewModelTest {
         await(vm.ui) { it.doneCount == 1 }
         vm.finishShopping()
         m = nextMessage(vm)
-        assertEquals("Finished: 1 bought item removed", m.text)
+        assertEquals("Finished: 1 bought item removed · 1 still needed", m.text)
         await(vm.ui) { it.left == 1 && it.doneCount == 0 }
         vm.clearAll()
         m = nextMessage(vm)
@@ -230,7 +225,12 @@ class ListViewModelTest {
         await(vm.ui) { u -> u.aisles.flatMap { it.second }.size == 3 }
         // Typed by hand: no recipe to name.
         assertNull(await(vm.ui) { it.aisles.isNotEmpty() }.row("onion").from)
-        // Already on the list: nothing is doubled; the message offers the typed amount, one tap away.
+        // Already on the list: nothing is doubled; the message offers the typed amount, one tap away. Two quick
+        // Enters are read against the list as it is, not as last shown (review B.17): the second is the duplicate.
+        vm.addTyped("bread")
+        vm.addTyped("bread")
+        assertEquals("Bread is already on the list", nextMessage(vm).text)
+        await(vm.ui) { u -> u.aisles.flatMap { it.second }.count { it.name == "bread" } == 1 }
         vm.addTyped("1 onion")
         val asked = nextMessage(vm)
         assertEquals("Onion is already on the list", asked.text)
@@ -325,7 +325,7 @@ class ListViewModelTest {
         // Straight after the tick: the screen may not show it yet; the count comes from the write.
         runBlocking { c.repository.tick(ui.row("onion").id) }
         vm.finishShopping()
-        assertEquals("Finished: 1 bought item removed", nextMessage(vm).text)
+        assertEquals("Finished: 1 bought item removed · 1 still needed", nextMessage(vm).text)
     }
 
     @Test
@@ -395,11 +395,19 @@ class ListViewModelTest {
         await(vm.ui) { it.shopping }
         val again = tracked(ListViewModel(c))
         assertTrue(await(again.ui) { it.loaded && it.aisles.isNotEmpty() }.shopping)
-        // Finishing takes the bought rows away and, with nothing left, the shop screen with them.
+        // Finishing takes the bought rows away and the shop screen with them, whatever is left (review B.14).
         again.finishShopping()
-        assertEquals("Finished: 2 bought items removed", nextMessage(again).text)
+        assertEquals("Finished: 2 bought items removed · 1 still needed", nextMessage(again).text)
+        // Missing 3: the unbought row is asked about once; "Keep" leaves it for the next trip.
+        assertEquals(1, await(again.carryOver) { it != null })
+        again.keepLeftovers()
+        assertEquals(null, again.carryOver.value)
+        assertEquals(ListMode.PLAN, await(again.ui) { !it.shopping }.mode)
         val after = await(again.ui) { it.doneCount == 0 && it.left == 1 }
-        assertTrue(after.shopping)
+        assertTrue(!after.shopping)
+        // Back to the shop for what is left: the ticks and the finish work as before.
+        again.setMode(ListMode.SHOP)
+        await(again.ui) { it.shopping }
         again.toggle(after.row("beef mince"))
         again.finishShopping()
         val empty = await(again.ui) { it.isEmpty }
@@ -416,5 +424,21 @@ class ListViewModelTest {
             shadowOf(Looper.getMainLooper()).idle()
             Thread.sleep(10)
         }
+    }
+
+    @Test
+    fun shoppingAtTheSecondStoreWalksItsOrder() {
+        // Missing 4 of the review: the list follows the store picked when the shop starts.
+        val c = TestContainer.create()
+        c.add("2 onions", "300ml milk")
+        val mine = runBlocking { c.repository.aisleOrder(1) }
+        runBlocking { c.repository.setAisleOrder(mine.reversed(), 2) }
+        val vm = tracked(ListViewModel(c))
+        val ui = await(vm.ui) { it.loaded && it.aisles.size == 2 }
+        assertTrue(ui.secondStore)
+        assertEquals(listOf(AisleCode.PRODUCE, AisleCode.DAIRY_EGGS), ui.aisles.map { it.first })
+        vm.startShopping(2)
+        val second = await(vm.ui) { it.activeStore == 2L && it.shopping }
+        assertEquals(listOf(AisleCode.DAIRY_EGGS, AisleCode.PRODUCE), second.aisles.map { it.first })
     }
 }

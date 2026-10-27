@@ -191,22 +191,45 @@ class ListRepository(
     /** Claude usage rows, re-emitted whenever one changes (Settings' spend). */
     fun observeUsage(): Flow<List<ClaudeUsageEntity>> = dao.observeUsage()
 
-    suspend fun aisleOrder(): List<AisleCode> {
+    /**
+     * The walking order of [storeId] (1 is the store the app starts with; 2 the second store, missing 4 of the
+     * review). A store with no order of its own yet walks like store 1.
+     */
+    suspend fun aisleOrder(storeId: Long = 1): List<AisleCode> {
         val hidden = dao.aisles().filter { it.hidden }.map { it.code }.toSet()
-        return dao.aisleOrder().map { AisleCode.valueOf(it.aisleCode) }.filter { it.name !in hidden }
+        val rows = dao.aisleOrder(storeId).ifEmpty { dao.aisleOrder(1) }
+        return rows.map { AisleCode.valueOf(it.aisleCode) }.filter { it.name !in hidden }
     }
 
-    /** Settings › Aisles: the store's walking order. Bumps listRev, so the list (and the watch) re-read it. */
-    suspend fun setAisleOrder(order: List<AisleCode>) =
+    /** Whether a second store has a walking order of its own. Held once read: a tick must not re-ask (QueryBudgetTest). */
+    @Volatile private var secondStoreCache: Boolean? = null
+
+    suspend fun hasSecondStore(): Boolean = secondStoreCache ?: dao.aisleOrder(2).isNotEmpty().also { secondStoreCache = it }
+
+    /**
+     * Settings › Aisles: the store's walking order. Bumps listRev, so the list (and the watch) re-read it. A second
+     * store gets its StoreProfile row with its first order (the backup carries both).
+     */
+    suspend fun setAisleOrder(
+        order: List<AisleCode>,
+        storeId: Long = 1,
+    ) = db.withTransaction {
+        if (storeId != 1L && dao.stores().none { it.id == storeId }) dao.insertStores(listOf(StoreProfileEntity(storeId, "Second store")))
+        dao.putAisleOrder(order.mapIndexed { i, a -> AisleOrderEntity(storeId, a.name, i) })
+        secondStoreCache = null
+        touchListRev()
+    }
+
+    /** Something the list is drawn from changed outside it (the store to walk): the list and the watch re-read. */
+    suspend fun touchListRev() =
         db.withTransaction {
-            dao.putAisleOrder(order.mapIndexed { i, a -> AisleOrderEntity(1, a.name, i) })
             val meta = dao.meta()!!
             dao.putMeta(meta.copy(listRev = meta.listRev + 1))
         }
 
     /** The walking order, re-read whenever listRev changes. */
-    fun observeAisleOrder(): Flow<List<AisleCode>> =
-        dao.observeListRev().filterNotNull().distinctUntilChanged().map { aisleOrder() }.distinctUntilChanged()
+    fun observeAisleOrder(storeId: Long = 1): Flow<List<AisleCode>> =
+        dao.observeListRev().filterNotNull().distinctUntilChanged().map { aisleOrder(storeId) }.distinctUntilChanged()
 
     /**
      * X.9: the arranged order within aisles. Held here once read, so a tick (which
@@ -219,8 +242,39 @@ class ListRepository(
         shelfCache ?: ShelfOrder(dao.shelfRanks().associate { it.key to it.rank }).also { shelfCache = it }
 
     /** The walking order and the order within aisles together, re-read whenever listRev changes. */
-    fun observeWalkingOrder(): Flow<Pair<List<AisleCode>, ShelfOrder>> =
-        dao.observeListRev().filterNotNull().distinctUntilChanged().map { aisleOrder() to shelfOrder() }.distinctUntilChanged()
+    fun observeWalkingOrder(storeId: Long = 1): Flow<Pair<List<AisleCode>, ShelfOrder>> =
+        dao.observeListRev().filterNotNull().distinctUntilChanged().map { aisleOrder(storeId) to shelfOrder() }.distinctUntilChanged()
+
+    /**
+     * Read-move-write in one transaction (review A.8): two quick taps on the arrows each move from the
+     * order the other left, instead of the second overwriting the first. False when [move] had nothing to do.
+     */
+    suspend fun arrangeWith(move: (ShelfOrder) -> ShelfOrder?): Boolean =
+        try {
+            db.withTransaction {
+                val next = move(shelfOrder()) ?: return@withTransaction false
+                dao.putShelfRanks(next.ranks.map { (k, r) -> ShelfRankEntity(k, r) })
+                shelfCache = next
+                val meta = dao.meta()!!
+                dao.putMeta(meta.copy(listRev = meta.listRev + 1))
+                true
+            }
+        } catch (e: Exception) {
+            shelfCache = null
+            secondStoreCache = null
+            throw e
+        }
+
+    /** An item's ranks follow its key when the key changes (a catalogue re-key, "use instead"; review A.6). Inside a transaction. */
+    private suspend fun renameShelfRanks(
+        from: String,
+        to: String,
+    ) {
+        val next = shelfOrder().renamed(from, to) ?: return
+        dao.deleteShelfRanks(shelfOrder().ranks.keys.filter { it.startsWith("i:") && it.endsWith(":$from") })
+        dao.putShelfRanks(next.ranks.map { (k, r) -> ShelfRankEntity(k, r) })
+        shelfCache = next
+    }
 
     /** Keeps an arrangement for this trip and the next. Bumps listRev, so the list (and the watch) re-read it. */
     suspend fun arrange(order: ShelfOrder) {
@@ -233,6 +287,7 @@ class ListRepository(
             }
         } catch (e: Exception) {
             shelfCache = null
+            secondStoreCache = null
             throw e
         }
     }
@@ -292,7 +347,13 @@ class ListRepository(
         // Items gone from the list go first (their ticks and contributions cascade): an
         // edit can drop an item and create another with the same key, and keys are
         // unique among live items.
-        (old.items.keys - new.items.keys).toList().takeIf { it.isNotEmpty() }?.let { dao.deleteItems(it) }
+        (old.items.keys - new.items.keys).toList().takeIf { it.isNotEmpty() }?.let { gone ->
+            dao.deleteItems(gone)
+            // Nothing may point at a row that is gone for good: its soft-delete stamp and the aliases
+            // that led to or from it go with it, or the backup validator refuses the export (review A.2).
+            dao.undelete(gone)
+            dao.deleteAliasesTouching(gone)
+        }
         val changedItems = new.items.values.filter { old.items[it.id] != it }
         val (rekeyed, others) = changedItems.partition { i -> old.items[i.id]?.let { it.mergeKey != i.mergeKey } == true }
         dao.upsertItems(others.map { Mapping.item(it, now) })
@@ -593,6 +654,11 @@ class ListRepository(
         key: String,
         stars: Int?,
     ) = changeNote(key) { it.copy(rating = stars?.takeIf { s -> s in 1..MAX_STARS }) }
+
+    /** "Cooked it" on a meal: one more time, now. [uncooked] takes an accidental tap back. */
+    suspend fun cooked(key: String) = changeNote(key) { it.copy(timesCooked = it.timesCooked + 1, lastCookedAt = clock()) }
+
+    suspend fun uncooked(key: String) = changeNote(key) { it.copy(timesCooked = (it.timesCooked - 1).coerceAtLeast(0)) }
 
     /** The cook's own notes ("10 min longer", "half the chilli"); blank clears them. */
     suspend fun setCookingNotes(
@@ -1189,9 +1255,15 @@ class ListRepository(
         itemId: Long,
         name: String,
     ): String? =
-        write { l ->
-            val target = merger.target(name, null, overrides())
-            l.swapItem(itemId, target)?.let { it to target.displayName }
+        db.withTransaction {
+            val from = load().items[itemId]?.mergeKey
+            val shown =
+                write { l ->
+                    val target = merger.target(name, null, overrides())
+                    l.swapItem(itemId, target)?.let { it to target.displayName }
+                }
+            if (shown != null && from != null) load().items[itemId]?.mergeKey?.let { to -> renameShelfRanks(from, to) }
+            shown
         }
 
     /** [swapItem] for the item with this key, if one is on the list ("always use instead" set in the library). */
@@ -1214,8 +1286,12 @@ class ListRepository(
         db.withTransaction {
             val now = clock()
             val before = now - ShoppingList.SEVEN_DAYS
-            val ids = dao.deletedBefore(before)
             val old = load()
+            // A bought row of a use still being shopped for (its rescaled extra on a live row, say) waits: purging it
+            // would take the use's bought share out of its progress (review A.7). It goes once nothing of the use is
+            // needed any more, when the use is archived below.
+            val stillNeeded = old.uses.values.filter { it.archivedAt == null && old.progress(it.id).toBuy > 0 }.map { it.id }.toSet()
+            val ids = dao.deletedBefore(before).filter { id -> old.contributionsOf(id).none { c -> c.useId in stillNeeded } }
             val gone = ids.toSet()
             // A purge changes what the uses' progress says (a bought row gone), so the list is re-read.
             val purged =
@@ -1230,6 +1306,9 @@ class ListRepository(
                 dao.undelete(ids)
             }
             dao.deleteForgottenRecipes(before, Week.of(now).startEpochDay)
+            // Rows older versions left pointing at items gone for good (review A.2).
+            dao.deleteDanglingAliases()
+            dao.deleteDanglingDeleted()
         }
 
     /** Move to another aisle; "Always put X in Y?" yes → a user override. */
@@ -1280,6 +1359,7 @@ class ListRepository(
                 if (existing == null || (existing.source != "USER" && st.source == "USER")) dao.putStaple(st.copy(key = to))
                 dao.deleteStaple(from)
             }
+            for ((from, to) in r.renamed) renameShelfRanks(from, to)
             dao.putMeta(dao.meta()!!.copy(catalogVersion = snap.version))
             true
         }
@@ -1298,7 +1378,9 @@ class ListRepository(
             when (m) {
                 is WatchMessage.Hello -> {
                     val i = dao.install(m.installId)
-                    val last = maxOf(i?.lastSeq ?: m.ackedThrough, m.ackedThrough)
+                    // A claim at the top of the range would make the next seq overflow (a malicious watch only).
+                    val claimed = minOf(m.ackedThrough, Int.MAX_VALUE - 1)
+                    val last = maxOf(i?.lastSeq ?: claimed, claimed)
                     val offset = clock() - m.watchNow * 1000
                     dao.putInstall(WatchInstallEntity(m.installId, last, offset))
                     // Results the watch has settled are never asked for again.
@@ -1357,10 +1439,10 @@ class ListRepository(
         }
 
     /** The list, the aisles in walking order (hidden ones flagged) and the epoch, for a snapshot. */
-    suspend fun watchView(): WatchListView =
+    suspend fun watchView(storeId: Long = 1): WatchListView =
         db.withTransaction {
             val byCode = dao.aisles().associateBy { it.code }
-            val ordered = dao.aisleOrder().map { it.aisleCode }
+            val ordered = dao.aisleOrder(storeId).ifEmpty { dao.aisleOrder(1) }.map { it.aisleCode }
             val rest = byCode.values.sortedBy { it.defaultOrder }.map { it.code }.filter { it !in ordered }
             val aisles =
                 (ordered + rest).mapNotNull { code ->
@@ -1427,13 +1509,14 @@ class ListRepository(
     suspend fun exportBackup(): BackupData =
         db.withTransaction {
             val meta = dao.meta()!!
+            val itemIds = dao.items().map { it.id }.toSet()
             BackupData(
                 listRev = meta.listRev,
                 nextId = meta.nextId,
                 catalogVersion = meta.catalogVersion,
                 manualTitle = meta.manualTitle,
                 items = dao.items(),
-                aliases = dao.aliases(),
+                aliases = dao.aliases().filter { a -> itemIds.contains(a.newId) && !itemIds.contains(a.oldId) },
                 recipes = dao.allRecipes(),
                 lines = dao.allLines(),
                 uses = dao.uses(),
@@ -1446,7 +1529,7 @@ class ListRepository(
                 overrides = dao.overrides(),
                 staples = dao.staples(),
                 usage = dao.usage(),
-                deleted = dao.allDeleted(),
+                deleted = dao.allDeleted().filter { it.id in itemIds },
                 planVersion = 1,
                 plannedMeals = dao.allPlannedMeals(),
                 trips = dao.trips(),
@@ -1479,6 +1562,7 @@ class ListRepository(
             dao.clearRecipeNotes()
             dao.clearShelfRanks()
             shelfCache = null
+            secondStoreCache = null
             dao.clearDecisions()
             dao.clearContributions()
             dao.clearTicks()
@@ -1541,6 +1625,7 @@ class ListRepository(
             )
         }
         shelfCache = null
+        secondStoreCache = null
         // The database holds the new marker already; a file that can't be written now means one more
         // new epoch at the next start-up (checkEpoch), never a restore reported as failed.
         runCatching { marker.write(fresh) }

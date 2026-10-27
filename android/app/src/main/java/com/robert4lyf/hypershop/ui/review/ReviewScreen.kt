@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Add
@@ -129,12 +130,14 @@ fun ReviewScreen(
     onStopRetry: () -> Unit = {},
     /** X.11: keep the recipe without planning it; only for a new recipe (not an edit, not typed-in items). */
     onSaveForLater: () -> Unit = {},
+    /** "Later": back to the tab with the import kept on the ready card; null for an edit, where there is no card. */
+    onLater: (() -> Unit)? = null,
 ) {
     val list = rememberLazyListState()
     val addFocus = remember { FocusRequester() }
     // "Add an ingredient" in the menu: the field is the last item, so scroll it in, then focus it.
     var focusAdd by remember { mutableIntStateOf(0) }
-    val itemCount = 2 + (if (ui.notice != null) 1 else 0) + ui.aisles.sumOf { it.second.size + 1 } + 1
+    val itemCount = (if (ui.hint) 2 else 1) + (if (ui.notice != null) 1 else 0) + ui.aisles.sumOf { it.second.size + 1 } + 1
     LaunchedEffect(focusAdd) {
         if (focusAdd == 0) return@LaunchedEffect
         list.animateScrollToItem(itemCount - 1)
@@ -142,7 +145,7 @@ fun ReviewScreen(
     }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().imePadding()) {
-            TopBar(onCancel, onClearInStock.takeUnless { ui.savedOnly }, onAddIngredient = { focusAdd++ })
+            TopBar(onCancel, onClearInStock.takeUnless { ui.savedOnly }, onAddIngredient = { focusAdd++ }, onLater = onLater)
             val card = MaterialTheme.colorScheme.card
             LazyColumn(Modifier.weight(1f), state = list, contentPadding = PaddingValues(bottom = 16.dp)) {
                 item(key = "hero") { Hero(ui, onServings, onRetryClaude, onStopRetry, edits.onTitle, edits.onBook) }
@@ -156,14 +159,16 @@ fun ReviewScreen(
                         )
                     }
                 }
-                // X.4: the sheet behind each row is where a line is changed or swapped; say so once.
-                item(key = "edit-hint") {
-                    Text(
-                        "Tap an ingredient to change its amount, swap it or rename it.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp).testTag("edit-hint"),
-                    )
+                // X.4: the sheet behind each row is where a line is changed or swapped; said while that is new (UX review 20).
+                if (ui.hint) {
+                    item(key = "edit-hint") {
+                        Text(
+                            "Tap an ingredient to change its amount, swap it or rename it.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp).testTag("edit-hint"),
+                        )
+                    }
                 }
                 for ((aisle, rows) in ui.aisles) {
                     val count = rows.size + 1
@@ -224,13 +229,23 @@ private fun TopBar(
     /** Null when there is nothing "at home" to clear (a saved recipe being edited). */
     onClearInStock: (() -> Unit)?,
     onAddIngredient: () -> Unit,
+    onLater: (() -> Unit)? = null,
 ) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        // Cancel discards the import, so it says so in words (system Back keeps it ready to review).
-        TextButton(onClick = onCancel) {
-            Icon(Icons.Rounded.Close, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.size(6.dp))
-            Text("Cancel")
+        if (onLater != null) {
+            // UX review 18: leaving keeps the import on the card, and says so; discarding is a deliberate choice in the menu.
+            TextButton(onClick = onLater, modifier = Modifier.testTag("later")) {
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(6.dp))
+                Text("Later")
+            }
+        } else {
+            // An edit: Cancel leaves the saved recipe as it was, so it says so in words.
+            TextButton(onClick = onCancel) {
+                Icon(Icons.Rounded.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(6.dp))
+                Text("Cancel")
+            }
         }
         Spacer(Modifier.weight(1f))
         var menu by rememberSaveable { mutableStateOf(false) }
@@ -241,6 +256,12 @@ private fun TopBar(
                     menu = false
                     onAddIngredient()
                 })
+                if (onLater != null) {
+                    DropdownMenuItem(text = { Text("Discard import") }, onClick = {
+                        menu = false
+                        onCancel()
+                    }, modifier = Modifier.testTag("discard-import"))
+                }
                 onClearInStock?.let { clear ->
                     DropdownMenuItem(text = { Text("Clear \"at home\"") }, onClick = {
                         menu = false
@@ -357,7 +378,13 @@ private fun Hero(
                             ui.title,
                             style = MaterialTheme.typography.headlineMedium,
                             color = Brand.OnHero,
-                            modifier = Modifier.semantics { heading() },
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier =
+                                Modifier.semantics {
+                                    heading()
+                                    contentDescription = ui.title
+                                },
                         )
                         if (ui.summary.isNotEmpty()) {
                             Text(ui.summary, Modifier.testTag("summary"), style = MaterialTheme.typography.bodyMedium, color = Brand.OnHero)

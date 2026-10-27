@@ -17,9 +17,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
 import timber.log.Timber
 import java.io.File
 import java.io.IOException
@@ -239,8 +236,8 @@ class BackupManager(
                     val head = input.readNBytes(4)
                     input.reset()
                     if (BackupArchive.isArchive(head)) return@use inspectArchive(input)
-                    val bytes = input.readNBytes(MAX_BYTES + 1)
-                    if (bytes.size > MAX_BYTES) return@use Inspection.Broken(listOf("the file is larger than a backup can be"))
+                    val bytes = input.readNBytes(MAX_JSON_BYTES + 1)
+                    if (bytes.size > MAX_JSON_BYTES) return@use Inspection.Broken(listOf("the file is larger than a backup can be"))
                     withLocalPhotos(inspectText(String(bytes)))
                 }
             } catch (e: IOException) {
@@ -254,7 +251,7 @@ class BackupManager(
     /** An archive: its photos staged, its JSON checked as any backup's. */
     private fun inspectArchive(input: java.io.InputStream): Inspection {
         val dir = File(staging, java.util.UUID.randomUUID().toString())
-        val read = BackupArchive.read(input, dir, MAX_BYTES.toLong())
+        val read = BackupArchive.read(input, dir, MAX_JSON_BYTES.toLong())
         val ok =
             when (read) {
                 is BackupArchive.Read.Newer -> return Inspection.Newer(read.version)
@@ -281,18 +278,25 @@ class BackupManager(
     private fun intactHere(names: Set<String>): Set<String> =
         names.filter { n -> c.recipePhotos.file(n)?.let { BackupArchive.isIntact(it) } == true }.toSet()
 
+    /** The two header fields alone, read without building the whole tree (review D.37). */
+    @Serializable
+    private data class Header(
+        val format: String? = null,
+        val version: Int? = null,
+    )
+
     fun inspectText(text: String): Inspection {
         val head =
             try {
-                json.parseToJsonElement(text).jsonObject
+                json.decodeFromString(Header.serializer(), text)
             } catch (e: SerializationException) {
                 return Inspection.NotABackup
             } catch (e: IllegalArgumentException) {
                 return Inspection.NotABackup
             }
         // A header field of the wrong shape ({"format": {}}) is not a backup, not a crash.
-        if ((head["format"] as? JsonPrimitive)?.contentOrNull != BackupFile.FORMAT) return Inspection.NotABackup
-        val version = (head["version"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: return Inspection.NotABackup
+        if (head.format != BackupFile.FORMAT) return Inspection.NotABackup
+        val version = head.version ?: return Inspection.NotABackup
         if (version > BackupFile.VERSION) return Inspection.Newer(version)
         val file =
             try {
@@ -446,6 +450,9 @@ class BackupManager(
     companion object {
         /** Well above any real backup (a 500-recipe library is a few MB). */
         const val MAX_BYTES = 64 * 1024 * 1024
+
+        /** The JSON alone: a real backup is a few megabytes; the archive's photos have their own budget. */
+        const val MAX_JSON_BYTES = 16 * 1024 * 1024
 
         fun suggestedName(createdAt: Long): String {
             val d = java.time.Instant.ofEpochMilli(createdAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate()

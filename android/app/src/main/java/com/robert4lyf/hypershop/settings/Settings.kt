@@ -38,21 +38,14 @@ class Settings(
     val model: Flow<ClaudeModel> = store.data.map { p -> p[MODEL]?.let { ClaudeModel.fromId(it) } ?: ClaudeModel.DEFAULT }
     val monthlyCapUsd: Flow<Double> = store.data.map { it[MONTHLY_CAP] ?: SpendGuard.DEFAULT_MONTHLY_CAP_USD }
     val dailyCalls: Flow<Int> = store.data.map { it[DAILY_CALLS] ?: SpendGuard.DEFAULT_DAILY_CALLS }
-    val watchVibrate: Flow<Boolean> = store.data.map { it[WATCH_VIBRATE] ?: true }
 
     /** W.1: with a key, Claude reads every new recipe (the rules read first and check it); off, only when the rules are unsure. */
     val claudeAlways: Flow<Boolean> = store.data.map { it[CLAUDE_ALWAYS] ?: true }
     val debugLog: Flow<Boolean> = store.data.map { it[DEBUG_LOG] ?: false }
 
-    /**
-     * How the list is laid out. Read from the older on/off switch when it has
-     * never been set, so "Group by type" survives the update.
-     */
+    /** How the list is laid out. A "TYPE" from before the review of 2026-10-27 (cut 5) reads as the store order. */
     val listView: Flow<ListView> =
-        store.data.map { p ->
-            p[LIST_VIEW]?.let { runCatching { ListView.valueOf(it) }.getOrNull() }
-                ?: if (p[LIST_CATEGORISED] == true) ListView.TYPE else ListView.STORE
-        }
+        store.data.map { p -> p[LIST_VIEW]?.let { runCatching { ListView.valueOf(it) }.getOrNull() } ?: ListView.STORE }
 
     /** Planning the list, or shopping with it: kept across process death, so a shop survives a restart. */
     val listMode: Flow<ListMode> =
@@ -71,6 +64,21 @@ class Settings(
 
     suspend fun setKeyWasSet(on: Boolean) = store.edit { it[KEY_SET] = on }
 
+    /** Missing 4 of the review: which store's walking order the list and the watch follow (1, or 2 for the second store). */
+    val activeStore: Flow<Long> = store.data.map { it[ACTIVE_STORE]?.toLong() ?: 1L }.distinctUntilChanged()
+
+    suspend fun setActiveStore(id: Long) = store.edit { it[ACTIVE_STORE] = id.toInt().coerceIn(1, 2) }
+
+    /** Missing 8 of the review: the one-time "add a Claude key" nudge on a review read offline has been shown. */
+    val keyNudged: Flow<Boolean> = store.data.map { it[KEY_NUDGED] ?: false }
+
+    suspend fun setKeyNudged() = store.edit { it[KEY_NUDGED] = true }
+
+    /** How often a review row's sheet has been opened: the review's "tap an ingredient" hint stops after a few. */
+    val reviewSheetOpens: Flow<Int> = store.data.map { it[REVIEW_SHEET_OPENS] ?: 0 }
+
+    suspend fun bumpReviewSheetOpens() = store.edit { it[REVIEW_SHEET_OPENS] = (it[REVIEW_SHEET_OPENS] ?: 0) + 1 }
+
     suspend fun setUnits(u: UnitsSetting) = store.edit { it[UNITS] = u.name }
 
     suspend fun setTheme(t: ThemeMode) = store.edit { it[THEME] = t.name }
@@ -80,8 +88,6 @@ class Settings(
     suspend fun setMonthlyCap(usd: Double) = store.edit { it[MONTHLY_CAP] = usd.coerceIn(0.0, 100.0) }
 
     suspend fun setDailyCalls(n: Int) = store.edit { it[DAILY_CALLS] = n.coerceIn(0, 1000) }
-
-    suspend fun setWatchVibrate(on: Boolean) = store.edit { it[WATCH_VIBRATE] = on }
 
     suspend fun setClaudeAlways(on: Boolean) = store.edit { it[CLAUDE_ALWAYS] = on }
 
@@ -123,19 +129,20 @@ class Settings(
         val THEME = stringPreferencesKey("theme")
         val MONTHLY_CAP = doublePreferencesKey("claude_monthly_cap_usd")
         val DAILY_CALLS = intPreferencesKey("claude_daily_calls")
-        val WATCH_VIBRATE = booleanPreferencesKey("watch_vibrate")
         val CLAUDE_ALWAYS = booleanPreferencesKey("claude_always")
         val DEBUG_LOG = booleanPreferencesKey("debug_log")
-        val LIST_CATEGORISED = booleanPreferencesKey("list_categorised")
         val LIST_VIEW = stringPreferencesKey("list_view")
         val LIST_MODE = stringPreferencesKey("list_mode")
         val KEY_LOST = booleanPreferencesKey("claude_key_lost_notice")
         val KEY_SET = booleanPreferencesKey("claude_key_was_set")
+        val REVIEW_SHEET_OPENS = intPreferencesKey("review_sheet_opens")
+        val ACTIVE_STORE = intPreferencesKey("active_store")
+        val KEY_NUDGED = booleanPreferencesKey("claude_key_nudged")
     }
 }
 
-/** The list's layouts: aisles in walking order, aisles split by type, or one card per recipe. */
-enum class ListView { STORE, TYPE, RECIPE }
+/** The list's layouts: aisles in walking order (groups labelled when an aisle has more than one), or one card per recipe. */
+enum class ListView { STORE, RECIPE }
 
 /** What the List tab is for right now: planning (add, review, edit) or shopping (tick, next aisle, finish). */
 enum class ListMode { PLAN, SHOP }

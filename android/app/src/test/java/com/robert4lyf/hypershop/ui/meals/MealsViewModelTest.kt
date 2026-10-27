@@ -116,6 +116,43 @@ class MealsViewModelTest {
     }
 
     @Test
+    fun thisWeekMovesOnWithTheClock() {
+        // Review B.12: the view model lives for the process; Monday must not show last week as "This week".
+        var now = 1_760_000_000_000L
+        val c = TestContainer.create(clock = { now }).also { made += it }
+        val vm = MealsViewModel(c).shown()
+        val before = await(vm.ui) { it.loaded }
+        assertEquals("This week", before.weekName)
+        now += 7 * 24 * 60 * 60 * 1000L
+        vm.refreshWeek()
+        val after = await(vm.ui) { it.week != before.week }
+        assertEquals("This week", after.weekName)
+        assertTrue(after.isCurrent)
+        // A week chosen with the arrows is left where it is.
+        vm.previousWeek()
+        await(vm.ui) { it.week == before.week }
+        now += 7 * 24 * 60 * 60 * 1000L
+        vm.refreshWeek()
+        assertEquals(before.week, await(vm.ui) { it.isPast }.week)
+    }
+
+    @Test
+    fun cookedItCountsOnTheRecipeAndCanBeTakenBack() {
+        val c = container()
+        val key = save(c, "Chilli", "2 onions")
+        val vm = MealsViewModel(c).shown()
+        val got = messages(vm)
+        vm.plan(await(vm.ui) { it.picks.isNotEmpty() }.picks.single())
+        val meal = await(vm.ui) { it.meals.isNotEmpty() }.meals.single()
+        assertEquals(key, meal.libraryKey)
+        vm.cooked(meal)
+        awaitTrue { runBlocking { c.repository.recipeNote(key) }?.timesCooked == 1 }
+        val m = got.first { it.text.startsWith("Cooked Chilli") }
+        runBlocking { m.undo!!.invoke() }
+        awaitTrue { runBlocking { c.repository.recipeNote(key) }?.timesCooked == 0 }
+    }
+
+    @Test
     fun aRepeatedTapOnAddAddsTheWeekOnce() {
         val c = container()
         save(c, "Chilli", "2 onions")

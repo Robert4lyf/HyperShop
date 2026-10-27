@@ -48,6 +48,43 @@ function traceAckDuplicateAfterAck(logger as Test.Logger) as Lang.Boolean {
 }
 
 (:test)
+function traceAckForeignInstall(logger as Test.Logger) as Lang.Boolean {
+    return TraceReplay.run(logger, "ack-foreign-install", [
+        ["config", 8, 32],
+        ["hello", 0, 0, 0, 0],
+        ["state", {}, [], 0, 1, 0, 0, false, null, 0, {}],
+        ["send", null],
+        ["state", {}, [], 0, 1, 0, 0, false, null, 0, {}],
+        ["recv", {"v" => 1, "t" => "snap", "ep" => 1, "lr" => 2, "at" => 0, "pg" => 0, "pgs" => 1, "ai" => [0, ["PRODUCE", "Produce", 1, false]], "it" => [[1, "Onion", "", 0, false, 1]]}],
+        ["state", {1 => false}, [], 0, 1, 1, 2, true, null, 0, {}],
+        ["hello", 0, 2, 0, 1],
+        ["state", {1 => false}, [], 0, 1, 1, 2, false, null, 0, {}],
+        ["send", null],
+        ["state", {1 => false}, [], 0, 1, 1, 2, false, null, 0, {}],
+        ["recv", {"v" => 1, "t" => "snap", "ep" => 1, "lr" => 2, "at" => 0, "pg" => 0, "pgs" => 1, "ai" => [0, ["PRODUCE", "Produce", 1, false]], "it" => [[1, "Onion", "", 0, false, 1]]}],
+        ["state", {1 => false}, [], 0, 1, 1, 2, false, null, 0, {}],
+        ["send", null],
+        ["state", {1 => false}, [], 0, 1, 1, 2, false, null, 0, {}],
+        ["toggle", 1, 0, true],
+        ["state", {1 => true}, [0], 0, 1, 1, 2, false, null, 0, {}],
+        ["send", [[1, 1, true, 2, 0]]],
+        ["state", {1 => true}, [1], 0, 2, 1, 2, false, null, 0, {}],
+        ["recv", {"v" => 1, "t" => "snap", "ep" => 1, "lr" => 2, "at" => 300, "pg" => 0, "pgs" => 0, "it" => []}],
+        ["state", {1 => true}, [1], 0, 2, 1, 2, true, null, 0, {}],
+        ["hello", 0, 2, 0, 1],
+        ["state", {1 => true}, [1], 0, 2, 1, 2, false, null, 0, {}],
+        ["send", null],
+        ["state", {1 => true}, [1], 0, 2, 1, 2, false, null, 0, {}],
+        ["recv", {"v" => 1, "t" => "snap", "ep" => 1, "lr" => 3, "at" => 1, "pg" => 0, "pgs" => 1, "ai" => [0, ["PRODUCE", "Produce", 0, false]], "it" => [[1, "Onion", "", 0, true, 2]]}],
+        ["state", {1 => true}, [], 1, 2, 1, 3, false, null, 0, {1 => "ok"}],
+        ["recv", {"v" => 1, "t" => "snap", "ep" => 1, "lr" => 3, "at" => 1, "pg" => 0, "pgs" => 1, "ai" => [0, ["PRODUCE", "Produce", 0, false]], "it" => [[1, "Onion", "", 0, true, 2]]}],
+        ["state", {1 => true}, [], 1, 2, 1, 3, false, null, 0, {1 => "ok"}],
+        ["send", null],
+        ["state", {1 => true}, [], 1, 2, 1, 3, false, null, 0, {1 => "ok"}],
+    ]);
+}
+
+(:test)
 function traceAckLostThenResend(logger as Test.Logger) as Lang.Boolean {
     return TraceReplay.run(logger, "ack-lost-then-resend", [
         ["config", 8, 32],

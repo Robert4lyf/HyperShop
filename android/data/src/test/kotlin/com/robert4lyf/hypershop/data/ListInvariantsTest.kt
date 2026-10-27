@@ -84,7 +84,7 @@ class ListInvariantsTest {
                 val l = r.repo.snapshot()
                 val live = l.liveItems
                 val recipeUses = l.uses.values.filter { it.kind == UseKind.RECIPE && it.archivedAt == null }
-                val pick = rnd.nextInt(10)
+                val pick = rnd.nextInt(11)
                 trail += "step $n: op $pick"
                 val step =
                     try {
@@ -125,6 +125,19 @@ class ListInvariantsTest {
                                     r.repo.restoreUse(it)
                                     "restore a use"
                                 } ?: "nothing to restore"
+                            9 ->
+                                // An edit: the use is replaced by another reading of a recipe, inheriting what was bought.
+                                recipeUses.randomOrNull(rnd)?.let { u ->
+                                    val lines = recipes[rnd.nextInt(recipes.size)]
+                                    val stored =
+                                        r.repo.storeRecipe(
+                                            "https://example.com/edit-$n", "Edited", 4, UnitLocale.METRIC, "WEB",
+                                            ParsedBy.RULES, null, false, lines.map { parser.parse(it) },
+                                        )
+                                    val servings = 1 + rnd.nextInt(8)
+                                    r.repo.apply(r.repo.preview(stored, servings, null, replacing = u.id), replacing = u.id)
+                                    "edit use ${u.id} to $lines"
+                                } ?: "nothing to edit"
                             else -> {
                                 val name = listOf("onion", "bread", "milk", "bananas").random(rnd)
                                 r.repo.manualAdd(name, QtyBase.of(Rational.ONE, null, UnitLocale.METRIC), null)

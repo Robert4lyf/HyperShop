@@ -26,7 +26,8 @@ internal object Lexicon {
             u(QtyUnit.CLOVE, "clove", "cloves")
             u(QtyUnit.BUNCH, "bunch", "bunches")
             u(QtyUnit.TIN, "tin", "tins", "can", "cans")
-            u(QtyUnit.PACKET, "packet", "packets", "package", "packages", "pack", "packs", "sachet", "sachets", "envelope", "envelopes")
+            u(QtyUnit.PACKET, "packet", "packets", "package", "packages", "pack", "packs", "pkg", "pkgs", "sachet", "sachets")
+            u(QtyUnit.PACKET, "envelope", "envelopes")
             u(QtyUnit.SPRIG, "sprig", "sprigs")
             u(QtyUnit.SLICE, "slice", "slices")
             u(QtyUnit.HEAD, "head", "heads")
@@ -108,7 +109,7 @@ internal object Lexicon {
         setOf(
             "small", "medium", "large", "extra-large", "medium-size", "medium-sized", "large-size", "big",
             "whole", "good-size", "good-sized", "miniature", "mini", "baby-size",
-            "thick", "thin", "fresh", "about", "approximately", "approx", "heaped", "heaping", "level",
+            "thick", "thin", "fresh", "lean", "extra-lean", "about", "approximately", "approx", "heaped", "heaping", "level",
             "scant", "good", "good-quality", "high-quality", "best-quality", "generous", "ripe", "few",
             "fat", "rounded", "plump", "juicy", "thumb-sized", "thumb-size", "each", "organic",
             // The shelf, not the product: "canned crushed tomatoes" are crushed tomatoes (RuleParser.shelf).

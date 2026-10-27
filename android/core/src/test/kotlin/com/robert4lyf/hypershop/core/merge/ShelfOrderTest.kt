@@ -39,6 +39,17 @@ class ShelfOrderTest {
     }
 
     @Test
+    fun anItemGoesToAnEndInOneMove() {
+        // UX review 17: "Move to top" / "Move to bottom" across a long group.
+        val today = listOf(slot("basil", position = 0), slot("dill", position = 1), slot("mint", position = 2), slot("sage", position = 3))
+        val o = ShelfOrder().movedItemToEnd(today, today[3], top = true)!!
+        assertEquals(listOf("sage", "basil", "dill", "mint"), o.sortItems(today))
+        val shown = listOf(today[3], today[0], today[1], today[2])
+        assertEquals(listOf("basil", "dill", "mint", "sage"), o.movedItemToEnd(shown, today[3], top = false)!!.sortItems(today))
+        assertEquals(null, o.movedItemToEnd(shown, today[3], top = true))
+    }
+
+    @Test
     fun anArrangedItemKeepsItsPlaceOnTheNextTrip() {
         val today = listOf(slot("basil", position = 0), slot("dill", position = 1), slot("mint", position = 2))
         val o = ShelfOrder().movedItem(today, today[2], -1)!!.let { it.movedItem(listOf(today[0], today[2], today[1]), today[2], -1)!! }

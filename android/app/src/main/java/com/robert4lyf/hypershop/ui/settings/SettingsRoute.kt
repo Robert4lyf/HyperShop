@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AddShoppingCart
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
@@ -129,11 +130,14 @@ data class SettingsActions(
     val onUnits: (UnitsSetting) -> Unit = {},
     val onTheme: (ThemeMode) -> Unit = {},
     val onRemoveStaple: (String) -> Unit = {},
+    /** "Ran out" on a staple: on the list once, still always at home (missing 5 of the review). */
+    val onRanOut: (String) -> Unit = {},
+    /** Aisles: which store's order is being edited (missing 4 of the review). */
+    val onEditStore: (Long) -> Unit = {},
     val onMoveAisle: (AisleCode, Int) -> Unit = { _, _ -> },
     /** "Move to top" (0) / "Move to bottom" (last). */
     val onMoveAisleTo: (AisleCode, Int) -> Unit = { _, _ -> },
     val onResetAisles: () -> Unit = {},
-    val onWatchVibrate: (Boolean) -> Unit = {},
     /** "Try again" under the watch status, offered while the link is down. */
     val onWatchRetry: () -> Unit = {},
     val onSaveKey: (String) -> Unit = {},
@@ -147,8 +151,10 @@ data class SettingsActions(
     val onDebugLog: (Boolean) -> Unit = {},
     val onRefreshLog: () -> Unit = {},
     val onLibrary: () -> Unit = {},
-    /** Advanced › Voice test. */
-    val onVoiceTest: () -> Unit = {},
+    /** Aisles › Walking order: its own screen (UX review 22). */
+    val onAisles: () -> Unit = {},
+    /** Advanced › Voice test: a developer harness, offered in debug builds only (null hides it). */
+    val onVoiceTest: (() -> Unit)? = null,
     /** Debug builds only. */
     val onDebug: (() -> Unit)? = null,
     /** Data: the file pickers (Storage Access Framework) are the route's; the view model gets the Uri. */
@@ -168,7 +174,8 @@ fun SettingsRoute(
     container: AppContainer,
     onDebug: (() -> Unit)?,
     onLibrary: () -> Unit = {},
-    onVoiceTest: () -> Unit = {},
+    onAisles: () -> Unit = {},
+    onVoiceTest: (() -> Unit)? = null,
     /** The app's snackbar host; without one the screen shows its own. */
     snackbar: SnackbarHostState? = null,
 ) {
@@ -191,10 +198,10 @@ fun SettingsRoute(
             onUnits = { vm.setUnits(it) },
             onTheme = { vm.setTheme(it) },
             onRemoveStaple = { vm.removeStaple(it) },
+            onRanOut = { vm.ranOut(it) },
             onMoveAisle = { a, d -> vm.moveAisle(a, d) },
             onMoveAisleTo = { a, i -> vm.moveAisleTo(a, i) },
             onResetAisles = { vm.resetAisleOrder() },
-            onWatchVibrate = { vm.setWatchVibrate(it) },
             onWatchRetry = { vm.retryWatch() },
             onSaveKey = { vm.saveKey(it) },
             onTestKey = { vm.testKey() },
@@ -208,6 +215,7 @@ fun SettingsRoute(
             onRefreshLog = { vm.refreshLog() },
             onDebug = onDebug,
             onLibrary = onLibrary,
+            onAisles = onAisles,
             onVoiceTest = onVoiceTest,
             onBackup = { createBackup.launch(BackupManager.suggestedName(container.clock())) },
             onRestore = {
@@ -253,18 +261,22 @@ fun SettingsScreen(
                 }
                 card("Appearance", Icons.Rounded.Palette, hue = 300f) { AppearanceGroup(ui, actions) }
                 card("List", Icons.Rounded.Tune, hue = 140f) { ListGroup(ui, actions) }
-                card("Aisles", Icons.Rounded.Route, hue = 30f) { AislesGroup(ui, actions) }
+                card("Aisles", Icons.Rounded.Route, hue = 30f) { AislesRow(actions) }
                 card("Ingredients", Icons.Rounded.LocalDining, hue = 95f) { IngredientsGroup(actions) }
                 card("Watch", Icons.Rounded.Watch, hue = 205f) { WatchGroup(ui, actions) }
                 card("Claude", Icons.Rounded.AutoAwesome, hue = 265f) {
                     KeySection(ui, actions)
                     EdgeDivider()
-                    ModelSection(ui, actions)
+                    ClaudeAlwaysSection(ui, actions)
                     EdgeDivider()
                     CapsSection(ui, actions)
                 }
                 card("Data", Icons.Rounded.SaveAlt, hue = 45f) { DataGroup(ui, actions) }
-                card("Advanced", Icons.Rounded.Code, hue = 180f) { AdvancedGroup(ui, actions) }
+                card("Advanced", Icons.Rounded.Code, hue = 180f) {
+                    AdvancedGroup(ui, actions)
+                    EdgeDivider()
+                    ModelSection(ui, actions)
+                }
             }
             snackbar?.let { SnackbarHost(it, Modifier.align(Alignment.BottomCenter)) }
         }
@@ -425,15 +437,20 @@ private fun ListGroup(
         Hint("None")
     } else {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (s in ui.staples) StapleChip(s) { actions.onRemoveStaple(s) }
+            for (s in ui.staples) StapleChip(s, onRanOut = { actions.onRanOut(s) }) { actions.onRemoveStaple(s) }
         }
     }
+    Hint(
+        "Set one from an item's sheet on the shopping list, or from a row on a review. A review leaves these off the list; " +
+            "the cart puts one on once.",
+    )
 }
 
 /** A staple: its name, and an × that is the only way to remove it (a full 48 dp target). */
 @Composable
 private fun StapleChip(
     name: String,
+    onRanOut: () -> Unit = {},
     onRemove: () -> Unit,
 ) {
     // A soft green, not grey: these are live settings, not disabled chips.
@@ -444,6 +461,14 @@ private fun StapleChip(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 14.dp)) {
             Text(name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelLarge)
+            // Missing 5 of the review: out of it this once, without un-stapling it.
+            IconButton(onClick = onRanOut, modifier = Modifier.testTag("ran-out-$name")) {
+                Icon(
+                    Icons.Rounded.AddShoppingCart,
+                    contentDescription = "Ran out of $name: add to the list",
+                    modifier = Modifier.size(18.dp),
+                )
+            }
             IconButton(onClick = onRemove) {
                 Icon(Icons.Rounded.Close, contentDescription = "Remove $name", modifier = Modifier.size(18.dp))
             }
@@ -451,8 +476,32 @@ private fun StapleChip(
     }
 }
 
+/** The way to the walking order: a 16-row reorder list made Settings long (UX review 22), so it has its own screen. */
 @Composable
-private fun AislesGroup(
+private fun AislesRow(actions: SettingsActions) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .clickable(role = Role.Button, onClick = actions.onAisles)
+            .testTag("open-aisles"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Walking order", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "The order you walk the store; the list and the watch follow it.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** The aisles in walking order with arrows, "Move to top/bottom" and Reset: the body of [AislesScreen]. */
+@Composable
+internal fun AislesGroup(
     ui: SettingsUi,
     actions: SettingsActions,
 ) {
@@ -668,7 +717,7 @@ private val MODEL_NOTES =
     )
 
 @Composable
-private fun ModelSection(
+private fun ClaudeAlwaysSection(
     ui: SettingsUi,
     actions: SettingsActions,
 ) {
@@ -676,12 +725,26 @@ private fun ModelSection(
         SwitchRow("Read every recipe with Claude", ui.claudeAlways, actions.onClaudeAlways)
         Hint(
             if (ui.claudeAlways) {
-                "Claude reads each new recipe; the offline reading checks it. About $0.001 a recipe on the default model."
+                "Claude reads each new recipe; the offline reading checks it. About $0.001 a recipe."
             } else {
                 "Claude reads a recipe only when the offline reading is unsure of a line."
             },
         )
+    }
+}
+
+/**
+ * Under Advanced (cut 4 of the review): the reading was evaluated on Haiku, and a bigger model costs 20–40× as
+ * much against the same monthly cap, so the choice is kept but out of the way.
+ */
+@Composable
+private fun ModelSection(
+    ui: SettingsUi,
+    actions: SettingsActions,
+) {
+    Column {
         SectionLabel("Model")
+        Hint("The reading was tuned on Haiku. A bigger model costs 20–40× as much against the same monthly cap.")
         for (m in ClaudeModel.entries) {
             Row(
                 Modifier
@@ -830,6 +893,8 @@ private fun AdvancedGroup(
             TextButton(onClick = actions.onRefreshLog) { Text("Refresh") }
         }
     }
-    OutlinedButton(onClick = actions.onVoiceTest, modifier = Modifier.testTag("open-voice-test")) { Text("Voice test") }
+    actions.onVoiceTest?.let { open ->
+        OutlinedButton(onClick = open, modifier = Modifier.testTag("open-voice-test")) { Text("Voice test") }
+    }
     actions.onDebug?.let { open -> OutlinedButton(onClick = open) { Text("Debug tools") } }
 }

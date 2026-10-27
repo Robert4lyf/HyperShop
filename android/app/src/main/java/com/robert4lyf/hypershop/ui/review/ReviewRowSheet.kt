@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.ui.review
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -20,6 +21,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.TrendingFlat
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Inventory
 import androidx.compose.material.icons.rounded.LocalMall
 import androidx.compose.material.icons.rounded.ReportProblem
@@ -163,12 +166,40 @@ fun ReviewRowSheet(
             for (reason in sheet.lines.mapNotNull { it.checkReason }.distinct()) {
                 InfoBanner("Check: ${ReviewViewModel.plainReason(reason)}", Icons.Rounded.ReportProblem, tone = Tone.WARNING)
             }
-            SwitchRow("At home", sheet.inStock, actions.onInStock)
+            // UX review 6: in the order corrections are made. The amount first (the commonest), then a swap, at home,
+            // the line's words behind "Edit the line" (one place for the text and the name: cut 6), the aisle, the rest.
+            for (line in sheet.lines) key(line.origin ?: line.id) { AmountRow(line, sheet.lines.size > 1, actions) }
             if (sheet.swaps.isNotEmpty()) SwapFor(sheet.swaps, actions.onRename)
-            key(sheet.key) { Rename(sheet.name, actions.onRename, actions.renamePreview) }
-            SectionLabel(if (sheet.lines.size == 1) "From the recipe" else "From the recipe (${sheet.lines.size} lines)")
-            for (line in sheet.lines) key(line.id) { LineEditor(line, actions, canRemove = sheet.canRemove) }
+            for (line in sheet.lines) {
+                line.alternative?.let { alt ->
+                    OutlinedButton(onClick = { actions.onSwap(line.id) }) {
+                        Icon(Icons.Rounded.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text("Use $alt instead")
+                    }
+                }
+            }
+            SwitchRow("At home", sheet.inStock, actions.onInStock)
+            var editing by rememberSaveable(sheet.key) { mutableStateOf(false) }
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .clickable(onClickLabel = if (editing) "Collapse" else "Expand", role = Role.Button) { editing = !editing }
+                    .testTag("edit-line"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Edit the line", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                Icon(if (editing) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, contentDescription = null)
+            }
+            if (editing) {
+                key(sheet.key) { Rename(sheet.name, actions.onRename, actions.renamePreview) }
+                SectionLabel(if (sheet.lines.size == 1) "From the recipe" else "From the recipe (${sheet.lines.size} lines)")
+                for (line in sheet.lines) key(line.origin ?: line.id) { LineEditor(line, actions) }
+            }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            // Asks "always or just this time?" on the chip, like the list's sheet; the move is announced with Undo.
+            MoveAisle(sheet.aisle, actions.onMoveAisle)
             if (!sheet.isStaple) {
                 FilledTonalButton(onClick = actions.onAlwaysInStock) {
                     Icon(Icons.Rounded.Inventory, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -176,8 +207,19 @@ fun ReviewRowSheet(
                     Text("Always at home")
                 }
             }
-            // Asks "always or just this time?" on the chip, like the list's sheet; the move is announced with Undo.
-            MoveAisle(sheet.aisle, actions.onMoveAisle)
+            if (sheet.canRemove) {
+                for (line in sheet.lines) {
+                    TextButton(
+                        onClick = { actions.onRemoveLine(line.id) },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.testTag("remove-${line.id}"),
+                    ) {
+                        Icon(Icons.Rounded.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text(if (sheet.lines.size == 1) "Remove from recipe" else "Remove \"${line.raw}\"")
+                    }
+                }
+            }
             WrongNote(actions.onWrong)
         }
     }
@@ -260,14 +302,33 @@ private fun Rename(
     }
 }
 
+/** The line's amount, set in one field: the correction made most often, so it comes first. */
+@Composable
+private fun AmountRow(
+    line: SheetLine,
+    several: Boolean,
+    actions: SheetActions,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        AmountField(
+            heading = if (several) line.raw else "Amount",
+            label = "e.g. 2, 200 g or 1 tbsp",
+            button = "Set",
+            tag = "amount-${line.id}",
+            onSubmit = { actions.onSetAmount(line.id, it) },
+            initial = line.amount ?: "",
+        )
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LineEditor(
     line: SheetLine,
     actions: SheetActions,
-    canRemove: Boolean,
 ) {
-    var text by rememberSaveable(line.id) { mutableStateOf(line.raw) }
+    // Keyed by the line's origin: an edit elsewhere in the sheet stores the recipe again with new ids (review B.15).
+    var text by rememberSaveable(line.origin ?: line.id) { mutableStateOf(line.raw) }
     val use = { if (text != line.raw && text.isNotBlank()) actions.onEditLine(line.id, text) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         OutlinedTextField(
@@ -286,34 +347,8 @@ private fun LineEditor(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 4.dp),
         )
-        AmountField(
-            heading = "Amount",
-            label = "e.g. 2, 200 g or 1 tbsp",
-            button = "Set",
-            tag = "amount-${line.id}",
-            onSubmit = { actions.onSetAmount(line.id, it) },
-            initial = line.amount ?: "",
-        )
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (text != line.raw) Button(onClick = use) { Text("Use this line") }
-            if (canRemove) {
-                TextButton(
-                    onClick = { actions.onRemoveLine(line.id) },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    modifier = Modifier.testTag("remove-${line.id}"),
-                ) {
-                    Icon(Icons.Rounded.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(8.dp))
-                    Text("Remove from recipe")
-                }
-            }
-            line.alternative?.let { alt ->
-                OutlinedButton(onClick = { actions.onSwap(line.id) }) {
-                    Icon(Icons.Rounded.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(8.dp))
-                    Text("Use $alt instead")
-                }
-            }
         }
     }
 }

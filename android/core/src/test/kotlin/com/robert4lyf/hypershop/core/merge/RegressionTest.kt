@@ -132,6 +132,77 @@ class RegressionTest {
     }
 
     @Test
+    fun anEditOverAPurchaseOnTwoRowsCountsBothRowsOnce() {
+        // Review finding A.1: 2 bought and finished, 1 extra bought on a live row; the edit keeps "3 onions".
+        var (l, useId) = add(ShoppingList(), listOf("2 onions"))
+        val onion = l.itemByKey("cat:onion")!!.id
+        l = l.tick(onion, 5)!!.finishShopping(10)
+        l = l.rescaleUse(useId, 6)
+        l = l.tick(l.liveItems.single().id, 11)!!
+        val (base, removed) = l.removeUseKeeping(useId)
+        var (edited, newUse) = add(base, listOf("3 onions"))
+        edited = edited.inheritPurchases(removed!!, newUse)
+        // Three bought, three asked for: nothing still needed. The finished row keeps its 2; the extra's
+        // row went with the old use, so its 1 sits on the live row the edit made for the onions.
+        assertEquals(Rational.of(2), edited.covered(onion)[BaseKey.ITEMS])
+        assertEquals(Rational.of(1), edited.covered(edited.itemByKey("cat:onion")!!.id)[BaseKey.ITEMS])
+        assertEquals(0, edited.progress(newUse).toBuy)
+        assertTrue(edited.liveItems.all { edited.isDone(it.id) })
+        // And four asked for: one more, on the live row only.
+        val (base2, removed2) = edited.removeUseKeeping(newUse)
+        var (again, use3) = add(base2, listOf("4 onions"))
+        again = again.inheritPurchases(removed2!!, use3)
+        assertEquals(Rational.of(1), again.uncovered(again.itemByKey("cat:onion")!!.id)[BaseKey.ITEMS])
+        assertEquals(1, again.progress(use3).toBuy)
+    }
+
+    @Test
+    fun anEditWithinWhatWasBoughtOnAFinishedTripLeavesNoEmptyRow() {
+        // Review finding A.3: 2 bought and finished; the edit keeps "2 onions".
+        var (l, useId) = add(ShoppingList(), listOf("2 onions"))
+        val onion = l.itemByKey("cat:onion")!!.id
+        l = l.tick(onion, 5)!!.finishShopping(10)
+        val (base, removed) = l.removeUseKeeping(useId)
+        var (edited, newUse) = add(base, listOf("2 onions"))
+        edited = edited.inheritPurchases(removed!!, newUse)
+        assertTrue(edited.liveItems.all { edited.contributionsOf(it.id).isNotEmpty() }, "no live row with nothing on it")
+        assertTrue(edited.liveItems.isEmpty())
+        assertEquals(Rational.of(2), edited.covered(onion)[BaseKey.ITEMS])
+        assertEquals(0, edited.progress(newUse).toBuy)
+        val covering = edited.contributions.mapNotNull { it.coveredBy }.toSet()
+        assertEquals(covering, edited.ticks.map { it.id }.toSet())
+    }
+
+    @Test
+    fun anIngredientTheEditDroppedStaysBoughtThroughAServingsChange() {
+        // Review finding A.4: the carrot was bought, the edit dropped it; more servings must not put it back.
+        var (l, useId) = add(ShoppingList(), listOf("2 onions", "1 carrot"))
+        val carrot = l.itemByKey("cat:carrot")!!.id
+        l = l.tick(carrot, 5)!!
+        val (base, removed) = l.removeUseKeeping(useId)
+        var (edited, newUse) = add(base, listOf("2 onions"))
+        edited = edited.inheritPurchases(removed!!, newUse)
+        val more = edited.rescaleUse(newUse, 8)
+        val row = more.itemByKey("cat:carrot")!!.id
+        assertTrue(more.isDone(row))
+        assertEquals(Rational.of(1), more.covered(row)[BaseKey.ITEMS])
+        assertEquals(Rational.of(4), more.uncovered(more.itemByKey("cat:onion")!!.id)[BaseKey.ITEMS])
+    }
+
+    @Test
+    fun aWatchTickOnAnItemSetAsideBringsItBack() {
+        // Review finding A.5: set aside on the phone, ticked from the wrist against an older snapshot.
+        val (l, _) = add(ShoppingList(), listOf("2 onions"))
+        val onion = l.itemByKey("cat:onion")!!.id
+        val aside = l.markUnavailable(onion, 7)!!
+        assertTrue(aside.isUnavailable(onion))
+        val (ticked, result) = aside.watchTick(onion, aside.listRev, 8, 1, 1)
+        assertEquals(WatchTickResult.OK, result)
+        assertTrue(ticked!!.isDone(onion))
+        assertFalse(ticked.isUnavailable(onion))
+    }
+
+    @Test
     fun anEditAfterAFinishedTripKeepsTheFinishedRowAndPutsOnlyTheExtraOnTheList() {
         var (l, useId) = add(ShoppingList(), listOf("2 onions"))
         val onion = l.itemByKey("cat:onion")!!.id

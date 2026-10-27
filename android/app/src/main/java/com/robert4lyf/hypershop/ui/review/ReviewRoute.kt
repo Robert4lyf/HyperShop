@@ -43,6 +43,7 @@ import com.robert4lyf.hypershop.ui.list.showTimed
 import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.util.factoryFor
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -56,6 +57,8 @@ fun ReviewRoute(
     onReopen: (Long) -> Unit = {},
     /** Undo after Cancel: opens the review again, unless another is showing by then. */
     onUndo: (Long) -> Unit = onReopen,
+    /** The nudge's "Settings" (missing 8 of the review). */
+    onSettings: () -> Unit = {},
 ) {
     // Claude may only run while this screen is in the foreground. One hold on the gate per
     // screen: adding the observer replays ON_START when already started, hence the flag.
@@ -82,6 +85,18 @@ fun ReviewRoute(
     val vm: ReviewViewModel = viewModel(key = "review-$jobId", factory = factoryFor { ReviewViewModel(container, jobId) })
     val state by vm.state.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
+    // Missing 8 of the review: the first recipe read offline with no key says, once, what a key would do.
+    val hasKey by container.apiKeyStore.hasKey.collectAsStateWithLifecycle()
+    val readOffline = (state as? ReviewState.Ready)?.ui?.let { it.badge == Badge.RULES && !it.byHand && !it.retrying } == true
+    LaunchedEffect(readOffline, hasKey) {
+        if (!readOffline || hasKey || container.settings.keyNudged.first()) return@LaunchedEffect
+        container.settings.setKeyNudged()
+        show(
+            container,
+            snackbar,
+            UiMessage("Read offline. A Claude key in Settings reads recipes better.", undo = { onSettings() }, action = "Settings"),
+        )
+    }
     var sheetKey by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmDiscard by rememberSaveable { mutableStateOf(false) }
     if (confirmDiscard) {
@@ -101,14 +116,20 @@ fun ReviewRoute(
     // Back on an edit or a library re-add is Cancel: left as it was, it sat on the
     // list as "1 recipe ready to review" for something that was never an import.
     val live = state is ReviewState.Ready || state is ReviewState.Loading
-    BackHandler(enabled = live && vm.isThrowaway) { vm.cancel() }
+    BackHandler(enabled = live && vm.isThrowaway) {
+        // As the on-screen Cancel: an edit with changes asks first (review B.11).
+        if ((state as? ReviewState.Ready)?.ui?.changed == true) confirmDiscard = true else vm.cancel()
+    }
     when (val s = state) {
         is ReviewState.Loading -> LoadingView(s, onCancel = vm::cancel, onPaste = vm::pasteInstead)
         is ReviewState.Ready ->
             ReviewScreen(
                 ui = s.ui,
                 onInStock = vm::setInStock,
-                onRow = { sheetKey = it },
+                onRow = {
+                    sheetKey = it
+                    vm.noteSheetOpened()
+                },
                 onServings = vm::setServings,
                 onAdd = vm::confirm,
                 onSaveForLater = vm::saveForLater,
@@ -119,6 +140,8 @@ fun ReviewRoute(
                 onClearInStock = vm::clearInStock,
                 edits = ReviewEdits(onTitle = vm::setTitle, onAddLine = vm::addLine, onBook = vm::setBook),
                 onStopRetry = vm::stopRetry,
+                // A shared import can wait on the card; an edit or a library re-add cannot (nothing to come back to).
+                onLater = if (vm.isThrowaway) null else onDone,
             )
         is ReviewState.Failed ->
             ManualLinesView(
@@ -189,8 +212,9 @@ fun ReviewRoute(
             }
         is ReviewState.AlreadyOnList ->
             AlertDialog(
-                // Outside or Back: nothing happens, the job stays ready to review.
-                onDismissRequest = onDone,
+                // Outside or Back: a shared import stays ready to review; a library "Add to list" (a throwaway job)
+                // is dropped, or it would sit on the Shopping tab as "1 recipe ready to review" (review B.13).
+                onDismissRequest = { if (vm.isThrowaway) vm.cancel() else onDone() },
                 title = { Text("Already on your shopping list") },
                 text = { Text("${s.title} is already on your shopping list.") },
                 confirmButton = { TextButton(onClick = vm::addAgain) { Text("Add again") } },

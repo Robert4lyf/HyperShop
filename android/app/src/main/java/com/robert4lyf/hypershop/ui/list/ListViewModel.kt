@@ -19,11 +19,15 @@ import com.robert4lyf.hypershop.core.report.WrongReport
 import com.robert4lyf.hypershop.data.InStockLine
 import com.robert4lyf.hypershop.data.MANUAL_TITLE
 import com.robert4lyf.hypershop.data.MealShopping
+import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.common.webLink
+import com.robert4lyf.hypershop.ui.recipes.UseActions
+import com.robert4lyf.hypershop.ui.recipes.UseDetail
+import com.robert4lyf.hypershop.watch.WatchLinkState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -44,6 +48,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 enum class TickState { OPEN, PARTIAL, DONE }
 
@@ -120,10 +126,12 @@ data class ListUi(
     val mode: ListMode = ListMode.PLAN,
     /** X.9: putting things in the order they are found, with arrows on every row and group. */
     val arranging: Boolean = false,
+    /** "Watch synced" / "Watch updating…" / "Watch not connected", or null with no watch to speak of (UX review 23). */
+    val watch: String? = null,
+    /** The store whose walking order the list follows, and whether a second store has one (missing 4 of the review). */
+    val activeStore: Long = 1,
+    val secondStore: Boolean = false,
 ) {
-    /** Rows grouped within each aisle, with a label per group. */
-    val categorised: Boolean get() = view == ListView.TYPE || arranging
-
     val isEmpty: Boolean get() = loaded && aisles.isEmpty()
 
     /** The shop screen is showing: shopping mode, with something to shop for (an empty list is planned, never shopped). */
@@ -193,11 +201,64 @@ class ListViewModel(
     private val c: AppContainer,
 ) : ViewModel() {
     /** Re-read on every list change, so a new walking order from Settings (or an arrangement) shows straight away. */
-    private val order = c.repository.observeWalkingOrder()
+    private val order = c.settings.activeStore.flatMapLatest { c.repository.observeWalkingOrder(it) }
+
+    /** Which store is walked, and whether a second one has an order to choose (missing 4 of the review). */
+    private val stores =
+        combine(c.settings.activeStore, c.repository.observeListRev()) { s, _ -> s to c.repository.hasSecondStore() }
+            .distinctUntilChanged()
+
+    /** "Shop" with a store picked: the list and the watch walk it, and the shop screen opens. */
+    fun startShopping(storeId: Long) =
+        viewModelScope.launch {
+            if (c.settings.activeStore.first() != storeId) {
+                c.settings.setActiveStore(storeId)
+                c.repository.touchListRev()
+            }
+            c.settings.setListMode(ListMode.SHOP)
+        }
 
     private val arranging = MutableStateFlow(false)
     private val messages = Channel<UiMessage>(Channel.BUFFERED)
     val events: Flow<UiMessage> = messages.receiveAsFlow()
+
+    /** Job ids to open on the review screen: "Edit" on a recipe's card (cut 1 of the review). */
+    private val reviewsOut = Channel<Long>(Channel.BUFFERED)
+    val reviews: Flow<Long> = reviewsOut.receiveAsFlow()
+
+    /** The recipe's own actions on its card in the recipe view, shared with the Recipes tab's model. */
+    private val useActions by lazy { UseActions(c, viewModelScope, messages, reviewsOut) }
+
+    /** The recipe whose ingredients are open in a sheet, or null. */
+    val useDetail: StateFlow<UseDetail?> get() = useActions.detail
+
+    fun closeUse() = useActions.closeDetail()
+
+    /** The use a card of the recipe view stands for: the recipe's, or the hand-added one. */
+    private suspend fun useOf(section: RecipeSection): UseSummary? {
+        val uses = c.repository.usesOnList(c.repository.snapshot())
+        return if (section.kind == RecipeSection.Kind.BY_HAND) {
+            uses.firstOrNull { it.recipeId == null }
+        } else {
+            val id = section.key.removePrefix("use-").toLongOrNull()
+            uses.firstOrNull { it.useId == id }
+        }
+    }
+
+    fun openUse(section: RecipeSection) = viewModelScope.launch { useOf(section)?.let { useActions.open(it) } }
+
+    fun editUse(section: RecipeSection) = viewModelScope.launch { useOf(section)?.let { useActions.edit(it) } }
+
+    fun editUse(use: UseSummary) = useActions.edit(use)
+
+    fun renameUse(
+        section: RecipeSection,
+        title: String,
+    ) = viewModelScope.launch { useOf(section)?.let { useActions.rename(it, title) } }
+
+    fun removeUse(section: RecipeSection) = viewModelScope.launch { useOf(section)?.let { useActions.remove(it) } }
+
+    fun removeUse(use: UseSummary) = useActions.remove(use)
 
     private val _sheet = MutableStateFlow<ItemSheet?>(null)
     val sheet: StateFlow<ItemSheet?> = _sheet
@@ -230,14 +291,17 @@ class ListViewModel(
      */
     private val listWithInStock = c.repository.list.map { Triple(it, c.repository.inStockOnList(it, stillShopping = true), sources(it)) }
 
+    /** The watch link's state and the listRev it last got, for the shop header's word. */
+    private val watchSent = combine(c.watchLink.state, c.watchSync.sent) { st, rev -> st to rev }
+
     val ui: StateFlow<ListUi> =
         combine(
             listWithInStock,
             c.settings.units,
             view,
-            c.importJobs.ready,
+            combine(c.importJobs.ready, watchSent, stores) { r, w, s -> Triple(r, w, s) },
             c.recipePhotos.paths(),
-        ) { (list, lines, src), units, v, ready, photos ->
+        ) { (list, lines, src), units, v, (ready, watch, store), photos ->
             lastList = list
             lastUnits = units
             build(
@@ -255,6 +319,9 @@ class ListViewModel(
                     // Arranging is a planning job: the shop screen leaves it.
                     arranging = v.arranging && v.mode == ListMode.PLAN && v.layout != ListView.RECIPE,
                     recipes = ui.recipes.map { r -> r.libraryKey?.let { r.copy(photo = photos[it]) } ?: r },
+                    watch = watchWord(watch.first, watch.second, list.listRev),
+                    activeStore = store.first,
+                    secondStore = store.second,
                 )
             }
         }.flowOn(Dispatchers.Default)
@@ -455,6 +522,32 @@ class ListViewModel(
     /** The menu's choice of layout. */
     fun setView(v: ListView) = viewModelScope.launch { c.settings.setListView(v) }
 
+    /** Whether the watch has this list, in a word for the shop header; null when there is no watch to speak of. */
+    private fun watchWord(
+        state: WatchLinkState,
+        sentRev: Int,
+        listRev: Long,
+    ): String? =
+        when (state) {
+            WatchLinkState.NO_SDK, WatchLinkState.NOT_INSTALLED -> null
+            WatchLinkState.DISCONNECTED, WatchLinkState.CONNECTED -> "Watch not connected"
+            WatchLinkState.APP_READY -> if (sentRev.toLong() == listRev) "Watch synced" else "Watch updating…"
+        }
+
+    /** After Finish with rows unbought: how many, while the "keep or drop?" prompt is up; null otherwise. */
+    val carryOver = MutableStateFlow<Int?>(null)
+
+    /** "Keep them": the prompt goes, the rows stay for the next trip. */
+    fun keepLeftovers() {
+        carryOver.value = null
+    }
+
+    /** "Remove them": everything left (all unbought after a finish) goes, with the clear's Undo. */
+    fun dropLeftovers() {
+        carryOver.value = null
+        clearAll()
+    }
+
     /** "Shop" / "Plan": the mode is a setting, so it survives a restart mid-shop. Nothing on the list changes. */
     fun setMode(m: ListMode) = viewModelScope.launch { c.settings.setListMode(m) }
 
@@ -495,8 +588,16 @@ class ListViewModel(
         by: Int,
     ) = viewModelScope.launch {
         val rows = ui.value.aisles.firstOrNull { it.first == row.aisle }?.second.orEmpty().filter { it.group == row.group }
-        val next = c.repository.shelfOrder().movedItem(rows.map { it.slot() }, row.slot(), by) ?: return@launch
-        c.repository.arrange(next)
+        c.repository.arrangeWith { it.movedItem(rows.map { r -> r.slot() }, row.slot(), by) }
+    }
+
+    /** UX review 17: a row to the top or bottom of its group, as shown. */
+    fun moveItemToEnd(
+        row: ListRow,
+        top: Boolean,
+    ) = viewModelScope.launch {
+        val rows = ui.value.aisles.firstOrNull { it.first == row.aisle }?.second.orEmpty().filter { it.group == row.group }
+        c.repository.arrangeWith { it.movedItemToEnd(rows.map { r -> r.slot() }, row.slot(), top) }
     }
 
     /** Moves the group [group] one place up or down within [aisle], past the group shown next to it. */
@@ -507,10 +608,7 @@ class ListViewModel(
     ) = viewModelScope.launch {
         val present = ui.value.aisles.firstOrNull { it.first == aisle }?.second.orEmpty().map { it.group }.distinct()
         val known: List<String?> = c.catalog.groupsIn(aisle) + null
-        val next =
-            c.repository.shelfOrder().movedGroup(aisle, present, known, group, by) { c.catalog.groupRank(aisle, it) }
-                ?: return@launch
-        c.repository.arrange(next)
+        c.repository.arrangeWith { it.movedGroup(aisle, present, known, group, by) { g -> c.catalog.groupRank(aisle, g) } }
     }
 
     /** "Found it after all": back among what is left. */
@@ -531,8 +629,16 @@ class ListViewModel(
         viewModelScope.launch {
             // Counted inside the write: a tick still on its way to the screen is included.
             val (stamp, n) = c.repository.finish()
-            val text = if (n == 1) "Finished: 1 bought item removed" else "Finished: $n bought items removed"
+            // A finished trip ends in planning whatever is still on the list (set aside as not available, or
+            // never found): the shop screen would count that as "left" (review B.14).
+            c.settings.setListMode(ListMode.PLAN)
+            val left = c.repository.snapshot().liveItems.size
+            val text =
+                (if (n == 1) "Finished: 1 bought item removed" else "Finished: $n bought items removed") +
+                    (if (left > 0) " · $left still needed" else "")
             messages.send(UiMessage(text, undo = { c.repository.undoDelete(stamp) }))
+            // Missing 3: what was not bought is asked about once, rather than carried over unnoticed.
+            if (left > 0 && n > 0) carryOver.value = left
         }
 
     // ---- the item sheet (5.7) ---------------------------------------------------------------
@@ -702,10 +808,20 @@ class ListViewModel(
      */
     fun addTyped(text: String) =
         viewModelScope.launch {
+            // One add at a time, against the list as it is, not as last shown: two quick Enters of one item must
+            // not add it twice (review B.17); the second finds the first's row and says so.
+            adding.withLock { addTypedNow(text) }
+        }
+
+    /** Adds in tap order. */
+    private val adding = Mutex()
+
+    private suspend fun addTypedNow(text: String) {
+        run {
             val lines = text.split('\n').map { it.trim() }.filter { it.isNotEmpty() }
             if (lines.size == 1) {
                 val p = typed(lines.single())
-                val existing = lastList.itemByKey(c.repository.target(p.name).mergeKey)
+                val existing = c.repository.snapshot().itemByKey(c.repository.target(p.name).mergeKey)
                 if (existing != null) {
                     val amount = amountOf(p)
                     val line = lines.single()
@@ -716,12 +832,13 @@ class ListViewModel(
                             action = if (amount == null) "Add 1 more" else "Add $amount",
                         ),
                     )
-                    return@launch
+                    return@run
                 }
             }
             for (l in lines) addLine(l)
             if (lines.size > 1) messages.send(UiMessage("Added ${lines.size} items"))
         }
+    }
 
     /**
      * A typed line read as a recipe's would be on its way to the list: "lime juice" is limes (V.2), whoever

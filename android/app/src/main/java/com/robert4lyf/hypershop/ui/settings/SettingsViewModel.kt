@@ -13,6 +13,7 @@ import com.robert4lyf.hypershop.claude.KeyCheck
 import com.robert4lyf.hypershop.claude.SpendGuard
 import com.robert4lyf.hypershop.core.merge.UnitsSetting
 import com.robert4lyf.hypershop.core.model.AisleCode
+import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.settings.ThemeMode
 import com.robert4lyf.hypershop.ui.common.UiMessage
@@ -40,7 +41,8 @@ data class SettingsUi(
     val theme: ThemeMode = ThemeMode.SYSTEM,
     val staples: List<String> = emptyList(),
     val aisles: List<AisleCode> = emptyList(),
-    val watchVibrate: Boolean = true,
+    /** Whose walking order [aisles] is: 1, or 2 for the second store (missing 4 of the review). */
+    val editingStore: Long = 1,
     val claudeAlways: Boolean = true,
     /** W.4: "This is wrong" notes saved on the phone. */
     val wrongNotes: Int = 0,
@@ -117,7 +119,6 @@ class SettingsViewModel(
         watch(s.model) { copy(model = it) }
         watch(s.monthlyCapUsd) { copy(monthlyCapUsd = it) }
         watch(s.dailyCalls) { copy(dailyCalls = it) }
-        watch(s.watchVibrate) { copy(watchVibrate = it) }
         watch(s.claudeAlways) { copy(claudeAlways = it) }
         viewModelScope.launch { _ui.update { it.copy(wrongNotes = c.wrongReports.count()) } }
         val link = combine(c.watchLink.state, c.watchLink.problem) { st, why -> watchStatus(st, why) to watchCanRetry(st, why) }
@@ -142,7 +143,7 @@ class SettingsViewModel(
             viewModelScope.launch {
                 val saved = c.apiKeyStore.isSaved()
                 if (!hasKeyMoved) _ui.update { it.copy(hasKey = saved, keyMissingAfterRestore = keyWasSet && !saved) }
-                val aisles = c.repository.aisleOrder()
+                val aisles = c.repository.aisleOrder(_ui.value.editingStore)
                 if (!aislesMoved) _ui.update { it.copy(aisles = aisles) }
             }
         viewModelScope.launch {
@@ -230,9 +231,25 @@ class SettingsViewModel(
     private fun write(order: List<AisleCode>) {
         if (order == _ui.value.aisles) return
         aislesMoved = true
+        val store = _ui.value.editingStore
         _ui.update { it.copy(aisles = order) }
-        viewModelScope.launch { aisleWrites.withLock { c.repository.setAisleOrder(order) } }
+        viewModelScope.launch { aisleWrites.withLock { c.repository.setAisleOrder(order, store) } }
     }
+
+    /** Settings › Aisles: which store's walking order the arrows move (missing 4 of the review). */
+    fun editStore(id: Long) =
+        viewModelScope.launch {
+            val order = aisleWrites.withLock { c.repository.aisleOrder(id) }
+            _ui.update { it.copy(editingStore = id, aisles = order) }
+        }
+
+    /** Settings › Always at home › "Ran out" (missing 5 of the review): on the list once, still always at home. */
+    fun ranOut(name: String) =
+        viewModelScope.launch {
+            val key = c.repository.staples().firstOrNull { stapleName(it) == name } ?: return@launch
+            c.repository.manualAdd(stapleName(key), QtyBase.PRESENCE, null)
+            messages.send(UiMessage("$name is on the shopping list, and still always at home"))
+        }
 
     // ---- Data: backup and restore ------------------------------------------------------------
 
@@ -365,8 +382,6 @@ class SettingsViewModel(
             c.buyAgain.clearHistory()
             messages.send(UiMessage("Shopping history cleared"))
         }
-
-    fun setWatchVibrate(on: Boolean) = viewModelScope.launch { c.settings.setWatchVibrate(on) }
 
     fun setClaudeAlways(on: Boolean) = viewModelScope.launch { c.settings.setClaudeAlways(on) }
 

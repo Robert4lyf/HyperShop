@@ -46,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -64,6 +65,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.robert4lyf.hypershop.BuildConfig
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.di.ShareOutcome
 import com.robert4lyf.hypershop.di.Startup
@@ -74,6 +76,7 @@ import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.meals.MealsRoute
 import com.robert4lyf.hypershop.ui.recipes.RecipesRoute
 import com.robert4lyf.hypershop.ui.review.ReviewRoute
+import com.robert4lyf.hypershop.ui.settings.AislesRoute
 import com.robert4lyf.hypershop.ui.settings.SettingsRoute
 import com.robert4lyf.hypershop.ui.voicetest.VoiceTestRoute
 import kotlinx.coroutines.Dispatchers
@@ -87,6 +90,7 @@ object Routes {
     const val REVIEW = "review/{job}"
     const val DEBUG = "debug"
     const val LIBRARY = "library"
+    const val AISLES = "aisles"
     const val VOICE_TEST = "voice-test"
     const val MEALS = "meals"
 
@@ -169,6 +173,14 @@ private fun AppShell(
             restoreState = true
         }
     }
+    // The launcher shortcut (missing 7 of the review): Shopping, with the Add field focused.
+    var addFocus by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        container.addRequests.collect {
+            selectTab(Routes.LIST)
+            addFocus++
+        }
+    }
     // X.10: with nothing to buy the app opens on This week, where a shop starts; otherwise on the shopping list.
     // Once per launch (not on rotation), and only if nothing has navigated yet (a share's review).
     var startChosen by rememberSaveable { mutableStateOf(false) }
@@ -176,9 +188,12 @@ private fun AppShell(
         if (startChosen) return@LaunchedEffect
         startChosen = true
         val empty = container.repository.list.first().liveItems.isEmpty()
+        // Someone who has shopped here before (saved recipes, or a finished trip): a first run stays on Shopping,
+        // where the Add field and the sample list are, not on "No saved recipes yet" (UX review 3).
+        val returning = container.repository.observeLibrary().first().isNotEmpty() || container.buyAgain.observe().first().hasHistory
         // Navigation's state belongs to the main thread, wherever the list was read.
         withContext(Dispatchers.Main) {
-            if (empty && nav.currentBackStackEntry?.destination?.route == Routes.LIST) selectTab(Routes.MEALS)
+            if (empty && returning && nav.currentBackStackEntry?.destination?.route == Routes.LIST) selectTab(Routes.MEALS)
         }
     }
     Scaffold(
@@ -225,7 +240,7 @@ private fun AppShell(
             popExitTransition = { fadeOut(tween(100)) },
         ) {
             composable(Routes.LIST) {
-                ListRoute(container, snackbar, onReview = openReview, onPlan = { selectTab(Routes.MEALS) })
+                ListRoute(container, snackbar, onReview = openReview, onPlan = { selectTab(Routes.MEALS) }, focusAdd = addFocus)
             }
             composable(Routes.RECIPES) {
                 RecipesRoute(
@@ -249,26 +264,35 @@ private fun AppShell(
                     container,
                     onDebug = debugScreen?.let { { nav.navigate(Routes.DEBUG) } },
                     onLibrary = { nav.navigate(Routes.LIBRARY) { launchSingleTop = true } },
-                    onVoiceTest = { nav.navigate(Routes.VOICE_TEST) { launchSingleTop = true } },
+                    onAisles = { nav.navigate(Routes.AISLES) { launchSingleTop = true } },
+                    // A developer harness with a microphone service: not in a release until voice mode exists.
+                    onVoiceTest = if (BuildConfig.DEBUG) ({ nav.navigate(Routes.VOICE_TEST) { launchSingleTop = true } }) else null,
                     snackbar = snackbar,
                 )
             }
             composable(Routes.VOICE_TEST) { VoiceTestRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.LIBRARY) { LibraryRoute(container, snackbar, onBack = { nav.popBackStack() }) }
+            composable(Routes.AISLES) { AislesRoute(container, onBack = { nav.popBackStack() }) }
             composable(Routes.REVIEW, arguments = listOf(navArgument("job") { type = NavType.LongType })) { e ->
                 ReviewRoute(
                     container,
                     e.arguments!!.getLong("job"),
                     snackbar,
                     onDone = {
-                        // Back to the tab the review was opened from; the list when it was opened by a share.
+                        // Back to the tab the review was opened from, or to Settings › Library (not past it to the
+                        // list, review B.18); the list when it was opened by a share.
                         val prev = nav.previousBackStackEntry?.destination?.route
-                        if (prev in TABS) nav.popBackStack() else nav.popBackStack(Routes.LIST, inclusive = false)
+                        if (prev in TABS || prev == Routes.LIBRARY) nav.popBackStack() else nav.popBackStack(Routes.LIST, inclusive = false)
                     },
+                    // "Try again" opens the new job only while the review is still on screen; left already, the job
+                    // waits on the Shopping tab's card (review B.20).
+                    onSettings = { selectTab(Routes.SETTINGS) },
                     onReopen = { id ->
-                        nav.navigate(Routes.review(id)) {
-                            popUpTo(Routes.REVIEW) { inclusive = true }
-                            launchSingleTop = true
+                        if (nav.currentBackStackEntry?.destination?.route == Routes.REVIEW) {
+                            nav.navigate(Routes.review(id)) {
+                                popUpTo(Routes.REVIEW) { inclusive = true }
+                                launchSingleTop = true
+                            }
                         }
                     },
                     // Undo after Cancel, up to 10 s later: a review opened meanwhile is left alone (the job is back on the card).
@@ -312,7 +336,7 @@ internal fun CompactNavBar(
                 // The ingredient library and the voice test are part of Settings, so its tab stays lit there.
                 val selected =
                     route == r ||
-                        (r == Routes.SETTINGS && (route == Routes.LIBRARY || route == Routes.VOICE_TEST))
+                        (r == Routes.SETTINGS && (route == Routes.LIBRARY || route == Routes.AISLES || route == Routes.VOICE_TEST))
                 Column(
                     Modifier
                         .weight(1f)

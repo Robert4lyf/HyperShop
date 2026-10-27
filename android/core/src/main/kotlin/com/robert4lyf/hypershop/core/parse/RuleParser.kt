@@ -47,7 +47,12 @@ class RuleParser(
      * amount hid it (held-out ho-37, hob-34). A dash only counts as a marker
      * when a space follows it, so "-1" or "half-fat" are never touched.
      */
-    private fun withoutMarker(text: String): String = LIST_MARKER.replaceFirst(text, "")
+    private fun withoutMarker(text: String): String {
+        // Blanked, not cut: the tokens' offsets index the line as written (the notes, "(optional)" and a spaced
+        // dash are all read from it), so a marker must not shift them (review C.21).
+        val m = LIST_MARKER.find(text) ?: return text
+        return " ".repeat(m.value.length) + text.substring(m.range.last + 1)
+    }
 
     /** One parse; holds the cursor over the tokens. */
     private inner class Line(
@@ -110,7 +115,18 @@ class RuleParser(
             // Nothing before it that could be a name, or the number is the first token (a leading amount read already).
             if (from == 0 || (0 until from).none { toks[it].kind == Kind.WORD }) return null
             if (unitAtEnd == QtyUnit.OTHER) flag("an unknown unit")
+            // "Serves 4", "Preheat oven to 200": pasted recipe text, not an amount of something (R7, review C.27).
+            if (unitAtEnd == null && !knownName(0, from)) flag("a number after a name the catalogue does not know")
             return Trailing(from, value, null, unitAtEnd, null, null)
+        }
+
+        /** Whether the words in [from, to), less their qualifiers and prep, name something the catalogue has. */
+        fun knownName(
+            from: Int,
+            to: Int,
+        ): Boolean {
+            val ws = (from until to).mapNotNull { word(it) }.filter { it !in Lexicon.qualifiers && it !in Lexicon.prep }
+            return ws.isNotEmpty() && entryOf(ws.joinToString(" ")) != null
         }
 
         /** R7: the line needs a look; the first reason is the one shown. */
@@ -130,6 +146,7 @@ class RuleParser(
             var qty = readNumber()
             var qtyMax: Rational? = null
             if (qty != null) qtyMax = readRangeEnd(qty)
+            if (qty?.isZero == true) flag("a zero amount")
             // R3.3: "1 dozen eggs", "2-3 dozen".
             if (qty != null && word(i) == "dozen") {
                 i++
@@ -152,6 +169,12 @@ class RuleParser(
                 } else if (kind(i) == Kind.NUM && word(i + 1) in Lexicon.lengths) {
                     notes += span(i, i + 2) // "1 2cm piece", "a 3cm piece"
                     i += 2
+                } else if (kind(i) == Kind.DASH && word(i + 1) in Lexicon.lengths) {
+                    // "1-inch piece ginger": the dash joins the size to its unit; one piece (review C.22).
+                    notes += span(qtyStart, i + 2)
+                    i += 2
+                    qty = Rational.ONE
+                    qtyMax = null
                 }
             }
             val qtyEnd = i
@@ -270,7 +293,7 @@ class RuleParser(
                     if (more == null || moreUnit == null) {
                         i = save
                     } else if (moreUnit == unit && word(save) == "plus") {
-                        altQty = altQty?.let { it * (qty!! + more) / qty!! }
+                        altQty = altQty?.let { if (qty!!.isZero) it else it * (qty!! + more) / qty!! }
                         qty = qty!! + more
                         qtyMax = qtyMax?.plus(more)
                         summed = true
@@ -317,7 +340,7 @@ class RuleParser(
             val more = if (qty != null) plusAfterName(name, unit) else null
             if (more != null) {
                 // "2 tbsp (30g) butter, plus 1 tbsp": the grams written for the first amount grow with it.
-                altQty = altQty?.let { it * (qty!! + more) / qty!! }
+                altQty = altQty?.let { if (qty!!.isZero) it else it * (qty!! + more) / qty!! }
                 qty = qty!! + more
                 qtyMax = qtyMax?.plus(more)
                 summed = true
@@ -565,7 +588,9 @@ class RuleParser(
                         }
                     }
                 }
-                if (kept.isNotEmpty() && (w in Lexicon.nameEnders || w in Lexicon.prep) && !startsCatalogName(words, idx)) {
+                // "juice from 1 lemon": "from" is read with "of" by juiceOf below, not as the end of the name (review C.23).
+                val juiceFrom = w == "from" && joinWords(kept).lowercase() in Regexless.PARTS
+                if (kept.isNotEmpty() && (w in Lexicon.nameEnders || w in Lexicon.prep) && !startsCatalogName(words, idx) && !juiceFrom) {
                     notes += span(toks.indexOf(t), toks.indexOf(words.last()) + 1)
                     break
                 }
@@ -857,13 +882,16 @@ private class Trailing(
 
 /** Small hand-written matchers (no regex backtracking on untrusted lines). */
 internal object Regexless {
+    /** The parts of a fruit a recipe asks for by the fruit. */
+    val PARTS = setOf("juice", "zest", "rind")
+
     /** "juice of 2 lemons" / "zest from a small orange" → (part, fruit, qty). */
     fun juiceOf(name: String): Triple<String, String, Rational?>? {
         val words = name.split(' ').filter { it.isNotEmpty() }
         val idx = words.indexOfFirst { it == "of" || it == "from" }
         if (idx < 1) return null
         val part = words[idx - 1]
-        if (part != "juice" && part != "zest" && part != "rind") return null
+        if (part !in PARTS) return null
         var rest = words.drop(idx + 1)
         // "2", "½", "1/2" (one number token) or a number word; "half a lemon" drops the article too.
         val n =

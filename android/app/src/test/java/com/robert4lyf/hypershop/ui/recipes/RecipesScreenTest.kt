@@ -84,21 +84,9 @@ class RecipesScreenTest {
     private fun show(dark: Boolean = false) {
         compose.setContent {
             HyperShopTheme(dark = dark, dynamicColor = false) {
-                RecipesScreen(USES, onRemove = { events += "remove ${it.useId}" })
+                RecipesScreen(USES)
             }
         }
-        compose.onNodeWithTag("view-list").performClick()
-    }
-
-    @Test
-    fun removeIsOneTapWithUndoOnTheMessage() {
-        show()
-        compose.onNodeWithContentDescription("Serves 4 · 6 still needed · 3 at home").assertExists()
-        // Every use can be removed from its menu; the snackbar's Undo puts it back.
-        compose.onNodeWithContentDescription("Serves 8 · 5 still needed").assertExists()
-        compose.onNodeWithTag("more-2").performClick()
-        compose.onNodeWithTag("remove-2").performClick()
-        assertEquals(listOf("remove 2"), events)
     }
 
     @Test
@@ -126,33 +114,27 @@ class RecipesScreenTest {
         val added = mutableListOf<String>()
         compose.setContent {
             HyperShopTheme(dynamicColor = false) {
-                RecipesScreen(USES, onRemove = {}, library = LibraryActions(onAdd = { added += it.key }))
+                RecipesScreen(USES, library = LibraryActions(onAdd = { added += it.key }))
             }
         }
-        compose.onNodeWithTag("view-library").performClick()
         val list = compose.onNodeWithTag("recipes")
         // Not on the list: straight in.
         list.performScrollToNode(hasTestTag("lib-add-r:9"))
         compose.onNodeWithTag("lib-add-r:9").performClick()
-        // On the list: "Add again" asks first.
+        // On the list too: straight in; the review asks "Already on your shopping list" itself, once (review B.13).
         list.performScrollToNode(hasTestTag("lib-add-r:1"))
         compose.onNodeWithTag("lib-add-r:1").performClick()
-        compose.onNodeWithText("Cancel").performClick()
-        compose.onNodeWithTag("lib-add-r:1").performClick()
-        compose.onNodeWithTag("add-again-confirm").performClick()
         assertEquals(listOf("r:9", "r:1"), added)
     }
 
     @Test
     fun anEmptyListWithSavedRecipesSaysSo() {
         compose.setContent {
-            HyperShopTheme(dynamicColor = false) { RecipesScreen(USES.copy(uses = emptyList()), onRemove = {}) }
+            HyperShopTheme(dynamicColor = false) { RecipesScreen(USES.copy(uses = emptyList())) }
         }
-        // Opens on saved recipes; "In this shop" says it is empty.
+        // The recipe book (cut 1 of the review): the saved recipes, whatever is in this shop.
         compose.onNodeWithTag("lib-r:9").assertExists()
-        compose.onNodeWithTag("view-list").performClick()
-        compose.onNodeWithTag("nothing-yet").assertExists()
-        compose.onNodeWithText("No recipes in this shop", substring = true).assertExists()
+        compose.onNodeWithTag("use-1").assertDoesNotExist()
     }
 
     @Test
@@ -191,10 +173,9 @@ class RecipesScreenTest {
         val opened = mutableListOf<String>()
         compose.setContent {
             HyperShopTheme(dynamicColor = false) {
-                RecipesScreen(USES, onRemove = {}, library = LibraryActions(onOpen = { opened += it.key }))
+                RecipesScreen(USES, library = LibraryActions(onOpen = { opened += it.key }))
             }
         }
-        compose.onNodeWithTag("view-library").performClick()
         compose.onNodeWithTag("recipes").performScrollToNode(hasTestTag("lib-r:9"))
         compose.onNodeWithTag("lib-r:9").performClick()
         assertEquals(listOf("r:9"), opened)
@@ -225,36 +206,15 @@ class RecipesScreenTest {
     }
 
     @Test
-    fun theListAndTheLibraryAreSeparateAndANewRecipeShowsOnTheList() {
-        var ui by mutableStateOf(USES.copy(uses = USES.uses.take(1)))
-        compose.setContent { HyperShopTheme(dynamicColor = false) { RecipesScreen(ui, onRemove = {}) } }
-        // X.12: opens on saved recipes, the recipe book; this shop's recipes are the other view.
+    fun theTabIsTheRecipeBookAndSaysWhatIsOnTheList() {
+        val ui by mutableStateOf(USES.copy(uses = USES.uses.take(1)))
+        compose.setContent { HyperShopTheme(dynamicColor = false) { RecipesScreen(ui) } }
+        // The recipe book (X.12, cut 1 of the review): this shop's recipes are on the Shopping tab's recipe view.
         compose.onNodeWithTag("lib-r:9").assertExists()
         compose.onNodeWithTag("use-1").assertDoesNotExist()
+        compose.onNodeWithText("On the shopping list").assertExists()
         TestPhotos.settle(compose)
         compose.onRoot().captureRoboImage(Shots.path("recipes-library-light.png"))
-        compose.onNodeWithTag("view-list").performClick()
-        compose.onNodeWithTag("use-1").assertExists()
-        compose.onNodeWithTag("lib-r:9").assertDoesNotExist()
-        compose.onNodeWithTag("view-library").performClick()
-        // A recipe added to the list brings the list back.
-        ui = USES
-        compose.waitForIdle()
-        compose.onNodeWithTag("use-3").assertExists()
-        compose.onNodeWithTag("lib-r:9").assertDoesNotExist()
-    }
-
-    @Test
-    fun tapARecipeOnTheListToSeeItsIngredients() {
-        val opened = mutableListOf<Long>()
-        compose.setContent {
-            HyperShopTheme(dynamicColor = false) { RecipesScreen(USES, onRemove = {}, onOpenUse = { opened += it.useId }) }
-        }
-        compose.onNodeWithTag("view-list").performClick()
-        compose.onNodeWithTag("use-2").performClick()
-        assertEquals(listOf(2L), opened)
-        // "Typed into the list" said nothing the card doesn't.
-        compose.onNodeWithText("Typed into the list").assertDoesNotExist()
     }
 
     @Test
@@ -300,12 +260,10 @@ class RecipesScreenTest {
     fun aRecipeWithoutAPhotoHasABandAsTallAsOneWith() {
         show()
 
-        // On the list: the chilli's photo and the cake's mosaic make bands of one height.
+        // The chilli's photo and the dal's mosaic make bands of one (compact, UX review 14) height.
         fun height(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot().let { it.bottom - it.top }
-        assertEquals(height("use-band-1").value, height("use-band-2").value, 1f)
-        // Saved: the same.
-        compose.onNodeWithTag("view-library").performClick()
         assertEquals(height("lib-band-r:1").value, height("lib-band-r:9").value, 1f)
+        assertEquals(96f, height("lib-band-r:9").value, 1f)
     }
 
     @Test
@@ -361,28 +319,8 @@ class RecipesScreenTest {
     @Test
     fun aRatedRecipeSaysSoOnItsCard() {
         val rated = USES.copy(library = USES.library.map { if (it.key == "r:9") it.copy(rating = 5) else it })
-        compose.setContent { HyperShopTheme(dynamicColor = false) { RecipesScreen(rated, onRemove = {}) } }
-        compose.onNodeWithTag("view-library").performClick()
+        compose.setContent { HyperShopTheme(dynamicColor = false) { RecipesScreen(rated) } }
         compose.onNodeWithText("★ 5/5", substring = true).assertExists()
-    }
-
-    @Test
-    fun switchingBetweenOnTheListAndSavedLeavesTheLabelsWhereTheyAre() {
-        compose.setContent { HyperShopTheme(dynamicColor = false) { RecipesScreen(USES, onRemove = {}) } }
-
-        fun lefts() =
-            listOf(
-                "Saved recipes",
-                "In this shop",
-            ).map { compose.onNodeWithText(it, useUnmergedTree = true).getUnclippedBoundsInRoot().left }
-        val before = lefts()
-        compose.onNodeWithTag("view-library").performClick()
-        compose.waitForIdle()
-        // A checkmark on the selected side used to push its label along on every switch.
-        assertEquals(before, lefts())
-        compose.onNodeWithTag("view-list").performClick()
-        compose.waitForIdle()
-        assertEquals(before, lefts())
     }
 
     @Test
@@ -393,12 +331,10 @@ class RecipesScreenTest {
             HyperShopTheme(dynamicColor = false) {
                 RecipesScreen(
                     ui,
-                    onRemove = {},
                     library = LibraryActions(onSort = { got += "sort ${it.name}" }, onHighlyRated = { got += "rated $it" }),
                 )
             }
         }
-        compose.onNodeWithTag("view-library").performClick()
         compose.onNodeWithTag("library-sort").performClick()
         compose.onNodeWithTag("sort-RATING").performClick()
         compose.onNodeWithTag("filter-highly-rated").performClick()

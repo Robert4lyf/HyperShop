@@ -8,6 +8,7 @@ import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.data.ClaudeUsageEntity
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.testutil.await
+import com.robert4lyf.hypershop.testutil.awaitTrue
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.list.add
 import kotlinx.coroutines.CoroutineScope
@@ -203,10 +204,17 @@ class SettingsViewModelTest {
         assertEquals(second, runBlocking { c.repository.aisleOrder() }.first())
         vm.moveAisle(second, -1)
         assertEquals(second, await(vm.ui) { true }.aisles.first())
-        vm.setWatchVibrate(false)
-        await(vm.ui) { !it.watchVibrate }
-        assertFalse(runBlocking { c.settings.watchVibrate.first() })
         assertTrue(AisleCode.PRODUCE in ui.aisles)
+        // Missing 4: the second store's order is its own; missing 5: "Ran out" puts a staple on the list once.
+        vm.editStore(2)
+        val two = await(vm.ui) { it.editingStore == 2L }
+        vm.moveAisle(two.aisles[1], -1)
+        awaitTrue { runBlocking { c.repository.aisleOrder(2) }.first() == two.aisles[1] }
+        assertEquals(second, runBlocking { c.repository.aisleOrder(1) }.first())
+        val staple = await(vm.ui) { it.staples.isNotEmpty() }.staples.first()
+        vm.ranOut(staple)
+        awaitTrue { runBlocking { c.repository.snapshot() }.liveItems.any { it.displayName.equals(staple, ignoreCase = true) } }
+        assertTrue(staple in await(vm.ui) { true }.staples)
     }
 
     @Test

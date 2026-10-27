@@ -37,7 +37,8 @@ fun RecipeBackdrop(
     modifier: Modifier = Modifier,
 ) {
     if (photo == null) {
-        Box(modifier.lowPoly(title))
+        // UX review 25: the mosaic's brightest facets get the same soft shade behind the title as a photo does.
+        Box(modifier.lowPoly(title)) { Box(Modifier.matchParentSize().background(MOSAIC_SHADE)) }
         return
     }
     Box(modifier) {
@@ -45,6 +46,13 @@ fun RecipeBackdrop(
         Box(Modifier.matchParentSize().background(PHOTO_SHADE))
     }
 }
+
+private val MOSAIC_SHADE =
+    Brush.verticalGradient(
+        0f to Color.Transparent,
+        0.5f to Color.Black.copy(alpha = 0.08f),
+        1f to Color.Black.copy(alpha = 0.38f),
+    )
 
 private val PHOTO_SHADE =
     Brush.verticalGradient(

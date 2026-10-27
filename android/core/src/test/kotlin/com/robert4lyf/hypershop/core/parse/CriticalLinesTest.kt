@@ -102,6 +102,10 @@ class CriticalLinesTest {
             Case("300g bacon lardons", "cat:pancetta", "300g"),
             // A recipe's own metric figure is what is shopped by.
             Case("1/2 cup (113g) butter", "cat:butter", "120g", locale = UnitLocale.US),
+            // The review of 2026-10-27 (C.26, C.29, C.30): a tin of beans is tinned, fresh yeast is not dried, lean mince is mince.
+            Case("1 tin beans", "cat:beans_tin", "1 tin", aisle = AisleCode.TINS_JARS),
+            Case("7g fresh yeast", "cat:fresh_yeast", "7g", aisle = AisleCode.CHILLED),
+            Case("500g lean minced beef", "cat:beef_mince", "500g"),
         )
 
     private fun show(

@@ -39,6 +39,78 @@ class RuleParserTest {
     }
 
     @Test
+    fun aListMarkerShiftsNothingThatIsReadFromTheLine() {
+        // Review C.21: the notes, "(optional)" and a spaced dash are read by offset into the line as written.
+        val egg = p.parse("- 1 egg (optional)")
+        assertEquals("egg", egg.name)
+        assertTrue(egg.optional)
+        assertNull(egg.note)
+        val onion = p.parse("• 1 onion, finely chopped")
+        assertEquals("onion", onion.name)
+        assertEquals("finely chopped", onion.note)
+        val sugar = p.parse("- 100 g sugar (plus 50g for dusting)")
+        assertEquals(Rational.of(100), sugar.quantity)
+        assertEquals(QtyUnit.G, sugar.unit)
+        assertEquals("sugar", sugar.name)
+        assertEquals("100", sugar.quantityText)
+        val cheddar = p.parse("- cheddar - big block")
+        assertEquals("cheddar", cheddar.name)
+        assertEquals("big block", cheddar.note)
+    }
+
+    @Test
+    fun aDashJoinsASizeToItsUnit() {
+        // Review C.22: "1-inch" is a size like "1 inch", one piece.
+        val r = p.parse("1-inch piece ginger")
+        assertEquals("ginger", r.name)
+        assertEquals(Rational.ONE, r.quantity)
+        assertTrue(r.note.orEmpty().contains("1-inch"), r.note)
+        assertFalse(r.check)
+    }
+
+    @Test
+    fun juiceFromAFruitIsTheFruit() {
+        // Review C.23: "from" reads as "of" does.
+        val lemon = p.parse("juice from 1 lemon")
+        assertEquals("lemon", lemon.name)
+        assertEquals(Rational.ONE, lemon.quantity)
+        assertTrue(lemon.check)
+        assertEquals("orange", p.parse("zest from 1 orange").name)
+        // "from" still ends a name that is not a part of a fruit.
+        assertEquals("starter", p.parse("200g starter from above").name)
+    }
+
+    @Test
+    fun aZeroAmountIsFlaggedAndNeverDividedBy() {
+        // Review C.28: the arithmetic for a "plus" amount scaled the grams by the first amount.
+        val r = p.parse("0 cups (0g) plus 1 cup flour")
+        assertTrue(r.check)
+        assertEquals("a zero amount", r.checkReason)
+        assertTrue(p.parse("0 tbsp (0g) butter, plus 1 tbsp").check)
+    }
+
+    @Test
+    fun pkgIsAPacketAndLeanAQualifier() {
+        val cheese = p.parse("1 pkg cream cheese")
+        assertEquals(QtyUnit.PACKET, cheese.unit)
+        assertEquals("cream cheese", cheese.name)
+        val beef = p.parse("500g lean minced beef")
+        assertEquals("minced beef", beef.name)
+        assertEquals("lean", beef.note)
+    }
+
+    @Test
+    fun aBareNumberAfterWordsTheCatalogueDoesNotKnowIsFlagged() {
+        // Review C.27: pasted recipe text ("Serves 4") is not an amount to trust; a known name's count is.
+        assertTrue(p.parse("Serves 4").check)
+        assertTrue(p.parse("Preheat oven to 200").check)
+        assertFalse(p.parse("Eggs 2").check)
+        assertFalse(p.parse("Large eggs 6").check)
+        assertEquals(Rational.of(6), p.parse("bananas x6").quantity)
+        assertFalse(p.parse("bananas x6").check)
+    }
+
+    @Test
     fun r2CaseSensitiveSpoonsAndFluidOunces() {
         assertEquals(QtyUnit.TBSP, p.parse("1 T soy sauce").unit)
         assertEquals(QtyUnit.TSP, p.parse("1 t cumin").unit)

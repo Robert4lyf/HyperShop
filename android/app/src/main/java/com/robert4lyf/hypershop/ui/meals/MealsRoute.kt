@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Replay
+import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.Button
@@ -65,6 +66,8 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.data.HomeRow
@@ -91,6 +94,8 @@ data class MealsActions(
     /** One more (+1) or one fewer (-1) serving. */
     val onServings: (Meal, Int) -> Unit = { _, _ -> },
     val onRemove: (Meal) -> Unit = {},
+    /** "Cooked it" on a meal (missing 2 of the review). */
+    val onCooked: (Meal) -> Unit = {},
     val onSearch: (String) -> Unit = {},
     val onPreviousWeek: () -> Unit = {},
     val onNextWeek: () -> Unit = {},
@@ -123,6 +128,7 @@ fun MealsRoute(
     val hasKey by container.apiKeyStore.hasKey.collectAsStateWithLifecycle()
     var adding by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.refreshWeek() }
     LaunchedEffect(vm) { vm.reviews.collect(onReview) }
     if (adding) {
         AddRecipeSheet(
@@ -141,6 +147,7 @@ fun MealsRoute(
             onPlan = vm::plan,
             onServings = { m, d -> vm.stepServings(m, d) },
             onRemove = vm::remove,
+            onCooked = vm::cooked,
             onSearch = vm::search,
             onPreviousWeek = vm::previousWeek,
             onNextWeek = vm::nextWeek,
@@ -188,7 +195,13 @@ fun MealsScreen(
                 if (ui.meals.isNotEmpty()) {
                     item(key = "planned") { SectionLabel("Meals", Modifier.padding(horizontal = 20.dp)) }
                     items(ui.meals, key = { "meal-${it.id}" }) { m ->
-                        MealCard(m, past = ui.isPast, onServings = { actions.onServings(m, it) }, onRemove = { actions.onRemove(m) })
+                        MealCard(
+                            m,
+                            past = ui.isPast,
+                            onServings = { actions.onServings(m, it) },
+                            onRemove = { actions.onRemove(m) },
+                            onCooked = { actions.onCooked(m) },
+                        )
                     }
                 } else if (ui.loaded && ui.repeatFrom != null && !ui.isPast) {
                     item(key = "repeat") { RepeatCard(ui, actions.onRepeat) }
@@ -313,6 +326,7 @@ private fun MealCard(
     past: Boolean,
     onServings: (Int) -> Unit,
     onRemove: () -> Unit,
+    onCooked: () -> Unit = {},
 ) {
     Surface(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp).cardLift(MaterialTheme.shapes.large).testTag("meal-${m.id}"),
@@ -372,6 +386,12 @@ private fun MealCard(
                     }
                 }
             }
+            // "Cooked it": counts for "your usual" and asks for stars; any week's meal, since last week's got cooked too.
+            if (m.saved) {
+                IconButton(onClick = onCooked, modifier = Modifier.testTag("meal-cooked-${m.id}")) {
+                    Icon(Icons.Rounded.Restaurant, contentDescription = "Cooked ${m.title}")
+                }
+            }
             if (!past) {
                 IconButton(onClick = onRemove, modifier = Modifier.testTag("meal-remove-${m.id}")) {
                     Icon(Icons.Rounded.Close, contentDescription = "Remove ${m.title}")
@@ -402,6 +422,12 @@ private fun BuyAgainSection(
             }
         }
         if (ui.buyAgain.regulars.isNotEmpty()) {
+            Text(
+                "Hold one to pin it or hide it.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 6.dp),
+            )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (r in ui.buyAgain.regulars) RegularChip(r, actions)
             }

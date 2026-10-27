@@ -144,15 +144,16 @@ class ListScreenTest {
             )
         val ui = SAMPLE_LIST.copy(aisles = listOf(AisleCode.DAIRY_EGGS to rows))
         compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions) } }
-        compose.onNodeWithText("700 ml Milk").assertExists()
-        compose.onNodeWithText("1 more Onion").assertExists()
+        compose.onNodeWithText("700 ml milk").assertExists()
+        compose.onNodeWithText("1 more onion").assertExists()
         compose.onNodeWithText("2 already bought · Weeknight chilli").assertExists()
         compose.onNodeWithText("1 × 250 g block").assertExists()
         // The pack note keeps its line; the recipe goes under it.
         assertEquals(listOf("1 × 250 g block", "Weeknight chilli"), subLines(rows[2]))
+        // A capital at the start of the row only (UX review 9): mid-line capitals read as typos.
         assertEquals("Coriander", displayMain("coriander", "coriander"))
-        assertEquals("2 Leaves", displayMain("2 leaves", "leaf"))
-        assertEquals("2 tins Chopped tomatoes", displayMain("2 tins chopped tomatoes", "chopped tomatoes"))
+        assertEquals("2 leaves", displayMain("2 leaves", "leaf"))
+        assertEquals("2 tins chopped tomatoes", displayMain("2 tins chopped tomatoes", "chopped tomatoes"))
     }
 
     @Test
@@ -234,13 +235,14 @@ class ListScreenTest {
                 ListRow(1, "onion", "2 onions", null, TickState.OPEN, AisleCode.PRODUCE, "Vegetables"),
                 ListRow(2, "basil", "basil", null, TickState.OPEN, AisleCode.PRODUCE, "Herbs"),
             )
-        val ui = SAMPLE_LIST.copy(aisles = listOf(AisleCode.PRODUCE to rows), view = ListView.TYPE)
+        // Cut 5 of the review: the store order labels an aisle's groups whenever it has more than one; no third view.
+        val ui = SAMPLE_LIST.copy(aisles = listOf(AisleCode.PRODUCE to rows), view = ListView.STORE)
         compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions.copy(onView = { events += "view $it" })) } }
         compose.onNodeWithText("Vegetables").assertExists()
         compose.onNodeWithText("Herbs").assertExists()
-        // The layouts live in the menu, as a radio group with "Group by type" chosen.
+        // The layouts live in the menu, as a radio group with "Store order" chosen.
         compose.onNodeWithContentDescription("More").performClick()
-        assertEquals(true, compose.onNodeWithTag("view-TYPE").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Selected))
+        assertEquals(true, compose.onNodeWithTag("view-STORE").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Selected))
         assertEquals(false, compose.onNodeWithTag("view-RECIPE").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Selected))
         compose.onNodeWithTag("view-RECIPE").performClick()
         assertEquals(listOf("view RECIPE"), events)
@@ -248,6 +250,7 @@ class ListScreenTest {
 
     @Test
     fun byRecipeShowsACardPerRecipe() {
+        val actions = actions.copy(onUseRemove = { events += "remove ${it.key}" }, onUseOpen = { events += "open ${it.key}" })
         val rows = SAMPLE_LIST.aisles.flatMap { it.second }
         val ui =
             SAMPLE_LIST.copy(
@@ -273,6 +276,13 @@ class ListScreenTest {
         compose.onNodeWithTag("recipe-use-1").performClick()
         compose.onNodeWithTag("item-${rows.first().id}").assertDoesNotExist()
         compose.onNodeWithTag("recipe-use-1").performClick()
+        // The recipe's own actions live on its card (cut 1 of the review); the shared card has none.
+        compose.onNodeWithTag("recipe-more-use-2").performClick()
+        compose.onNodeWithTag("recipe-remove-use-2").performClick()
+        compose.onNodeWithTag("recipe-more-use-2").performClick()
+        compose.onNodeWithTag("recipe-open-use-2").performClick()
+        compose.onNodeWithTag("recipe-more-shared").assertDoesNotExist()
+        assertEquals(listOf("remove use-2", "open use-2"), events.filter { it.endsWith("use-2") })
         TestPhotos.settle(compose)
         compose.onRoot().captureRoboImage(Shots.path("list-recipes-light.png"))
     }

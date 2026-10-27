@@ -75,6 +75,7 @@ object BackupValidator {
     /** A plan week within about 270 years of 1970 either way: past that it is not a real week. */
     private const val MIN_WEEK = -100_000L
     private const val MAX_WEEK = 100_000L
+    private const val MAX_ID = Int.MAX_VALUE.toLong()
 
     fun validate(b: BackupData): List<String> {
         val problems = ArrayList<String>()
@@ -98,6 +99,8 @@ object BackupValidator {
         for ((t, n) in tables) check(n <= MAX_ROWS, "$t: $n rows is more than a backup can hold")
         check(b.nextId >= 1, "nextId must be at least 1")
         check(b.listRev >= 1, "listRev must be at least 1")
+        // The watch carries ids and listRev as 32-bit numbers (review D.36).
+        check(b.nextId <= MAX_ID && b.listRev <= MAX_ID, "ids or listRev beyond what the watch can carry")
 
         val itemIds = b.items.map { it.id }
         val recipeIds = b.recipes.map { it.id }
@@ -169,11 +172,14 @@ object BackupValidator {
             check(t.itemId in items, "tick ${t.id}: item ${t.itemId} is missing")
             check(runCatching { TickSource.valueOf(t.source) }.isSuccess, "tick ${t.id}: unknown source")
         }
+        val tickItem = b.ticks.associate { it.id to it.itemId }
         for (c in b.contributions) {
             check(c.useId in uses, "contribution ${c.id}: use ${c.useId} is missing")
             check(c.itemId in items, "contribution ${c.id}: item ${c.itemId} is missing")
             check(c.recipeLineId == null || c.recipeLineId in lines, "contribution ${c.id}: line ${c.recipeLineId} is missing")
             check(c.coveredBy == null || c.coveredBy in ticks, "contribution ${c.id}: tick ${c.coveredBy} is missing")
+            check(c.coveredBy == null || tickItem[c.coveredBy] == c.itemId, "contribution ${c.id}: covered by another item's tick")
+            check(c.createdListRev <= b.listRev, "contribution ${c.id}: made after the list's own revision")
             check(
                 c.qtyBase.length <= MAX_JSON &&
                     runCatching {
@@ -204,7 +210,9 @@ object BackupValidator {
         check(b.overrides.map { it.key }.toSet().size == b.overrides.size, "duplicate overrides")
         for (st in b.staples) check(st.key.length in 1..MAX_TEXT, "staple: bad key")
         check(b.staples.map { it.key }.toSet().size == b.staples.size, "duplicate staples")
+        val deletedAt = b.items.associate { it.id to it.deletedAt }
         for (d in b.deleted) check(d.id in items, "deleted ${d.id}: item is missing")
+        for (d in b.deleted) check(deletedAt[d.id] != null, "deleted ${d.id}: the item is live")
         for (u in b.usage) {
             check(u.date.length <= 10 && u.model.length <= 100, "usage ${u.date.take(10)}: bad row")
             check(
@@ -262,6 +270,7 @@ object BackupValidator {
             check(n.libraryKey.length in 1..ListRepository.MAX_URL, "recipe note: bad recipe key")
             check(n.rating == null || n.rating in 1..ListRepository.MAX_STARS, "recipe note: rating out of range")
             check((n.notes?.length ?: 0) <= ListRepository.MAX_COOKING_NOTES, "recipe note: notes too long")
+            check(n.timesCooked >= 0, "recipe note: cooked a negative number of times")
             check((n.photo?.length ?: 0) <= MAX_TEXT && (n.photoUrl?.length ?: 0) <= ListRepository.MAX_URL, "recipe note: photo too long")
             // A file name, never a path: a restore must not point the app at a file outside its photo folder.
             check(n.photo == null || PHOTO_NAME.matches(n.photo), "recipe note: bad photo name")

@@ -90,6 +90,7 @@ import com.robert4lyf.hypershop.ui.common.TickMark
 import com.robert4lyf.hypershop.ui.common.sectionItem
 import com.robert4lyf.hypershop.ui.common.sectionPosition
 import com.robert4lyf.hypershop.ui.recipes.RecipeArt
+import com.robert4lyf.hypershop.ui.review.TitleDialog
 import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.theme.card
@@ -104,17 +105,25 @@ data class ListActions(
     val onShare: () -> Unit = {},
     /** "Need it" on an in-stock ingredient. */
     val onNeed: (InStockRow) -> Unit = {},
-    /** The menu's choice of layout: store order, by type, or by recipe. */
+    /** The menu's choice of layout: store order or by recipe. */
     val onView: (ListView) -> Unit = {},
     /** "Shop" on the planning screen, "Plan" on the shop screen. */
     val onMode: (ListMode) -> Unit = {},
+    /** "Shop" with a store picked, when a second store has a walking order (missing 4 of the review). */
+    val onShop: (Long) -> Unit = {},
     /** X.8: "Not available" on this trip, and "Found it" to take that back. */
     val onUnavailable: (ListRow) -> Unit = {},
     val onAvailable: (ListRow) -> Unit = {},
-    /** X.9: "Arrange items" and its "Done"; a row or a group moved one place (-1 up, +1 down). */
+    /** X.9: "Arrange items" and its "Done"; a row or a group moved one place (-1 up, +1 down), or to an end (true = top). */
     val onArrange: (Boolean) -> Unit = {},
     val onMoveItem: (ListRow, Int) -> Unit = { _, _ -> },
+    val onMoveItemTo: (ListRow, Boolean) -> Unit = { _, _ -> },
     val onMoveGroup: (AisleCode, String?, Int) -> Unit = { _, _, _ -> },
+    /** The recipe view's card menu (cut 1 of the review): its ingredients, Edit, Rename, Remove from list. */
+    val onUseOpen: (RecipeSection) -> Unit = {},
+    val onUseEdit: (RecipeSection) -> Unit = {},
+    val onUseRename: (RecipeSection, String) -> Unit = { _, _ -> },
+    val onUseRemove: (RecipeSection) -> Unit = {},
 )
 
 /**
@@ -227,8 +236,8 @@ private fun ListBody(
         if (ui.arranging) {
             item(key = "arrange-hint") {
                 Text(
-                    "Move things into the order you find them in the shop. Groups move together; " +
-                        "the order is kept for every trip.",
+                    "Move things into the order you find them in the shop: the arrows one place, ⋮ to the top or bottom. " +
+                        "Groups move together; the order is kept for every trip.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp).testTag("arrange-hint"),
@@ -249,6 +258,7 @@ private fun ListBody(
                         onToggle = { collapsed = if (open) collapsed + section.key else collapsed - section.key },
                         modifier = Modifier.padding(top = 12.dp),
                         count = count,
+                        actions = actions,
                     )
                 }
                 if (open) {
@@ -268,7 +278,8 @@ private fun ListBody(
             val open = aisle.name !in collapsed
             // Categorised: a label above each group, when the aisle has more than one.
             val groups = rows.map { it.group }.distinct()
-            val labelled = ui.categorised && groups.size > 1
+            // Group labels whenever an aisle has more than one group (cut 5 of the review: the "Group by type" view went).
+            val labelled = groups.size > 1
             val cells = if (labelled) withLabels(rows) else rows.map { Cell.Item(it) }
             val count = if (open) cells.size + 1 else 1
             item(key = "aisle-${aisle.name}", contentType = "aisle") {
@@ -478,6 +489,23 @@ private fun ArrangeRow(
             modifier = Modifier.weight(1f).padding(vertical = 8.dp),
         )
         MoveArrows(row.name, "${row.id}", canUp, canDown) { actions.onMoveItem(row, it) }
+        // UX review 17: across a long aisle, one tap instead of eleven.
+        var menu by remember { mutableStateOf(false) }
+        Box {
+            IconButton(onClick = { menu = true }, modifier = Modifier.testTag("more-${row.id}")) {
+                Icon(Icons.Rounded.MoreVert, contentDescription = "More for ${row.name}")
+            }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(text = { Text("Move to top") }, enabled = canUp, onClick = {
+                    menu = false
+                    actions.onMoveItemTo(row, true)
+                }, modifier = Modifier.testTag("top-${row.id}"))
+                DropdownMenuItem(text = { Text("Move to bottom") }, enabled = canDown, onClick = {
+                    menu = false
+                    actions.onMoveItemTo(row, false)
+                }, modifier = Modifier.testTag("bottom-${row.id}"))
+            }
+        }
     }
 }
 
@@ -528,11 +556,26 @@ private fun ListTop(
             },
         actions = {
             if (shopping) {
-                // The way into the shop screen: one tap, in reach of either thumb.
-                HeroButton(onClick = { actions.onMode(ListMode.SHOP) }, modifier = Modifier.testTag("start-shopping")) {
-                    Icon(Icons.Rounded.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(6.dp))
-                    Text("Shop")
+                // The way into the shop screen: one tap, in reach of either thumb. With a second store's order on
+                // record, the tap asks which store (missing 4 of the review).
+                var pickStore by remember { mutableStateOf(false) }
+                Box {
+                    HeroButton(
+                        onClick = { if (ui.secondStore) pickStore = true else actions.onMode(ListMode.SHOP) },
+                        modifier = Modifier.testTag("start-shopping"),
+                    ) {
+                        Icon(Icons.Rounded.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(6.dp))
+                        Text("Shop")
+                    }
+                    DropdownMenu(expanded = pickStore, onDismissRequest = { pickStore = false }) {
+                        for ((id, name) in STORES) {
+                            DropdownMenuItem(text = { Text(name) }, onClick = {
+                                pickStore = false
+                                actions.onShop(id)
+                            }, modifier = Modifier.testTag("shop-store-$id"))
+                        }
+                    }
                 }
             }
             var menu by remember { mutableStateOf(false) }
@@ -638,21 +681,15 @@ private fun AisleTitle(
 }
 
 /**
- * The main line as shown: the item's name gets a capital wherever it starts
- * ("2 Onions", "700 ml Milk", "Coriander"), so rows with and without an
- * amount read alike. A plural the name isn't a prefix of ("leaves") gets the
- * first letter capitalised instead.
+ * The main line as shown: a capital at the start of the row and nowhere else ("2 tins chopped tomatoes",
+ * "700 ml milk", "Coriander"): a capital mid-line read as a typo (UX review 9). [name] is the item's name, kept
+ * for callers; it no longer moves the capital.
  */
+@Suppress("UNUSED_PARAMETER")
 internal fun displayMain(
     main: String,
     name: String,
-): String {
-    val at =
-        main.indexOf(name, ignoreCase = true).takeIf { it >= 0 && name.isNotEmpty() }
-            ?: main.indexOfFirst { it.isLetter() }.takeIf { it >= 0 }
-            ?: return main
-    return main.substring(0, at) + main[at].uppercaseChar() + main.substring(at + 1)
-}
+): String = main.replaceFirstChar { it.uppercaseChar() }
 
 /**
  * The row's sub-lines: "2 already ticked" or the pack note, and the recipe the
@@ -752,7 +789,10 @@ private fun ListRowItem(
     }
 }
 
-private val VIEWS = listOf(ListView.STORE to "Store order", ListView.TYPE to "Group by type", ListView.RECIPE to "Group by recipe")
+private val VIEWS = listOf(ListView.STORE to "Store order", ListView.RECIPE to "Group by recipe")
+
+/** The two stores a walking order can be kept for (missing 4 of the review). */
+internal val STORES = listOf(1L to "My store", 2L to "Second store")
 
 /** A recipe card's header: in the recipe's own colour, or plain for shared and hand-added items. */
 @Composable
@@ -762,6 +802,7 @@ private fun RecipeTitle(
     onToggle: () -> Unit,
     modifier: Modifier,
     count: Int,
+    actions: ListActions = ListActions({}, {}, {}),
 ) {
     val dark = LocalDarkTheme.current
     val left = section.rows.count { it.state != TickState.DONE }
@@ -810,6 +851,43 @@ private fun RecipeTitle(
             Text("Done ✓", style = MaterialTheme.typography.labelLarge, color = content)
         } else {
             CountPill("$left left", content)
+        }
+        if (section.kind != RecipeSection.Kind.SHARED) {
+            // The recipe's own actions, here on its card (cut 1 of the review): the Recipes tab is the recipe book.
+            var menu by remember { mutableStateOf(false) }
+            var renaming by rememberSaveable { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { menu = true }, modifier = Modifier.testTag("recipe-more-${section.key}")) {
+                    Icon(Icons.Rounded.MoreVert, contentDescription = "More for ${section.title}", tint = content)
+                }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text("Show ingredients") }, onClick = {
+                        menu = false
+                        actions.onUseOpen(section)
+                    }, modifier = Modifier.testTag("recipe-open-${section.key}"))
+                    DropdownMenuItem(text = { Text("Edit") }, onClick = {
+                        menu = false
+                        actions.onUseEdit(section)
+                    }, modifier = Modifier.testTag("recipe-edit-${section.key}"))
+                    DropdownMenuItem(text = { Text("Rename") }, onClick = {
+                        menu = false
+                        renaming = true
+                    })
+                    DropdownMenuItem(text = { Text("Remove from list") }, onClick = {
+                        menu = false
+                        actions.onUseRemove(section)
+                    }, modifier = Modifier.testTag("recipe-remove-${section.key}"))
+                }
+            }
+            if (renaming) {
+                val byHand = section.kind == RecipeSection.Kind.BY_HAND
+                TitleDialog(
+                    section.title,
+                    onDismiss = { renaming = false },
+                    heading = if (byHand) "Rename" else "Rename recipe",
+                    label = if (byHand) "Name, e.g. Household" else "Recipe name",
+                ) { actions.onUseRename(section, it) }
+            }
         }
         Icon(if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, contentDescription = null, tint = content)
     }

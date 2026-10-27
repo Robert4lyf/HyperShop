@@ -66,6 +66,19 @@ interface ListDao {
     @Query("DELETE FROM ItemAlias WHERE oldId IN (:ids)")
     suspend fun deleteAliases(ids: List<Long>)
 
+    @Query("DELETE FROM ItemAlias WHERE oldId IN (:ids) OR newId IN (:ids)")
+    suspend fun deleteAliasesTouching(ids: List<Long>)
+
+    /** Aliases whose survivor is gone, or whose loser is back as a row of its own: left by versions before Y.2. */
+    @Query("DELETE FROM ItemAlias WHERE newId NOT IN (SELECT id FROM Item) OR oldId IN (SELECT id FROM Item)")
+    suspend fun deleteDanglingAliases()
+
+    @Query("DELETE FROM DeletedItem WHERE id NOT IN (SELECT id FROM Item)")
+    suspend fun deleteDanglingDeleted()
+
+    @Query("DELETE FROM ShelfRank WHERE key IN (:keys)")
+    suspend fun deleteShelfRanks(keys: List<String>)
+
     // ---- recipes --------------------------------------------------------------
     @Insert
     suspend fun insertRecipe(r: RecipeEntity): Long

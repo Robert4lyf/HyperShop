@@ -11,13 +11,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.History
@@ -30,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +37,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -80,8 +81,12 @@ fun AddItemField(
     onAdd: (String) -> Unit,
     suggestions: (String) -> List<String>,
     onPick: (String, String) -> Unit = { _, s -> onAdd(s) },
+    /** Bumped to focus the field from outside (the launcher shortcut, missing 7 of the review). */
+    focus: Int = 0,
 ) {
     var text by rememberSaveable { mutableStateOf("") }
+    val requester = remember { FocusRequester() }
+    LaunchedEffect(focus) { if (focus > 0) runCatching { requester.requestFocus() } }
     val submit = {
         if (text.isNotBlank()) onAdd(text)
         text = ""
@@ -115,7 +120,7 @@ fun AddItemField(
             colors = pillFieldColors(),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { submit() }),
-            modifier = Modifier.fillMaxWidth().fieldLift().testTag("add-item"),
+            modifier = Modifier.fillMaxWidth().focusRequester(requester).fieldLift().testTag("add-item"),
         )
         if (shown.isNotEmpty()) {
             Surface(
@@ -195,53 +200,6 @@ fun ReadyCard(
 }
 
 /**
- * "This week": the way into planning a weekly shop, above the list while
- * planning. One line says how far the shop is prepared; the card opens the Plan
- * screen. Shown to someone who has shopped here before (saved recipes, or a
- * finished trip): a first list starts with the field above, nothing else.
- */
-@Composable
-fun PlanCard(
-    prep: PlanPrep,
-    onPlan: () -> Unit,
-) {
-    Surface(
-        Modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp)
-            .cardLift(MaterialTheme.shapes.large)
-            .clip(MaterialTheme.shapes.large)
-            .clickable(onClickLabel = "Plan", role = Role.Button, onClick = onPlan)
-            .testTag("plan-card"),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.card,
-    ) {
-        Row(
-            Modifier.padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Box(
-                Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Rounded.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
-            }
-            Column(Modifier.weight(1f)) {
-                Text("Plan this week's shop", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    prep.summary(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.testTag("plan-card-summary"),
-                )
-            }
-            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-/**
  * An empty list. The first time: a sample to try, and a paste of a copied link.
  * Someone who has shopped before gets their own shortcuts instead: plan the week,
  * or put last shop's household items straight back on.
@@ -302,9 +260,10 @@ fun androidx.compose.foundation.lazy.LazyListScope.listHeader(
     ui: ListUi,
     actions: HeaderActions,
     prep: PlanPrep = PlanPrep(),
+    /** Bumped to focus the Add field (the launcher shortcut). */
+    focusAdd: Int = 0,
 ) {
-    item(key = "add") { AddItemField(actions.onAdd, actions.suggestions, actions.onPick) }
+    item(key = "add") { AddItemField(actions.onAdd, actions.suggestions, actions.onPick, focus = focusAdd) }
     item(key = "ready") { ReadyCard(ui.readyJobs, actions.onReview) }
-    // Not over an empty list: its own shortcuts say the same.
-    if (prep.returning && !ui.isEmpty) item(key = "plan") { PlanCard(prep, actions.onPlan) }
+    // No "Plan this week's shop" card above the list (cut 2 of the review): This week is a tab of its own.
 }

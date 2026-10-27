@@ -41,6 +41,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -155,6 +156,7 @@ class AppContainer(
             catalog = catalog,
             units = { settings.units.first() },
             scope = applicationScope,
+            store = { settings.activeStore.first() },
             log = log::log,
             clock = clock,
             cap = PayloadCap(bytes = PayloadCap.FR245_BYTES),
@@ -167,6 +169,9 @@ class AppContainer(
      * then calls [reviewOpened].
      */
     val pendingReviews = MutableStateFlow<List<Long>>(emptyList())
+
+    /** The launcher shortcut asked for the Add field (missing 7 of the review): the app opens Shopping and focuses it. */
+    val addRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     /** Backups and restores, one at a time ([BackupManager.recover] runs in [startUp]). */
     val backups by lazy { BackupManager(this, BuildConfig.VERSION_NAME) }

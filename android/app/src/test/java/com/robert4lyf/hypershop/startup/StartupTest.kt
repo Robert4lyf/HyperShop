@@ -166,8 +166,9 @@ class StartupTest {
         compose.onNodeWithTag("add-item").assertDoesNotExist()
         c.startUp()
         awaitTrue { c.startup.value == Startup.Ready }
-        // An empty list opens on This week (X.10).
-        compose.waitUntil(5_000) { compose.onAllNodesWithTag("meals").fetchSemanticsNodes().isNotEmpty() }
+        // A first run (no saved recipes, no finished trip) stays on Shopping, where the Add field and the sample list
+        // are (UX review 3); a returning user's empty list opens on This week (X.10).
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("add-item").fetchSemanticsNodes().isNotEmpty() }
     }
 
     @Test

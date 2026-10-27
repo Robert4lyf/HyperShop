@@ -38,6 +38,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- The launcher's long-press shortcut to the Add field (res/xml/shortcuts.xml). -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
             <!-- Share a recipe link from a browser or app (text only in v1). -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />

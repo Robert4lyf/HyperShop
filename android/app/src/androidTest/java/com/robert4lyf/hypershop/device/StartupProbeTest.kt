@@ -7,7 +7,6 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -63,8 +62,6 @@ class StartupProbeTest {
         val recipesTab = hasText("Recipes") and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)
         compose.waitUntil(30_000) { compose.onAllNodes(recipesTab).fetchSemanticsNodes().isNotEmpty() }
         compose.onNode(recipesTab).performClick()
-        compose.waitUntil(30_000) { compose.onAllNodesWithTag("view-library").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("view-library").performClick()
         compose.waitUntil(30_000) { compose.onAllNodesWithTag(newest).fetchSemanticsNodes().isNotEmpty() }
         compose.waitForIdle()
 

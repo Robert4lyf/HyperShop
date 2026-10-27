@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.ui.review
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.robert4lyf.hypershop.core.model.AisleCode
+import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.data.ImportJobEntity
 import com.robert4lyf.hypershop.importing.ImportError
@@ -143,7 +144,10 @@ class ReviewViewModelTest {
             val c = TestContainer.create(claude = claude, key = "sk-ant-test")
             c.reviewGate.acquire()
             val job = runBlocking { c.readyJob("200g golden caster sugar", claudePending = true) }
-            val ui = ready(ReviewViewModel(c, job))
+            // UX review 1: the rules' reading shows at once, Claude's is laid over when it lands.
+            val vm = ReviewViewModel(c, job)
+            assertTrue(ready(vm).badge != Badge.CLAUDE || claude.requestCount == 1)
+            val ui = (await(vm.state) { it is ReviewState.Ready && it.ui.badge == Badge.CLAUDE && !it.ui.busy } as ReviewState.Ready).ui
             assertEquals(Badge.CLAUDE, ui.badge)
             assertEquals(1, claude.requestCount)
             // Left with Back and opened again from the card: Claude's parse was kept, not paid for twice.
@@ -253,11 +257,11 @@ class ReviewViewModelTest {
             c.reviewGate.acquire()
             val job = runBlocking { c.readyJob("200g golden caster sugar", claudePending = true) }
             val first = ReviewViewModel(c, job)
-            await(first.state) { it is ReviewState.Loading && it.stage == ReviewViewModel.STAGE_CLAUDE }
+            await(first.state) { it is ReviewState.Ready && it.ui.retrying }
             // Back and straight in again while Claude is still answering.
             val second = ReviewViewModel(c, job)
-            assertEquals(Badge.CLAUDE, ready(first).badge)
-            assertEquals(Badge.CLAUDE, ready(second).badge)
+            await(first.state) { it is ReviewState.Ready && it.ui.badge == Badge.CLAUDE }
+            await(second.state) { it is ReviewState.Ready && it.ui.badge == Badge.CLAUDE }
             assertEquals(1, claude.requestCount)
         } finally {
             claude.shutdown()
@@ -287,10 +291,61 @@ class ReviewViewModelTest {
             vm.stopRetry()
             val ui = (await(vm.state) { it is ReviewState.Ready && !it.ui.retrying } as ReviewState.Ready).ui
             assertFalse(ui.busy)
-            assertEquals(Badge.CLAUDE_PENDING, ui.badge)
+            // Not in flight any more: read offline, with "Ask Claude" one tap away (UX review 5).
+            assertEquals(Badge.RULES, ui.badge)
         } finally {
             claude.shutdown()
         }
+    }
+
+    @Test
+    fun anAnswerThatLandsAfterStopIsLaidOverAndNotPaidForAgain() {
+        val claude = MockWebServer().apply { start() }
+        try {
+            claude.enqueue(
+                MockResponse()
+                    .setHeadersDelay(2, TimeUnit.SECONDS)
+                    .setBody(File("../../testdata/claude/synthetic-ok-cake.json").readText()),
+            )
+            val c = TestContainer.create(claude = claude, key = "sk-ant-test")
+            c.reviewGate.acquire()
+            val job = runBlocking { c.readyJob("200g golden caster sugar", claudePending = true) }
+            runBlocking { c.importJobs.update(job, c.importJobs.get(job)!!.result!!.copy(claudeTried = true)) }
+            val vm = ReviewViewModel(c, job)
+            ready(vm)
+            vm.retryWithClaude()
+            await(vm.state) { it is ReviewState.Ready && it.ui.retrying }
+            vm.stopRetry()
+            await(vm.state) { it is ReviewState.Ready && !it.ui.retrying }
+            // Review B.10: the answer, billed anyway, is laid over when it lands; the job and the review agree.
+            val ui = (await(vm.state) { it is ReviewState.Ready && it.ui.badge == Badge.CLAUDE } as ReviewState.Ready).ui
+            assertEquals("Claude's reading arrived", ui.notice)
+            assertEquals(1, claude.requestCount)
+            awaitTrue { runBlocking { c.importJobs.get(job)!!.result!!.parsedBy } == ParsedBy.CLAUDE }
+        } finally {
+            claude.shutdown()
+        }
+    }
+
+    @Test
+    fun undoOfAnAisleAtHomeLeavesALaterChoiceAlone() {
+        val c = TestContainer.create()
+        val vm = ReviewViewModel(c, runBlocking { c.readyJob(*CHILLI) })
+        val first = ready(vm)
+        val produce = first.aisles.first { it.first == AisleCode.PRODUCE }.second.map { it.key }
+        val other = first.aisles.first { it.first != AisleCode.PRODUCE }.second.first { !it.inStock }.key
+        val events = mutableListOf<UiMessage>()
+        val collecting = CoroutineScope(Dispatchers.Unconfined).launch { vm.events.collect { events += it } }
+        vm.aisleInStock(AisleCode.PRODUCE)
+        await(vm.state) { s -> s is ReviewState.Ready && produce.all { s.ui.row(it).inStock } }
+        // A row set at home after the aisle action (review B.16): Undo of the aisle must not take it back.
+        vm.setInStock(other, true)
+        await(vm.state) { it is ReviewState.Ready && it.ui.row(other).inStock }
+        await(vm.state) { events.any { it.undo != null } }
+        runBlocking { events.first { it.undo != null }.undo!!.invoke() }
+        val after = await(vm.state) { s -> s is ReviewState.Ready && produce.none { s.ui.row(it).inStock } } as ReviewState.Ready
+        assertTrue(after.ui.row(other).inStock)
+        collecting.cancel()
     }
 
     @Test
@@ -350,7 +405,7 @@ class ReviewViewModelTest {
         assertEquals("\"A or B\": one of two", flagged.checkReason)
         assertTrue(ui.row("cat:onion").adds)
         assertTrue("a staple, pre-ticked", ui.row("cat:salt").inStock)
-        assertEquals("3 to add · 1 at home · 1 to check", ui.summary)
+        assertEquals("Planned for this week · 3 to add · 1 at home · 1 to check", ui.summary)
     }
 
     @Test

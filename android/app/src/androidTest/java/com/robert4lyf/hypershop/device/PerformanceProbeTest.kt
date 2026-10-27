@@ -342,9 +342,7 @@ class PerformanceProbeTest {
                     }
                 }
             }
-            // The Saved toggle shows once the library has loaded: with 100 recipes and more, after the first frame.
-            compose.waitUntil(30_000) { compose.onAllNodesWithTag("view-library").fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithTag("view-library").performClick()
+            // The tab is the recipe book (Y.7d): the newest card shows once the library has loaded.
             compose.waitUntil(30_000) { compose.onAllNodesWithTag(newest).fetchSemanticsNodes().isNotEmpty() }
         }
         val last = n + 1
@@ -360,8 +358,7 @@ class PerformanceProbeTest {
             shown = false
             compose.waitForIdle()
             shown = true
-            compose.waitUntil(30_000) { compose.onAllNodesWithTag("view-library").fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithTag("view-library").performClick()
+            compose.waitUntil(30_000) { compose.onAllNodesWithTag(newest).fetchSemanticsNodes().isNotEmpty() }
             compose.waitForIdle()
         }
         step("open a recipe and close it") {

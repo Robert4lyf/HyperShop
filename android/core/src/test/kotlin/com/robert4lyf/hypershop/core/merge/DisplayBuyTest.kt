@@ -31,6 +31,26 @@ class DisplayBuyTest {
         // 450 g at a UK onion (150 g, Waitrose's typical weight): three, never fewer than needed.
         assertEquals(RowText("3 onions", "450g in the recipe"), row("450g onions", key = "onion"))
         assertEquals(RowText("2 onions", null), row("2 onions", key = "onion"))
+        // A typical weight is not exact: 910 g is six onions, not seven (review C.31); 470 g is still four.
+        assertEquals(RowText("6 onions", "910g in the recipe"), row("910g onions", key = "onion"))
+        assertEquals(RowText("4 onions", "470g in the recipe"), row("470g onions", key = "onion"))
+    }
+
+    @Test
+    fun aCountedPresenceItemIsNotThatManyPacksAndAnUnsureAmountIsNotOne() {
+        // Review C.24: the review's brief agrees with the list row, which says "basil", not "10 packs basil".
+        val basil = add(ShoppingList(), listOf("10 basil leaves")).first
+        val b = basil.itemByKey("cat:basil")!!
+        assertEquals("basil", Display.row(basil, b, cat.byId["basil"]).main)
+        assertEquals(null to "basil", Display.brief(basil.total(b.id), cat.byId["basil"], "basil"))
+        val weighed = add(ShoppingList(), listOf("30g basil")).first
+        assertEquals("1 pack" to "basil", Display.brief(weighed.total(weighed.itemByKey("cat:basil")!!.id), cat.byId["basil"], "basil"))
+        // Review C.25: two cups of honey (about 680 g) do not fit a 454 g jar; without a density nothing is said.
+        assertEquals(RowText("honey", "454g jar"), row("2 cups honey", key = "honey"))
+        val honey = add(ShoppingList(), listOf("2 cups honey")).first
+        assertEquals(null to "honey", Display.brief(honey.total(honey.itemByKey("cat:honey")!!.id), cat.byId["honey"], "honey"))
+        // A spoonful still fits: one jar.
+        assertEquals("1 jar honey", row("2 tbsp honey", key = "honey").main)
     }
 
     @Test

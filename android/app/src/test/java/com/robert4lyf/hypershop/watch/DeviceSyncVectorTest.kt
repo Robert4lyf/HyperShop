@@ -5,6 +5,7 @@ import com.robert4lyf.hypershop.core.merge.Display
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.sync.PayloadCap
 import com.robert4lyf.hypershop.core.sync.PayloadSize
+import com.robert4lyf.hypershop.core.sync.SnapshotPage
 import com.robert4lyf.hypershop.core.sync.WatchCodec
 import com.robert4lyf.hypershop.core.sync.rules.WatchSyncModel
 import com.robert4lyf.hypershop.data.EpochMarker
@@ -173,6 +174,12 @@ class DeviceSyncVectorTest {
                 "phone.push" -> {
                     c.watchSync.push(force = true)
                     drainPhone()
+                }
+                // An ack-only page carrying another install's ackedThrough (the phone pushed to the install it last knew).
+                "phone.foreignAck" -> {
+                    val (epoch, rev) = c.repository.epochAndRev()
+                    val page = SnapshotPage(epoch.toInt(), rev.toInt(), int("at"), emptyList(), 0, 0, emptyList(), 0, emptyList(), 0)
+                    toWatch += WatchCodec.encodePage(page)
                 }
                 "watch.hello" -> hello()
                 "watch.toggle" -> lastToggle = watch.toggle(real(int("item")).toInt(), nowMs / 1000)

@@ -129,6 +129,12 @@ class SyncHarness(
             "phone.rekey" -> phone.rekey(int("from"), int("to"))
             "phone.newEpoch" -> phone.newEpoch(int("epoch"))
             "phone.push" -> pushSnapshot()
+            // An ack-only page carrying another install's ackedThrough (the phone pushed to the install it last knew).
+            "phone.foreignAck" ->
+                toWatch +=
+                    WatchCodec.encodePage(
+                        SnapshotPage(phone.epoch, phone.listRev, int("at"), emptyList(), 0, 0, emptyList(), 0, emptyList(), 0),
+                    )
             "watch.hello" -> watchHello()
             "watch.toggle" -> {
                 lastToggle = watch.toggle(int("item"), nowMs / 1000)
