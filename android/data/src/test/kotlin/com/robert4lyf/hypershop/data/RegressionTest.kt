@@ -37,7 +37,7 @@ class RegressionTest {
         useId: Long,
     ) {
         val w = r.db.openHelper.writableDatabase
-        w.execSQL("INSERT INTO Item VALUES ($id,'name:zucchini',NULL,'zucchini','zucchini','OTHER',5,3,NULL,0)")
+        w.execSQL("INSERT INTO Item VALUES ($id,'name:zucchini',NULL,'zucchini','zucchini','OTHER',5,3,NULL,0,NULL)")
         w.execSQL("INSERT INTO Contribution VALUES (${id + 1},$useId,NULL,$id,$two,0,1,NULL,NULL)")
     }
 

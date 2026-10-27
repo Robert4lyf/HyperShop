@@ -20,13 +20,25 @@ internal object Mapping {
             AisleCode.valueOf(
                 e.aisleCode,
             ),
-            e.position, e.rev, e.deletedAt,
+            e.position, e.rev, e.deletedAt, e.unavailableAt,
         )
 
     fun item(
         i: ListItem,
         now: Long,
-    ) = ItemEntity(i.id, i.mergeKey, i.catalogId, i.normName, i.displayName, i.aisle.name, i.position, i.rev, i.deletedAt, now)
+    ) = ItemEntity(
+        i.id,
+        i.mergeKey,
+        i.catalogId,
+        i.normName,
+        i.displayName,
+        i.aisle.name,
+        i.position,
+        i.rev,
+        i.deletedAt,
+        now,
+        i.unavailableAt,
+    )
 
     fun use(e: RecipeUseEntity) = RecipeUse(e.id, e.recipeId, UseKind.valueOf(e.kind), e.servings, e.addedAt, e.archivedAt)
 

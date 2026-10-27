@@ -58,6 +58,8 @@ data class ListRow(
     val group: String? = null,
     /** The recipe it came from, when exactly one recipe put it on the list. */
     val from: String? = null,
+    /** X.8: set aside as not available on this trip; still needed, back on the next one. */
+    val unavailable: Boolean = false,
 )
 
 /** The item sheet (PLAN §3.5). */
@@ -118,7 +120,12 @@ data class ListUi(
 
     /** The shop screen is showing: shopping mode, with something to shop for (an empty list is planned, never shopped). */
     val shopping: Boolean get() = mode == ListMode.SHOP && loaded && aisles.isNotEmpty()
-    val left: Int get() = aisles.sumOf { (_, r) -> r.count { it.state != TickState.DONE } }
+
+    /** Still to find on this trip: what is set aside as not available is not "left". */
+    val left: Int get() = aisles.sumOf { (_, r) -> r.count { it.state != TickState.DONE && !it.unavailable } }
+
+    /** X.8: set aside as not available on this trip. */
+    val unavailable: Int get() = aisles.sumOf { (_, r) -> r.count { it.unavailable } }
     val doneCount: Int get() = aisles.sumOf { (_, r) -> r.count { it.state == TickState.DONE } }
 }
 
@@ -386,7 +393,17 @@ class ListViewModel(
                         list.isPartial(item.id) -> TickState.PARTIAL
                         else -> TickState.OPEN
                     }
-                ListRow(item.id, item.displayName, text.main, text.sub, state, item.aisle, entry?.group, from[item.id]) to item.position
+                ListRow(
+                    item.id,
+                    item.displayName,
+                    text.main,
+                    text.sub,
+                    state,
+                    item.aisle,
+                    entry?.group,
+                    from[item.id],
+                    unavailable = list.isUnavailable(item.id),
+                ) to item.position
             }
         // Categorised: by group (the catalogue's order), then as usual within it.
         val order =
@@ -428,6 +445,20 @@ class ListViewModel(
 
     /** Tick, or untick a DONE item (the item sheet's button too). No snackbar: tapping again is the undo. */
     fun toggle(id: Long) = viewModelScope.launch { c.repository.toggle(id) }
+
+    /** X.8: "Not available" in the shop: set aside for this trip, back on the next, with Undo. */
+    fun unavailable(row: ListRow) =
+        viewModelScope.launch {
+            if (!c.repository.markUnavailable(row.id)) return@launch
+            messages.send(
+                UiMessage("${row.name.replaceFirstChar { it.uppercase() }} set aside for next time", undo = {
+                    c.repository.markAvailable(row.id)
+                }),
+            )
+        }
+
+    /** "Found it after all": back among what is left. */
+    fun available(row: ListRow) = viewModelScope.launch { c.repository.markAvailable(row.id) }
 
     /** "Delete" on the item card: closes it, with Undo on the list. */
     fun delete(

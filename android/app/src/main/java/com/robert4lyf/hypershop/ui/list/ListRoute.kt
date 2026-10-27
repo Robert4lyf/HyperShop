@@ -69,6 +69,8 @@ fun ListRoute(
             onNeed = vm::needIt,
             onView = vm::setView,
             onMode = vm::setMode,
+            onUnavailable = vm::unavailable,
+            onAvailable = vm::available,
             onShare = {
                 val send =
                     Intent(Intent.ACTION_SEND)

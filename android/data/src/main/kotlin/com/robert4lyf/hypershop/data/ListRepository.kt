@@ -1043,6 +1043,12 @@ class ListRepository(
             (if (l.isDone(itemId)) l.untick(itemId) else l.tick(itemId, clock(), TickSource.PHONE))?.let { it to true }
         } ?: false
 
+    /** X.8: "Not available" on this trip; false when there is nothing to set aside (bought, gone, already set aside). */
+    suspend fun markUnavailable(itemId: Long): Boolean = write { l -> l.markUnavailable(itemId, clock())?.let { it to true } } ?: false
+
+    /** "Available after all", and Undo of [markUnavailable]. */
+    suspend fun markAvailable(itemId: Long): Boolean = write { l -> l.markAvailable(itemId)?.let { it to true } } ?: false
+
     suspend fun manualAdd(
         name: String,
         qty: QtyBase,

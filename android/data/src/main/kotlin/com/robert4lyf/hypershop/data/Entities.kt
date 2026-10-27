@@ -48,6 +48,8 @@ data class ItemEntity(
     val rev: Long,
     val deletedAt: Long?,
     val updatedAt: Long,
+    /** X.8: set aside as not available on this trip ([ListItem.unavailableAt]); v8. */
+    val unavailableAt: Long? = null,
 )
 
 @Serializable

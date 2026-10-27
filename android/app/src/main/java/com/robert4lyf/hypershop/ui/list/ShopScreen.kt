@@ -24,9 +24,11 @@ import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.RemoveShoppingCart
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -181,13 +183,15 @@ private fun ShopTop(
     now: ShopGroup?,
     onPlan: () -> Unit,
 ) {
-    val total = ui.left + ui.doneCount
+    val total = ui.left + ui.doneCount + ui.unavailable
     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        if (ui.left == 0) {
+                        if (ui.left == 0 && ui.unavailable > 0) {
+                            "All found"
+                        } else if (ui.left == 0) {
                             "All bought"
                         } else if (ui.left == 1) {
                             "1 left"
@@ -204,7 +208,11 @@ private fun ShopTop(
                                 }.testTag("shop-left"),
                     )
                     Text(
-                        listOfNotNull("${ui.doneCount} of $total bought", now?.let { "Now: ${it.title}" }).joinToString(" · "),
+                        listOfNotNull(
+                            "${ui.doneCount} of $total bought",
+                            ui.unavailable.takeIf { it > 0 }?.let { "$it not available" },
+                            now?.let { "Now: ${it.title}" },
+                        ).joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -243,15 +251,39 @@ internal data class ShopGroup(
     val rows: List<ListRow>,
     /** Rows ticked a moment ago, still shown in place. */
     val lingering: Set<Long> = emptySet(),
+    /** X.8: the "Not available today" group at the end: nothing to walk to, so never "Now" or "Next". */
+    val setAside: Boolean = false,
 ) {
     val open: List<ListRow> get() = rows.filter { it.state != TickState.DONE || it.id in lingering }
     val bought: List<ListRow> get() = rows.filter { it.state == TickState.DONE && it.id !in lingering }
+
+    /** Something here still to pick up. */
+    val toFind: Boolean get() = !setAside && open.isNotEmpty()
 }
 
 internal fun groups(
     ui: ListUi,
     lingering: Set<Long> = emptySet(),
-): List<ShopGroup> = ui.aisles.map { (a, rows) -> ShopGroup("aisle-${a.name}", a.displayName, a, rows, lingering) }
+): List<ShopGroup> {
+    val aisles =
+        ui.aisles.mapNotNull { (a, rows) ->
+            rows.filter { !it.unavailable }.takeIf { it.isNotEmpty() }?.let {
+                ShopGroup(
+                    "aisle-${a.name}",
+                    a.displayName,
+                    a,
+                    it,
+                    lingering,
+                )
+            }
+        }
+    val setAside = ui.aisles.flatMap { it.second }.filter { it.unavailable }
+    return if (setAside.isEmpty()) {
+        aisles
+    } else {
+        aisles + ShopGroup("not-available", "Not available today", AisleCode.OTHER, setAside, setAside = true)
+    }
+}
 
 /** How long a ticked row stays in place before it folds into "N bought". */
 internal const val LINGER_MS = 2_500L
@@ -320,7 +352,7 @@ internal fun nowAisle(
     firstVisible: Int,
 ): ShopGroup? {
     val top = cells.take(firstVisible + 1).lastOrNull { it is ShopCell.Header } as ShopCell.Header?
-    return top?.group?.takeIf { it.open.isNotEmpty() }
+    return top?.group?.takeIf { it.toFind }
 }
 
 /**
@@ -334,7 +366,7 @@ internal fun nextAisle(
     firstVisible: Int,
 ): NextAisle? {
     val headers = cells.withIndex().filter { it.value is ShopCell.Header }.map { NextAisle(it.index, it.value as ShopCell.Header) }
-    val open = headers.filter { it.cell.group.open.isNotEmpty() }
+    val open = headers.filter { it.cell.group.toFind }
     if (open.isEmpty()) return null
     val top = headers.lastOrNull { it.index <= firstVisible } ?: return open.first()
     return open.firstOrNull { it.index > top.index } ?: open.firstOrNull { it.index < top.index }
@@ -370,10 +402,10 @@ private fun GroupHeader(
             modifier = Modifier.weight(1f),
         )
         if (now) Text("Now", style = MaterialTheme.typography.labelMedium, color = content)
-        if (left == 0) {
-            Text("Done ✓", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-        } else {
-            CountPill(if (left == 1) "1 left" else "$left left", content)
+        when {
+            g.setAside -> CountPill("$left for next time", content)
+            left == 0 -> Text("Done ✓", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            else -> CountPill(if (left == 1) "1 left" else "$left left", content)
         }
     }
 }
@@ -429,7 +461,7 @@ private fun ShopRow(
         when (row.state) {
             TickState.DONE -> "Bought"
             TickState.PARTIAL -> "Partly bought"
-            TickState.OPEN -> "Still needed"
+            TickState.OPEN -> if (row.unavailable) "Not available today" else "Still needed"
         }
     val tint: AisleStyle = row.aisle.style
     Row(
@@ -471,13 +503,31 @@ private fun ShopRow(
             Text(
                 displayMain(row.main, row.name),
                 style = MaterialTheme.typography.titleMedium,
-                color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                color = if (done || row.unavailable) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                 textDecoration = if (done) TextDecoration.LineThrough else null,
             )
             // The pack note or "2 already bought"; the recipe's name is planning, not shopping.
             row.sub?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+        }
+        // X.8: not on the shelf today. Set aside, it stays needed and comes back on the next trip.
+        when {
+            row.unavailable ->
+                TextButton(onClick = { actions.onAvailable(row) }, modifier = Modifier.testTag("available-${row.id}")) {
+                    Text("Found it")
+                }
+            !done ->
+                IconButton(
+                    onClick = { actions.onUnavailable(row) },
+                    modifier = Modifier.size(48.dp).testTag("unavailable-${row.id}"),
+                ) {
+                    Icon(
+                        Icons.Rounded.RemoveShoppingCart,
+                        contentDescription = "Not available today: ${row.name}",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
         }
     }
 }

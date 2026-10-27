@@ -41,10 +41,10 @@ class SchemaTest {
     @Test
     fun mergeKeyIsUniqueAmongLiveItemsOnly() {
         val w = r.db.openHelper.writableDatabase
-        w.execSQL("INSERT INTO Item VALUES (1,'cat:onion',NULL,'onion','onion','PRODUCE',0,1,500,0)")
-        w.execSQL("INSERT INTO Item VALUES (2,'cat:onion',NULL,'onion','onion','PRODUCE',0,1,NULL,0)")
+        w.execSQL("INSERT INTO Item VALUES (1,'cat:onion',NULL,'onion','onion','PRODUCE',0,1,500,0,NULL)")
+        w.execSQL("INSERT INTO Item VALUES (2,'cat:onion',NULL,'onion','onion','PRODUCE',0,1,NULL,0,NULL)")
         try {
-            w.execSQL("INSERT INTO Item VALUES (3,'cat:onion',NULL,'onion','onion','PRODUCE',0,1,NULL,0)")
+            w.execSQL("INSERT INTO Item VALUES (3,'cat:onion',NULL,'onion','onion','PRODUCE',0,1,NULL,0,NULL)")
             fail("two live items with one key")
         } catch (e: SQLiteConstraintException) {
             assertTrue(e.message!!.contains("UNIQUE"))
