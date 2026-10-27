@@ -10,7 +10,7 @@ import com.robert4lyf.hypershop.core.catalog.CatalogLoader
 import com.robert4lyf.hypershop.core.model.AisleCode
 
 @Database(
-    version = 7,
+    version = 8,
     exportSchema = true,
     entities = [
         MetaEntity::class, ItemEntity::class, ItemAliasEntity::class, RecipeEntity::class, RecipeLineEntity::class,
@@ -136,6 +136,14 @@ abstract class HyperShopDatabase : RoomDatabase() {
                 }
             }
 
+        /** v8: an item set aside as not available on this trip ([ItemEntity.unavailableAt]). */
+        val MIGRATION_7_8: Migration =
+            object : LiveKeyMigration(7, 8) {
+                override fun migrateTables(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `Item` ADD COLUMN `unavailableAt` INTEGER")
+                }
+            }
+
         /** Seeds aisles, the store and its aisle order, staples and Meta (PLAN §3.4, §4). */
         val CALLBACK =
             object : Callback() {
@@ -178,7 +186,9 @@ abstract class HyperShopDatabase : RoomDatabase() {
                 context,
                 HyperShopDatabase::class.java,
                 NAME,
-            ).addCallback(CALLBACK).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+            ).addCallback(
+                CALLBACK,
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                 .build()
 
         /**

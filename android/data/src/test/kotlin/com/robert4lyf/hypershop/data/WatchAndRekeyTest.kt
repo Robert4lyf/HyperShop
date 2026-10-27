@@ -89,7 +89,7 @@ class WatchAndRekeyTest {
             // A name-keyed item from an older catalogue that did not know "zucchini".
             val zId = r.repo.manualAdd("courgette", QtyBase.of(Rational.ONE, null, UnitLocale.METRIC), null)
             val w = r.db.openHelper.writableDatabase
-            w.execSQL("INSERT INTO Item VALUES (900,'name:zucchini',NULL,'zucchini','zucchini','OTHER',5,3,NULL,0)")
+            w.execSQL("INSERT INTO Item VALUES (900,'name:zucchini',NULL,'zucchini','zucchini','OTHER',5,3,NULL,0,NULL)")
             val use = r.db.dao().uses().first().id
             val two = "'{\"parts\":{\"count\":\"2\"}}'"
             w.execSQL("INSERT INTO Contribution VALUES (901,$use,NULL,900,$two,0,1,NULL,NULL)")

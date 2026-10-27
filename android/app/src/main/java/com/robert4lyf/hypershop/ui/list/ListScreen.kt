@@ -106,6 +106,9 @@ data class ListActions(
     val onView: (ListView) -> Unit = {},
     /** "Shop" on the planning screen, "Plan" on the shop screen. */
     val onMode: (ListMode) -> Unit = {},
+    /** X.8: "Not available" on this trip, and "Found it" to take that back. */
+    val onUnavailable: (ListRow) -> Unit = {},
+    val onAvailable: (ListRow) -> Unit = {},
 )
 
 /**

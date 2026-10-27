@@ -21,6 +21,11 @@ data class ListItem(
     val position: Int,
     val rev: Long = 1,
     val deletedAt: Long? = null,
+    /**
+     * "Not available" on this trip (X.8): set aside, still needed. It stops counting as left; ticking it after all
+     * clears it, and so does "Finish shopping", which leaves it on the list for the next trip like anything unbought.
+     */
+    val unavailableAt: Long? = null,
 )
 
 /**
@@ -232,6 +237,8 @@ data class ShoppingList(
         return copy(
             ticks = ticks + t,
             contributions = contributions.map { if (it.itemId == itemId && it.coveredBy == null) it.copy(coveredBy = t.id) else it },
+            // Found after all: no longer set aside.
+            items = items.mapValues { (id, i) -> if (id == itemId) i.copy(unavailableAt = null) else i },
             nextId = nextId + 1,
         ).bumped(setOf(itemId))
     }
@@ -245,9 +252,28 @@ data class ShoppingList(
         ).bumped(setOf(itemId))
     }
 
+    fun isUnavailable(itemId: Long): Boolean = items[itemId]?.let { it.deletedAt == null && it.unavailableAt != null } == true
+
+    /** X.8: "Not available" on this trip, for a live item with something still to buy; null when there is nothing to set aside. */
+    fun markUnavailable(
+        itemId: Long,
+        now: Long,
+    ): ShoppingList? {
+        val item = items[itemId]?.takeIf { it.deletedAt == null && it.unavailableAt == null } ?: return null
+        if (isDone(itemId)) return null
+        return copy(items = items + (itemId to item.copy(unavailableAt = now))).bumped(setOf(itemId))
+    }
+
+    /** "Available after all" (and Undo of [markUnavailable]). */
+    fun markAvailable(itemId: Long): ShoppingList? {
+        val item = items[itemId]?.takeIf { it.unavailableAt != null } ?: return null
+        return copy(items = items + (itemId to item.copy(unavailableAt = null))).bumped(setOf(itemId))
+    }
+
     /**
      * Soft-deletes DONE items (stamped [now], so [undoDelete] can bring exactly
-     * them back) and archives uses fully covered for 7 days.
+     * them back) and archives uses fully covered for 7 days. What was set aside as not available is needed again
+     * on the next trip: it stays on the list, no longer set aside.
      */
     fun finishShopping(now: Long): ShoppingList {
         val done = liveItems.filter { isDone(it.id) }.map { it.id }.toSet()
@@ -260,7 +286,18 @@ data class ShoppingList(
                         cs.all { c -> c.coveredBy != null && (tickAt[c.coveredBy] ?: now) <= now - SEVEN_DAYS }
                 if (u.archivedAt == null && coveredFor7Days) u.copy(archivedAt = now) else u
             }
-        return copy(items = items.mapValues { (id, i) -> if (id in done) i.copy(deletedAt = now) else i }, uses = archived).bumped(done)
+        val setAside = liveItems.filter { it.unavailableAt != null && it.id !in done }.map { it.id }.toSet()
+        return copy(
+            items =
+                items.mapValues { (id, i) ->
+                    when (id) {
+                        in done -> i.copy(deletedAt = now)
+                        in setAside -> i.copy(unavailableAt = null)
+                        else -> i
+                    }
+                },
+            uses = archived,
+        ).bumped(done + setAside)
     }
 
     fun clearAll(now: Long): ShoppingList {

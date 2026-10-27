@@ -50,6 +50,8 @@ class ShopScreenTest {
             onFinish = { events += "finish" },
             onClearAll = { events += "clear" },
             onMode = { events += "mode $it" },
+            onUnavailable = { events += "unavailable ${it.id}" },
+            onAvailable = { events += "available ${it.id}" },
         )
     private val shop = SAMPLE_LIST.copy(mode = ListMode.SHOP)
 
@@ -69,6 +71,27 @@ class ShopScreenTest {
         compose.onNodeWithText("1 of 6 bought · Now: Produce").assertExists()
         compose.onNodeWithTag("shop-plan").performClick()
         assertEquals(listOf("mode PLAN"), events)
+    }
+
+    @Test
+    fun aRowNotOnTheShelfIsSetAsideUntilFoundOrTheNextTrip() {
+        // X.8: butter was not on the shelf.
+        val ui =
+            shop.copy(
+                aisles = shop.aisles.map { (a, rows) -> a to rows.map { if (it.id == 5L) it.copy(unavailable = true) else it } },
+            )
+        show(ui)
+        compose.onNodeWithTag("shop-left").assertTextContains("4 left")
+        compose.onNodeWithText("1 of 6 bought · 1 not available · Now: Produce").assertExists()
+        compose.onNodeWithText("Not available today").assertExists()
+        compose.onNodeWithText("1 for next time").assertExists()
+        compose.onNodeWithTag("unavailable-5").assertDoesNotExist()
+        compose.onNodeWithTag("available-5").performClick()
+        // A bought row has nothing to set aside.
+        compose.onNodeWithTag("unavailable-3").assertDoesNotExist()
+        compose.onNodeWithTag("unavailable-2").performClick()
+        assertEquals(listOf("available 5", "unavailable 2"), events)
+        compose.onRoot().captureRoboImage(Shots.path("shop-not-available.png"))
     }
 
     @Test

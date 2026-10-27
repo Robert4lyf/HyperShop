@@ -192,7 +192,8 @@ class WatchSyncCoordinator(
                 ?.let { list.items[it.itemId]?.aisle?.name }
         val items =
             list.liveItems
-                .filter { it.aisle in order }
+                // Set aside on the phone for this trip (X.8): not something to look for on the wrist either.
+                .filter { it.aisle in order && it.unavailableAt == null }
                 .sortedWith(compareBy({ order.getValue(it.aisle) }, { it.position }))
                 .map { item ->
                     val text = Display.row(list, item, item.catalogId?.let { catalog.byId[it] }, u)
