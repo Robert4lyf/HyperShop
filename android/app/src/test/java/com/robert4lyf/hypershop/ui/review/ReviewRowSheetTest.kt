@@ -61,7 +61,7 @@ class ReviewRowSheetViewModelTest {
         await(vm0.state) { it is ReviewState.Added }
         val vm = ReviewViewModel(c, runBlocking { c.readyJob("200 ml milk") })
         await(vm.state) { it is ReviewState.Ready }
-        assertEquals("milk: +200ml → 700ml on list", vm.sheet("cat:milk")!!.effect)
+        assertEquals("milk: +200ml → 700ml on the shopping list", vm.sheet("cat:milk")!!.effect)
         assertEquals("1 × 4 pint (2.27l) bottle", vm.sheet("cat:milk")!!.packNote)
         assertEquals("200 ml milk", vm.sheet("cat:milk")!!.lines.single().raw)
     }
@@ -248,7 +248,7 @@ class ReviewRowSheetScreenTest {
         RowSheet(
             key = "cat:milk",
             name = "milk",
-            effect = "milk: +200ml → 700ml on list",
+            effect = "milk: +200ml → 700ml on the shopping list",
             packNote = "1 × 4 pint (2.27 l) bottle",
             lines =
                 listOf(
@@ -288,7 +288,7 @@ class ReviewRowSheetScreenTest {
     @Test
     fun actions() {
         show()
-        compose.onNodeWithText("milk: +200ml → 700ml on list").fetchSemanticsNode()
+        compose.onNodeWithText("milk: +200ml → 700ml on the shopping list").fetchSemanticsNode()
         compose.onNodeWithText("Usually sold as 1 × 4 pint (2.27 l) bottle").fetchSemanticsNode()
         compose.onNodeWithText("Use oat milk instead").performClick()
         compose.onNodeWithText("Always at home").performClick()

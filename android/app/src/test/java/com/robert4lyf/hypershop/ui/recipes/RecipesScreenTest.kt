@@ -80,12 +80,15 @@ class RecipesScreenTest {
 
     private val events = mutableListOf<String>()
 
-    private fun show(dark: Boolean = false) =
+    /** The recipes in this shop (the tab opens on saved recipes, X.12). */
+    private fun show(dark: Boolean = false) {
         compose.setContent {
             HyperShopTheme(dark = dark, dynamicColor = false) {
                 RecipesScreen(USES, onRemove = { events += "remove ${it.useId}" })
             }
         }
+        compose.onNodeWithTag("view-list").performClick()
+    }
 
     @Test
     fun removeIsOneTapWithUndoOnTheMessage() {
@@ -145,11 +148,11 @@ class RecipesScreenTest {
         compose.setContent {
             HyperShopTheme(dynamicColor = false) { RecipesScreen(USES.copy(uses = emptyList()), onRemove = {}) }
         }
-        // An empty list opens on the library; the list says it is empty.
+        // Opens on saved recipes; "In this shop" says it is empty.
         compose.onNodeWithTag("lib-r:9").assertExists()
         compose.onNodeWithTag("view-list").performClick()
         compose.onNodeWithTag("nothing-yet").assertExists()
-        compose.onNodeWithText("Nothing on the list", substring = true).assertExists()
+        compose.onNodeWithText("No recipes in this shop", substring = true).assertExists()
     }
 
     @Test
@@ -225,14 +228,15 @@ class RecipesScreenTest {
     fun theListAndTheLibraryAreSeparateAndANewRecipeShowsOnTheList() {
         var ui by mutableStateOf(USES.copy(uses = USES.uses.take(1)))
         compose.setContent { HyperShopTheme(dynamicColor = false) { RecipesScreen(ui, onRemove = {}) } }
-        // Opens on the list: its cards, not the library's.
-        compose.onNodeWithTag("use-1").assertExists()
-        compose.onNodeWithTag("lib-r:9").assertDoesNotExist()
-        compose.onNodeWithTag("view-library").performClick()
+        // X.12: opens on saved recipes, the recipe book; this shop's recipes are the other view.
         compose.onNodeWithTag("lib-r:9").assertExists()
         compose.onNodeWithTag("use-1").assertDoesNotExist()
         TestPhotos.settle(compose)
         compose.onRoot().captureRoboImage(Shots.path("recipes-library-light.png"))
+        compose.onNodeWithTag("view-list").performClick()
+        compose.onNodeWithTag("use-1").assertExists()
+        compose.onNodeWithTag("lib-r:9").assertDoesNotExist()
+        compose.onNodeWithTag("view-library").performClick()
         // A recipe added to the list brings the list back.
         ui = USES
         compose.waitForIdle()
@@ -246,6 +250,7 @@ class RecipesScreenTest {
         compose.setContent {
             HyperShopTheme(dynamicColor = false) { RecipesScreen(USES, onRemove = {}, onOpenUse = { opened += it.useId }) }
         }
+        compose.onNodeWithTag("view-list").performClick()
         compose.onNodeWithTag("use-2").performClick()
         assertEquals(listOf(2L), opened)
         // "Typed into the list" said nothing the card doesn't.
@@ -367,8 +372,8 @@ class RecipesScreenTest {
 
         fun lefts() =
             listOf(
-                "On the list",
-                "Saved",
+                "Saved recipes",
+                "In this shop",
             ).map { compose.onNodeWithText(it, useUnmergedTree = true).getUnclippedBoundsInRoot().left }
         val before = lefts()
         compose.onNodeWithTag("view-library").performClick()

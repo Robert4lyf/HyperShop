@@ -53,6 +53,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -126,6 +127,8 @@ fun ReviewScreen(
     onClearInStock: () -> Unit,
     edits: ReviewEdits = ReviewEdits(),
     onStopRetry: () -> Unit = {},
+    /** X.11: keep the recipe without planning it; only for a new recipe (not an edit, not typed-in items). */
+    onSaveForLater: () -> Unit = {},
 ) {
     val list = rememberLazyListState()
     val addFocus = remember { FocusRequester() }
@@ -179,6 +182,13 @@ fun ReviewScreen(
                 item(key = "add-line") { AddLine(edits.onAddLine, enabled = !ui.busy, focus = addFocus) }
             }
             BottomActionBar {
+                if (!ui.editing && !ui.byHand && !ui.savedOnly) {
+                    OutlinedButton(
+                        onClick = onSaveForLater,
+                        enabled = !ui.busy,
+                        modifier = Modifier.heightIn(min = 56.dp).testTag("save-for-later"),
+                    ) { Text("Save for later", textAlign = TextAlign.Center) }
+                }
                 Button(
                     onClick = onAdd,
                     // An edit can be saved with nothing to add (everything now in stock).
@@ -732,7 +742,7 @@ private fun ReviewRowItem(
             val sub =
                 when {
                     row.inStock -> row.quantity?.let { "needs $it" }
-                    !row.adds -> "Already on your list"
+                    !row.adds -> "Already on your shopping list"
                     else -> row.quantity?.let { "+$it" }
                 }.let { s -> if (row.optional && !row.inStock) listOfNotNull(s, "optional").joinToString(" · ") else s }
             sub?.let {

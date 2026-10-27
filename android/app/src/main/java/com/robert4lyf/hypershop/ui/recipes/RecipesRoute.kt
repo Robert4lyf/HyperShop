@@ -30,7 +30,6 @@ import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDropDown
-import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DoneAll
@@ -90,7 +89,6 @@ import com.robert4lyf.hypershop.core.merge.UseState
 import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.EmptyHero
-import com.robert4lyf.hypershop.ui.common.HeroButton
 import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.PillShape
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
@@ -243,10 +241,10 @@ fun RecipesScreen(
     var renaming by rememberSaveable { mutableStateOf<Long?>(null) }
     var renamingSaved by rememberSaveable { mutableStateOf<String?>(null) }
     var adding by rememberSaveable { mutableStateOf(false) }
-    // Null until a toggle is tapped: the list when it has anything, else the library.
+    // Null until a toggle is tapped: your saved recipes (X.12: this tab is the recipe book; the week is its own tab).
     var picked by rememberSaveable { mutableStateOf<Boolean?>(null) }
-    val showLibrary = ui.hasLibrary && (picked ?: ui.uses.isEmpty())
-    // A recipe landing on the list (from the library, a link or a photo) is shown there.
+    val showLibrary = ui.hasLibrary && (picked ?: true)
+    // A recipe landing on the shopping list (from the library, a link or a photo) is shown there.
     var seen by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(ui.loaded, ui.uses.size) {
         if (!ui.loaded) return@LaunchedEffect
@@ -269,18 +267,9 @@ fun RecipesScreen(
                         subtitle =
                             when {
                                 !ui.loaded || n == 0 -> null
-                                n == 1 -> "1 recipe on your list"
-                                else -> "$n recipes on your list"
+                                n == 1 -> "1 recipe in this shop"
+                                else -> "$n recipes in this shop"
                             },
-                        actions = {
-                            if (ui.hasLibrary) {
-                                HeroButton(onClick = onMeals, modifier = Modifier.testTag("open-meals")) {
-                                    Icon(Icons.Rounded.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.size(6.dp))
-                                    Text("Plan the week")
-                                }
-                            }
-                        },
                     )
                 }
                 if (ui.loaded && ui.uses.isEmpty() && !ui.hasLibrary) {
@@ -295,29 +284,29 @@ fun RecipesScreen(
                     item(key = "view") {
                         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                             SegmentedButton(
-                                selected = !showLibrary,
+                                selected = showLibrary,
                                 // No checkmark: it would push the label sideways on every switch; the fill says which is on.
                                 icon = {},
-                                onClick = { picked = false },
+                                onClick = { picked = true },
                                 shape = SegmentedButtonDefaults.itemShape(0, 2),
                                 colors = basilSegmentedColors(),
-                                modifier = Modifier.testTag("view-list"),
-                            ) { Text("On the list") }
+                                modifier = Modifier.testTag("view-library"),
+                            ) { Text("Saved recipes") }
                             SegmentedButton(
-                                selected = showLibrary,
+                                selected = !showLibrary,
                                 icon = {},
-                                onClick = { picked = true },
+                                onClick = { picked = false },
                                 shape = SegmentedButtonDefaults.itemShape(1, 2),
                                 colors = basilSegmentedColors(),
-                                modifier = Modifier.testTag("view-library"),
-                            ) { Text("Saved") }
+                                modifier = Modifier.testTag("view-list"),
+                            ) { Text("In this shop") }
                         }
                     }
                 }
                 if (ui.loaded && ui.uses.isEmpty() && ui.hasLibrary && !showLibrary) {
                     item(key = "nothing-yet") {
                         InfoBanner(
-                            "Nothing on the list. Pick this week's meals, or tap + for a new recipe.",
+                            "No recipes in this shop. Plan meals on This week, or tap + for a new recipe.",
                             Icons.AutoMirrored.Rounded.MenuBook,
                             Modifier.padding(horizontal = 16.dp).testTag("nothing-yet"),
                         )
@@ -583,11 +572,15 @@ private fun LibraryCard(
                         Text("Uses $it", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
                     }
                     if (row.onList) {
-                        Text("On your list", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            "On the shopping list",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
                     }
                 }
                 FilledTonalButton(onClick = onAdd, modifier = Modifier.testTag("lib-add-${row.key}")) {
-                    Text(if (row.onList) "Add again" else "Add to list")
+                    Text(if (row.onList) "Plan again" else "Plan")
                 }
                 var menu by remember { mutableStateOf(false) }
                 Box {
@@ -682,7 +675,7 @@ private fun UseCard(
                                 })
                                 DropdownMenuItem(text = {
                                     Text(
-                                        "Remove from list",
+                                        "Remove from shopping list",
                                     )
                                 }, modifier = Modifier.testTag("remove-${use.useId}"), onClick = {
                                     menu = false
@@ -875,7 +868,7 @@ private fun DetailButtons(
         Button(onClick = onAdd, modifier = Modifier.testTag("detail-add")) {
             Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.size(8.dp))
-            Text(if (onList) "Add again" else "Add to list")
+            Text(if (onList) "Plan again" else "Plan")
         }
         onOpen?.let {
             OutlinedButton(onClick = it) {

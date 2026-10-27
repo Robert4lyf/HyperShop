@@ -17,6 +17,7 @@ import com.robert4lyf.hypershop.testutil.readyJob
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
@@ -48,6 +49,22 @@ class ReviewViewModelTest {
         // The queued row changes found the screen finished and did nothing.
         assertTrue(vm.state.value is ReviewState.Added)
         assertEquals(1, runBlocking { c.repository.usesOnList() }.size)
+    }
+
+    @Test
+    fun saveForLaterKeepsTheRecipeWithoutPlanningOrAddingIt() {
+        val c = TestContainer.create()
+        val job = runBlocking { c.readyJob("2 onions", "1 carrot", url = "https://example.com/soup", title = "Soup") }
+        val vm = ReviewViewModel(c, job)
+        ready(vm)
+        vm.saveForLater()
+        val added = await(vm.state) { it is ReviewState.Added } as ReviewState.Added
+        assertEquals("Soup", added.savedForLater)
+        // X.11: in your recipes, and nothing else: no meal planned, nothing on the shopping list.
+        assertEquals(listOf("Soup"), runBlocking { c.repository.observeLibrary().first() }.map { it.title })
+        assertTrue(runBlocking { c.planner.week(c.planner.currentWeek()) }.isEmpty())
+        assertTrue(runBlocking { c.repository.snapshot() }.liveItems.isEmpty())
+        assertEquals(JobState.DONE, runBlocking { c.importJobs.get(job) }?.state)
     }
 
     @Test
@@ -103,7 +120,7 @@ class ReviewViewModelTest {
         await(vm1.state) { it is ReviewState.Added }
         vm2.confirm()
         val ui = (await(vm2.state) { it is ReviewState.Ready && it.ui.notice != null } as ReviewState.Ready).ui
-        assertEquals("List changed — review updated", ui.notice)
+        assertEquals("Shopping list changed — review updated", ui.notice)
         vm2.confirm()
         await(vm2.state) { it is ReviewState.Added }
     }

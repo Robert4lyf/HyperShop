@@ -159,13 +159,13 @@ class ReviewScreenTest {
         // Also said in the hero, in full contrast: the disabled button is not the only statement.
         compose.onNodeWithTag("summary").assertTextContains("Nothing to add", substring = true)
         compose.onNodeWithTag("servings-original").assertTextEquals("(recipe: 4)")
-        compose.onNodeWithText("Already on your list").assertDoesNotExist()
+        compose.onNodeWithText("Already on your shopping list").assertDoesNotExist()
     }
 
     @Test
     fun aRowTheListAlreadyCoversSaysSo() {
         show(SAMPLE_REVIEW.copy(aisles = listOf(AisleCode.PRODUCE to listOf(SAMPLE_REVIEW.aisles[0].second[0].copy(adds = false)))))
-        compose.onNodeWithText("Already on your list").fetchSemanticsNode()
+        compose.onNodeWithText("Already on your shopping list").fetchSemanticsNode()
         compose.onNodeWithTag("add").assertIsNotEnabled()
     }
 

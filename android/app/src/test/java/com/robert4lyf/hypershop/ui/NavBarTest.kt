@@ -3,13 +3,16 @@ package com.robert4lyf.hypershop.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -29,7 +32,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
-/** The tab bar at 200 % font scale: labels whole, the plan screen under the List tab. */
+/** The tab bar at 200 % font scale: labels whole; This week is a tab of its own (X.10). */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34], qualifiers = "w411dp-h891dp-xxhdpi")
 class NavBarTest {
@@ -37,7 +40,8 @@ class NavBarTest {
 
     private val tabs =
         listOf(
-            Tab(Routes.LIST, "List", Icons.Rounded.ShoppingCart, Icons.Outlined.ShoppingCart),
+            Tab(Routes.MEALS, "This week", Icons.Rounded.CalendarMonth, Icons.Outlined.CalendarMonth),
+            Tab(Routes.LIST, "Shopping", Icons.Rounded.ShoppingCart, Icons.Outlined.ShoppingCart),
             Tab(Routes.SETTINGS, "Settings", Icons.Rounded.Settings, Icons.Outlined.Settings),
         )
 
@@ -50,12 +54,12 @@ class NavBarTest {
                 HyperShopTheme(dynamicColor = false) { CompactNavBar(tabs, route = Routes.MEALS, onSelect = {}) }
             }
         }
-        for (label in listOf("List", "Settings")) {
+        for (label in listOf("This week", "Shopping", "Settings")) {
             val node = compose.onNodeWithText(label)
             assertEquals(label, node.getUnclippedBoundsInRoot(), node.getBoundsInRoot())
         }
-        // The week's plan is about the list, so that tab stays lit there.
-        compose.onNodeWithText("List").assertIsSelected()
+        compose.onNodeWithText("This week").assertIsSelected()
+        compose.onNodeWithText("Shopping").assertIsNotSelected()
         // Taller than 60 dp for the big labels, but a bar, not a screen: Scaffold offers it the whole screen.
         val height = compose.onRoot().getBoundsInRoot().height
         assertTrue("bar height $height", height >= 60.dp && height <= 120.dp)
@@ -68,7 +72,7 @@ class NavBarTest {
                 Box(Modifier.fillMaxSize()) { CompactNavBar(tabs, route = Routes.LIST, onSelect = {}) }
             }
         }
-        val bar = compose.onNodeWithText("List").onParent().onParent()
+        val bar = compose.onNodeWithText("Shopping").onParent().onParent()
         val height = bar.getBoundsInRoot().height
         assertTrue("bar height $height", height >= 60.dp && height <= 72.dp)
     }

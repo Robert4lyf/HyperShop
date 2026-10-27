@@ -58,6 +58,15 @@ class WeeklyShopScenariosTest {
     private fun show(c: AppContainer) {
         compose.setContent { HyperShopTheme { HyperShopApp(c) } }
         compose.waitForIdle()
+        // An empty list opens on This week (X.10); these scenarios start from the shopping list, as a person
+        // switching tabs would. Once the start screen has settled, so the switch is not undone by it.
+        compose.waitUntil(10_000) {
+            listOf("meals", "list", "shop").any { compose.onAllNodesWithTag(it).fetchSemanticsNodes().isNotEmpty() }
+        }
+        if (compose.onAllNodesWithTag("meals").fetchSemanticsNodes().isNotEmpty()) {
+            compose.onNodeWithTag("tab-list").performClick()
+            compose.waitForIdle()
+        }
     }
 
     private fun waitFor(what: () -> Boolean) = compose.waitUntil(15_000) { runCatching(what).getOrDefault(false) }
@@ -276,8 +285,8 @@ class WeeklyShopScenariosTest {
             }
         }
         compose.onNodeWithTag("meals").assertExists()
-        // Back to the list and type the usual items.
-        tap("back")
+        // Over to the shopping list and type the usual items.
+        tap("tab-list")
         for (line in regulars) type(line)
         tap("plan-card")
         val cupboard = runBlocking { c.homeCheck.view(c.repository.snapshot()) }.filter { !it.have }.map { it.mergeKey }

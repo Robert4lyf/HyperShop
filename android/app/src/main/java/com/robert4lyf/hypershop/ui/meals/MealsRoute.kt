@@ -22,7 +22,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronLeft
@@ -81,6 +80,8 @@ import com.robert4lyf.hypershop.ui.common.fieldLift
 import com.robert4lyf.hypershop.ui.common.label
 import com.robert4lyf.hypershop.ui.common.pillFieldColors
 import com.robert4lyf.hypershop.ui.list.show
+import com.robert4lyf.hypershop.ui.recipes.AddRecipeActions
+import com.robert4lyf.hypershop.ui.recipes.AddRecipeSheet
 import com.robert4lyf.hypershop.ui.recipes.RecipeArt
 import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.util.factoryFor
@@ -104,21 +105,36 @@ data class MealsActions(
     val onHave: (List<HomeRow>) -> Unit = {},
     val onNeed: (HomeRow) -> Unit = {},
     val onStartShopping: () -> Unit = {},
-    val onBack: () -> Unit = {},
-    /** "Go to the list": the List tab, where the combined ingredients are. */
+    /** "Go to the list": the Shopping tab, where the combined ingredients are. */
     val onList: () -> Unit = {},
+    /** X.10: "New recipe": the add-a-recipe sheet, here where the week is planned. */
+    val onNewRecipe: () -> Unit = {},
 )
 
 @Composable
 fun MealsRoute(
     container: AppContainer,
     snackbar: SnackbarHostState,
-    onBack: () -> Unit,
     onList: () -> Unit,
+    onReview: (Long) -> Unit,
 ) {
     val vm: MealsViewModel = viewModel(factory = factoryFor { MealsViewModel(container) })
     val ui by vm.ui.collectAsStateWithLifecycle()
+    val hasKey by container.apiKeyStore.hasKey.collectAsStateWithLifecycle()
+    var adding by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
+    LaunchedEffect(vm) { vm.reviews.collect(onReview) }
+    if (adding) {
+        AddRecipeSheet(
+            AddRecipeActions(
+                onLink = vm::addLink,
+                onManual = { n, sv, l -> vm.addManual(n, sv, l) },
+                onPhoto = { uri, book, page -> vm.addPhoto(uri, book, page) },
+            ),
+            onDismiss = { adding = false },
+            hasKey = hasKey,
+        )
+    }
     MealsScreen(
         ui,
         MealsActions(
@@ -142,8 +158,8 @@ fun MealsRoute(
                 vm.startShopping()
                 onList()
             },
-            onBack = onBack,
             onList = onList,
+            onNewRecipe = { adding = true },
         ),
     )
 }
@@ -179,6 +195,18 @@ fun MealsScreen(
                 }
                 // Choosing meals comes with the meals, before Buy again and the home check.
                 if (ui.hasLibrary && !ui.isPast) pickSection(ui, actions, allPicks) { allPicks = true }
+                if (ui.loaded && !ui.isPast) {
+                    item(key = "new-recipe") {
+                        OutlinedButton(
+                            onClick = actions.onNewRecipe,
+                            modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth().testTag("new-recipe"),
+                        ) {
+                            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.size(8.dp))
+                            Text("New recipe: link, typed or photo")
+                        }
+                    }
+                }
                 if (ui.isCurrent && (ui.buyAgain.regulars.isNotEmpty() || ui.buyAgain.lastShop.isNotEmpty())) {
                     item(key = "buy-again") { BuyAgainSection(ui, actions) }
                 }
@@ -190,7 +218,7 @@ fun MealsScreen(
                     item(key = "none") {
                         EmptyHero(
                             "No saved recipes yet",
-                            body = "Every recipe you add is saved. Share a link to HyperShop, or tap + on the Recipes tab.",
+                            body = "Every recipe you add is saved. Share a link to HyperShop, or tap New recipe.",
                         )
                     }
                 }
@@ -206,10 +234,7 @@ private fun WeekHeader(
     actions: MealsActions,
 ) {
     Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = actions.onBack, modifier = Modifier.testTag("back")) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
-        }
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f).padding(start = 16.dp)) {
             Text(
                 ui.weekName.ifEmpty { "This week" },
                 style = MaterialTheme.typography.headlineSmall,
@@ -240,7 +265,7 @@ private fun WeekHeader(
 private fun summary(ui: MealsUi): String? =
     when {
         ui.meals.isEmpty() -> if (ui.isPast) "Nothing was planned" else "Nothing planned yet"
-        ui.pending > 0 -> "${plural(ui.meals.size, "meal")} · ${ui.pending} not on the list yet"
+        ui.pending > 0 -> "${plural(ui.meals.size, "meal")} · ${ui.pending} not on the shopping list yet"
         ui.itemsLeft > 0 -> "${plural(ui.meals.size, "meal")} · ${plural(ui.itemsLeft, "item")} still needed"
         else -> plural(ui.meals.size, "meal")
     }
@@ -275,11 +300,11 @@ private fun RepeatCard(
 
 private fun mealState(m: Meal): String =
     when (m.shopping) {
-        MealShopping.NOT_ON_LIST -> "Not on the list yet"
+        MealShopping.NOT_ON_LIST -> "Not on the shopping list yet"
         MealShopping.TO_BUY -> m.progress!!.label()
         MealShopping.BOUGHT -> "All bought"
         MealShopping.NOTHING_TO_BUY -> "Nothing to buy"
-        MealShopping.TAKEN_OFF -> "Taken off the list"
+        MealShopping.TAKEN_OFF -> "Taken off the shopping list"
     }
 
 @Composable
@@ -413,12 +438,12 @@ private fun RegularChip(
                 .background(if (r.onList) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.card)
                 .combinedClickable(
                     role = Role.Button,
-                    onClickLabel = if (r.onList) null else "Add to the list",
+                    onClickLabel = if (r.onList) null else "Add to the shopping list",
                     onLongClickLabel = "Pin or hide",
                     onLongClick = { menu = true },
                     onClick = { if (!r.onList) actions.onRegular(r) },
                 )
-                .semantics { stateDescription = if (r.onList) "On the list" else "Not on the list" }
+                .semantics { stateDescription = if (r.onList) "On the shopping list" else "Not on the shopping list" }
                 .padding(horizontal = 14.dp, vertical = 8.dp)
                 .testTag("regular-${r.mergeKey}"),
             verticalAlignment = Alignment.CenterVertically,
@@ -466,7 +491,7 @@ private fun HomeHeader(
             }
         }
         Text(
-            "Cupboard things the meals need. Have it takes it off this shop's list.",
+            "Cupboard things the meals need. Have it takes it off this shopping list.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -624,7 +649,7 @@ private fun BottomBar(
             BottomActionBar(navigationBarInset = false) {
                 Button(onClick = actions.onAddToList, modifier = Modifier.weight(1f).heightIn(min = 56.dp).testTag("meals-add-to-list")) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(if (ui.pending == 1) "Add 1 meal to the list" else "Add ${ui.pending} meals to the list")
+                        Text(if (ui.pending == 1) "Add 1 meal to the shopping list" else "Add ${ui.pending} meals to the shopping list")
                         Text(previewLine(p), style = MaterialTheme.typography.labelSmall)
                     }
                 }
@@ -645,7 +670,7 @@ private fun BottomBar(
 private fun previewLine(p: com.robert4lyf.hypershop.data.WeekPreview): String =
     listOfNotNull(
         plural(p.newItems, "new item"),
-        p.joined.takeIf { it > 0 }?.let { "$it join the list" },
+        p.joined.takeIf { it > 0 }?.let { "$it already on it" },
         p.atHome.takeIf { it > 0 }?.let { "$it usually at home" },
     ).joinToString(" · ")
 

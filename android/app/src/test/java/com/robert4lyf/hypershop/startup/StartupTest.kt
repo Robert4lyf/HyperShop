@@ -166,7 +166,8 @@ class StartupTest {
         compose.onNodeWithTag("add-item").assertDoesNotExist()
         c.startUp()
         awaitTrue { c.startup.value == Startup.Ready }
-        compose.waitUntil(5_000) { compose.onAllNodesWithTag("add-item").fetchSemanticsNodes().isNotEmpty() }
+        // An empty list opens on This week (X.10).
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("meals").fetchSemanticsNodes().isNotEmpty() }
     }
 
     @Test

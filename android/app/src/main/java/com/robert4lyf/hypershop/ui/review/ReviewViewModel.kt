@@ -182,6 +182,8 @@ sealed interface ReviewState {
         val useId: Long,
         /** An edit was saved: no Undo, "Saved changes to <title>". */
         val edited: String? = null,
+        /** X.11: kept in your recipes without planning it or adding anything: "Saved <title> for later". */
+        val savedForLater: String? = null,
     ) : ReviewState
 
     data object Cancelled : ReviewState
@@ -700,9 +702,31 @@ class ReviewViewModel(
                     }
                     ApplyResult.Stale -> {
                         busy = false
-                        recompute(notice = "List changed — review updated")
+                        recompute(notice = "Shopping list changed — review updated")
                     }
                 }
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    /**
+     * X.11 "Save for later": the recipe goes into your recipes as reviewed, and nothing
+     * is planned or put on the shopping list. For a recipe kept for another week.
+     */
+    fun saveForLater() {
+        val ready = _state.value as? ReviewState.Ready ?: return
+        if (busy) return
+        val s = stored ?: return
+        busy = true
+        _state.value = ready.copy(ui = ready.ui.copy(busy = true))
+        act {
+            try {
+                c.repository.saveToLibrary(s.recipe.id, jobId)
+                offerPhoto(s.recipe.id)
+                stored = null
+                _state.value = ReviewState.Added(0, 0, savedForLater = result?.title ?: "Recipe")
             } finally {
                 busy = false
             }
@@ -776,10 +800,10 @@ class ReviewViewModel(
         val effect =
             when {
                 row.decision.inStock -> "$name: at home, nothing added"
-                adding == null && row.existing != null -> "$name: already on the list"
-                adding == null -> "$name: added to the list"
+                adding == null && row.existing != null -> "$name: already on the shopping list"
+                adding == null -> "$name: added to the shopping list"
                 row.existing == null || before == null -> "$name: +$adding (new)"
-                else -> "$name: +$adding → $after on list"
+                else -> "$name: +$adding → $after on the shopping list"
             }
         val lines =
             p.incoming.lines.filter { it.target.mergeKey == key }.map { l ->

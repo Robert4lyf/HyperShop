@@ -28,8 +28,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.Icon
@@ -44,11 +46,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -70,6 +76,9 @@ import com.robert4lyf.hypershop.ui.recipes.RecipesRoute
 import com.robert4lyf.hypershop.ui.review.ReviewRoute
 import com.robert4lyf.hypershop.ui.settings.SettingsRoute
 import com.robert4lyf.hypershop.ui.voicetest.VoiceTestRoute
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 
 object Routes {
     const val LIST = "list"
@@ -84,7 +93,7 @@ object Routes {
     fun review(job: Long) = "review/$job"
 }
 
-private val TABS = setOf(Routes.LIST, Routes.RECIPES, Routes.SETTINGS)
+private val TABS = setOf(Routes.MEALS, Routes.LIST, Routes.RECIPES, Routes.SETTINGS)
 
 internal data class Tab(
     val route: String,
@@ -93,7 +102,10 @@ internal data class Tab(
     val off: androidx.compose.ui.graphics.vector.ImageVector,
 )
 
-/** The app's navigation: three tabs, plus the review screen opened by an import. */
+/**
+ * The app's navigation: four tabs in the order of the week (plan it, shop it, the recipes behind it, settings),
+ * plus the review screen opened by an import.
+ */
 @Composable
 fun HyperShopApp(
     container: AppContainer,
@@ -149,6 +161,26 @@ private fun AppShell(
     // The review screens pin their main action to the bottom edge (BottomActionBar pads for
     // the navigation bar itself), so the snackbar sits above that bar instead of over it.
     val reviewing = route == Routes.REVIEW
+    // Each tab keeps its state (and its view model) while you are on another, so coming back doesn't rebuild it.
+    val selectTab: (String) -> Unit = { r ->
+        nav.navigate(r) {
+            popUpTo(Routes.LIST) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+    // X.10: with nothing to buy the app opens on This week, where a shop starts; otherwise on the shopping list.
+    // Once per launch (not on rotation), and only if nothing has navigated yet (a share's review).
+    var startChosen by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (startChosen) return@LaunchedEffect
+        startChosen = true
+        val empty = container.repository.list.first().liveItems.isEmpty()
+        // Navigation's state belongs to the main thread, wherever the list was read.
+        withContext(Dispatchers.Main) {
+            if (empty && nav.currentBackStackEntry?.destination?.route == Routes.LIST) selectTab(Routes.MEALS)
+        }
+    }
     Scaffold(
         contentWindowInsets =
             if (reviewing) {
@@ -172,19 +204,12 @@ private fun AppShell(
             if (route != Routes.REVIEW) {
                 val tabs =
                     listOf(
-                        Tab(Routes.LIST, "List", Icons.Rounded.ShoppingCart, Icons.Outlined.ShoppingCart),
+                        Tab(Routes.MEALS, "This week", Icons.Rounded.CalendarMonth, Icons.Outlined.CalendarMonth),
+                        Tab(Routes.LIST, "Shopping", Icons.Rounded.ShoppingCart, Icons.Outlined.ShoppingCart),
                         Tab(Routes.RECIPES, "Recipes", Icons.AutoMirrored.Rounded.MenuBook, Icons.AutoMirrored.Outlined.MenuBook),
                         Tab(Routes.SETTINGS, "Settings", Icons.Rounded.Settings, Icons.Outlined.Settings),
                     )
-                CompactNavBar(tabs, route) { r ->
-                    // Each tab keeps its state (and its view model) while you are on another,
-                    // so coming back doesn't rebuild it.
-                    nav.navigate(r) {
-                        popUpTo(Routes.LIST) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                }
+                CompactNavBar(tabs, route, selectTab)
             }
         },
     ) { padding ->
@@ -200,25 +225,23 @@ private fun AppShell(
             popExitTransition = { fadeOut(tween(100)) },
         ) {
             composable(Routes.LIST) {
-                ListRoute(container, snackbar, onReview = openReview, onPlan = { nav.navigate(Routes.MEALS) { launchSingleTop = true } })
+                ListRoute(container, snackbar, onReview = openReview, onPlan = { selectTab(Routes.MEALS) })
             }
             composable(Routes.RECIPES) {
                 RecipesRoute(
                     container,
                     snackbar,
                     onReview = openReview,
-                    onMeals = { nav.navigate(Routes.MEALS) { launchSingleTop = true } },
+                    onMeals = { selectTab(Routes.MEALS) },
                 )
             }
             composable(Routes.MEALS) {
                 MealsRoute(
                     container,
                     snackbar,
-                    onBack = { nav.popBackStack() },
-                    // Back to the list itself. Navigating to it with saved state restored the List tab's own
-                    // stack, which held this screen when it was opened from the list, so Start shopping
-                    // went nowhere. The list is the root of every stack.
+                    // Start shopping: the Shopping tab, which is the root of every stack.
                     onList = { nav.popBackStack(Routes.LIST, inclusive = false) },
+                    onReview = openReview,
                 )
             }
             composable(Routes.SETTINGS) {
@@ -286,16 +309,16 @@ internal fun CompactNavBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             for ((r, label, on, off) in tabs) {
-                // The library and the voice test are part of Settings, and the week's plan is about the list, so those tabs stay lit there.
+                // The ingredient library and the voice test are part of Settings, so its tab stays lit there.
                 val selected =
                     route == r ||
-                        (r == Routes.SETTINGS && (route == Routes.LIBRARY || route == Routes.VOICE_TEST)) ||
-                        (r == Routes.LIST && route == Routes.MEALS)
+                        (r == Routes.SETTINGS && (route == Routes.LIBRARY || route == Routes.VOICE_TEST))
                 Column(
                     Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(r) }),
+                        .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(r) })
+                        .testTag("tab-$r"),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {

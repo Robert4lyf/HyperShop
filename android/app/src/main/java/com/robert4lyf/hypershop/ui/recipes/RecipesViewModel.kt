@@ -16,7 +16,6 @@ import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.importing.ImportInput
 import com.robert4lyf.hypershop.importing.ImportResult
 import com.robert4lyf.hypershop.importing.LineIdentity
-import com.robert4lyf.hypershop.importing.PhotoStore
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -32,7 +31,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.io.File
 
 data class RecipesUi(
     val uses: List<UseSummary> = emptyList(),
@@ -391,10 +389,15 @@ class RecipesViewModel(
             val removed = c.repository.removeFromList(use.useId) ?: return@launch
             messages.send(
                 UiMessage(
-                    "Removed ${use.title} from the list",
+                    "Removed ${use.title} from the shopping list",
                     undo = {
                         // The recipe copy can go meanwhile (the start-up purge); the use can't come back without it.
-                        if (!c.repository.undoRemoveFromList(removed)) messages.send(UiMessage("Can't undo: the list has changed since"))
+                        if (!c.repository.undoRemoveFromList(
+                                removed,
+                            )
+                        ) {
+                            messages.send(UiMessage("Can't undo: the shopping list has changed since"))
+                        }
                     },
                 ),
             )
@@ -465,55 +468,25 @@ class RecipesViewModel(
         reviews.send(c.importJobs.enqueueReady(ImportInput("", use.title), result))
     }
 
-    /**
-     * "+ › Photo of a recipe": the photo is saved, scaled down, and reviewed like a
-     * shared page; the review screen asks Claude to read it once it is open.
-     */
+    private val newRecipe = NewRecipe(c)
+
+    /** "+ › Photo of a recipe". */
     fun addPhoto(
         uri: Uri,
         book: String = "",
         page: String = "",
     ) = viewModelScope.launch {
-        val file = PhotoStore.save(c.context, uri)
-        // The camera's own copy (a photo of someone's cookbook) is not left in the cache.
-        File(File(c.context.cacheDir, "camera"), "shot.jpg").delete()
-        if (file == null) {
-            messages.send(UiMessage("Couldn't open that photo"))
-            return@launch
-        }
-        val result =
-            ImportResult(
-                url = null,
-                title = null,
-                servings = null,
-                locale = UnitLocale.METRIC,
-                method = "PHOTO",
-                claudePending = true,
-                photo = file.path,
-                book = book.trim().ifEmpty { null },
-                page = page.trim().ifEmpty { null },
-            )
-        reviews.send(c.importJobs.enqueueReady(ImportInput("", "Photo of a recipe"), result))
+        val job = newRecipe.photo(uri, book, page)
+        if (job == null) messages.send(UiMessage("Couldn't open that photo")) else reviews.send(job)
     }
 
-    /** "+ › Paste a link": the same path as sharing a page to the app (the review screen opens when it is ready). */
-    fun addLink(text: String) {
-        c.applicationScope.launch { c.importShared(text, null) }
-    }
+    /** "+ › Paste a link": the review screen opens when it is ready. */
+    fun addLink(text: String) = newRecipe.link(text)
 
-    /**
-     * "+ › Type it in": the lines are rule-parsed here, never sent to Claude; the
-     * review screen calls Claude (with a key) once it is open, as for a shared page.
-     */
+    /** "+ › Type it in". */
     fun addManual(
         title: String,
         servings: Int?,
         ingredients: String,
-    ) = viewModelScope.launch {
-        val lines = ingredients.lines().map { it.trim() }.filter { it.isNotEmpty() }
-        val name = title.trim()
-        if (lines.isEmpty() || name.isEmpty()) return@launch
-        val parsed = c.importer.fromLines(lines, name, allowClaude = false, model = c.settings.model.first())
-        reviews.send(c.importJobs.enqueueReady(ImportInput("", name), parsed.copy(servings = servings)))
-    }
+    ) = viewModelScope.launch { newRecipe.manual(title, servings, ingredients)?.let { reviews.send(it) } }
 }

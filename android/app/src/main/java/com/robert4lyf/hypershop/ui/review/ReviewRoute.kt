@@ -111,6 +111,7 @@ fun ReviewRoute(
                 onRow = { sheetKey = it },
                 onServings = vm::setServings,
                 onAdd = vm::confirm,
+                onSaveForLater = vm::saveForLater,
                 // A cancelled import has Undo on its snackbar; only an edit of a saved recipe (no Undo) asks first.
                 onCancel = { if (s.ui.changed && vm.isThrowaway) confirmDiscard = true else vm.cancel() },
                 onRetryClaude = vm::retryWithClaude,
@@ -157,6 +158,10 @@ fun ReviewRoute(
                     show(container, snackbar, UiMessage("Saved changes to ${s.edited}"))
                     return@LaunchedEffect
                 }
+                if (s.savedForLater != null) {
+                    show(container, snackbar, UiMessage("Saved ${s.savedForLater} to your recipes"))
+                    return@LaunchedEffect
+                }
                 // Outlives this screen: the snackbar and its Undo belong to the list.
                 container.applicationScope.launch(Dispatchers.Main) {
                     val r = snackbar.showTimed("Added ${s.count} items", "Undo", 6)
@@ -186,8 +191,8 @@ fun ReviewRoute(
             AlertDialog(
                 // Outside or Back: nothing happens, the job stays ready to review.
                 onDismissRequest = onDone,
-                title = { Text("Already on your list") },
-                text = { Text("${s.title} is already on your list.") },
+                title = { Text("Already on your shopping list") },
+                text = { Text("${s.title} is already on your shopping list.") },
                 confirmButton = { TextButton(onClick = vm::addAgain) { Text("Add again") } },
                 dismissButton = { TextButton(onClick = vm::cancel) { Text("Don't add") } },
             )
