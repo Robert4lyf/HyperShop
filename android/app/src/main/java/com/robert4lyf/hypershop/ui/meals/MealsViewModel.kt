@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -158,8 +159,12 @@ class MealsViewModel(
         if (job == null) messages.send(UiMessage("Couldn't open that photo")) else reviewQueue.send(job)
     }
 
-    private val current = c.planner.currentWeek()
-    private val week = MutableStateFlow(current)
+    /** The week the clock says it is, read when used: the view model lives for the process, across Sunday midnight. */
+    private val current: Week get() = c.planner.currentWeek()
+
+    /** What "this week" was when the week shown was last pinned to it. */
+    private var pinned = current
+    private val week = MutableStateFlow(pinned)
 
     /** Plan, list and Buy again writes, one at a time and in tap order. */
     private val writing = Mutex()
@@ -170,7 +175,7 @@ class MealsViewModel(
     private val announce = HashMap<Long, Job>()
 
     private val weekView =
-        week.flatMapLatest { w ->
+        week.onStart { refreshWeek() }.flatMapLatest { w ->
             c.planner.observeWeek(w).map { meals ->
                 val pending = meals.any { it.shopping.pending }
                 val preview = if (pending && w >= current) c.planner.previewWeek(w) else null
@@ -288,7 +293,20 @@ class MealsViewModel(
     fun nextWeek() = week.update { it + 1 }
 
     fun thisWeek() {
-        week.value = current
+        pinned = current
+        week.value = pinned
+    }
+
+    /**
+     * The screen showing again (the tab, or the app, after a while): a week pinned as "this week" that the clock
+     * has since left is moved on, so Monday does not show last week as this one (review B.12). A week chosen
+     * with the arrows stays.
+     */
+    fun refreshWeek() {
+        val now = current
+        if (now == pinned) return
+        if (week.value == pinned) week.value = now
+        pinned = now
     }
 
     /** Write in the app's scope, in tap order; the message is the screen's. */

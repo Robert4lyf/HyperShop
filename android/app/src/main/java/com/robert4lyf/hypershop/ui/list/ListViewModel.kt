@@ -44,6 +44,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 enum class TickState { OPEN, PARTIAL, DONE }
 
@@ -527,6 +529,9 @@ class ListViewModel(
         viewModelScope.launch {
             // Counted inside the write: a tick still on its way to the screen is included.
             val (stamp, n) = c.repository.finish()
+            // A finished trip ends in planning whatever is still on the list (set aside as not available, or
+            // never found): the shop screen would count that as "left" (review B.14).
+            c.settings.setListMode(ListMode.PLAN)
             val text = if (n == 1) "Finished: 1 bought item removed" else "Finished: $n bought items removed"
             messages.send(UiMessage(text, undo = { c.repository.undoDelete(stamp) }))
         }
@@ -698,10 +703,20 @@ class ListViewModel(
      */
     fun addTyped(text: String) =
         viewModelScope.launch {
+            // One add at a time, against the list as it is, not as last shown: two quick Enters of one item must
+            // not add it twice (review B.17); the second finds the first's row and says so.
+            adding.withLock { addTypedNow(text) }
+        }
+
+    /** Adds in tap order. */
+    private val adding = Mutex()
+
+    private suspend fun addTypedNow(text: String) {
+        run {
             val lines = text.split('\n').map { it.trim() }.filter { it.isNotEmpty() }
             if (lines.size == 1) {
                 val p = typed(lines.single())
-                val existing = lastList.itemByKey(c.repository.target(p.name).mergeKey)
+                val existing = c.repository.snapshot().itemByKey(c.repository.target(p.name).mergeKey)
                 if (existing != null) {
                     val amount = amountOf(p)
                     val line = lines.single()
@@ -712,12 +727,13 @@ class ListViewModel(
                             action = if (amount == null) "Add 1 more" else "Add $amount",
                         ),
                     )
-                    return@launch
+                    return@run
                 }
             }
             for (l in lines) addLine(l)
             if (lines.size > 1) messages.send(UiMessage("Added ${lines.size} items"))
         }
+    }
 
     /**
      * A typed line read as a recipe's would be on its way to the list: "lime juice" is limes (V.2), whoever

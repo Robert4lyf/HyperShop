@@ -255,6 +255,9 @@ internal data class ShopGroup(
     val setAside: Boolean = false,
 ) {
     val open: List<ListRow> get() = rows.filter { it.state != TickState.DONE || it.id in lingering }
+
+    /** Still to find, by state: a row lingering in place after its tick is bought, as the top bar counts it (review B.19). */
+    val left: Int get() = rows.count { it.state != TickState.DONE }
     val bought: List<ListRow> get() = rows.filter { it.state == TickState.DONE && it.id !in lingering }
 
     /** Something here still to pick up. */
@@ -379,7 +382,7 @@ private fun GroupHeader(
     tile: Modifier,
 ) {
     val g = cell.group
-    val left = g.open.size
+    val left = g.left
     val (container, content) = g.aisle.style.let { it.container to it.content }
     Row(
         tile

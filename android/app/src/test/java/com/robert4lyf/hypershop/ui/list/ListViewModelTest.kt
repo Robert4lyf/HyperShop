@@ -230,7 +230,12 @@ class ListViewModelTest {
         await(vm.ui) { u -> u.aisles.flatMap { it.second }.size == 3 }
         // Typed by hand: no recipe to name.
         assertNull(await(vm.ui) { it.aisles.isNotEmpty() }.row("onion").from)
-        // Already on the list: nothing is doubled; the message offers the typed amount, one tap away.
+        // Already on the list: nothing is doubled; the message offers the typed amount, one tap away. Two quick
+        // Enters are read against the list as it is, not as last shown (review B.17): the second is the duplicate.
+        vm.addTyped("bread")
+        vm.addTyped("bread")
+        assertEquals("Bread is already on the list", nextMessage(vm).text)
+        await(vm.ui) { u -> u.aisles.flatMap { it.second }.count { it.name == "bread" } == 1 }
         vm.addTyped("1 onion")
         val asked = nextMessage(vm)
         assertEquals("Onion is already on the list", asked.text)
@@ -395,11 +400,15 @@ class ListViewModelTest {
         await(vm.ui) { it.shopping }
         val again = tracked(ListViewModel(c))
         assertTrue(await(again.ui) { it.loaded && it.aisles.isNotEmpty() }.shopping)
-        // Finishing takes the bought rows away and, with nothing left, the shop screen with them.
+        // Finishing takes the bought rows away and the shop screen with them, whatever is left (review B.14).
         again.finishShopping()
         assertEquals("Finished: 2 bought items removed", nextMessage(again).text)
+        assertEquals(ListMode.PLAN, await(again.ui) { !it.shopping }.mode)
         val after = await(again.ui) { it.doneCount == 0 && it.left == 1 }
-        assertTrue(after.shopping)
+        assertTrue(!after.shopping)
+        // Back to the shop for what is left: the ticks and the finish work as before.
+        again.setMode(ListMode.SHOP)
+        await(again.ui) { it.shopping }
         again.toggle(after.row("beef mince"))
         again.finishShopping()
         val empty = await(again.ui) { it.isEmpty }

@@ -116,6 +116,27 @@ class MealsViewModelTest {
     }
 
     @Test
+    fun thisWeekMovesOnWithTheClock() {
+        // Review B.12: the view model lives for the process; Monday must not show last week as "This week".
+        var now = 1_760_000_000_000L
+        val c = TestContainer.create(clock = { now }).also { made += it }
+        val vm = MealsViewModel(c).shown()
+        val before = await(vm.ui) { it.loaded }
+        assertEquals("This week", before.weekName)
+        now += 7 * 24 * 60 * 60 * 1000L
+        vm.refreshWeek()
+        val after = await(vm.ui) { it.week != before.week }
+        assertEquals("This week", after.weekName)
+        assertTrue(after.isCurrent)
+        // A week chosen with the arrows is left where it is.
+        vm.previousWeek()
+        await(vm.ui) { it.week == before.week }
+        now += 7 * 24 * 60 * 60 * 1000L
+        vm.refreshWeek()
+        assertEquals(before.week, await(vm.ui) { it.isPast }.week)
+    }
+
+    @Test
     fun aRepeatedTapOnAddAddsTheWeekOnce() {
         val c = container()
         save(c, "Chilli", "2 onions")

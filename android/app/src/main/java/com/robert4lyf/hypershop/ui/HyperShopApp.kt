@@ -261,14 +261,19 @@ private fun AppShell(
                     e.arguments!!.getLong("job"),
                     snackbar,
                     onDone = {
-                        // Back to the tab the review was opened from; the list when it was opened by a share.
+                        // Back to the tab the review was opened from, or to Settings › Library (not past it to the
+                        // list, review B.18); the list when it was opened by a share.
                         val prev = nav.previousBackStackEntry?.destination?.route
-                        if (prev in TABS) nav.popBackStack() else nav.popBackStack(Routes.LIST, inclusive = false)
+                        if (prev in TABS || prev == Routes.LIBRARY) nav.popBackStack() else nav.popBackStack(Routes.LIST, inclusive = false)
                     },
+                    // "Try again" opens the new job only while the review is still on screen; left already, the job
+                    // waits on the Shopping tab's card (review B.20).
                     onReopen = { id ->
-                        nav.navigate(Routes.review(id)) {
-                            popUpTo(Routes.REVIEW) { inclusive = true }
-                            launchSingleTop = true
+                        if (nav.currentBackStackEntry?.destination?.route == Routes.REVIEW) {
+                            nav.navigate(Routes.review(id)) {
+                                popUpTo(Routes.REVIEW) { inclusive = true }
+                                launchSingleTop = true
+                            }
                         }
                     },
                     // Undo after Cancel, up to 10 s later: a review opened meanwhile is left alone (the job is back on the card).

@@ -40,7 +40,6 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.People
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ShoppingCart
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -62,7 +61,6 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -175,9 +173,6 @@ fun RecipesRoute(
         }
     }
     val detail by vm.detail.collectAsStateWithLifecycle()
-    // The sheet's own confirmations: the sheet closes first, so the dialog is not under it.
-    // Kept as the recipe's key (saveable), and looked up again after a rotation.
-    var addAgain by rememberSaveable { mutableStateOf<String?>(null) }
     // The photo picker: the system's, so no permission; the recipe it is for is kept across the trip there.
     var photoFor by rememberSaveable { mutableStateOf<String?>(null) }
     val picker =
@@ -193,7 +188,8 @@ fun RecipesRoute(
             d,
             onAdd = {
                 vm.closeDetail()
-                if (d.row.onList) addAgain = d.row.key else vm.addFromLibrary(d.row)
+                // On the list already: the review asks "Already on your shopping list" itself, once (review B.13).
+                vm.addFromLibrary(d.row)
             },
             onRemove = {
                 vm.closeDetail()
@@ -213,7 +209,6 @@ fun RecipesRoute(
                 ),
         )
     }
-    ui.libraryRow(addAgain)?.let { row -> AddAgainDialog(row, onConfirm = { vm.addFromLibrary(row) }, onDismiss = { addAgain = null }) }
 }
 
 /** The saved recipe a dialog is about, by its key; null for no dialog (or one whose row has gone). */
@@ -237,7 +232,6 @@ fun RecipesScreen(
     onMeals: () -> Unit = {},
 ) {
     // Which use or saved recipe a dialog is about, by id or key, so it survives a rotation.
-    var addAgain by rememberSaveable { mutableStateOf<String?>(null) }
     var renaming by rememberSaveable { mutableStateOf<Long?>(null) }
     var renamingSaved by rememberSaveable { mutableStateOf<String?>(null) }
     var adding by rememberSaveable { mutableStateOf(false) }
@@ -342,7 +336,7 @@ fun RecipesScreen(
                         LibraryCard(
                             row,
                             showPlanned = ui.sort == LibrarySort.PLANNED,
-                            onAdd = { if (row.onList) addAgain = row.key else library.onAdd(row) },
+                            onAdd = { library.onAdd(row) },
                             onRemove = { library.onRemove(row) },
                             onOpen = { library.onOpen(row) },
                             onRename = { renamingSaved = row.key },
@@ -361,7 +355,6 @@ fun RecipesScreen(
         }
     }
     if (adding) AddRecipeSheet(add, onDismiss = { adding = false }, hasKey = hasKey, lastBook = ui.lastBook)
-    ui.libraryRow(addAgain)?.let { row -> AddAgainDialog(row, onConfirm = { library.onAdd(row) }, onDismiss = { addAgain = null }) }
     renaming?.let { id -> ui.uses.firstOrNull { it.useId == id } }?.let { use ->
         val byHand = use.recipeId == null
         TitleDialog(
@@ -374,26 +367,6 @@ fun RecipesScreen(
     ui.libraryRow(renamingSaved)?.let { row ->
         TitleDialog(row.title, onDismiss = { renamingSaved = null }) { library.onRename(row, it) }
     }
-}
-
-/** "Add again" for a recipe already on the list: its amounts would double up, so it asks. */
-@Composable
-private fun AddAgainDialog(
-    row: LibraryRow,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Add ${row.title} again?") },
-        confirmButton = {
-            TextButton(onClick = {
-                onDismiss()
-                onConfirm()
-            }, modifier = Modifier.testTag("add-again-confirm")) { Text("Add again") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
 }
 
 private const val DAY = DateUtils.DAY_IN_MILLIS

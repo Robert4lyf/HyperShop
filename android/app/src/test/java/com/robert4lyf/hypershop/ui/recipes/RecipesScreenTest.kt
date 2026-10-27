@@ -134,12 +134,9 @@ class RecipesScreenTest {
         // Not on the list: straight in.
         list.performScrollToNode(hasTestTag("lib-add-r:9"))
         compose.onNodeWithTag("lib-add-r:9").performClick()
-        // On the list: "Add again" asks first.
+        // On the list too: straight in; the review asks "Already on your shopping list" itself, once (review B.13).
         list.performScrollToNode(hasTestTag("lib-add-r:1"))
         compose.onNodeWithTag("lib-add-r:1").performClick()
-        compose.onNodeWithText("Cancel").performClick()
-        compose.onNodeWithTag("lib-add-r:1").performClick()
-        compose.onNodeWithTag("add-again-confirm").performClick()
         assertEquals(listOf("r:9", "r:1"), added)
     }
 

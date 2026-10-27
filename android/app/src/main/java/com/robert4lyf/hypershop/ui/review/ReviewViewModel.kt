@@ -32,6 +32,7 @@ import com.robert4lyf.hypershop.importing.PhotoStore
 import com.robert4lyf.hypershop.importing.ReviewLines
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.common.webLink
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -79,6 +80,11 @@ data class SheetLine(
     val checkReason: String? = null,
     /** The amount as read ("2 tbsp"), to start the Amount field from. */
     val amount: String? = null,
+    /**
+     * Which line of the recipe this is ([LineOrigin]): what the sheet's editors are keyed by, since every edit
+     * stores the recipe again with new line [id]s and a draft in another line must not be lost to that (review B.15).
+     */
+    val origin: LineOrigin? = null,
 )
 
 /** The review row's detail sheet (PLAN §3.1). */
@@ -266,16 +272,19 @@ class ReviewViewModel(
 
     private fun finished() = _state.value is ReviewState.Added || _state.value == ReviewState.Cancelled
 
+    /** The Claude call in flight, or the last one: an answer that lands after Stop is laid over by [stopRetry]. */
+    private var pendingAnswer: Deferred<ImportResult>? = null
+
     /**
      * Claude, and saving its answer on the job, run in the app's scope: leaving the
      * screen mid-call (the request is billed whether or not anyone waits) still
      * records the usage and keeps the answer, so reopening doesn't pay again; a
      * review reopened mid-call joins the call ([AppContainer.claudeParse]).
      */
-    private suspend fun parseWithClaude(
+    private fun claudeCall(
         r: ImportResult,
         keep: (ImportResult) -> Boolean = { true },
-    ): ImportResult =
+    ): Deferred<ImportResult> =
         c
             .claudeParse(jobId) {
                 c.importer
@@ -284,7 +293,12 @@ class ReviewViewModel(
                         allowClaude = true,
                         model = c.settings.model.first(),
                     ).also { if (keep(it)) c.importJobs.finish(jobId, withReviewOf(it, c.importJobs.get(jobId)?.result)) }
-            }.await()
+            }.also { pendingAnswer = it }
+
+    private suspend fun parseWithClaude(
+        r: ImportResult,
+        keep: (ImportResult) -> Boolean = { true },
+    ): ImportResult = claudeCall(r, keep).await()
 
     /**
      * The answer as it is kept on the job: with the review's state *as the job holds it when the answer
@@ -583,9 +597,10 @@ class ReviewViewModel(
     /** Overflow menu: mark this aisle in stock (with Undo). */
     fun aisleInStock(aisle: AisleCode) =
         act {
-            val before = decisions.toMap()
             val rows = preview?.rows?.filter { it.target.aisle == aisle && !it.decision.inStock }.orEmpty()
             if (rows.isEmpty()) return@act
+            // Only the rows this changes: a row set after the aisle action keeps its setting through the Undo (review B.16).
+            val before = rows.associate { it.target.mergeKey to it.decision }
             for (r in rows) decisions[r.target.mergeKey] = r.decision.copy(inStock = true)
             changed = true
             recompute()
@@ -595,18 +610,18 @@ class ReviewViewModel(
     /** Overflow menu: clear in stock (with Undo). */
     fun clearInStock() =
         act {
-            val before = decisions.toMap()
-            if (before.values.none { it.inStock }) return@act
+            val before = decisions.filterValues { it.inStock }
+            if (before.isEmpty()) return@act
             decisions.replaceAll { _, d -> d.copy(inStock = false) }
             changed = true
             recompute()
             _events.send(UiMessage("Cleared \"at home\"", undo = { restoreDecisions(before) }))
         }
 
-    /** Undo of [clearInStock] and [aisleInStock]: the decisions as they were. */
+    /** Undo of [clearInStock] and [aisleInStock]: the rows they changed, as they were; any other row stays as it is now. */
     fun restoreDecisions(decisions: Map<String, RowDecision>) =
         act {
-            this.decisions = decisions.toMutableMap()
+            this.decisions.putAll(decisions)
             changed = true
             recompute()
         }
@@ -658,14 +673,32 @@ class ReviewViewModel(
         return again.copy(lines = r.lines, origins = r.origins, corrections = fixed.values.toList(), claudeBefore = null)
     }
 
-    /** "Stop" while asking Claude. An answer that still arrives is kept on the job for next time. */
+    /**
+     * "Stop" while asking Claude. The call goes on (it is billed either way): its answer is laid over the review
+     * when it lands, so a second "Ask Claude" is not paid for (review B.10); gone from the screen, the job keeps
+     * it for next time ([withReviewOf]).
+     */
     fun stopRetry() {
         val j = retryJob?.takeIf { it.isActive } ?: return
+        val answer = pendingAnswer
         j.cancel()
         act {
             busy = false
             retrying = false
             recompute()
+        }
+        if (answer == null) return
+        viewModelScope.launch {
+            val again = runCatching { answer.await() }.getOrNull() ?: return@launch
+            if (again.parsedBy != ParsedBy.CLAUDE) return@launch
+            act {
+                val r = result ?: return@act
+                if (r.parsedBy == ParsedBy.CLAUDE || busy) return@act
+                val kept = keepCorrections(again, r, corrections.toMap())
+                store(kept)
+                result = kept
+                recompute("Claude's reading arrived")
+            }
         }
     }
 
@@ -805,6 +838,8 @@ class ReviewViewModel(
                 row.existing == null || before == null -> "$name: +$adding (new)"
                 else -> "$name: +$adding → $after on the shopping list"
             }
+        val stored = stored?.lines.orEmpty()
+        val origins = result?.let { LineIdentity.originsOf(it) }.orEmpty()
         val lines =
             p.incoming.lines.filter { it.target.mergeKey == key }.map { l ->
                 SheetLine(
@@ -820,6 +855,7 @@ class ReviewViewModel(
                                 l.parsed.unit?.serial?.replace('_', ' '),
                             ).joinToString(" ")
                         },
+                    origin = origins.getOrNull(stored.indexOfFirst { it.first.id == l.recipeLineId }),
                 )
             }
         return RowSheet(

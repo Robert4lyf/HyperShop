@@ -101,7 +101,10 @@ fun ReviewRoute(
     // Back on an edit or a library re-add is Cancel: left as it was, it sat on the
     // list as "1 recipe ready to review" for something that was never an import.
     val live = state is ReviewState.Ready || state is ReviewState.Loading
-    BackHandler(enabled = live && vm.isThrowaway) { vm.cancel() }
+    BackHandler(enabled = live && vm.isThrowaway) {
+        // As the on-screen Cancel: an edit with changes asks first (review B.11).
+        if ((state as? ReviewState.Ready)?.ui?.changed == true) confirmDiscard = true else vm.cancel()
+    }
     when (val s = state) {
         is ReviewState.Loading -> LoadingView(s, onCancel = vm::cancel, onPaste = vm::pasteInstead)
         is ReviewState.Ready ->
@@ -189,8 +192,9 @@ fun ReviewRoute(
             }
         is ReviewState.AlreadyOnList ->
             AlertDialog(
-                // Outside or Back: nothing happens, the job stays ready to review.
-                onDismissRequest = onDone,
+                // Outside or Back: a shared import stays ready to review; a library "Add to list" (a throwaway job)
+                // is dropped, or it would sit on the Shopping tab as "1 recipe ready to review" (review B.13).
+                onDismissRequest = { if (vm.isThrowaway) vm.cancel() else onDone() },
                 title = { Text("Already on your shopping list") },
                 text = { Text("${s.title} is already on your shopping list.") },
                 confirmButton = { TextButton(onClick = vm::addAgain) { Text("Add again") } },

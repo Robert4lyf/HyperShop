@@ -167,7 +167,7 @@ fun ReviewRowSheet(
             if (sheet.swaps.isNotEmpty()) SwapFor(sheet.swaps, actions.onRename)
             key(sheet.key) { Rename(sheet.name, actions.onRename, actions.renamePreview) }
             SectionLabel(if (sheet.lines.size == 1) "From the recipe" else "From the recipe (${sheet.lines.size} lines)")
-            for (line in sheet.lines) key(line.id) { LineEditor(line, actions, canRemove = sheet.canRemove) }
+            for (line in sheet.lines) key(line.origin ?: line.id) { LineEditor(line, actions, canRemove = sheet.canRemove) }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             if (!sheet.isStaple) {
                 FilledTonalButton(onClick = actions.onAlwaysInStock) {
@@ -267,7 +267,8 @@ private fun LineEditor(
     actions: SheetActions,
     canRemove: Boolean,
 ) {
-    var text by rememberSaveable(line.id) { mutableStateOf(line.raw) }
+    // Keyed by the line's origin: an edit elsewhere in the sheet stores the recipe again with new ids (review B.15).
+    var text by rememberSaveable(line.origin ?: line.id) { mutableStateOf(line.raw) }
     val use = { if (text != line.raw && text.isNotBlank()) actions.onEditLine(line.id, text) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         OutlinedTextField(

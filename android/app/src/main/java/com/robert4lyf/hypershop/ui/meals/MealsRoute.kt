@@ -65,6 +65,8 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.data.HomeRow
@@ -123,6 +125,7 @@ fun MealsRoute(
     val hasKey by container.apiKeyStore.hasKey.collectAsStateWithLifecycle()
     var adding by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.refreshWeek() }
     LaunchedEffect(vm) { vm.reviews.collect(onReview) }
     if (adding) {
         AddRecipeSheet(
