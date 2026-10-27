@@ -37,6 +37,23 @@ class DisplayBuyTest {
     }
 
     @Test
+    fun aCountedPresenceItemIsNotThatManyPacksAndAnUnsureAmountIsNotOne() {
+        // Review C.24: the review's brief agrees with the list row, which says "basil", not "10 packs basil".
+        val basil = add(ShoppingList(), listOf("10 basil leaves")).first
+        val b = basil.itemByKey("cat:basil")!!
+        assertEquals("basil", Display.row(basil, b, cat.byId["basil"]).main)
+        assertEquals(null to "basil", Display.brief(basil.total(b.id), cat.byId["basil"], "basil"))
+        val weighed = add(ShoppingList(), listOf("30g basil")).first
+        assertEquals("1 pack" to "basil", Display.brief(weighed.total(weighed.itemByKey("cat:basil")!!.id), cat.byId["basil"], "basil"))
+        // Review C.25: two cups of honey (about 680 g) do not fit a 454 g jar; without a density nothing is said.
+        assertEquals(RowText("honey", "1 × 454g jar"), row("2 cups honey", key = "honey"))
+        val honey = add(ShoppingList(), listOf("2 cups honey")).first
+        assertEquals(null to "honey", Display.brief(honey.total(honey.itemByKey("cat:honey")!!.id), cat.byId["honey"], "honey"))
+        // A spoonful still fits: one jar.
+        assertEquals("1 jar honey", row("2 tbsp honey", key = "honey").main)
+    }
+
+    @Test
     fun aPotIsCountedFromItsSizeWithTheNeedBesideIt() {
         assertEquals(RowText("1 pot double cream", "150ml needed"), row("150ml double cream", key = "double_cream"))
         assertEquals(RowText("2 pots double cream", "500ml needed"), row("500ml double cream", key = "double_cream"))

@@ -155,7 +155,10 @@ object Display {
             if (parts.keys == setOf(BaseKey.ITEMS)) return null
             // A presence item (herbs, spirits, a paste) is one of whatever it comes in when the amount cannot be
             // counted: the catalogue's word that a recipe's use rarely needs more, with the amount on the sub-line.
-            val fallback = if (entry.displayPolicy == DisplayPolicy.PRESENCE) Rational.ONE else null
+            // Only while the pack's size is unknown: with one known, an amount that may not fit it (two cups of
+            // honey against a 454 g jar, no density to say) stays as written rather than "1 jar" (review C.25).
+            val sized = entry.packNote?.let(::packSize) != null
+            val fallback = if (entry.displayPolicy == DisplayPolicy.PRESENCE && !sized) Rational.ONE else null
             // Nothing said ("basil, to serve"): one. An amount is counted in the pack's own dimension, a cup weighed
             // (or a weight measured) with the catalogue's density. Without one, only "one pack" is safe to say, and
             // only when the amount fits it even at an extreme density ("60ml yoghurt" in a 500 g pot); otherwise a
@@ -220,7 +223,12 @@ object Display {
             return b.amount to (if (plural) entry!!.plural else name)
         }
         if (entry?.displayPolicy == DisplayPolicy.PRESENCE && units != UnitsSetting.AS_WRITTEN) {
-            return packs(q, entry.shoppingUnit) to name
+            // Counted things ("10 basil leaves", "2 bay leaves") are not that many packs, and an amount [buy] could not
+            // fit into a pack of known size is not one: the list row says the name alone, so does this (review C.24).
+            val parts = q.parts.mapKeys { BaseKey.decode(it.key) }.filterValues { it > Rational.ZERO }
+            val counted = parts.keys.any { it.dimension == Dimension.COUNT }
+            val unsure = parts.isNotEmpty() && entry.packNote?.let(::packSize) != null && countIn(parts, entry) == null
+            return (if (counted || unsure) null else packs(q, entry.shoppingUnit)) to name
         }
         return amount(q, units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy) to name
     }
