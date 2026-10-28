@@ -345,6 +345,8 @@ data class PlannedMealEntity(
     val position: Int,
     val useId: Long?,
     val addedAt: Long,
+    /** X.14: "Cooked it" on this meal, and when; null until then. A second tap takes it back. */
+    val cookedAt: Long? = null,
 )
 
 /** A finished shopping trip: when "Finish shopping" was pressed. Its items are [TripItemEntity]. */

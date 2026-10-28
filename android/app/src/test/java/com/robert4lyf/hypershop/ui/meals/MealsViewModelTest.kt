@@ -147,9 +147,21 @@ class MealsViewModelTest {
         assertEquals(key, meal.libraryKey)
         vm.cooked(meal)
         awaitTrue { runBlocking { c.repository.recipeNote(key) }?.timesCooked == 1 }
+        // X.14: the card says so, which is what the tap used to leave unchanged.
+        val cooked = await(vm.ui) { it.meals.single().cooked }.meals.single()
         val m = got.first { it.text.startsWith("Cooked Chilli") }
         runBlocking { m.undo!!.invoke() }
         awaitTrue { runBlocking { c.repository.recipeNote(key) }?.timesCooked == 0 }
+        await(vm.ui) { !it.meals.single().cooked }
+        // A tap on a cooked meal takes it back, and a stale second tap never counts twice.
+        vm.cooked(cooked.copy(cooked = false))
+        await(vm.ui) { it.meals.single().cooked }
+        vm.cooked(cooked.copy(cooked = false))
+        Thread.sleep(200)
+        assertEquals(1, runBlocking { c.repository.recipeNote(key) }?.timesCooked)
+        vm.cooked(await(vm.ui) { it.meals.single().cooked }.meals.single())
+        await(vm.ui) { !it.meals.single().cooked }
+        assertEquals(0, runBlocking { c.repository.recipeNote(key) }?.timesCooked)
     }
 
     @Test

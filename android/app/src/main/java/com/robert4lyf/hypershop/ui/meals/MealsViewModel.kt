@@ -62,6 +62,8 @@ data class Meal(
     val notes: String? = null,
     /** The recipe's library entry, for "Cooked it". */
     val libraryKey: String = "",
+    /** X.14: "Cooked it" was tapped on this meal; tapping again takes it back. */
+    val cooked: Boolean = false,
 )
 
 /** A saved recipe that could be planned. */
@@ -282,7 +284,17 @@ class MealsViewModel(
     )
 
     private fun PlannedMeal.toMeal() =
-        Meal(id, title, servings, shopping, progress, url?.let { siteOf(it) } ?: bookRef, saved, libraryKey = libraryKey)
+        Meal(
+            id,
+            title,
+            servings,
+            shopping,
+            progress,
+            url?.let { siteOf(it) } ?: bookRef,
+            saved,
+            libraryKey = libraryKey,
+            cooked = cookedAt != null,
+        )
 
     private fun siteOf(url: String): String? =
         com.robert4lyf.hypershop.ui.common.webLink(url)?.let {
@@ -319,18 +331,19 @@ class MealsViewModel(
         c.applicationScope.async(start = CoroutineStart.UNDISPATCHED) { writing.withLock { block() } }
 
     /**
-     * "Cooked it" on a meal (missing 2 of the review): the recipe's note counts one more time, which puts it ahead
-     * in "your usual"; the message asks for stars, which live on the recipe's sheet.
+     * "Cooked it" on a meal (missing 2 of the review), a toggle (X.14): the meal says it was cooked and its recipe
+     * counts one more time, which puts it ahead in "your usual"; the message asks for stars, which live on the
+     * recipe's sheet. Tapped again, both are taken back. It used to only count, so a tap changed nothing on the card.
      */
     fun cooked(meal: Meal) {
-        if (meal.libraryKey.isEmpty()) return
-        val write = written { c.repository.cooked(meal.libraryKey) }
+        val on = !meal.cooked
+        val write = written { c.planner.setCooked(meal.id, on) }
         viewModelScope.launch {
-            write.await()
+            if (!write.await() || !on) return@launch
             messages.send(
                 UiMessage(
                     "Cooked ${meal.title} · rate it on its recipe",
-                    undo = { writing.withLock { c.repository.uncooked(meal.libraryKey) } },
+                    undo = { writing.withLock { c.planner.setCooked(meal.id, false) } },
                 ),
             )
         }

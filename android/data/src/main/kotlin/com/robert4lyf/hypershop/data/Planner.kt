@@ -51,6 +51,8 @@ data class PlannedMeal(
     val bookRef: String?,
     /** Still in "Your recipes" (false: removed from them since it was planned). */
     val saved: Boolean,
+    /** X.14: when "Cooked it" was tapped on this meal; null if not. */
+    val cookedAt: Long? = null,
 )
 
 /**
@@ -124,6 +126,7 @@ class Planner(
                 url = r?.url,
                 bookRef = r?.let { bookRef(it.book, it.page) },
                 saved = r?.lastAddedAt != null,
+                cookedAt = m.cookedAt,
             )
         }
     }
@@ -222,6 +225,23 @@ class Planner(
             val old = repo.load()
             val use = m.useId?.takeIf { it in old.uses }
             if (use != null) repo.persist(old, old.rescaleUse(use, servings))
+            true
+        }
+
+    /**
+     * X.14 "Cooked it" on meal [id], or ([cooked] false) taking it back: the meal says so, and its
+     * recipe counts one cooking more or less for "your usual", in one transaction. False when the
+     * meal is gone or already in that state, so a double tap never counts twice.
+     */
+    suspend fun setCooked(
+        id: Long,
+        cooked: Boolean,
+    ): Boolean =
+        db.withTransaction {
+            val m = dao.plannedMeal(id) ?: return@withTransaction false
+            if ((m.cookedAt != null) == cooked) return@withTransaction false
+            dao.setMealCooked(id, if (cooked) repo.clock() else null)
+            if (cooked) repo.cooked(m.libraryKey) else repo.uncooked(m.libraryKey)
             true
         }
 

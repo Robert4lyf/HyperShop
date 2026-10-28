@@ -38,6 +38,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconToggleButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -339,7 +340,7 @@ private fun MealCard(
                 // The title and its state read as one TalkBack node; the servings controls stay their own.
                 Column(Modifier.semantics(mergeDescendants = true) {}) {
                     Text(m.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    val bits = listOfNotNull(mealState(m), m.source, "No longer saved".takeIf { !m.saved })
+                    val bits = listOfNotNull("Cooked".takeIf { m.cooked }, mealState(m), m.source, "No longer saved".takeIf { !m.saved })
                     Text(
                         bits.joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
@@ -388,8 +389,16 @@ private fun MealCard(
             }
             // "Cooked it": counts for "your usual" and asks for stars; any week's meal, since last week's got cooked too.
             if (m.saved) {
-                IconButton(onClick = onCooked, modifier = Modifier.testTag("meal-cooked-${m.id}")) {
-                    Icon(Icons.Rounded.Restaurant, contentDescription = "Cooked ${m.title}")
+                // A toggle that shows its state (X.14): filled once cooked, and a second tap takes it back.
+                FilledTonalIconToggleButton(
+                    checked = m.cooked,
+                    onCheckedChange = { onCooked() },
+                    modifier = Modifier.testTag("meal-cooked-${m.id}"),
+                ) {
+                    Icon(
+                        if (m.cooked) Icons.Rounded.Check else Icons.Rounded.Restaurant,
+                        contentDescription = "Cooked ${m.title}",
+                    )
                 }
             }
             if (!past) {
