@@ -61,6 +61,7 @@ class MigrationTest {
                     HyperShopDatabase.MIGRATION_7_8,
                     HyperShopDatabase.MIGRATION_8_9,
                     HyperShopDatabase.MIGRATION_9_10,
+                    HyperShopDatabase.MIGRATION_10_11,
                 )
                 .allowMainThreadQueries()
                 .build()
@@ -95,6 +96,7 @@ class MigrationTest {
                     HyperShopDatabase.MIGRATION_7_8,
                     HyperShopDatabase.MIGRATION_8_9,
                     HyperShopDatabase.MIGRATION_9_10,
+                    HyperShopDatabase.MIGRATION_10_11,
                 )
                 .allowMainThreadQueries()
                 .build()

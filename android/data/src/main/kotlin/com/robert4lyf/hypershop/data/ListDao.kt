@@ -478,6 +478,12 @@ interface ListDao {
         useId: Long?,
     )
 
+    @Query("UPDATE PlannedMeal SET cookedAt = :at WHERE id = :id")
+    suspend fun setMealCooked(
+        id: Long,
+        at: Long?,
+    )
+
     @Query("UPDATE PlannedMeal SET servings = :servings WHERE id = :id")
     suspend fun setMealServings(
         id: Long,
