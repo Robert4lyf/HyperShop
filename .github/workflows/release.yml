@@ -20,6 +20,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      fresh_devices:
+        description: Download the device definitions afresh (tests the Garmin sign-in)
+        type: boolean
+        default: false
 
 # Publishing a release writes to the repository; the PR gate in android.yml
 # still runs read-only.
@@ -161,7 +166,7 @@ jobs:
       # all; the token or password is only needed when the cache is cold.
       - name: Cache the device definitions
         id: devices
-        if: steps.secrets.outputs.ready == 'true'
+        if: steps.secrets.outputs.ready == 'true' && !inputs.fresh_devices
         uses: actions/cache@v4
         with:
           path: ~/.Garmin/ConnectIQ/Devices
