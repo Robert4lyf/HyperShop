@@ -651,7 +651,7 @@ PROGRESS.md
 ### Step 6 — Forerunner 245 app
 - **6.0** Prerequisites:
   - `tools/build_watch.sh` fetches SDK 9.2.0 and a throwaway key, and a device-independent strict compile passes.
-  - With the secrets set, CI downloads the device definitions (`connect-iq-sdk-manager`) and runs `package_watch.sh`.
+  - With the secrets set, CI downloads the device definitions (`tools/garmin_devices.sh`, `connect-iq-sdk-manager`; cached by the manifest) and runs `package_watch.sh`. It signs in with `GARMIN_TOKEN`, a saved sign-in made by `tools/garmin_token.sh` on your own computer (works with two-step verification; renew it when a build warns), else with `GARMIN_USERNAME`/`GARMIN_PASSWORD` (fails with two-step verification on).
   - Record the 245's facts in `garmin/README.md`, including glance support.
 - **6.1** `manifest.xml`: `fr245` and `fr245m`, minApiLevel 3.2.0, Communications, and the new UUID. `check_monkeyc_limits.py` passes.
 - **6.2** Data layer: a port of the 1.5b watch rules, modelled on `PhoneLink.mc` and `SetQueue.mc`.
