@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.robert4lyf.hypershop.core.merge.UseState
 import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.search.RecipeSearch
@@ -156,7 +157,9 @@ class RecipesViewModel(
         ) { uses, (lib, planned), notes, photos, (search, view) ->
             val (q, typing) = search
             val (sort, highly) = view
-            val onList = uses.mapNotNull { it.libraryKey }.toSet()
+            // "On the shopping list" only while something of it is still to buy: a recipe bought (or removed with
+            // only bought shares left) stays a use for a week, and the badge said so long after the shop.
+            val onList = uses.filter { it.progress.state == UseState.STILL_NEEDED }.mapNotNull { it.libraryKey }.toSet()
             val rows =
                 lib.map {
                     LibraryRow(
