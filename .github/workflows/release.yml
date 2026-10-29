@@ -129,13 +129,14 @@ jobs:
         id: secrets
         env:
           KEY: ${{ secrets.CIQ_DEVELOPER_KEY }}
+          TOKEN: ${{ secrets.GARMIN_TOKEN }}
           USER: ${{ secrets.GARMIN_USERNAME }}
           PASS: ${{ secrets.GARMIN_PASSWORD }}
         run: |
-          if [[ -n "$KEY" && -n "$USER" && -n "$PASS" ]]; then
+          if [[ -n "$KEY" && ( -n "$TOKEN" || ( -n "$USER" && -n "$PASS" ) ) ]]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::notice::CIQ_DEVELOPER_KEY, GARMIN_USERNAME and GARMIN_PASSWORD are not all set; no watch package this time."
+            echo "::notice::CIQ_DEVELOPER_KEY and a Garmin sign-in (GARMIN_TOKEN, or GARMIN_USERNAME and GARMIN_PASSWORD) are not all set; no watch package this time."
           fi
 
       - uses: actions/checkout@v4
@@ -155,25 +156,30 @@ jobs:
           path: ~/.cache/connectiq/sdk-${{ env.CIQ_SDK_VERSION }}
           key: connectiq-sdk-${{ env.CIQ_SDK_VERSION }}-${{ runner.os }}
 
-      # Device definitions are the one part of the toolchain behind a Garmin
-      # login, which is why the account's credentials are secrets at all.
-      # connect-iq-sdk-manager is a community CLI that drives the same
-      # downloads as the SDK Manager's Devices tab; its installer checks the
-      # release's sha256. The agreement accepted here is the one the SDK
-      # Manager already had you accept on their own machine.
-      - name: Download the device definitions
+      # Device definitions sit behind a Garmin sign-in (tools/garmin_devices.sh says
+      # how it signs in). Cached by the manifest, so most builds never sign in at
+      # all; the token or password is only needed when the cache is cold.
+      - name: Cache the device definitions
+        id: devices
+        if: steps.secrets.outputs.ready == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.Garmin/ConnectIQ/Devices
+          key: connectiq-devices-${{ hashFiles('garmin/manifest.xml') }}
+
+      - name: Check the saved Garmin sign-in
         if: steps.secrets.outputs.ready == 'true'
         env:
+          GARMIN_TOKEN: ${{ secrets.GARMIN_TOKEN }}
+        run: ./tools/garmin_devices.sh --check
+
+      - name: Download the device definitions
+        if: steps.secrets.outputs.ready == 'true' && steps.devices.outputs.cache-hit != 'true'
+        env:
+          GARMIN_TOKEN: ${{ secrets.GARMIN_TOKEN }}
           GARMIN_USERNAME: ${{ secrets.GARMIN_USERNAME }}
           GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/lindell/connect-iq-sdk-manager-cli/master/install.sh \
-            | sh -s -- -b "$HOME/.local/bin"
-          export PATH="$HOME/.local/bin:$PATH"
-          connect-iq-sdk-manager agreement view > /dev/null
-          connect-iq-sdk-manager agreement accept
-          connect-iq-sdk-manager login
-          connect-iq-sdk-manager device download --manifest garmin/manifest.xml
+        run: ./tools/garmin_devices.sh
 
       # The your own key, never a generated one: the store accepts an
       # update only when it is signed like the first upload. Written outside
