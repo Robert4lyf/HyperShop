@@ -113,6 +113,20 @@ class RecipesViewModelTest {
     }
 
     @Test
+    fun aRecipeBoughtIsNoLongerOnTheShoppingList() {
+        // Y.13: everything bought and the shop finished; the card still said "On the shopping list".
+        val c = TestContainer.create()
+        c.add(*CHILLI)
+        val vm = RecipesViewModel(c).shown()
+        await(vm.ui) { it.library.singleOrNull()?.onList == true }
+        runBlocking {
+            for (i in c.repository.snapshot().liveItems) c.repository.tick(i.id)
+            c.repository.finishShopping()
+        }
+        await(vm.ui) { it.library.singleOrNull()?.onList == false }
+    }
+
+    @Test
     fun removingFromTheListOrTheLibraryCanBeUndone() {
         val c = TestContainer.create()
         c.add(*CHILLI)
