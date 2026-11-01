@@ -98,7 +98,7 @@ class UsesTest {
             assertEquals(3, uses.size)
             val links = r.repo.useLinks(l, uses.map { it.useId })
             assertEquals(uses.map { it.title to it.url }, uses.map { links.getValue(it.useId).let { k -> k.title to k.url } })
-            assertTrue("Added by hand" in links.values.map { it.title })
+            assertTrue("Miscellaneous" in links.values.map { it.title })
             assertEquals(1, uses.single { it.useId == a.useId }.inStockCount)
         }
 

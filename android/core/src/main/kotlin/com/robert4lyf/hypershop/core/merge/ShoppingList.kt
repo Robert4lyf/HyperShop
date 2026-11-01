@@ -26,6 +26,12 @@ data class ListItem(
      * clears it, and so does "Finish shopping", which leaves it on the list for the next trip like anything unbought.
      */
     val unavailableAt: Long? = null,
+    /**
+     * Y.19: some of it is already at home ("300 g", from the cupboard check), taken off what the recipes need
+     * together, so only the shortfall is bought. Not a total: the contributions still say what is needed, and a
+     * recipe added later raises the need while what is at home stays the same.
+     */
+    val onHand: QtyBase? = null,
 )
 
 /**
@@ -206,6 +212,22 @@ data class ShoppingList(
         contributionsOf(
             itemId,
         ).filter { it.coveredBy == null }.fold(QtyBase.PRESENCE) { a, c -> a + c.qty }
+
+    /** What is still to buy: the unbought need less what is at home ([ListItem.onHand]). */
+    fun toBuy(itemId: Long): QtyBase {
+        val need = uncovered(itemId)
+        return items[itemId]?.onHand?.let { need.minusClamped(it) } ?: need
+    }
+
+    /** Y.19: [qty] of the item is at home (null: none said); bumps its rev, as the row's text changes. */
+    fun setOnHand(
+        itemId: Long,
+        qty: QtyBase?,
+    ): ShoppingList? {
+        val item = items[itemId]?.takeIf { it.deletedAt == null } ?: return null
+        if (item.onHand == qty) return null
+        return copy(items = items + (itemId to item.copy(onHand = qty))).bumped(setOf(itemId))
+    }
 
     fun covered(itemId: Long): QtyBase =
         contributionsOf(

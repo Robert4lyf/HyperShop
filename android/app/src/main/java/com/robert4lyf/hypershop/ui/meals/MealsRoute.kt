@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
@@ -34,6 +36,7 @@ import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ShoppingCart
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -65,6 +68,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -110,6 +114,11 @@ data class MealsActions(
     val onHide: (Regular) -> Unit = {},
     val onHave: (List<HomeRow>) -> Unit = {},
     val onNeed: (HomeRow) -> Unit = {},
+    /** Y.19: some of it at home ("300 g"), and taking that back. */
+    val onHaveSome: (HomeRow, String) -> Unit = { _, _ -> },
+    val onClearSome: (HomeRow) -> Unit = {},
+    /** Y.21: lines typed under Miscellaneous (household things, extras). */
+    val onAddMisc: (String) -> Unit = {},
     val onStartShopping: () -> Unit = {},
     /** "Go to the list": the Shopping tab, where the combined ingredients are. */
     val onList: () -> Unit = {},
@@ -142,6 +151,7 @@ fun MealsRoute(
             hasKey = hasKey,
         )
     }
+    val misc by vm.misc.collectAsStateWithLifecycle()
     MealsScreen(
         ui,
         MealsActions(
@@ -162,6 +172,9 @@ fun MealsRoute(
             onHide = { vm.hide(it) },
             onHave = vm::have,
             onNeed = vm::need,
+            onHaveSome = { r, t -> vm.haveSome(r, t) },
+            onClearSome = vm::clearSome,
+            onAddMisc = vm::addMisc,
             onStartShopping = {
                 vm.startShopping()
                 onList()
@@ -169,6 +182,7 @@ fun MealsRoute(
             onList = onList,
             onNewRecipe = { adding = true },
         ),
+        misc = misc,
     )
 }
 
@@ -183,6 +197,8 @@ fun MealsRoute(
 fun MealsScreen(
     ui: MealsUi,
     actions: MealsActions,
+    /** Y.21: what is on the shopping list without a recipe. */
+    misc: List<String> = emptyList(),
 ) {
     var allPicks by rememberSaveable { mutableStateOf(false) }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -224,6 +240,7 @@ fun MealsScreen(
                 if (ui.isCurrent && (ui.buyAgain.regulars.isNotEmpty() || ui.buyAgain.lastShop.isNotEmpty())) {
                     item(key = "buy-again") { BuyAgainSection(ui, actions) }
                 }
+                if (ui.loaded && ui.isCurrent) item(key = "misc") { MiscSection(misc, actions.onAddMisc) }
                 if (ui.isCurrent && ui.home.isNotEmpty()) {
                     item(key = "home-label") { HomeHeader(ui, actions) }
                     items(ui.home, key = { "home-${it.mergeKey}" }) { r -> HomeRowItem(r, actions) }
@@ -533,6 +550,87 @@ private fun HomeHeader(
     }
 }
 
+/**
+ * Y.21: Miscellaneous, for what no recipe needs (toilet roll, bin bags): typed here while the week is planned, so
+ * the whole shop is in one place, and on the shopping list under Miscellaneous. One item per line also works.
+ */
+@Composable
+private fun MiscSection(
+    items: List<String>,
+    onAdd: (String) -> Unit,
+) {
+    var text by rememberSaveable { mutableStateOf("") }
+    Column(Modifier.padding(horizontal = 20.dp).padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionLabel("Miscellaneous")
+        Text(
+            if (items.isEmpty()) {
+                "Household things and anything else no recipe needs."
+            } else {
+                "On the shopping list: ${items.joinToString(", ")}"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.testTag("misc-items"),
+        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                placeholder = { Text("e.g. toilet roll, 2 bin bags") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions =
+                    KeyboardActions(onDone = {
+                        if (text.isNotBlank()) onAdd(text)
+                        text = ""
+                    }),
+                modifier = Modifier.weight(1f).testTag("misc-add"),
+            )
+            FilledTonalButton(
+                enabled = text.isNotBlank(),
+                onClick = {
+                    onAdd(text)
+                    text = ""
+                },
+                modifier = Modifier.testTag("misc-add-go"),
+            ) { Text("Add") }
+        }
+    }
+}
+
+/** Y.19: how much of [r] is in the cupboard, against what the week's recipes need together. */
+@Composable
+private fun HaveSomeDialog(
+    r: HomeRow,
+    onSet: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var text by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("How much ${r.name} is at home?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                r.needed?.let { Text("The recipes need $it together. Only the rest goes on the shopping list.") }
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text(r.needed?.let { "e.g. half of $it" } ?: "e.g. 300 g") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("home-some-amount"),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = text.isNotBlank(), onClick = {
+                onSet(text)
+                onDismiss()
+            }, modifier = Modifier.testTag("home-some-set")) { Text("Set") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
 /** One ingredient, one decision: "Have" or "Need", however many recipes want it. */
 @Composable
 private fun HomeRowItem(
@@ -554,7 +652,12 @@ private fun HomeRowItem(
         Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}) {
             Text(r.name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleSmall)
             Text(
-                listOfNotNull("for ${r.from.joinToString(", ")}", "usually at home".takeIf { r.usual }).joinToString(" · "),
+                listOfNotNull(
+                    // Y.19: what all the recipes need together, and what was said to be in already.
+                    listOfNotNull(r.needed, "for ${r.from.joinToString(", ")}").joinToString(" "),
+                    r.onHand?.let { "$it at home" },
+                    "usually at home".takeIf { r.usual },
+                ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
@@ -570,9 +673,19 @@ private fun HomeRowItem(
             )
             TextButton(onClick = { actions.onNeed(r) }, modifier = Modifier.testTag("home-need-${r.mergeKey}")) { Text("Need it") }
         } else {
+            var asking by remember { mutableStateOf(false) }
+            if (r.onHand != null) {
+                TextButton(
+                    onClick = { actions.onClearSome(r) },
+                    modifier = Modifier.testTag("home-clear-${r.mergeKey}"),
+                ) { Text("Need all") }
+            } else if (r.needed != null) {
+                TextButton(onClick = { asking = true }, modifier = Modifier.testTag("home-some-${r.mergeKey}")) { Text("Some") }
+            }
             OutlinedButton(onClick = { actions.onHave(listOf(r)) }, modifier = Modifier.testTag("home-have-${r.mergeKey}")) {
                 Text("Have it")
             }
+            if (asking) HaveSomeDialog(r, onSet = { actions.onHaveSome(r, it) }, onDismiss = { asking = false })
         }
     }
 }

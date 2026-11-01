@@ -130,4 +130,30 @@ class HomeCheckTest {
             // Still there for Need it and Undo, which read every line.
             assertEquals(listOf(pasta), r.repo.inStockOnList(r.repo.snapshot()).map { it.target.mergeKey })
         }
+
+    @Test
+    fun someAtHomeLeavesOnlyTheShortfallToBuy() =
+        runBlocking {
+            // Y.19: two recipes need 300 g of rice together; 100 g is in the cupboard, so 200 g is bought.
+            r.import("200 g basmati rice", "2 onions")
+            r.import("100 g basmati rice", url = "https://example.com/b")
+            val rice = rows().single { it.name.contains("rice") }
+            assertEquals("300g", rice.needed)
+            assertEquals(HaveSome.SET, home.haveSome(rice.mergeKey, "100 g"))
+            var l = r.repo.snapshot()
+            val id = l.itemByKey(rice.mergeKey)!!.id
+            assertEquals(Rational.of(200), l.toBuy(id)[BaseKey.MASS])
+            assertEquals(Rational.of(300), l.uncovered(id)[BaseKey.MASS])
+            assertEquals("100g", rows().single { it.mergeKey == rice.mergeKey }.onHand)
+            // A count cannot come off a weight; nothing changes.
+            assertEquals(HaveSome.DIFFERENT_MEASURE, home.haveSome(rice.mergeKey, "2"))
+            assertEquals(HaveSome.NOT_AN_AMOUNT, home.haveSome(rice.mergeKey, "some"))
+            // Taken back: the whole 300 g to buy.
+            home.clearSome(rice.mergeKey)
+            l = r.repo.snapshot()
+            assertEquals(Rational.of(300), l.toBuy(id)[BaseKey.MASS])
+            // As much as the recipes need is "Have it": off the list.
+            assertEquals(HaveSome.ENOUGH, home.haveSome(rice.mergeKey, "500 g"))
+            assertTrue(rows().single { it.mergeKey == rice.mergeKey }.have)
+        }
 }

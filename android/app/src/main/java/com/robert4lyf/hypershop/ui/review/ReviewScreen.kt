@@ -159,6 +159,19 @@ fun ReviewScreen(
                         )
                     }
                 }
+                // Y.20: what is at home is checked once, against every recipe's need together, on This week; a recipe's own
+                // lines are not asked about one by one (300 g in the cupboard may not cover three recipes).
+                if (!ui.editing && !ui.byHand && !ui.savedOnly) {
+                    item(key = "cupboard-hint") {
+                        Text(
+                            "Add everything, then check the cupboard on This week: " +
+                                "it weighs what you have against all the recipes together.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp).testTag("cupboard-hint"),
+                        )
+                    }
+                }
                 // X.4: the sheet behind each row is where a line is changed or swapped; said while that is new (UX review 20).
                 if (ui.hint) {
                     item(key = "edit-hint") {
@@ -176,7 +189,8 @@ fun ReviewScreen(
                         AisleHeader(
                             aisle,
                             rows,
-                            onAisleInStock.takeUnless { ui.savedOnly },
+                            // Y.20: no "all at home" for an aisle; the cupboard check on This week does that.
+                            null,
                             Modifier.padding(top = 12.dp).sectionItem(sectionPosition(0, count), aisle.style.container),
                         )
                     }
@@ -799,7 +813,9 @@ private fun ReviewRowItem(
                 }
             }
         }
-        onInStock?.let { toggle -> InStockPill(row.inStock, name) { toggle(row.key, it) } }
+        // Y.20: only a row already at home (an "always at home" staple) shows it, so it can be taken back; the rest
+        // are checked on This week, and a row's own sheet still has the switch.
+        onInStock?.takeIf { row.inStock }?.let { toggle -> InStockPill(true, name) { toggle(row.key, it) } }
         Icon(
             Icons.Rounded.ChevronRight,
             contentDescription = null,

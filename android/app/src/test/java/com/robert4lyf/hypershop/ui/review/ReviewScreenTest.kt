@@ -126,11 +126,14 @@ class ReviewScreenTest {
     }
 
     @Test
-    fun theInStockPillTogglesWithoutOpeningTheSheet() {
+    fun onlyARowAlreadyAtHomeShowsThePillAndItTakesItBack() {
+        // Y.20: the cupboard is checked on This week against every recipe together; a row here shows "At home"
+        // only when it already is (a staple), so it can be taken back.
         show()
-        compose.onAllNodesWithText("At home")[0].performClick()
-        compose.onAllNodesWithText("At home")[3].performClick()
-        assertEquals(listOf("stock cat:onion true", "stock cat:salt false"), events)
+        compose.onAllNodesWithText("At home").assertCountEquals(1)
+        compose.onNodeWithText("At home").performClick()
+        assertEquals(listOf("stock cat:salt false"), events)
+        compose.onNodeWithTag("cupboard-hint").assertExists()
     }
 
     @Test

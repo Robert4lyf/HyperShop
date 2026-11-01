@@ -261,7 +261,7 @@ class RecipesViewModelTest {
         // Still hand-added: one use with no recipe, and nothing in the library.
         val after = await(vm.ui) { u -> u.uses.singleOrNull()?.progress?.toBuy == 2 }
         assertEquals(null, after.uses.single().recipeId)
-        assertEquals("Added by hand", after.uses.single().title)
+        assertEquals("Miscellaneous", after.uses.single().title)
         assertTrue(after.library.isEmpty())
         val list = runBlocking { c.repository.snapshot() }
         assertEquals(setOf("cat:beef_mince", "cat:leek"), list.liveItems.map { it.mergeKey }.toSet())
@@ -364,7 +364,7 @@ class RecipesViewModelTest {
         val start = await(vm.ui) { it.uses.size == 2 && it.library.size == 1 }
         val chilli = start.uses.first { it.recipeId != null }
         val byHand = start.uses.first { it.recipeId == null }
-        assertEquals("Added by hand", byHand.title)
+        assertEquals("Miscellaneous", byHand.title)
         // From the list: the library shows it too.
         vm.rename(chilli, "  Friday chilli ")
         val renamed =
@@ -373,7 +373,7 @@ class RecipesViewModelTest {
         // From the library: the list shows it too.
         vm.renameSaved(renamed.library.single(), "Chilli")
         await(vm.ui) { u -> u.uses.any { it.title == "Chilli" } && u.library.single().title == "Chilli" }
-        // "Added by hand" becomes "Household", and stays so after Finish shopping.
+        // "Miscellaneous" becomes "Household", and stays so after Finish shopping.
         vm.rename(byHand, "Household")
         await(vm.ui) { u -> u.uses.any { it.recipeId == null && it.title == "Household" } }
         runBlocking {
@@ -384,7 +384,7 @@ class RecipesViewModelTest {
         assertEquals("Household", runBlocking { c.repository.manualTitle() })
         // Blank puts the old name back.
         vm.rename(byHand, " ")
-        await(vm.ui) { u -> u.uses.any { it.recipeId == null && it.title == "Added by hand" } }
+        await(vm.ui) { u -> u.uses.any { it.recipeId == null && it.title == "Miscellaneous" } }
     }
 
     @Test
