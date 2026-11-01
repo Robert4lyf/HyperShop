@@ -31,8 +31,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -56,24 +54,18 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import com.robert4lyf.hypershop.core.model.AisleCode
-import com.robert4lyf.hypershop.ui.common.AmountField
 import com.robert4lyf.hypershop.ui.common.EdgeDivider
 import com.robert4lyf.hypershop.ui.common.InfoBanner
-import com.robert4lyf.hypershop.ui.common.PillShape
 import com.robert4lyf.hypershop.ui.common.SectionLabel
 import com.robert4lyf.hypershop.ui.common.SheetHeader
 import com.robert4lyf.hypershop.ui.common.WrongNote
-import com.robert4lyf.hypershop.ui.common.basilChipColors
 import com.robert4lyf.hypershop.ui.common.cardLift
 import com.robert4lyf.hypershop.ui.common.rememberOpenLink
 import com.robert4lyf.hypershop.ui.theme.card
-import com.robert4lyf.hypershop.ui.theme.icon
 
 data class ItemSheetActions(
-    val onMove: (AisleCode, Boolean) -> Unit,
-    /** False when the text has no amount. */
-    val onEditQuantity: (String) -> Boolean,
+    /** The edit section's Save: name, amount and unit, aisle and category at once. False when the amount has no number. */
+    val onSave: (ItemChanges) -> Boolean,
     /** Takes the item off the list (with Undo on the list). */
     val onDelete: () -> Unit = {},
     /** Swap for this name; true = always use it instead from now on. */
@@ -99,7 +91,7 @@ fun ItemSheetHost(
 
 /**
  * The item sheet (PLAN §3.5): tick, totals per dimension, sources, pack note,
- * swaps, quantity, aisle, and "Remove from list" at the end, labelled and
+ * swaps, the edit section (name, amount and unit, aisle, category), and "Remove from list" at the end, labelled and
  * away from the tick so neither is hit by mistake.
  */
 @Composable
@@ -134,8 +126,7 @@ fun ItemSheetContent(
             if (sheet.sources.isNotEmpty()) Sources(sheet.sources)
             Swaps(sheet, actions.onSwap)
             EdgeDivider()
-            AmountField("Change the amount", "Total needed, e.g. 3 or 500 g", "Set", "edit-qty", actions.onEditQuantity)
-            ItemAisle(sheet.name, sheet.aisle, actions.onMove)
+            ItemEditor(sheet, actions.onSave)
             EdgeDivider()
             OutlinedButton(
                 onClick = actions.onDelete,
@@ -149,56 +140,6 @@ fun ItemSheetContent(
             }
             WrongNote(actions.onWrong)
         }
-    }
-}
-
-/**
- * The aisle picker: a chip per aisle with its icon. A tap asks whether to
- * remember it ("Always"), move only this item ("Just this time"), or not move.
- */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ItemAisle(
-    name: String,
-    current: AisleCode,
-    onMove: (AisleCode, Boolean) -> Unit,
-) {
-    // The aisle asked about survives a rotation (an enum is Serializable, so it saves as is).
-    var picked by rememberSaveable { mutableStateOf<AisleCode?>(null) }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionLabel("Aisle")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (a in AisleCode.entries) {
-                FilterChip(
-                    selected = a == current,
-                    onClick = { if (a != current) picked = a },
-                    label = { Text(a.displayName) },
-                    leadingIcon = { Icon(a.icon, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) },
-                    shape = PillShape,
-                    colors = basilChipColors(),
-                )
-            }
-        }
-    }
-    picked?.let { a ->
-        AlertDialog(
-            onDismissRequest = { picked = null },
-            icon = { Icon(a.icon, contentDescription = null) },
-            title = { Text("Move ${name.replaceFirstChar { it.uppercase() }} to ${a.displayName}?") },
-            confirmButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = {
-                        picked = null
-                        onMove(a, false)
-                    }) { Text("Just this time") }
-                    TextButton(onClick = {
-                        picked = null
-                        onMove(a, true)
-                    }) { Text("Always") }
-                }
-            },
-            dismissButton = { TextButton(onClick = { picked = null }) { Text("Cancel") } },
-        )
     }
 }
 
