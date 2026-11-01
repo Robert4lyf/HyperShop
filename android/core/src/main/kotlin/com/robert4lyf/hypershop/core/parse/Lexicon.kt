@@ -26,6 +26,7 @@ internal object Lexicon {
             u(QtyUnit.CLOVE, "clove", "cloves")
             u(QtyUnit.BUNCH, "bunch", "bunches")
             u(QtyUnit.TIN, "tin", "tins", "can", "cans")
+            u(QtyUnit.JAR, "jar", "jars")
             u(QtyUnit.PACKET, "packet", "packets", "package", "packages", "pack", "packs", "pkg", "pkgs", "sachet", "sachets")
             u(QtyUnit.PACKET, "envelope", "envelopes")
             u(QtyUnit.SPRIG, "sprig", "sprigs")
@@ -43,7 +44,7 @@ internal object Lexicon {
     val otherUnits =
         setOf(
             "ear", "ears", "leaf", "leaves", "bag", "bags", "strip", "strips", "rectangle", "rectangles",
-            "handful", "handfuls", "bottle", "bottles", "jar", "jars", "sheet", "sheets", "drop", "drops",
+            "handful", "handfuls", "bottle", "bottles", "sheet", "sheets", "drop", "drops",
             "loaf", "loaves", "bulb", "bulbs", "splash", "splashes", "cube", "cubes", "square", "squares",
             "wedge", "wedges", "stem", "stems", "branch", "branches", "pod", "pods", "punnet", "punnets",
             "knob", "knobs", "rasher", "rashers", "box", "boxes", "carton", "cartons", "tub", "tubs",
@@ -67,7 +68,7 @@ internal object Lexicon {
     val trailingUnits = setOf(QtyUnit.CLOVE, QtyUnit.SPRIG, QtyUnit.STALK, QtyUnit.SLICE, QtyUnit.FILLET, QtyUnit.HEAD, QtyUnit.BUNCH)
 
     /** Container units that take an alternative size before them ("400g tin"). */
-    val containers = setOf(QtyUnit.TIN, QtyUnit.PACKET)
+    val containers = setOf(QtyUnit.TIN, QtyUnit.JAR, QtyUnit.PACKET)
 
     val numberWords: Map<String, Rational> =
         mapOf(

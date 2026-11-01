@@ -210,8 +210,9 @@ class BasketEvalTest {
          * onions and tomato purée, and tins counted, [165, 143, 154, 150]; X.6, UK item weights and names from fresh pages:
          * [165, 143, 154, 152]; Y.17, salted and unsalted butter two items (asked for by the owner): "3 tablespoons
          * salted butter" is labelled "butter", from before the split, and the list now names it salted butter, as asked.
-         * The label stands, so "named as the label" is one fewer.
+         * The label stands, so "named as the label" is one fewer; Y.18, "jar" a unit of its own (asked for by the owner),
+         * [165, 143, 155, 153].
          */
-        val FLOORS = listOf(165, 142, 154, 152)
+        val FLOORS = listOf(165, 143, 155, 153)
     }
 }

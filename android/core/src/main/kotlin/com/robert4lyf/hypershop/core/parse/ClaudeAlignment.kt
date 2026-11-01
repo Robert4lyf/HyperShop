@@ -65,6 +65,6 @@ class ClaudeAlignment(
 
     companion object {
         const val DISAGREE = "the amount was read two ways"
-        private val CONTAINERS = setOf(QtyUnit.TIN, QtyUnit.PACKET)
+        private val CONTAINERS = setOf(QtyUnit.TIN, QtyUnit.JAR, QtyUnit.PACKET)
     }
 }

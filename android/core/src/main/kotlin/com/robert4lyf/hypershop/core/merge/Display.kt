@@ -253,7 +253,7 @@ object Display {
     private const val CLOVES_A_BULB = 10L
     private val EACH_UNITS = setOf("each", "head", "piece", "loaf", "ball")
     private val CONTAINERS = setOf("jar", "bottle", "pot", "carton", "tub", "pack", "bag", "box", "punnet", "bunch", "tube", "tin")
-    private val COUNTED_CONTAINERS = setOf(QtyUnit.BUNCH, QtyUnit.TIN, QtyUnit.PACKET, QtyUnit.SPRIG)
+    private val COUNTED_CONTAINERS = setOf(QtyUnit.BUNCH, QtyUnit.TIN, QtyUnit.JAR, QtyUnit.PACKET, QtyUnit.SPRIG)
     private val PACK_SIZE = Regex("""(\d+(?:\.\d+)?)\s*(kg|g|ml|l)\b""", RegexOption.IGNORE_CASE)
 
     /** The row text for an item: main line "<amount> <name>", sub-line the pack note or "2 already bought". */

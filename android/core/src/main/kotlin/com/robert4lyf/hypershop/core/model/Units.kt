@@ -67,6 +67,10 @@ enum class QtyUnit(
     @SerialName("tin")
     TIN("tin", Dimension.COUNT),
 
+    /** Y.18: "a jar of pesto", like a tin; it was an "other" word that read back as "1 other". */
+    @SerialName("jar")
+    JAR("jar", Dimension.COUNT),
+
     @SerialName("packet")
     PACKET("packet", Dimension.COUNT),
 
