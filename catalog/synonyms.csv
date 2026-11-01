@@ -1020,6 +1020,7 @@ light soft brown sugar,brown_sugar
 light soy sauce,soy_sauce
 lighter creme fraiche,creme_fraiche
 lighter puff pastry,puff_pastry
+lightly salted butter,salted_butter
 lima bean,butter_beans
 lima beans,butter_beans
 lime,lime
@@ -1457,7 +1458,7 @@ salmon fillet,salmon
 salmon fillets,salmon
 salmon steak,salmon
 salt,salt
-salted butter,butter
+salted butter,salted_butter
 salted cashews,cashew
 salted peanuts,peanut
 sandwich bread,bread
@@ -1650,7 +1651,7 @@ swordfish,swordfish
 swordfish steak,swordfish
 tabasco,hot_sauce
 tabasco sauce,hot_sauce
-table butter,butter
+table butter,salted_butter
 table salt,salt
 tagliatelle,tagliatelle
 tahini,tahini

@@ -15,6 +15,7 @@ import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.QtyBase
+import com.robert4lyf.hypershop.core.model.QtyUnit
 import com.robert4lyf.hypershop.core.report.WrongReport
 import com.robert4lyf.hypershop.data.ListRepository
 import com.robert4lyf.hypershop.data.StoredRecipe
@@ -891,10 +892,12 @@ class ReviewViewModel(
                     l.parsed.checkReason?.takeIf { l.parsed.check },
                     amount =
                         l.parsed.quantity?.let { q ->
-                            listOfNotNull(
-                                Display.fraction(q) + (l.parsed.quantityMax?.let { "–" + Display.fraction(it) } ?: ""),
-                                l.parsed.unit?.serial?.replace('_', ' '),
-                            ).joinToString(" ")
+                            // A unit word with no unit of its own ("jar", "pot") reads as typed, not as "other".
+                            l.parsed.quantityText?.takeIf { l.parsed.unit == QtyUnit.OTHER }
+                                ?: listOfNotNull(
+                                    Display.fraction(q) + (l.parsed.quantityMax?.let { "–" + Display.fraction(it) } ?: ""),
+                                    l.parsed.unit?.serial?.replace('_', ' '),
+                                ).joinToString(" ")
                         },
                     origin = origins.getOrNull(stored.indexOfFirst { it.first.id == l.recipeLineId }),
                 )
@@ -935,14 +938,29 @@ class ReviewViewModel(
     /** Live re-parse of an edited line. */
     fun reparse(text: String): String = summary(c.ruleParser.parse(text))
 
-    /** Under the rename field: "Joins maple syrup in Baking" or "A new item in Other". */
-    fun renamePreview(name: String): String? {
+    /**
+     * Under the rename field: "Joins maple syrup in Baking" or "A new item in Other"; with [key], a name the
+     * catalogue reads as the row's own item says so, since renaming to it changes nothing on the list.
+     */
+    fun renamePreview(
+        name: String,
+        key: String? = null,
+    ): String? {
         val n = name.trim().lowercase()
         if (n.isEmpty()) return null
         val t = c.repository.target(n)
         val entry = c.catalog.byId[t.catalogId ?: ""]
+        if (key != null && t.mergeKey == key) {
+            return "That is ${entry?.name ?: t.displayName} already, so the list keeps calling it that"
+        }
         return if (entry != null) "Joins ${entry.name} in ${t.aisle.displayName}" else "A new item in ${t.aisle.displayName}"
     }
+
+    /** False when [name] is the row's own item under another word ("salted butter" for butter): Rename would do nothing. */
+    fun renameChanges(
+        key: String,
+        name: String,
+    ): Boolean = name.isNotBlank() && c.repository.target(name.trim().lowercase()).mergeKey != key
 
     private fun summary(p: ParsedIngredient): String =
         listOfNotNull(

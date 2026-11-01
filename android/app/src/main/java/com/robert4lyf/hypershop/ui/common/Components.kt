@@ -380,7 +380,15 @@ fun AmountField(
 ) {
     var amount by remember(initial) { mutableStateOf(initial) }
     var bad by remember { mutableStateOf(false) }
-    val submit = { if (amount.isNotBlank() && amount != initial) bad = !onSubmit(amount) }
+    // What was set, said under the field until the next edit: the change itself can be a word on a row further up.
+    var done by remember { mutableStateOf<String?>(null) }
+    val submit = {
+        if (amount.isNotBlank() && amount != initial) {
+            val typed = amount.trim()
+            bad = !onSubmit(amount)
+            done = typed.takeIf { !bad }
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionLabel(heading)
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -389,10 +397,16 @@ fun AmountField(
                 onValueChange = {
                     amount = it
                     bad = false
+                    done = null
                 },
                 label = { Text(label) },
                 isError = bad,
-                supportingText = if (bad) ({ Text("Enter an amount, like 2 or 200 ml") }) else null,
+                supportingText =
+                    when {
+                        bad -> ({ Text("Enter an amount, like 2 or 200 ml") })
+                        done != null -> ({ Text("Set to $done", color = MaterialTheme.colorScheme.primary) })
+                        else -> null
+                    },
                 singleLine = true,
                 shape = MaterialTheme.shapes.medium,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Done),

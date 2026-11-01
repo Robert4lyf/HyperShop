@@ -47,7 +47,7 @@ object DefaultSwaps {
             listOf("yogurt", "greek_yogurt"),
             listOf("buttermilk", "yogurt", "milk"),
             listOf("milk", "oat_milk", "almond_milk", "soy_milk"),
-            listOf("butter", "vegan_butter"),
+            listOf("butter", "salted_butter", "vegan_butter"),
             listOf("onion", "shallot", "red_onion"),
             listOf("spring_onion", "chives"),
             listOf("parsley", "coriander"),

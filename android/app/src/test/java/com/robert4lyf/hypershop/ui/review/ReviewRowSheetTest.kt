@@ -299,6 +299,8 @@ class ReviewRowSheetScreenTest {
         compose.onNodeWithText("Use this line").performClick()
         compose.onNodeWithTag("amount-7").performTextReplacement("300 ml")
         compose.onNodeWithText("Set").performClick()
+        // Said under the field: the change itself may be a word on a row further up the screen.
+        compose.onNodeWithText("Set to 300 ml").fetchSemanticsNode()
         // A chip asks: just this time, or always.
         compose.onNodeWithText("Frozen").performScrollTo().performClick()
         compose.onNodeWithText("Just this time").performClick()

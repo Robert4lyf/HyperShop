@@ -20,7 +20,9 @@ object EvalFloors {
         val acceptedWrongAtMost: Int,
     )
 
-    val RELEASE_C = Floors(right = 263, name = 263, quantity = 284, unit = 281, catalogue = 262, shown = 282, acceptedWrongAtMost = 9)
+    // Y.18: "jar" became a unit (owner). rc-165 "1 (16-ounce) jar prepared salsa" is labelled "1.0 other", from when
+    // "jar" was an "other" word, and now reads "1 jar" unflagged: one fewer unit and shown, one more accepted. The label stands.
+    val RELEASE_C = Floors(right = 263, name = 263, quantity = 284, unit = 280, catalogue = 262, shown = 281, acceptedWrongAtMost = 10)
     val FINAL = Floors(right = 116, name = 118, quantity = 135, unit = 135, catalogue = 118, shown = 133, acceptedWrongAtMost = 10)
     val T = Floors(right = 114, name = 114, quantity = 134, unit = 134, catalogue = 111, shown = 131, acceptedWrongAtMost = 14)
 
