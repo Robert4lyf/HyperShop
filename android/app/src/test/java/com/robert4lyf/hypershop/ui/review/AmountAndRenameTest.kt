@@ -34,8 +34,9 @@ class AmountAndRenameTest {
         val c = TestContainer.create()
         val vm = ReviewViewModel(c, runBlocking { c.readyJob("250g butter") })
         val key = ready(vm).aisles.flatMap { it.second }.single().key
-        assertFalse(vm.renameChanges(key, "Salted butter"))
-        assertTrue(vm.renamePreview("Salted butter", key)!!.startsWith("That is butter already"))
-        assertTrue(vm.renameChanges(key, "Margarine"))
+        assertFalse(vm.renameChanges(key, "Cold butter"))
+        assertTrue(vm.renamePreview("Cold butter", key)!!.startsWith("That is unsalted butter already"))
+        // Y.17: salted butter is an item of its own.
+        assertTrue(vm.renameChanges(key, "Salted butter"))
     }
 }

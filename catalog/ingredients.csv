@@ -188,7 +188,8 @@ anchovy,anchovies,anchovies,anchovy|anchovy fillet|anchovy fillets,TINS_JARS,fal
 oyster,oysters,oysters,oyster,MEAT_FISH,false,each,count,,,Fish & seafood,,agent-estimate
 egg,egg,eggs,large egg|free-range egg|free-range eggs|egg yolk|egg white|egg yolks|egg whites|soft-boiled eggs,DAIRY_EGGS,false,box,count,,1 × box of 6,Butter & eggs,68,sourced
 milk,milk,milk,whole milk|semi-skimmed milk|skimmed milk|low-fat milk|2% milk|full-fat milk,DAIRY_EGGS,false,bottle,volume,,1 × 4 pint (2.27 l) bottle,Milk & cream,,sourced
-butter,butter,butter,unsalted butter|salted butter|sweet butter|cold butter|table butter,DAIRY_EGGS,false,block,mass,227,1 × 250 g block,Butter & eggs,,sourced
+butter,unsalted butter,unsalted butter,butter|sweet butter|cold butter,DAIRY_EGGS,false,block,mass,227,1 × 250 g block,Butter & eggs,,user
+salted_butter,salted butter,salted butter,table butter|lightly salted butter,DAIRY_EGGS,false,block,mass,227,1 × 250 g block,Butter & eggs,,user
 double_cream,double cream,double cream,heavy cream|whipping cream|heavy whipping cream|cream|whipped cream,DAIRY_EGGS,false,pot,volume,,1 × 300 ml pot,Milk & cream,,sourced
 single_cream,single cream,single cream,light cream|half-and-half,DAIRY_EGGS,false,pot,volume,,1 × 300 ml pot,Milk & cream,,sourced
 creme_fraiche,crème fraîche,crème fraîche,cr me fra che|lighter crème fraîche|half-fat crème fraîche,DAIRY_EGGS,false,pot,volume,,1 × 300 ml pot,Milk & cream,,sourced
