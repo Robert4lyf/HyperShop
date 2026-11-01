@@ -51,6 +51,8 @@ data class ItemEntity(
     val updatedAt: Long,
     /** X.8: set aside as not available on this trip ([ListItem.unavailableAt]); v8. */
     val unavailableAt: Long? = null,
+    /** Y.19: what the cupboard check said is at home ([ListItem.onHand]), as [QtyBase] JSON; v12. */
+    val onHand: String? = null,
 )
 
 @Serializable

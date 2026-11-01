@@ -21,6 +21,7 @@ internal object Mapping {
                 e.aisleCode,
             ),
             e.position, e.rev, e.deletedAt, e.unavailableAt,
+            e.onHand?.let { runCatching { json.decodeFromString(QtyBase.serializer(), it) }.getOrNull() },
         )
 
     fun item(
@@ -38,6 +39,7 @@ internal object Mapping {
         i.deletedAt,
         now,
         i.unavailableAt,
+        i.onHand?.let { json.encodeToString(QtyBase.serializer(), it) },
     )
 
     fun use(e: RecipeUseEntity) = RecipeUse(e.id, e.recipeId, UseKind.valueOf(e.kind), e.servings, e.addedAt, e.archivedAt)

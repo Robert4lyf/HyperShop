@@ -6,9 +6,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.robert4lyf.hypershop.core.merge.UseKind
 import com.robert4lyf.hypershop.core.merge.UseProgress
+import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.plan.Week
 import com.robert4lyf.hypershop.data.BuyAgainView
+import com.robert4lyf.hypershop.data.HaveSome
 import com.robert4lyf.hypershop.data.HomeRow
 import com.robert4lyf.hypershop.data.MealShopping
 import com.robert4lyf.hypershop.data.PlannedMeal
@@ -498,6 +501,82 @@ class MealsViewModel(
             val lines = write.await()
             if (lines.isEmpty()) return@launch
             messages.send(UiMessage("${row.name} back on the shopping list", undo = { writing.withLock { c.homeCheck.haveLines(lines) } }))
+        }
+    }
+
+    /**
+     * Y.19 "Have some": [text] of the row at home, out of what all the week's recipes need; only the rest stays to buy.
+     * As much as is needed is "Have it".
+     */
+    fun haveSome(
+        row: HomeRow,
+        text: String,
+    ) {
+        val write = written { c.homeCheck.haveSome(row.mergeKey, text) }
+        viewModelScope.launch {
+            val name = row.name.replaceFirstChar { it.uppercase() }
+            messages.send(
+                when (write.await()) {
+                    HaveSome.SET ->
+                        UiMessage("$name: ${text.trim()} at home, the rest stays on the shopping list", undo = {
+                            writing.withLock { c.homeCheck.clearSome(row.mergeKey) }
+                        })
+                    HaveSome.ENOUGH ->
+                        UiMessage("$name: that covers it, at home", undo = {
+                            writing.withLock { c.homeCheck.need(listOf(row.mergeKey)) }
+                        })
+                    HaveSome.NOT_AN_AMOUNT -> UiMessage("Enter an amount, like 300 g")
+                    HaveSome.DIFFERENT_MEASURE -> UiMessage("Enter it as the list measures it: ${row.needed ?: "the same unit"}")
+                },
+            )
+        }
+    }
+
+    /** Takes back "Have some": all of it to buy again. */
+    fun clearSome(row: HomeRow) {
+        written { c.homeCheck.clearSome(row.mergeKey) }
+    }
+
+    /**
+     * Y.21: what is on the list without a recipe (Miscellaneous: household things, extras), still to buy, by name;
+     * shown on This week so the week's whole shop is planned in one place.
+     */
+    val misc: StateFlow<List<String>> =
+        c.repository.list.map { l ->
+            val manual = l.uses.values.filter { it.kind == UseKind.MANUAL }.map { it.id }.toSet()
+            l.contributions.filter { it.useId in manual && it.coveredBy == null }
+                .mapNotNull { l.items[it.itemId]?.takeIf { i -> i.deletedAt == null }?.displayName }
+                .distinct()
+        }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Y.21: one or more lines typed under Miscellaneous, on the shopping list as typed items are. */
+    fun addMisc(text: String) {
+        val lines = text.split('\n').map { it.trim() }.filter { it.isNotEmpty() }
+        if (lines.isEmpty()) return
+        val write =
+            written {
+                lines.mapNotNull { line ->
+                    val p = c.repository.merger.juiceAsFruit(c.ruleParser.parse(line), UnitLocale.METRIC)
+                    if (p.name.isBlank()) return@mapNotNull null
+                    // Already there with no amount typed: not a second one by accident.
+                    if (p.quantity == null && c.repository.snapshot().itemByKey(c.repository.target(p.name).mergeKey) != null) {
+                        return@mapNotNull null
+                    }
+                    c.repository.manualAdd(p.name, p.shopBase(UnitLocale.METRIC), p.shopUnit)
+                    p.name
+                }
+            }
+        viewModelScope.launch {
+            val added = write.await()
+            messages.send(
+                UiMessage(
+                    when {
+                        added.isEmpty() -> "Already on the shopping list"
+                        added.size == 1 -> "Added ${added.single()}"
+                        else -> "Added ${added.size} items"
+                    },
+                ),
+            )
         }
     }
 

@@ -137,6 +137,19 @@ class MealsViewModelTest {
     }
 
     @Test
+    fun miscellaneousGoesOnTheShoppingListWithoutARecipe() {
+        // Y.21: household things typed on This week; no recipe called "miscellaneous" needed.
+        val c = container()
+        val vm = MealsViewModel(c).shown()
+        val collecting = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch { vm.misc.collect {} }
+        vm.addMisc("toilet roll\n2 bin bags")
+        awaitTrue { runBlocking { c.repository.snapshot() }.liveItems.size == 2 }
+        await(vm.misc) { it.size == 2 }
+        assertEquals("Miscellaneous", runBlocking { c.repository.usesOnList() }.single().title)
+        collecting.cancel()
+    }
+
+    @Test
     fun cookedItCountsOnTheRecipeAndCanBeTakenBack() {
         val c = container()
         val key = save(c, "Chilli", "2 onions")

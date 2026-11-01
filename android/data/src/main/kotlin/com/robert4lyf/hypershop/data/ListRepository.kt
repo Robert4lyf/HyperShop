@@ -158,7 +158,7 @@ data class WatchListView(
  */
 class ListRepository(
     internal val db: HyperShopDatabase,
-    private val catalog: Catalog = CatalogLoader.default,
+    internal val catalog: Catalog = CatalogLoader.default,
     internal val clock: () -> Long = System::currentTimeMillis,
     /** Where the shared [list] reads run; lives as long as the repository (the app). */
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
@@ -1658,8 +1658,8 @@ class ListRepository(
     }
 }
 
-/** "Added by hand", until it is renamed. */
-const val MANUAL_TITLE = "Added by hand"
+/** What no recipe needs (household things, extras), until it is renamed; "Added by hand" before Y.21. */
+const val MANUAL_TITLE = "Miscellaneous"
 
 private const val MAX_TITLE = 80
 

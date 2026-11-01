@@ -118,7 +118,7 @@ class ListViewModelTest {
         vm.setView(ListView.RECIPE)
         val ui = await(vm.ui) { it.view == ListView.RECIPE && it.recipes.size == 4 }
         assertEquals(
-            listOf("Weeknight chilli", "Red lentil dal", "In more than one recipe", "Added by hand"),
+            listOf("Weeknight chilli", "Red lentil dal", "In more than one recipe", "Miscellaneous"),
             ui.recipes.map { it.title },
         )
         // Within a card, walking order: produce before meat.

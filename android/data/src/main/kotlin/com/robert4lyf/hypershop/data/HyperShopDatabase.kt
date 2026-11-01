@@ -10,7 +10,7 @@ import com.robert4lyf.hypershop.core.catalog.CatalogLoader
 import com.robert4lyf.hypershop.core.model.AisleCode
 
 @Database(
-    version = 11,
+    version = 12,
     exportSchema = true,
     entities = [
         MetaEntity::class, ItemEntity::class, ItemAliasEntity::class, RecipeEntity::class, RecipeLineEntity::class,
@@ -170,6 +170,14 @@ abstract class HyperShopDatabase : RoomDatabase() {
                 }
             }
 
+        /** v12: some of an item at home, from the cupboard check ([ItemEntity.onHand]). */
+        val MIGRATION_11_12: Migration =
+            object : LiveKeyMigration(11, 12) {
+                override fun migrateTables(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `Item` ADD COLUMN `onHand` TEXT")
+                }
+            }
+
         /** Seeds aisles, the store and its aisle order, staples and Meta (PLAN §3.4, §4). */
         val CALLBACK =
             object : Callback() {
@@ -225,6 +233,7 @@ abstract class HyperShopDatabase : RoomDatabase() {
                 MIGRATION_8_9,
                 MIGRATION_9_10,
                 MIGRATION_10_11,
+                MIGRATION_11_12,
             )
                 .build()
 

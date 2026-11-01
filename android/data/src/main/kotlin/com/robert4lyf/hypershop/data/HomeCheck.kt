@@ -1,10 +1,13 @@
 package com.robert4lyf.hypershop.data
 
 import androidx.room.withTransaction
+import com.robert4lyf.hypershop.core.merge.Display
 import com.robert4lyf.hypershop.core.merge.LineStatus
 import com.robert4lyf.hypershop.core.merge.ShoppingList
 import com.robert4lyf.hypershop.core.merge.UseKind
 import com.robert4lyf.hypershop.core.model.AisleCode
+import com.robert4lyf.hypershop.core.model.UnitLocale
+import com.robert4lyf.hypershop.core.parse.RuleParser
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
@@ -18,7 +21,14 @@ data class HomeRow(
     val have: Boolean,
     /** A staple: usually at home (Settings › Ingredients), whatever this shop says. */
     val usual: Boolean,
+    /** Y.19: what every recipe on the list needs together ("520 g"), so a cupboard with some in can be weighed against it. */
+    val needed: String? = null,
+    /** Y.19: what was said to be at home of it ("300 g"); only the rest is bought. */
+    val onHand: String? = null,
 )
+
+/** Y.19: what "Have some" did with the amount typed. */
+enum class HaveSome { SET, ENOUGH, NOT_AN_AMOUNT, DIFFERENT_MEASURE }
 
 /**
  * The At home check (docs/design/release-b.md): before shopping, the cupboard
@@ -46,12 +56,23 @@ class HomeCheck(
                 open(l).groupBy { it.first }.mapNotNull { (itemId, cs) ->
                     val item = l.items[itemId] ?: return@mapNotNull null
                     if (item.aisle !in CUPBOARD && item.mergeKey !in staples) return@mapNotNull null
+                    val entry = repo.catalog.byId[item.catalogId ?: ""]
+
+                    fun text(q: com.robert4lyf.hypershop.core.model.QtyBase) =
+                        Display.amount(
+                            q,
+                            produce = item.aisle == AisleCode.PRODUCE,
+                            gramsPerCup = entry?.gramsPerCup,
+                            policy = entry?.displayPolicy,
+                        )
                     HomeRow(
                         item.mergeKey,
                         item.displayName,
                         cs.mapNotNull { titles[it.second.useId] }.distinct(),
                         have = false,
                         usual = item.mergeKey in staples,
+                        needed = text(l.uncovered(item.id)),
+                        onHand = item.onHand?.let { text(it) },
                     )
                 }
             val have =
@@ -104,6 +125,41 @@ class HomeCheck(
             val lines = moving.map { it.useId to it.recipeLineId!! }.distinct()
             dao.putDecisions(lines.map { (u, line) -> LineDecisionEntity(u, line, LineStatus.IN_STOCK.name) })
             lines
+        }
+
+    /**
+     * Y.19 "Have some": [text] ("300 g") of [key] is at home, out of everything the recipes need together; only
+     * the rest is bought. As much as is needed, or more, is "Have it". The amount must be in the list's own measure
+     * (a weight for a weighed item): a count against grams cannot be taken off.
+     */
+    suspend fun haveSome(
+        key: String,
+        text: String,
+    ): HaveSome {
+        val parsed = RuleParser().parse("${text.trim()} x")
+        if (parsed.quantity == null) return HaveSome.NOT_AN_AMOUNT
+        val have = parsed.shopBase(UnitLocale.METRIC)
+        val enough =
+            db.withTransaction {
+                val old = repo.load()
+                val item = old.itemByKey(key) ?: return@withTransaction null
+                val need = old.uncovered(item.id)
+                if (have.keys.none { it in need.keys }) return@withTransaction null
+                if (need.minusClamped(have).isPresence) return@withTransaction true
+                old.setOnHand(item.id, have)?.let { repo.persist(old, it) }
+                false
+            } ?: return HaveSome.DIFFERENT_MEASURE
+        if (!enough) return HaveSome.SET
+        have(listOf(key))
+        return HaveSome.ENOUGH
+    }
+
+    /** Takes back "Have some": the whole of [key] to buy again. */
+    suspend fun clearSome(key: String) =
+        db.withTransaction {
+            val old = repo.load()
+            val item = old.itemByKey(key) ?: return@withTransaction
+            old.setOnHand(item.id, null)?.let { repo.persist(old, it) }
         }
 
     /** Undo of [need]: exactly those lines at home again. */

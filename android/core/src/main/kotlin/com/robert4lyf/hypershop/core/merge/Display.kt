@@ -264,7 +264,7 @@ object Display {
         units: UnitsSetting = UnitsSetting.METRIC,
     ): RowText {
         val done = list.isDone(item.id)
-        val shownQty = if (done) list.total(item.id) else list.uncovered(item.id)
+        val shownQty = if (done) list.total(item.id) else list.toBuy(item.id)
         val produce = item.aisle == AisleCode.PRODUCE
         val hint = hintOf(list.contributionsOf(item.id).map { it.unitHint })
         val bought = buy(shownQty, entry, units, hint)
@@ -299,6 +299,9 @@ object Display {
                         entry?.gramsPerCup,
                         entry?.displayPolicy,
                     )?.let { "$it already bought" }
+                // Y.19: what the cupboard check said is at home, which is why the amount is less than the recipes'.
+                !done && item.onHand != null ->
+                    amount(item.onHand, units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy)?.let { "$it at home" }
                 // "400g tin", not "1 × 400 g tin": beside "2 tins" the one read as the count (UX review 16).
                 else -> entry?.packNote?.let { compactUnits(it.removePrefix("1 × ")) }
             }
