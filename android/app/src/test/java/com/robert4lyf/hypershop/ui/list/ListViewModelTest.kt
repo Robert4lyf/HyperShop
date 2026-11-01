@@ -297,11 +297,60 @@ class ListViewModelTest {
         assertEquals(listOf("2", "200g"), sheet.totals)
         assertEquals(listOf("Weeknight chilli" to "2 + 200g"), sheet.sources.map { it.title to it.amount })
         assertEquals(AisleCode.PRODUCE, sheet.aisle)
-        assertTrue(!vm.editQuantity(sheet.id, "lots"))
-        assertTrue(vm.editQuantity(sheet.id, "5"))
+        assertEquals("", sheet.amount)
+        assertTrue(!vm.saveItem(sheet.id, ItemChanges(amount = "lots")))
+        assertTrue(vm.saveItem(sheet.id, ItemChanges(amount = "5")))
         await(vm.ui) { it.row("onion").main.startsWith("5 onions") }
-        vm.moveItem(sheet.id, AisleCode.TINS_JARS, always = false)
+        vm.saveItem(sheet.id, ItemChanges(aisle = AisleCode.TINS_JARS, alwaysAisle = false))
         await(vm.ui) { it.row("onion").aisle == AisleCode.TINS_JARS }
+    }
+
+    @Test
+    fun saveRenamesSetsTheUnitMovesAndFilesTheCategoryInOneGo() {
+        val c = TestContainer.create()
+        c.add("2 onions", "1 carrot")
+        val vm = tracked(ListViewModel(c))
+        val ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
+        vm.openItem(ui.row("carrot").id)
+        val sheet = await(vm.sheet) { it != null }!!
+        assertEquals("1", sheet.amount)
+        assertTrue(sheet.groups.getValue(AisleCode.PRODUCE).isNotEmpty())
+        val changes =
+            ItemChanges(
+                name = "dragon fruit",
+                amount = "2 packet",
+                aisle = AisleCode.FROZEN,
+                alwaysAisle = true,
+                groupChanged = true,
+                group = "Exotic",
+            )
+        assertTrue(vm.saveItem(sheet.id, changes))
+        assertEquals("Saved", nextMessage(vm).text)
+        val row =
+            await(
+                vm.ui,
+            ) { u -> u.aisles.flatMap { it.second }.any { it.name == "dragon fruit" && it.group == "Exotic" } }.row("dragon fruit")
+        assertEquals(AisleCode.FROZEN, row.aisle)
+        assertTrue(row.main, row.main.startsWith("2 packet"))
+        assertNull(vm.sheet.value)
+        // The category is the ingredient's: an onion filed under one keeps it on the next list.
+        vm.openItem(ui.row("onion").id)
+        val onion = await(vm.sheet) { it?.name == "onion" }!!
+        vm.saveItem(onion.id, ItemChanges(groupChanged = true, group = "Salad"))
+        await(vm.ui) { it.row("onion").group == "Salad" }
+        assertEquals("Salad", c.catalog.lookup("onion")!!.group)
+    }
+
+    @Test
+    fun aRenameKeepsTheAisleTheFormShowed() {
+        val c = TestContainer.create()
+        c.add("2 onions")
+        val vm = tracked(ListViewModel(c))
+        val ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
+        vm.saveItem(ui.row("onion").id, ItemChanges(name = "grelots"))
+        assertEquals("Saved", nextMessage(vm).text)
+        val item = runBlocking { c.repository.snapshot() }.liveItems.single()
+        assertEquals("grelots" to AisleCode.PRODUCE, item.displayName to item.aisle)
     }
 
     @Test
@@ -349,7 +398,7 @@ class ListViewModelTest {
         // A move made from the onion's sheet doesn't close the carrot's, opened since.
         vm.openItem(onion)
         await(vm.sheet) { it?.id == onion }
-        vm.moveItem(onion, AisleCode.TINS_JARS, always = false)
+        vm.saveItem(onion, ItemChanges(aisle = AisleCode.TINS_JARS, alwaysAisle = false))
         vm.openItem(carrot)
         await(vm.ui) { it.row("onion").aisle == AisleCode.TINS_JARS }
         settle()
@@ -438,7 +487,9 @@ class ListViewModelTest {
         assertTrue(ui.secondStore)
         assertEquals(listOf(AisleCode.PRODUCE, AisleCode.DAIRY_EGGS), ui.aisles.map { it.first })
         vm.startShopping(2)
-        val second = await(vm.ui) { it.activeStore == 2L && it.shopping }
-        assertEquals(listOf(AisleCode.DAIRY_EGGS, AisleCode.PRODUCE), second.aisles.map { it.first })
+        // The store and its order arrive on separate flows: wait for the order, not the first frame shopping there.
+        val walked = listOf(AisleCode.DAIRY_EGGS, AisleCode.PRODUCE)
+        val second = await(vm.ui) { it.activeStore == 2L && it.shopping && it.aisles.map { a -> a.first } == walked }
+        assertEquals(walked, second.aisles.map { it.first })
     }
 }

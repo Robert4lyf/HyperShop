@@ -135,8 +135,7 @@ fun ListRoute(
         ItemSheetHost(
             s,
             ItemSheetActions(
-                onMove = { a, always -> vm.moveItem(s.id, a, always) },
-                onEditQuantity = { vm.editQuantity(s.id, it) },
+                onSave = { vm.saveItem(s.id, it) },
                 onDelete = { vm.delete(s.id, s.name) },
                 onSwap = { to, always -> vm.swapItem(s.id, to, always) },
                 onToggle = {

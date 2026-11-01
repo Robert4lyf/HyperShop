@@ -1266,6 +1266,21 @@ class ListRepository(
             shown
         }
 
+    /**
+     * Renames the item from its sheet: [swapItem], answering the id it is known by
+     * afterwards (the item it merged into, when that name was on the list already),
+     * or null when nothing changed.
+     */
+    suspend fun renameItem(
+        itemId: Long,
+        name: String,
+    ): Long? =
+        db.withTransaction {
+            swapItem(itemId, name) ?: return@withTransaction null
+            val l = load()
+            l.items[itemId]?.takeIf { it.deletedAt == null }?.id ?: l.aliases[itemId]
+        }
+
     /** [swapItem] for the item with this key, if one is on the list ("always use instead" set in the library). */
     suspend fun swapKey(
         mergeKey: String,

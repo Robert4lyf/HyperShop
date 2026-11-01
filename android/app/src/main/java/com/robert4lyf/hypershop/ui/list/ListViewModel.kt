@@ -92,6 +92,12 @@ data class ItemSheet(
     val done: Boolean = false,
     /** The row as the list shows it ("1 bulb garlic · 3 cloves"), for "This is wrong". */
     val shown: String = "",
+    /** The total as text to edit ("400 g"); blank when it is not one amount. */
+    val amount: String = "",
+    /** Its category within the aisle ("Herbs"), if it has one. */
+    val group: String? = null,
+    /** The categories each aisle has, to pick from. */
+    val groups: Map<AisleCode, List<String>> = emptyMap(),
 )
 
 /** One "From" row: "Weeknight chilli · 400 g", linked to the recipe's page when it has one. */
@@ -685,6 +691,9 @@ class ListViewModel(
                     entry != null,
                     list.isDone(id),
                     listOfNotNull(row.main, row.sub).joinToString(" · "),
+                    ItemEdit.text(list.total(id)),
+                    entry?.group,
+                    AisleCode.entries.associateWith { c.catalog.groupsIn(it) },
                 )
         }.also { openJob = it }
     }
@@ -737,28 +746,51 @@ class ListViewModel(
     /** After a change made from [id]'s sheet: closes it, unless another item's sheet is open by now. */
     private fun closeSheetOf(id: Long) = _sheet.update { if (it?.id == id) null else it }
 
-    fun moveItem(
+    /**
+     * The sheet's Save: every change at once, then the sheet closes. False, and nothing
+     * saved, when the amount has no number in it.
+     *
+     * The rename goes first, because a name can be another ingredient's, with its own
+     * aisle: the aisle on the form (as it was, or as picked) is then laid over that. A category belongs to
+     * the ingredient, so it is kept in the library and applies from now on; a name the
+     * library does not know becomes one of yours there, in the aisle it is in.
+     */
+    fun saveItem(
         id: Long,
-        aisle: AisleCode,
-        always: Boolean,
-    ) = viewModelScope.launch {
-        c.repository.moveAisle(id, aisle, always)
-        closeSheetOf(id)
-    }
-
-    /** Edit quantity: the new total; the difference becomes a manual contribution. False if [text] has no amount. */
-    fun editQuantity(
-        id: Long,
-        text: String,
+        ch: ItemChanges,
     ): Boolean {
-        val parsed = c.ruleParser.parse(text.trim() + " x")
-        val q = parsed.shopBase(UnitLocale.METRIC)
-        if (q.isPresence) return false
+        val total =
+            ch.amount?.let { text ->
+                c.ruleParser.parse(text.trim() + " x").shopBase(UnitLocale.METRIC).takeUnless { it.isPresence } ?: return false
+            }
         viewModelScope.launch {
-            c.repository.editQuantity(id, q)
+            val before = c.repository.snapshot().items[id]?.aisle
+            val itemId = ch.name?.let { c.repository.renameItem(id, it) } ?: id
+            total?.let { c.repository.editQuantity(itemId, it) }
+            // The aisle the form showed stays, unless another was picked: a new name the
+            // catalogue does not know would otherwise land in a guessed one.
+            val aisle = ch.aisle ?: before
+            if (aisle != null && c.repository.snapshot().items[itemId]?.aisle != aisle) {
+                c.repository.moveAisle(itemId, aisle, ch.aisle != null && ch.alwaysAisle)
+            }
+            if (ch.groupChanged) setGroup(itemId, ch.group)
             closeSheetOf(id)
+            messages.send(UiMessage("Saved"))
         }
         return true
+    }
+
+    private suspend fun setGroup(
+        itemId: Long,
+        group: String?,
+    ) {
+        val item = c.repository.snapshot().items[itemId] ?: return
+        val entry = item.catalogId?.let { c.catalog.byId[it] }
+        val edit =
+            entry?.let { EntryEdit.of(it).copy(group = group) }
+                ?: EntryEdit("", item.displayName, item.displayName, aisle = item.aisle.name, custom = true, group = group)
+        c.library.save(edit)
+        c.repository.rekeyIfCatalogChanged()
     }
 
     // ---- the "Add item" field (5.6b) ----------------------------------------------------
