@@ -92,6 +92,8 @@ data class SheetActions(
     val onInStock: (Boolean) -> Unit = {},
     /** Where a new name would go: "Joins maple syrup in Baking". */
     val renamePreview: (String) -> String? = { null },
+    /** False when the name is the row's own item under another word: Rename would change nothing. */
+    val renameChanges: (String) -> Boolean = { true },
     /** W.4 "This is wrong": what was expected, and whether to share the note too. */
     val onWrong: (String, Boolean) -> Unit = { _, _ -> },
 )
@@ -137,7 +139,8 @@ internal fun ReviewRowSheetHost(
                 onRemoveLine = vm::removeLine,
                 onSetAmount = vm::setAmount,
                 onInStock = { vm.setInStock(key, it) },
-                renamePreview = vm::renamePreview,
+                renamePreview = { vm.renamePreview(it, key) },
+                renameChanges = { vm.renameChanges(key, it) },
                 onWrong = { expected, share ->
                     scope.launch {
                         val text = vm.wrongNote(key, expected) ?: return@launch
@@ -193,7 +196,7 @@ fun ReviewRowSheet(
                 Icon(if (editing) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, contentDescription = null)
             }
             if (editing) {
-                key(sheet.key) { Rename(sheet.name, actions.onRename, actions.renamePreview) }
+                key(sheet.key) { Rename(sheet.name, actions.onRename, actions.renamePreview, actions.renameChanges) }
                 SectionLabel(if (sheet.lines.size == 1) "From the recipe" else "From the recipe (${sheet.lines.size} lines)")
                 for (line in sheet.lines) key(line.origin ?: line.id) { LineEditor(line, actions) }
             }
@@ -274,9 +277,12 @@ private fun Rename(
     current: String,
     onRename: (String) -> Unit,
     preview: (String) -> String?,
+    changes: (String) -> Boolean = { true },
 ) {
     var text by rememberSaveable { mutableStateOf(current.replaceFirstChar { it.uppercase() }) }
-    val changed = text.isNotBlank() && !text.trim().equals(current, ignoreCase = true)
+    val edited = text.isNotBlank() && !text.trim().equals(current, ignoreCase = true)
+    // Another word for the same item ("Salted butter" on butter) is said under the field, with no button that does nothing.
+    val changed = edited && changes(text)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         OutlinedTextField(
             value = text,
@@ -288,7 +294,7 @@ private fun Rename(
             keyboardActions = KeyboardActions(onDone = { if (changed) onRename(text) }),
             modifier = Modifier.fillMaxWidth().testTag("rename"),
         )
-        if (changed) {
+        if (edited) {
             preview(text)?.let {
                 Text(
                     it,
