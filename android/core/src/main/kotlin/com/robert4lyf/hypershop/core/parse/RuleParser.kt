@@ -7,6 +7,7 @@ import com.robert4lyf.hypershop.core.model.Dimension
 import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.QtyUnit
 import com.robert4lyf.hypershop.core.model.Rational
+import com.robert4lyf.hypershop.core.model.UnitLocale
 
 /**
  * The offline rule parser (PLAN §3.2, docs/parser-spec.md). Small on purpose:
@@ -292,13 +293,15 @@ class RuleParser(
                     val moreUnit = more?.let { readUnit() }
                     if (more == null || moreUnit == null) {
                         i = save
-                    } else if (moreUnit == unit && word(save) == "plus") {
-                        altQty = altQty?.let { if (qty!!.isZero) it else it * (qty!! + more) / qty!! }
-                        qty = qty!! + more
-                        qtyMax = qtyMax?.plus(more)
+                    } else if (word(save) == "plus" && compatibleExtra(more, moreUnit, unit) != null) {
+                        val added = compatibleExtra(more, moreUnit, unit)!!
+                        altQty = altQty?.let { if (qty!!.isZero) it else it * (qty!! + added) / qty!! }
+                        qty = qty!! + added
+                        qtyMax = qtyMax?.plus(added)
                         summed = true
                     } else {
                         notes += span(save, i)
+                        flag("Extra amount uses a different measure; check the original line")
                     }
                 }
             } else {
@@ -751,7 +754,27 @@ class RuleParser(
                 flag("\"plus\" an amount of something else")
                 return null
             }
-            return more.takeIf { moreUnit == unit }
+            val converted = compatibleExtra(more, moreUnit, unit)
+            if (converted == null) flag("Extra amount uses a different measure; check the original line")
+            return converted
+        }
+
+        /** No density or pack-size guesses: only equal count units or a shared physical dimension. */
+        private fun compatibleExtra(
+            more: Rational,
+            from: QtyUnit?,
+            to: QtyUnit?,
+        ): Rational? {
+            if (from == to) return more
+            if (from == null || to == null || from.dimension != to.dimension || from.dimension == Dimension.COUNT) return null
+            val ratios =
+                UnitLocale.entries.map { locale ->
+                    val a = from.baseFactor(locale) ?: return null
+                    val b = to.baseFactor(locale) ?: return null
+                    a / b
+                }.distinct()
+            // Parsing has no source locale yet. Cups/fl oz/pints must wait for review when their ratios differ.
+            return ratios.singleOrNull()?.let { more * it }
         }
 
         /** A dash with whitespace on both sides. */

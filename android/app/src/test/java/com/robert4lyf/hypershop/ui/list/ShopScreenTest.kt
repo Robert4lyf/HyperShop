@@ -52,6 +52,7 @@ class ShopScreenTest {
             onFinish = { events += "finish" },
             onClearAll = { events += "clear" },
             onMode = { events += "mode $it" },
+            onShop = { events += "shop $it" },
             onUnavailable = { events += "unavailable ${it.id}" },
             onAvailable = { events += "available ${it.id}" },
         )
@@ -70,7 +71,7 @@ class ShopScreenTest {
         compose.onNodeWithTag("add-item").assertDoesNotExist()
         compose.onNodeWithTag("in-stock").assertDoesNotExist()
         compose.onNodeWithTag("shop-left").assertTextContains("5 left")
-        compose.onNodeWithText("1 of 6 bought · Now: Produce").assertExists()
+        compose.onNodeWithText("1 of 6 bought · Now: Produce · My store").assertExists()
         compose.onNodeWithTag("shop-plan").performClick()
         assertEquals(listOf("mode PLAN"), events)
     }
@@ -84,7 +85,7 @@ class ShopScreenTest {
             )
         show(ui)
         compose.onNodeWithTag("shop-left").assertTextContains("4 left")
-        compose.onNodeWithText("1 of 6 bought · 1 not available · Now: Produce").assertExists()
+        compose.onNodeWithText("1 of 6 bought · 1 not available · Now: Produce · My store").assertExists()
         compose.onNodeWithText("Not available today").assertExists()
         compose.onNodeWithText("1 for next time").assertExists()
         compose.onNodeWithTag("unavailable-5").assertDoesNotExist()
@@ -92,6 +93,7 @@ class ShopScreenTest {
         // A bought row has nothing to set aside.
         compose.onNodeWithTag("unavailable-3").assertDoesNotExist()
         compose.onNodeWithTag("unavailable-2").performClick()
+        compose.onNodeWithText("Set aside").performClick()
         assertEquals(listOf("available 5", "unavailable 2"), events)
         compose.onRoot().captureRoboImage(Shots.path("shop-not-available.png"))
     }
@@ -101,7 +103,7 @@ class ShopScreenTest {
         var ui by mutableStateOf(SAMPLE_LIST)
         compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions) } }
         compose.onNodeWithTag("start-shopping").performClick()
-        assertEquals(listOf("mode SHOP"), events)
+        assertEquals(listOf("shop 1"), events)
         ui = ListUi(loaded = true)
         compose.onNodeWithTag("start-shopping").assertDoesNotExist()
         // An empty list in shopping mode is the planning screen: there is nothing to walk.
@@ -120,7 +122,8 @@ class ShopScreenTest {
         compose.onNodeWithText("1 bought").assertExists()
         toggle.performClick()
         compose.onNodeWithTag("item-3").assertExists()
-        assertEquals("Bought", compose.onNodeWithTag("tick-3").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
+        assertEquals("Bought", compose.onNodeWithTag("item-3").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
+        assertNull(compose.onNodeWithTag("tick-3").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
         // Unticking from the shown bought rows is the same tick target as always.
         compose.onNodeWithTag("tick-3").performClick()
         assertEquals(listOf("toggle 3"), events)

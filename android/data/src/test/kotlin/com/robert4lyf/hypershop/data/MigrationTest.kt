@@ -26,6 +26,34 @@ class MigrationTest {
     @get:Rule val helper = MigrationTestHelper(InstrumentationRegistry.getInstrumentation(), HyperShopDatabase::class.java)
 
     @Test
+    fun schemaTwelveKeepsTheSharedArrangementAtBothStores() {
+        helper.createDatabase(name, 12).apply {
+            execSQL("INSERT INTO StoreProfile (id,name) VALUES (1,'Local'),(2,'Weekend')")
+            execSQL("INSERT INTO ShelfRank (`key`,rank) VALUES ('g:PRODUCE:Herbs',7)")
+            close()
+        }
+        val db =
+            helper.runMigrationsAndValidate(
+                name,
+                16,
+                true,
+                HyperShopDatabase.MIGRATION_12_13,
+                HyperShopDatabase.MIGRATION_13_14,
+                HyperShopDatabase.MIGRATION_14_15,
+                HyperShopDatabase.MIGRATION_15_16,
+            )
+        val rows = db.query("SELECT storeId,rank FROM ShelfRank ORDER BY storeId")
+        assertTrue(rows.moveToFirst())
+        assertEquals(1L, rows.getLong(0))
+        assertEquals(7, rows.getInt(1))
+        assertTrue(rows.moveToNext())
+        assertEquals(2L, rows.getLong(0))
+        assertEquals(7, rows.getInt(1))
+        rows.close()
+        db.close()
+    }
+
+    @Test
     fun recipesOnTheListJoinTheLibraryAndTheLiveKeyIndexSurvives() {
         helper.createDatabase(name, 1).apply {
             // As a real v1 install has it: made in onCreate, outside Room's schema.
@@ -63,6 +91,10 @@ class MigrationTest {
                     HyperShopDatabase.MIGRATION_9_10,
                     HyperShopDatabase.MIGRATION_10_11,
                     HyperShopDatabase.MIGRATION_11_12,
+                    HyperShopDatabase.MIGRATION_12_13,
+                    HyperShopDatabase.MIGRATION_13_14,
+                    HyperShopDatabase.MIGRATION_14_15,
+                    HyperShopDatabase.MIGRATION_15_16,
                 )
                 .allowMainThreadQueries()
                 .build()
@@ -99,6 +131,10 @@ class MigrationTest {
                     HyperShopDatabase.MIGRATION_9_10,
                     HyperShopDatabase.MIGRATION_10_11,
                     HyperShopDatabase.MIGRATION_11_12,
+                    HyperShopDatabase.MIGRATION_12_13,
+                    HyperShopDatabase.MIGRATION_13_14,
+                    HyperShopDatabase.MIGRATION_14_15,
+                    HyperShopDatabase.MIGRATION_15_16,
                 )
                 .allowMainThreadQueries()
                 .build()

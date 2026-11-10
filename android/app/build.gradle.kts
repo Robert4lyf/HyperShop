@@ -45,6 +45,26 @@ android {
     }
 
     signingConfigs {
+        val signingInputs =
+            listOf(
+                "HYPERSHOP_RELEASE_KEYSTORE",
+                "HYPERSHOP_RELEASE_STORE_PASSWORD",
+                "HYPERSHOP_RELEASE_KEY_ALIAS",
+                "HYPERSHOP_RELEASE_KEY_PASSWORD",
+            ).map { providers.environmentVariable(it).orNull }
+        require(signingInputs.none { !it.isNullOrBlank() } || signingInputs.all { !it.isNullOrBlank() }) {
+            "Private release signing requires all four HYPERSHOP_RELEASE_* environment variables"
+        }
+        // Optional private release identity. Never falls back to the public debug key.
+        val signingPath = providers.environmentVariable("HYPERSHOP_RELEASE_KEYSTORE").orNull
+        if (signingPath != null) {
+            create("privateRelease") {
+                storeFile = file(signingPath)
+                storePassword = providers.environmentVariable("HYPERSHOP_RELEASE_STORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("HYPERSHOP_RELEASE_KEY_ALIAS").get()
+                keyPassword = providers.environmentVariable("HYPERSHOP_RELEASE_KEY_PASSWORD").get()
+            }
+        }
         // Committed debug keystore (from BangGym): every build, local or CI,
         // signs with the same key so each APK installs over the last.
         getByName("debug") {
@@ -62,6 +82,7 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
         release {
+            signingConfig = signingConfigs.findByName("privateRelease")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

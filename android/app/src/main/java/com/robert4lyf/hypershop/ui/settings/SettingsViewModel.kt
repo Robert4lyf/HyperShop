@@ -42,7 +42,9 @@ data class SettingsUi(
     val staples: List<String> = emptyList(),
     val aisles: List<AisleCode> = emptyList(),
     /** Whose walking order [aisles] is: 1, or 2 for the second store (missing 4 of the review). */
+    val backupHealth: String? = null,
     val editingStore: Long = 1,
+    val storeNames: Map<Long, String> = emptyMap(),
     val claudeAlways: Boolean = true,
     /** W.4: "This is wrong" notes saved on the phone. */
     val wrongNotes: Int = 0,
@@ -138,6 +140,17 @@ class SettingsViewModel(
                 _ui.update { it.copy(hasKey = v, keyMissingAfterRestore = keyWasSet && !v) }
             }
         }
+        watch(backups.health) { value ->
+            val parts = value?.split('|')
+            val time = parts?.firstOrNull()?.toLongOrNull()
+            val text =
+                time?.let {
+                    "Last manual backup: ${java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate()} · " +
+                        "${parts.getOrNull(1) ?: "0"} photos included · ${parts.getOrNull(2) ?: "0"} missing"
+                }
+            copy(backupHealth = text)
+        }
+        watch(c.repository.observeStores()) { rows -> copy(storeNames = rows.associate { it.id to it.name }) }
         watch(c.repository.observeStaples()) { keys -> copy(staples = keys.map(::stapleName).sorted()) }
         val startUp =
             viewModelScope.launch {
@@ -241,6 +254,11 @@ class SettingsViewModel(
         viewModelScope.launch {
             val order = aisleWrites.withLock { c.repository.aisleOrder(id) }
             _ui.update { it.copy(editingStore = id, aisles = order) }
+        }
+
+    fun renameStore(name: String) =
+        viewModelScope.launch {
+            c.repository.renameStore(_ui.value.editingStore, name)
         }
 
     /** Settings › Always at home › "Ran out" (missing 5 of the review): on the list once, still always at home. */

@@ -138,8 +138,29 @@ class BackupManager(
     /** Every field written, defaults included: a backup must say what it is (format, version) and leave nothing implied. */
     private val writer = Json { encodeDefaults = true }
 
+    private val healthFile = File(c.context.noBackupFilesDir, "manual-backup-health.txt")
+    val health = kotlinx.coroutines.flow.MutableStateFlow(runCatching { healthFile.readText() }.getOrNull())
+
+    private fun recordExport(summary: BackupSummary) {
+        val value = "${c.clock()}|${summary.photos}|${summary.missingPhotos}"
+        // Only called after the provider's output stream has closed successfully.
+        runCatching {
+            val atomic = android.util.AtomicFile(healthFile)
+            val stream = atomic.startWrite()
+            try {
+                stream.write(value.toByteArray())
+                atomic.finishWrite(stream)
+            } catch (e: Exception) {
+                atomic.failWrite(stream)
+                throw e
+            }
+            health.value = value
+        }.onFailure { Timber.w(it, "Export succeeded but its health record could not be saved") }
+    }
+
     /** The current data as a file value. */
     suspend fun snapshot(): BackupFile {
+        c.flushLibraryEdits()
         val s = c.settings
         return BackupFile(
             createdAt = c.clock(),
@@ -198,7 +219,7 @@ class BackupManager(
                         } ?: context.contentResolver.openOutputStream(uri, "w") ?: throw IOException("could not open the file")
                     out.use { BackupArchive.write(it, file.createdAt, jsonOf(file).toByteArray(), files) }
                     val s = summary(file, files.map { it.name }.toSet())
-                    s.copy(missingPhotos = names.size - files.size)
+                    s.copy(missingPhotos = names.size - files.size).also(::recordExport)
                 }
             }.onFailure { Timber.w(it, "Backup failed") }
         }

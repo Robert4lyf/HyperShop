@@ -72,13 +72,13 @@ class Rational private constructor(
 
         /**
          * The nearest fraction with a denominator from the cookery set
-         * (1, 2, 3, 4, 8, 16, 100, 1000), within 1e-6; else thousandths.
+         * (1, 2, 3, 4, 6, 8, 16, 100, 1000), within 1e-6; else thousandths.
          * Used for decimals from JSON (golden data, Claude) so 0.333 stays 0.333
          * but 0.3333333 becomes ⅓.
          */
         fun fromDouble(d: Double): Rational {
             require(d.isFinite()) { "not finite: $d" }
-            for (den in longArrayOf(1, 2, 3, 4, 8, 16, 100, 1000)) {
+            for (den in longArrayOf(1, 2, 3, 4, 6, 8, 16, 100, 1000)) {
                 val n = (d * den).roundToLong()
                 if (abs(n.toDouble() / den - d) < 1e-6) return of(n, den)
             }

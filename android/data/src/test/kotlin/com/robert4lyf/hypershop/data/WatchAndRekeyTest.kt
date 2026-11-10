@@ -92,7 +92,11 @@ class WatchAndRekeyTest {
             w.execSQL("INSERT INTO Item VALUES (900,'name:zucchini',NULL,'zucchini','zucchini','OTHER',5,3,NULL,0,NULL,NULL)")
             val use = r.db.dao().uses().first().id
             val two = "'{\"parts\":{\"count\":\"2\"}}'"
-            w.execSQL("INSERT INTO Contribution VALUES (901,$use,NULL,900,$two,0,1,NULL,NULL)")
+            w.execSQL(
+                "INSERT INTO Contribution " +
+                    "(id,useId,recipeLineId,itemId,qtyBase,noScale,createdListRev,coveredBy,unitHint) " +
+                    "VALUES (901,$use,NULL,900,$two,0,1,NULL,NULL)",
+            )
             w.execSQL("UPDATE Meta SET catalogVersion = 'old', nextId = 1000")
             assertTrue(r.repo.rekeyIfCatalogChanged())
             assertFalse(r.repo.rekeyIfCatalogChanged())

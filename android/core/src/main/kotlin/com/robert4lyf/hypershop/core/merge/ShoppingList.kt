@@ -96,6 +96,8 @@ data class Contribution(
     val coveredBy: Long? = null,
     /** The line's own unit, for the "as written" units setting. */
     val unitHint: QtyUnit? = null,
+    /** Portion of this covered requirement supplied from home. Null is a pre-v16 tick. */
+    val homeUsed: QtyBase? = null,
 )
 
 data class Tick(
@@ -216,7 +218,55 @@ data class ShoppingList(
     /** What is still to buy: the unbought need less what is at home ([ListItem.onHand]). */
     fun toBuy(itemId: Long): QtyBase {
         val need = uncovered(itemId)
-        return items[itemId]?.onHand?.let { need.minusClamped(it) } ?: need
+        val home = items[itemId]?.onHand?.minusClamped(homeConsumed(itemId)) ?: return need
+        // Home deductions belong to recipe requirements, never deliberately added manual extras.
+        val recipeNeed =
+            contributionsOf(itemId).filter { it.coveredBy == null && uses[it.useId]?.kind == UseKind.RECIPE }
+                .fold(QtyBase.PRESENCE) { q, c -> q + c.qty }
+        val deduction =
+            QtyBase(
+                home.parts.mapValues {
+                        (k, v) ->
+                    v.min(recipeNeed.parts[k] ?: Rational.ZERO)
+                }.filterValues { it > Rational.ZERO },
+            )
+        return need.minusClamped(deduction)
+    }
+
+    /** Home stock is allocated once per covered requirement, never deducted again after a servings increase. */
+    fun homeConsumed(itemId: Long): QtyBase {
+        val home = items[itemId]?.onHand ?: QtyBase.PRESENCE
+        val covered = contributionsOf(itemId).filter { it.coveredBy != null && uses[it.useId]?.kind == UseKind.RECIPE }
+        val explicit = covered.fold(QtyBase.PRESENCE) { q, c -> q + (c.homeUsed ?: QtyBase.PRESENCE) }
+        val legacy = covered.filter { it.homeUsed == null }.fold(QtyBase.PRESENCE) { q, c -> q + c.qty }
+        val inferred = home.minusClamped(explicit).let { available -> available.minusClamped(available.minusClamped(legacy)) }
+        return explicit + inferred
+    }
+
+    fun purchased(itemId: Long): QtyBase = covered(itemId).minusClamped(homeConsumed(itemId))
+
+    private fun cover(
+        ids: Set<Long>,
+        tickId: Long,
+        itemId: Long,
+    ): List<Contribution> {
+        var available = items[itemId]?.onHand?.minusClamped(homeConsumed(itemId)) ?: QtyBase.PRESENCE
+        return contributions.map { c ->
+            if (c.id !in ids) {
+                c
+            } else {
+                val home =
+                    if (uses[c.useId]?.kind == UseKind.RECIPE) {
+                        c.qty.minusClamped(
+                            c.qty.minusClamped(available),
+                        )
+                    } else {
+                        QtyBase.PRESENCE
+                    }
+                available = available.minusClamped(home)
+                c.copy(coveredBy = tickId, homeUsed = home)
+            }
+        }
     }
 
     /** Y.19: [qty] of the item is at home (null: none said); bumps its rev, as the row's text changes. */
@@ -258,7 +308,7 @@ data class ShoppingList(
         val t = Tick(nextId, itemId, at, source)
         return copy(
             ticks = ticks + t,
-            contributions = contributions.map { if (it.itemId == itemId && it.coveredBy == null) it.copy(coveredBy = t.id) else it },
+            contributions = cover(contributionsOf(itemId).filter { it.coveredBy == null }.map { it.id }.toSet(), t.id, itemId),
             // Found after all: no longer set aside.
             items = items.mapValues { (id, i) -> if (id == itemId) i.copy(unavailableAt = null) else i },
             nextId = nextId + 1,
@@ -270,7 +320,7 @@ data class ShoppingList(
         val t = ticks.lastOrNull { it.itemId == itemId } ?: return null
         return copy(
             ticks = ticks - t,
-            contributions = contributions.map { if (it.coveredBy == t.id) it.copy(coveredBy = null) else it },
+            contributions = contributions.map { if (it.coveredBy == t.id) it.copy(coveredBy = null, homeUsed = null) else it },
         ).bumped(setOf(itemId))
     }
 
@@ -374,7 +424,7 @@ data class ShoppingList(
         val l =
             copy(
                 ticks = ticks + t,
-                contributions = contributions.map { if (it.id in toCover) it.copy(coveredBy = t.id) else it },
+                contributions = cover(toCover, t.id, itemId),
                 // Found after all, as a phone tick says: a wrist tick on an item set aside here brings it back.
                 items = items.mapValues { (id, i) -> if (id == itemId) i.copy(unavailableAt = null) else i },
                 nextId = nextId + 1,
@@ -393,7 +443,7 @@ data class ShoppingList(
         val l =
             copy(
                 ticks = ticks - t,
-                contributions = contributions.map { if (it.coveredBy == t.id) it.copy(coveredBy = null) else it },
+                contributions = contributions.map { if (it.coveredBy == t.id) it.copy(coveredBy = null, homeUsed = null) else it },
             ).bumped(setOf(itemId))
         return l to if (l.isDone(itemId)) WatchTickResult.STILL_DONE else WatchTickResult.OK
     }
@@ -459,7 +509,7 @@ data class ShoppingList(
         val cs =
             r.contributions.map { c ->
                 val moved = redirect[c.itemId]?.let { c.copy(itemId = it) } ?: c
-                if (moved.coveredBy != null && moved.coveredBy !in tickIds) moved.copy(coveredBy = null) else moved
+                if (moved.coveredBy != null && moved.coveredBy !in tickIds) moved.copy(coveredBy = null, homeUsed = null) else moved
             }
         val ts = r.ticks.map { t -> redirect[t.itemId]?.let { t.copy(itemId = it) } ?: t }
         return copy(
@@ -553,6 +603,13 @@ data class ShoppingList(
                         noScale = if (news.isEmpty()) true else first.noScale,
                         createdListRev = rev,
                         coveredBy = coveredBy, unitHint = news.firstOrNull()?.unitHint ?: first.unitHint,
+                        homeUsed =
+                            cs.mapNotNull { it.homeUsed }.reduceOrNull {
+                                    a,
+                                    b,
+                                ->
+                                a + b
+                            }?.let { it.minusClamped(it.minusClamped(rowKeep)) },
                     )
                 touched += row.id
             }
@@ -721,7 +778,7 @@ data class ShoppingList(
         val back =
             w.contributions
                 .filter { it.id !in have && it.useId in l.uses }
-                .map { c -> (redirect[c.itemId]?.let { c.copy(itemId = it) } ?: c).copy(coveredBy = null) }
+                .map { c -> (redirect[c.itemId]?.let { c.copy(itemId = it) } ?: c).copy(coveredBy = null, homeUsed = null) }
                 .filter { it.itemId in l.items }
         if (back.isEmpty()) return null
         return l.copy(contributions = l.contributions + back).bumped(back.map { it.itemId }.toSet())
@@ -844,7 +901,20 @@ data class ShoppingList(
         }
         val rev = maxOf(existing.rev, item.rev) + 1
         return copy(
-            items = items - itemId + (existing.id to existing.copy(rev = rev - 1)),
+            items =
+                items - itemId + (
+                    existing.id to
+                        existing.copy(
+                            rev = rev - 1,
+                            onHand =
+                                listOfNotNull(existing.onHand, item.onHand).reduceOrNull {
+                                        a,
+                                        b,
+                                    ->
+                                    a + b
+                                },
+                        )
+                ),
             contributions = contributions.map { if (it.itemId == itemId) it.copy(itemId = existing.id) else it },
             ticks = ticks.map { if (it.itemId == itemId) it.copy(itemId = existing.id) else it },
             aliases = aliases + (itemId to existing.id),

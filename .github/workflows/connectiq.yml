@@ -21,6 +21,8 @@ name: Connect IQ
 # "Connect IQ result" passes when it was skipped or passed and fails otherwise.
 
 on:
+  push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 

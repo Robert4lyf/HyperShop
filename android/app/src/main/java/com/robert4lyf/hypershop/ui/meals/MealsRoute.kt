@@ -115,7 +115,7 @@ data class MealsActions(
     val onHave: (List<HomeRow>) -> Unit = {},
     val onNeed: (HomeRow) -> Unit = {},
     /** Y.19: some of it at home ("300 g"), and taking that back. */
-    val onHaveSome: (HomeRow, String) -> Unit = { _, _ -> },
+    val onHaveSome: (HomeRow, String, (String?) -> Unit) -> Unit = { _, _, done -> done(null) },
     val onClearSome: (HomeRow) -> Unit = {},
     /** Y.21: lines typed under Miscellaneous (household things, extras). */
     val onAddMisc: (String) -> Unit = {},
@@ -172,7 +172,7 @@ fun MealsRoute(
             onHide = { vm.hide(it) },
             onHave = vm::have,
             onNeed = vm::need,
-            onHaveSome = { r, t -> vm.haveSome(r, t) },
+            onHaveSome = { r, t, done -> vm.haveSome(r, t, done) },
             onClearSome = vm::clearSome,
             onAddMisc = vm::addMisc,
             onStartShopping = {
@@ -200,6 +200,8 @@ fun MealsScreen(
     /** Y.21: what is on the shopping list without a recipe. */
     misc: List<String> = emptyList(),
 ) {
+    var allFood by rememberSaveable { mutableStateOf(false) }
+    val shownHome = ui.home.filter { allFood || it.likelyCupboard }
     var allPicks by rememberSaveable { mutableStateOf(false) }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().imePadding()) {
@@ -242,8 +244,16 @@ fun MealsScreen(
                 }
                 if (ui.loaded && ui.isCurrent) item(key = "misc") { MiscSection(misc, actions.onAddMisc) }
                 if (ui.isCurrent && ui.home.isNotEmpty()) {
-                    item(key = "home-label") { HomeHeader(ui, actions) }
-                    items(ui.home, key = { "home-${it.mergeKey}" }) { r -> HomeRowItem(r, actions) }
+                    item(key = "home-label") {
+                        HomeHeader(ui.copy(home = shownHome), actions)
+                        TextButton(
+                            onClick = { allFood = !allFood },
+                            modifier = Modifier.padding(horizontal = 16.dp).testTag("home-all-food"),
+                        ) {
+                            Text(if (allFood) "Show likely cupboard items" else "Include fridge, freezer and fresh food (${ui.home.size})")
+                        }
+                    }
+                    items(shownHome, key = { "home-${it.mergeKey}" }) { r -> HomeRowItem(r, actions) }
                 }
                 if (ui.loaded && !ui.hasLibrary) {
                     item(key = "none") {
@@ -543,7 +553,7 @@ private fun HomeHeader(
             }
         }
         Text(
-            "Cupboard things the meals need. Have it takes it off this shopping list.",
+            "Check what I already have for this shop. Have it takes unbought recipe amounts off the list.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -600,44 +610,73 @@ private fun MiscSection(
 
 /** Y.19: how much of [r] is in the cupboard, against what the week's recipes need together. */
 @Composable
-private fun HaveSomeDialog(
+internal fun HaveSomeDialog(
     r: HomeRow,
-    onSet: (String) -> Unit,
+    onSet: (String, (String?) -> Unit) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var text by remember { mutableStateOf("") }
+    var text by rememberSaveable(r.mergeKey) {
+        mutableStateOf(
+            r.exactOnHand?.let(com.robert4lyf.hypershop.ui.list.ItemEdit::text) ?: r.onHand.orEmpty(),
+        )
+    }
+    var invalid by rememberSaveable(r.mergeKey) { mutableStateOf(false) }
+    var failure by rememberSaveable(r.mergeKey) { mutableStateOf<String?>(null) }
+    var submitting by remember(r.mergeKey) { mutableStateOf(false) }
+    val error = failure ?: "Enter a positive amount using the requirement's measure, e.g. 300 g.".takeIf { invalid }
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!submitting) onDismiss() },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).testTag("home-some-dialog"),
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
         title = { Text("How much ${r.name} is at home?") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 r.needed?.let { Text("The recipes need $it together. Only the rest goes on the shopping list.") }
                 OutlinedTextField(
                     value = text,
-                    onValueChange = { text = it },
-                    label = { Text(r.needed?.let { "e.g. half of $it" } ?: "e.g. 300 g") },
+                    onValueChange = {
+                        text = it
+                        invalid = false
+                        failure = null
+                    },
+                    enabled = !submitting,
+                    label = { Text("Amount at home") },
+                    placeholder = { Text("e.g. 300 g or 1/2 kg") },
+                    isError = error != null,
+                    supportingText = error?.let { message -> ({ Text(message) }) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().testTag("home-some-amount"),
                 )
             }
         },
         confirmButton = {
-            TextButton(enabled = text.isNotBlank(), onClick = {
-                onSet(text)
-                onDismiss()
-            }, modifier = Modifier.testTag("home-some-set")) { Text("Set") }
+            TextButton(enabled = text.isNotBlank() && !submitting, onClick = {
+                val entered = com.robert4lyf.hypershop.core.parse.QuantityInput.parse(text)
+                val required = r.needed?.let(com.robert4lyf.hypershop.core.parse.QuantityInput::parse)
+                invalid = entered == null || (required != null && entered.keys.any { it !in required.keys })
+                if (!invalid) {
+                    submitting = true
+                    failure = null
+                    onSet(text) { message ->
+                        submitting = false
+                        if (message == null) onDismiss() else failure = message
+                    }
+                }
+            }, modifier = Modifier.testTag("home-some-set")) { Text(if (submitting) "Saving…" else "Set") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(enabled = !submitting, onClick = onDismiss) { Text("Cancel") } },
     )
 }
 
 /** One ingredient, one decision: "Have" or "Need", however many recipes want it. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HomeRowItem(
     r: HomeRow,
     actions: MealsActions,
 ) {
-    Row(
+    val focus = androidx.compose.ui.platform.LocalFocusManager.current
+    Column(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
@@ -646,46 +685,59 @@ private fun HomeRowItem(
             .heightIn(min = 56.dp)
             .padding(start = 14.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
             .testTag("home-${r.mergeKey}"),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         // One TalkBack node for the name and what it is for; the button stays its own.
-        Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}) {
+        Column(Modifier.semantics(mergeDescendants = true) {}) {
             Text(r.name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleSmall)
             Text(
                 listOfNotNull(
                     // Y.19: what all the recipes need together, and what was said to be in already.
                     listOfNotNull(r.needed, "for ${r.from.joinToString(", ")}").joinToString(" "),
                     r.onHand?.let { "$it at home" },
+                    r.remaining?.let { "Buy $it" },
                     "usually at home".takeIf { r.usual },
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
             )
         }
-        if (r.have) {
-            Text(
-                "At home",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.padding(horizontal = 8.dp),
-            )
-            TextButton(onClick = { actions.onNeed(r) }, modifier = Modifier.testTag("home-need-${r.mergeKey}")) { Text("Need it") }
-        } else {
-            var asking by remember { mutableStateOf(false) }
-            if (r.onHand != null) {
-                TextButton(
-                    onClick = { actions.onClearSome(r) },
-                    modifier = Modifier.testTag("home-clear-${r.mergeKey}"),
-                ) { Text("Need all") }
-            } else if (r.needed != null) {
-                TextButton(onClick = { asking = true }, modifier = Modifier.testTag("home-some-${r.mergeKey}")) { Text("Some") }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (r.have) {
+                Text(
+                    "At home",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
+                TextButton(onClick = { actions.onNeed(r) }, modifier = Modifier.testTag("home-need-${r.mergeKey}")) { Text("Need it") }
+            } else {
+                var asking by rememberSaveable(r.mergeKey) { mutableStateOf(false) }
+                if (r.needed != null) {
+                    TextButton(onClick = {
+                        focus.clearFocus()
+                        asking = true
+                    }, modifier = Modifier.testTag("home-some-${r.mergeKey}")) {
+                        Text(if (r.onHand != null) "Edit amount" else "Have some")
+                    }
+                }
+                if (r.onHand != null) {
+                    TextButton(
+                        onClick = { actions.onClearSome(r) },
+                        modifier = Modifier.testTag("home-clear-${r.mergeKey}"),
+                    ) { Text("Need all") }
+                }
+                OutlinedButton(onClick = { actions.onHave(listOf(r)) }, modifier = Modifier.testTag("home-have-${r.mergeKey}")) {
+                    Text("Have it")
+                }
+                if (asking) {
+                    HaveSomeDialog(
+                        r,
+                        onSet = { text, done -> actions.onHaveSome(r, text, done) },
+                        onDismiss = { asking = false },
+                    )
+                }
             }
-            OutlinedButton(onClick = { actions.onHave(listOf(r)) }, modifier = Modifier.testTag("home-have-${r.mergeKey}")) {
-                Text("Have it")
-            }
-            if (asking) HaveSomeDialog(r, onSet = { actions.onHaveSome(r, it) }, onDismiss = { asking = false })
         }
     }
 }

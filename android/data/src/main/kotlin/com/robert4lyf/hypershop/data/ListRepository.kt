@@ -26,6 +26,7 @@ import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.QtyUnit
+import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.parse.Normaliser
 import com.robert4lyf.hypershop.core.plan.Week
@@ -195,6 +196,20 @@ class ListRepository(
      * The walking order of [storeId] (1 is the store the app starts with; 2 the second store, missing 4 of the
      * review). A store with no order of its own yet walks like store 1.
      */
+    fun observeStores(): Flow<List<StoreProfileEntity>> = dao.observeStores()
+
+    suspend fun storeProfiles(): List<StoreProfileEntity> = dao.stores()
+
+    suspend fun renameStore(
+        id: Long,
+        name: String,
+    ) = db.withTransaction {
+        require(id in 1L..2L && name.trim().length in 1..80) { "Enter a store name (up to 80 characters)" }
+        dao.putStore(StoreProfileEntity(id, name.trim()))
+        touchListRev()
+        secondStoreCache = null
+    }
+
     suspend fun aisleOrder(storeId: Long = 1): List<AisleCode> {
         val hidden = dao.aisles().filter { it.hidden }.map { it.code }.toSet()
         val rows = dao.aisleOrder(storeId).ifEmpty { dao.aisleOrder(1) }
@@ -236,25 +251,33 @@ class ListRepository(
      * re-reads the walking order) reads nothing more for it; [arrange] and a restore
      * are the only writes.
      */
-    @Volatile private var shelfCache: ShelfOrder? = null
+    @Volatile private var shelfCache: Map<Long, ShelfOrder>? = null
 
-    suspend fun shelfOrder(): ShelfOrder =
-        shelfCache ?: ShelfOrder(dao.shelfRanks().associate { it.key to it.rank }).also { shelfCache = it }
+    suspend fun shelfOrder(storeId: Long = 1): ShelfOrder {
+        val orders =
+            shelfCache ?: dao.shelfRanks().groupBy { it.storeId }
+                .mapValues { (_, rows) -> ShelfOrder(rows.associate { it.key to it.rank }) }.also { shelfCache = it }
+        return orders[storeId] ?: ShelfOrder(emptyMap())
+    }
 
     /** The walking order and the order within aisles together, re-read whenever listRev changes. */
     fun observeWalkingOrder(storeId: Long = 1): Flow<Pair<List<AisleCode>, ShelfOrder>> =
-        dao.observeListRev().filterNotNull().distinctUntilChanged().map { aisleOrder(storeId) to shelfOrder() }.distinctUntilChanged()
+        dao.observeListRev().filterNotNull().distinctUntilChanged()
+            .map { aisleOrder(storeId) to shelfOrder(storeId) }.distinctUntilChanged()
 
     /**
      * Read-move-write in one transaction (review A.8): two quick taps on the arrows each move from the
      * order the other left, instead of the second overwriting the first. False when [move] had nothing to do.
      */
-    suspend fun arrangeWith(move: (ShelfOrder) -> ShelfOrder?): Boolean =
+    suspend fun arrangeWith(
+        storeId: Long = 1,
+        move: (ShelfOrder) -> ShelfOrder?,
+    ): Boolean =
         try {
             db.withTransaction {
-                val next = move(shelfOrder()) ?: return@withTransaction false
-                dao.putShelfRanks(next.ranks.map { (k, r) -> ShelfRankEntity(k, r) })
-                shelfCache = next
+                val next = move(shelfOrder(storeId)) ?: return@withTransaction false
+                dao.putShelfRanks(next.ranks.map { (k, r) -> ShelfRankEntity(k, r, storeId) })
+                shelfCache = shelfCache.orEmpty() + (storeId to next)
                 val meta = dao.meta()!!
                 dao.putMeta(meta.copy(listRev = meta.listRev + 1))
                 true
@@ -270,18 +293,30 @@ class ListRepository(
         from: String,
         to: String,
     ) {
-        val next = shelfOrder().renamed(from, to) ?: return
-        dao.deleteShelfRanks(shelfOrder().ranks.keys.filter { it.startsWith("i:") && it.endsWith(":$from") })
-        dao.putShelfRanks(next.ranks.map { (k, r) -> ShelfRankEntity(k, r) })
-        shelfCache = next
+        // A newly catalogued custom name keeps its pack preference. Existing destination choices win.
+        val packs = dao.storePacks()
+        val copied =
+            packs.filter { p -> p.key == from && packs.none { it.storeId == p.storeId && it.key == to } }
+                .map { it.copy(key = to) }
+        if (copied.isNotEmpty()) dao.putStorePacks(copied)
+        for (store in dao.stores()) {
+            val order = shelfOrder(store.id)
+            val next = order.renamed(from, to) ?: continue
+            dao.deleteStoreShelfRanks(store.id, order.ranks.keys.filter { it.startsWith("i:") && it.endsWith(":$from") })
+            dao.putShelfRanks(next.ranks.map { (k, r) -> ShelfRankEntity(k, r, store.id) })
+            shelfCache = shelfCache.orEmpty() + (store.id to next)
+        }
     }
 
     /** Keeps an arrangement for this trip and the next. Bumps listRev, so the list (and the watch) re-read it. */
-    suspend fun arrange(order: ShelfOrder) {
+    suspend fun arrange(
+        order: ShelfOrder,
+        storeId: Long = 1,
+    ) {
         try {
             db.withTransaction {
-                dao.putShelfRanks(order.ranks.map { (k, r) -> ShelfRankEntity(k, r) })
-                shelfCache = order
+                dao.putShelfRanks(order.ranks.map { (k, r) -> ShelfRankEntity(k, r, storeId) })
+                shelfCache = shelfCache.orEmpty() + (storeId to order)
                 val meta = dao.meta()!!
                 dao.putMeta(meta.copy(listRev = meta.listRev + 1))
             }
@@ -583,13 +618,15 @@ class ListRepository(
         val recipes = recipesById(withInStock.mapNotNull { it.recipeId })
         val ov = overrides()
         // A line already on the list ("Need it") isn't in stock any more.
-        val onList = l.contributions.filter { it.itemId in live }.mapNotNull { it.recipeLineId }.toSet()
-        val wanted = inStock.values.flatten().toSet() - onList
+        val onList =
+            l.contributions.filter { it.itemId in live && it.coveredBy == null }
+                .mapNotNull { c -> c.recipeLineId?.let { c.useId to it } }.toSet()
+        val wanted = inStock.flatMap { (use, ids) -> ids.filter { use to it !in onList } }.toSet()
         val rows = recipes.keys.toList().chunked(MAX_ARGS).flatMap { dao.linesFor(it) }.filter { it.id in wanted }.groupBy { it.recipeId }
         // Two uses of one recipe share its parsed lines.
         val parsedByRecipe = HashMap<Long, List<Pair<Long, ParsedIngredient>>>()
         return withInStock.sortedBy { it.addedAt }.flatMap { u ->
-            val ids = inStock.getValue(u.id).toSet() - onList
+            val ids = inStock.getValue(u.id).filter { u.id to it !in onList }.toSet()
             val r = recipes[u.recipeId] ?: return@flatMap emptyList()
             val parsed =
                 parsedByRecipe.getOrPut(r.id) {
@@ -598,9 +635,14 @@ class ListRepository(
             if (parsed.isEmpty()) return@flatMap emptyList()
             val locale = UnitLocale.valueOf(r.unitLocale)
             val inc = merger.incoming(r.id, r.servingsOriginal, u.servings, locale, parsed, ov)
-            inc.lines.map { line ->
+            inc.lines.mapNotNull { line ->
                 val noScale = line.parsed.noScale
-                val q = line.parsed.shopBase(locale).let { if (noScale) it else it.times(inc.scale) }
+                val full = line.parsed.shopBase(locale).let { if (noScale) it else it.times(inc.scale) }
+                val covered =
+                    l.contributions.filter { it.useId == u.id && it.recipeLineId == line.recipeLineId && it.coveredBy != null }
+                        .fold(QtyBase.PRESENCE) { q, c -> q + c.qty }
+                val q = full.minusClamped(covered)
+                if (!full.isPresence && q.isPresence) return@mapNotNull null
                 InStockLine(u.id, r.title ?: "Recipe", line.recipeLineId, line.target, q, noScale || q.isPresence, line.parsed.shopUnit)
             }
         }
@@ -1169,6 +1211,69 @@ class ListRepository(
 
     fun catalogEntry(name: String) = merger.catalogEntry(name)
 
+    /** Validate before any write. Nested repository operations share this Room transaction. */
+    suspend fun editItem(
+        itemId: Long,
+        expectedRev: Long,
+        name: String?,
+        total: QtyBase?,
+        aisle: AisleCode?,
+        alwaysAisle: Boolean,
+        libraryEdit: PendingLibraryEditEntity? = null,
+        packChanged: Boolean = false,
+        pack: QtyBase? = null,
+        storeId: Long = 1,
+    ): Long =
+        db.withTransaction {
+            val before = load()
+            val item = requireNotNull(before.items[itemId]?.takeIf { it.deletedAt == null }) { "This item is no longer on the list" }
+            require(item.rev == expectedRev) { "This item changed on the phone or watch. Reopen it before saving." }
+            require(name == null || name.isNotBlank()) { "Enter an ingredient name" }
+            val collision = name?.let { before.itemByKey(merger.target(it, null, overrides()).mergeKey) }?.takeIf { it.id != itemId }
+            // A rename-only merge carries every contribution. A total on the source must never replace the destination's total.
+            require(collision == null || total == null) { "Rename and merge first, then reopen the combined item to change its amount." }
+            if (total != null) {
+                require(!total.isPresence && total.parts.values.all { it > Rational.ZERO }) { "Enter a positive amount" }
+                val bought = before.contributionsOf(itemId).filter { it.coveredBy != null }.fold(QtyBase.PRESENCE) { q, c -> q + c.qty }
+                require(bought.parts.all { (key, value) -> (total.parts[key] ?: Rational.ZERO) >= value }) {
+                    "The total cannot be less than what is already bought. Correct the purchase first."
+                }
+            }
+            if (packChanged) {
+                require(dao.stores().any { it.id == storeId }) { "Store no longer exists" }
+                require(pack == null || (pack.parts.size == 1 && pack.parts.values.all { it > Rational.ZERO })) {
+                    "Enter one positive pack size"
+                }
+            }
+            val resultId = name?.let { renameItem(itemId, it) } ?: itemId
+            total?.let { editQuantity(resultId, it) }
+            val chosenAisle = aisle ?: item.aisle
+            if (load().items[resultId]?.aisle != chosenAisle || (aisle != null && alwaysAisle)) {
+                moveAisle(resultId, chosenAisle, aisle != null && alwaysAisle)
+            }
+            libraryEdit?.let { dao.putPendingLibraryEdit(it) }
+            if (packChanged) {
+                val key = requireNotNull(load().items[resultId]).mergeKey
+                if (pack == null) {
+                    dao.deleteStorePack(storeId, key)
+                } else {
+                    dao.putStorePacks(listOf(StorePackEntity(storeId, key, json.encodeToString(QtyBase.serializer(), pack))))
+                }
+                touchListRev()
+            }
+            resultId
+        }
+
+    suspend fun packPreference(
+        storeId: Long,
+        key: String,
+    ): QtyBase? =
+        dao.storePacks().firstOrNull { it.storeId == storeId && it.key == key }?.let { json.decodeFromString(QtyBase.serializer(), it.qty) }
+
+    suspend fun pendingLibraryEdits(): List<PendingLibraryEditEntity> = dao.pendingLibraryEdits()
+
+    suspend fun completeLibraryEdit(id: String) = dao.deletePendingLibraryEdit(id)
+
     suspend fun editQuantity(
         itemId: Long,
         total: QtyBase,
@@ -1262,7 +1367,7 @@ class ListRepository(
                     val target = merger.target(name, null, overrides())
                     l.swapItem(itemId, target)?.let { it to target.displayName }
                 }
-            if (shown != null && from != null) load().items[itemId]?.mergeKey?.let { to -> renameShelfRanks(from, to) }
+            if (shown != null && from != null) renameShelfRanks(from, merger.target(name, null, overrides()).mergeKey)
             shown
         }
 
@@ -1465,7 +1570,7 @@ class ListRepository(
                     val e = byCode[code]
                     WatchAisle(a, e?.name ?: a.displayName, e?.hidden ?: false)
                 }
-            WatchListView(load(), aisles, dao.meta()!!.listEpoch.toInt(), shelfOrder())
+            WatchListView(load(), aisles, dao.meta()!!.listEpoch.toInt(), shelfOrder(storeId))
         }
 
     /**
@@ -1523,6 +1628,7 @@ class ListRepository(
     /** Every user-data table, read in one transaction. */
     suspend fun exportBackup(): BackupData =
         db.withTransaction {
+            check(dao.pendingLibraryEdits().isEmpty()) { "Finish saving ingredient preferences before exporting a backup" }
             val meta = dao.meta()!!
             val itemIds = dao.items().map { it.id }.toSet()
             BackupData(
@@ -1552,6 +1658,8 @@ class ListRepository(
                 regulars = dao.regulars(),
                 recipeNotes = dao.recipeNotes(),
                 shelfRanks = dao.shelfRanks(),
+                storePacks = dao.storePacks(),
+                arrangementVersion = 1,
             )
         }
 
@@ -1571,10 +1679,12 @@ class ListRepository(
         if (problems.isNotEmpty()) return problems
         val fresh = EpochMarker.newMarker()
         db.withTransaction {
+            dao.clearPendingLibraryEdits()
             dao.clearPlannedMeals()
             dao.clearTrips()
             dao.clearRegulars()
             dao.clearRecipeNotes()
+            dao.clearStorePacks()
             dao.clearShelfRanks()
             shelfCache = null
             secondStoreCache = null
@@ -1624,7 +1734,14 @@ class ListRepository(
             dao.pruneTrips(MAX_TRIPS)
             dao.insertRegulars(b.regulars)
             dao.insertRecipeNotes(b.recipeNotes)
-            dao.putShelfRanks(b.shelfRanks)
+            val ranks =
+                if (b.arrangementVersion == 0) {
+                    b.stores.flatMap { store -> b.shelfRanks.map { it.copy(storeId = store.id) } }
+                } else {
+                    b.shelfRanks
+                }
+            dao.putShelfRanks(ranks)
+            dao.putStorePacks(b.storePacks)
             // A file from before the plan: its recipes on the list become planned meals, as the 4→5 migration did.
             if (b.planVersion == 0) PlanSeed.fromUses(db.openHelper.writableDatabase)
             val meta = dao.meta()!!

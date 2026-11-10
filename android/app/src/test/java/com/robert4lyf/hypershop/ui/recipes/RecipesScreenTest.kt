@@ -11,7 +11,9 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -195,6 +197,19 @@ class RecipesScreenTest {
         assertEquals(1, added)
         assertEquals(1, removed)
         compose.onRoot().captureRoboImage(Shots.path("recipe-detail-light.png"))
+    }
+
+    @Test
+    fun cookingViewUsesOnlySavedTextAndKeepsServingContext() {
+        compose.setContent {
+            HyperShopTheme(dynamicColor = false) { RecipeDetailContent(DETAIL, onAdd = {}) }
+        }
+        compose.onNodeWithTag("cook-recipe").performClick()
+        compose.onNodeWithText("Ingredients as saved").assertExists()
+        compose.onNode(hasText("200g red lentils") and hasAnyAncestor(hasTestTag("cooking-view"))).assertExists()
+        compose.onNodeWithTag("cooking-view").captureRoboImage(Shots.path("cooking-view-light.png"))
+        compose.onNodeWithText("Back to recipe").performClick()
+        compose.onNodeWithTag("cooking-view").assertDoesNotExist()
     }
 
     @Test

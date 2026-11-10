@@ -1,5 +1,13 @@
 # Hand-off notes
 
+## November 2026 — dependable shopping branch
+
+See [implementation and requirement matrix](reports/2026-11-improvements.md), [real-device acceptance](reports/2026-11-acceptance.md), [safe release/signing setup](releases/safe-builds.md), and [parser evaluation limitations](reports/2026-11-rule-evaluation.md). This work is for review; hardware acceptance, private signing and live Claude measurements remain open. Do not infer release readiness from JVM screenshots or compilation.
+
+10 November continuation: the full gate passes, including 918 passing JVM tests (three credential-gated live checks skipped), all APK variants and device-independent watch compilation. Final UI review fixed the partial-home dialog's width/layout loop and added coverage through the real weekly-screen entry point. Exact results and remaining checks are in the validation ledger linked above.
+
+The older handoffs below are retained for historical context.
+
 ## Status: Step Y (the review of 2026-10-27, implemented) — ⏸ Hand-off H, plus checks 35–43
 
 Step Y (PROGRESS.md › Step Y, the review in docs/reports/review-2026-10-27.md, what was done about each item in docs/reports/review-2026-10-27-implementation.md) fixed the 37 bugs the review found and made its 25 improvements, 6 cuts and 8 additions, with the judgement calls listed in the report's § 3. **Run on:** the JVM (every check below has a test) and the sync model checker. **Not run on:** a real phone, any real Forerunner 245. **Back up first**; the database moves to version 10. These need your eyes:

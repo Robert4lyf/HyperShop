@@ -52,7 +52,13 @@ object Rekey {
                 l.copy(
                     items =
                         l.items - loser.id +
-                            (survivor.id to survivor.copy(mergeKey = newKey, catalogId = entry.id, rev = rev - 1)),
+                            (
+                                survivor.id to
+                                    survivor.copy(
+                                        mergeKey = newKey, catalogId = entry.id, rev = rev - 1,
+                                        onHand = listOfNotNull(survivor.onHand, loser.onHand).reduceOrNull { a, b -> a + b },
+                                    )
+                            ),
                     contributions = l.contributions.map { if (it.itemId == loser.id) it.copy(itemId = survivor.id) else it },
                     ticks = l.ticks.map { if (it.itemId == loser.id) it.copy(itemId = survivor.id) else it },
                     aliases = l.aliases + (loser.id to survivor.id),

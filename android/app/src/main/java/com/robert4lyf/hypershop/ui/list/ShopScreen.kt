@@ -26,7 +26,6 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.RemoveShoppingCart
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material3.Button
@@ -59,6 +58,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.invisibleToUser
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -252,7 +252,7 @@ private fun ShopTop(
                             // UX review 23: whether the watch has this list, said where the shop happens.
                             ui.watch,
                             // Missing 4: which store's order this is, when there is a choice.
-                            STORES.firstOrNull { it.first == ui.activeStore }?.second?.takeIf { ui.secondStore },
+                            ui.storeName,
                         ).joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -268,7 +268,7 @@ private fun ShopTop(
                 TextButton(onClick = onPlan, modifier = Modifier.testTag("shop-plan")) {
                     Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.size(6.dp))
-                    Text("Done")
+                    Text("Back to list")
                 }
             }
             Spacer(Modifier.height(6.dp))
@@ -505,7 +505,7 @@ private fun BoughtRow(
  * already bought" under it. TalkBack reads the tick as a checkbox named after
  * the item, then the row.
  */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 private fun ShopRow(
     row: ListRow,
@@ -529,10 +529,9 @@ private fun ShopRow(
                 .size(52.dp)
                 .clip(CircleShape)
                 .clickable(onClickLabel = if (done) "Mark not bought" else "Mark bought", role = Role.Checkbox) { actions.onToggle(row) }
-                .semantics {
+                .clearAndSetSemantics {
                     testTag = "tick-${row.id}"
-                    contentDescription = row.main
-                    stateDescription = state
+                    invisibleToUser()
                 },
             contentAlignment = Alignment.Center,
         ) {
@@ -580,17 +579,26 @@ private fun ShopRow(
                 TextButton(onClick = { actions.onAvailable(row) }, modifier = Modifier.testTag("available-${row.id}")) {
                     Text("Found it")
                 }
-            !done ->
-                IconButton(
-                    onClick = { actions.onUnavailable(row) },
-                    modifier = Modifier.size(48.dp).testTag("unavailable-${row.id}"),
-                ) {
-                    Icon(
-                        Icons.Rounded.RemoveShoppingCart,
-                        contentDescription = "Not available today: ${row.name}",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            !done -> {
+                var asking by rememberSaveable(row.id) { mutableStateOf(false) }
+                TextButton(onClick = { asking = true }, modifier = Modifier.heightIn(min = 48.dp).testTag("unavailable-${row.id}")) {
+                    Text("Unavailable")
+                }
+                if (asking) {
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { asking = false },
+                        title = { Text("Set ${row.name} aside for this trip?") },
+                        text = { Text("It stays on the list for next time. Use Found it if you locate it today.") },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                asking = false
+                                actions.onUnavailable(row)
+                            }) { Text("Set aside") }
+                        },
+                        dismissButton = { TextButton(onClick = { asking = false }) { Text("Cancel") } },
                     )
                 }
+            }
         }
     }
 }

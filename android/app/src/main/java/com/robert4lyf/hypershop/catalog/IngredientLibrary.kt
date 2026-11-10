@@ -206,8 +206,7 @@ class IngredientLibrary(
                 out.fd.sync()
             }
             if (!tmp.renameTo(file)) {
-                file.delete()
-                tmp.renameTo(file)
+                throw IOException("Could not replace the ingredient library; the original was kept")
             }
         }
         // The catalogue first: anything reacting to [edits] then reads the new entries.

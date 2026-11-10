@@ -62,10 +62,20 @@ jobs:
           HYPERSHOP_SKIP_WATCH: '1'
         run: tools/verify.sh
 
-      # Only when something failed, and kept for a day: artifacts count against
-      # the account's 0.5 GB of Actions storage. The APK is not uploaded here;
-      # release.yml publishes it as a release asset, which that quota excludes
-      # (a ~60 MB APK per run filled it within a day of pushes).
+      # One temporary copy of the verified bytes, consumed by release.yml.
+      - name: Keep verified APK for promotion
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-apk-${{ github.sha }}
+          overwrite: true
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 2
+
+      # Failure reports last one day. The single verified APK above is retained
+      # briefly for promotion; historical rollback APKs live in Releases.
       - name: Upload test report
         if: failure()
         uses: actions/upload-artifact@v4

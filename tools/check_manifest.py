@@ -33,10 +33,11 @@ DEBUG_ONLY_ACTIVITIES = {
 }
 
 
-def find_manifest() -> Path | None:
+def find_manifest(variant: str = "debug") -> Path | None:
+    title = variant.capitalize()
     for candidate in (
-        BUILD / "merged_manifests/debug/processDebugManifest/AndroidManifest.xml",
-        BUILD / "merged_manifest/debug/processDebugMainManifest/AndroidManifest.xml",
+        BUILD / f"merged_manifests/{variant}/process{title}Manifest/AndroidManifest.xml",
+        BUILD / f"merged_manifest/{variant}/process{title}MainManifest/AndroidManifest.xml",
     ):
         if candidate.exists():
             return candidate
@@ -44,9 +45,12 @@ def find_manifest() -> Path | None:
 
 
 def main() -> int:
-    path = find_manifest()
+    variant = sys.argv[1] if len(sys.argv) > 1 else "debug"
+    if variant not in {"debug", "release"}:
+        raise ValueError("variant must be debug or release")
+    path = find_manifest(variant)
     if path is None:
-        print("merged manifest not found; run :app:assembleDebug first", file=sys.stderr)
+        print("merged manifest not found; assemble the requested variant first", file=sys.stderr)
         return 1
     root = ET.parse(path).getroot()
     problems: list[str] = []
@@ -55,11 +59,17 @@ def main() -> int:
         name = perm.get(A + "name", "")
         if name.endswith(".CAMERA"):
             problems.append(f"CAMERA permission declared: {name}")
+        if variant == "release" and name.rsplit(".", 1)[-1] in {
+            "RECORD_AUDIO", "FOREGROUND_SERVICE_MICROPHONE", "MODIFY_AUDIO_SETTINGS",
+        }:
+            problems.append(f"debug voice permission in release: {name}")
 
     app = root.find("application")
     assert app is not None
     for tag in ("activity", "activity-alias", "service", "receiver", "provider"):
         for comp in app.iter(tag):
+            if variant == "release" and "VoiceTest" in comp.get(A + "name", ""):
+                problems.append("debug voice component in release")
             if comp.get(A + "exported") != "true":
                 continue
             name = comp.get(A + "name", "")
@@ -67,7 +77,7 @@ def main() -> int:
             if comp.get(A + "permission", "").startswith("android.permission."):
                 continue
             if tag in ("activity", "activity-alias"):
-                if name not in ALLOWED_ACTIVITIES | DEBUG_ONLY_ACTIVITIES:
+                if name not in ALLOWED_ACTIVITIES | (DEBUG_ONLY_ACTIVITIES if variant == "debug" else set()):
                     problems.append(f"exported {tag}: {name}")
             elif name not in ALLOWED_OTHER:
                 problems.append(f"exported {tag}: {name}")

@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
@@ -70,6 +71,20 @@ class ItemSheetTest {
         }
 
     @Test
+    fun aChangedDraftSurvivesRecreation() {
+        val restore = androidx.compose.ui.test.junit4.StateRestorationTester(compose)
+        restore.setContent {
+            HyperShopTheme(dynamicColor = false) { ItemSheetContent(SHEET, ItemSheetActions(onSave = { true })) }
+        }
+        compose.onNodeWithTag("edit-name").performTextReplacement("A corrected long ingredient name")
+        compose.onNodeWithTag("edit-qty").performTextReplacement("450 g")
+        restore.emulateSavedInstanceStateRestore()
+        compose.onNodeWithTag("edit-name").assertTextContains("A corrected long ingredient name")
+        compose.onNodeWithTag("edit-qty").assertTextContains("450 g")
+        compose.onNodeWithTag("save-item").assertIsEnabled()
+    }
+
+    @Test
     fun aSourceWithAPageOpensIt() {
         val opened = mutableListOf<String>()
         val handler =
@@ -94,8 +109,8 @@ class ItemSheetTest {
                 }
             }
         }
-        compose.onNodeWithText("Weeknight chilli").performClick()
-        compose.onNodeWithText("Added by hand").performClick()
+        compose.onNodeWithText("Weeknight chilli").performScrollTo().performClick()
+        compose.onNodeWithText("Added by hand").performScrollTo().performClick()
         assertEquals(listOf("https://recipes.example/chilli"), opened)
     }
 
@@ -108,7 +123,7 @@ class ItemSheetTest {
         compose.onNodeWithText("Added by hand").assertExists()
         compose.onNodeWithText("200g").assertExists()
         compose.onNodeWithTag("edit-qty").performScrollTo().performTextInput("lots")
-        compose.onNodeWithTag("save-item").performScrollTo().performClick()
+        compose.onNodeWithTag("save-item").performClick()
         compose.onNodeWithText("Enter an amount, like 2 or 200 ml").assertExists()
         compose.onNodeWithTag("delete-item").performScrollTo().performClick()
         compose.onNodeWithText("Remove from list").assertExists()
@@ -120,17 +135,21 @@ class ItemSheetTest {
     fun oneSaveCarriesNameUnitAisleAndCategory() {
         show()
         // Nothing changed yet: nothing to save.
-        compose.onNodeWithTag("save-item").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("save-item").assertIsNotEnabled()
         compose.onNodeWithTag("edit-name").performScrollTo().performTextReplacement("red onion")
         compose.onNodeWithTag("edit-qty").performScrollTo().performTextInput("3")
         compose.onNodeWithTag("unit-kg").performScrollTo().performClick()
+        compose.onNodeWithText("New total: 3 kg").assertExists()
+        compose.onNodeWithText("Use amount").performClick()
         compose.onNodeWithTag("edit-qty").assertTextContains("3 kg")
+        compose.onNodeWithTag("item-preferences").performScrollTo().performClick()
         compose.onNodeWithTag("aisle-${AisleCode.DAIRY_EGGS.name}").performScrollTo().performClick()
         compose.onNodeWithTag("always-aisle").performScrollTo().performClick()
         compose.onNodeWithTag("new-group").performScrollTo().performTextInput("odds and ends")
         compose.onNodeWithText("Add").performScrollTo().performClick()
         compose.onNodeWithText("The category is kept for next time too.").assertExists()
-        compose.onNodeWithTag("save-item").performScrollTo().performClick()
+        compose.onNodeWithTag("save-item").performClick()
+        compose.onNodeWithText("Rename and save").performClick()
         val expected =
             ItemChanges("red onion", "3 kg", AisleCode.DAIRY_EGGS, alwaysAisle = false, groupChanged = true, group = "Odds and ends")
         assertEquals(listOf("save $expected"), events)
@@ -145,7 +164,7 @@ class ItemSheetTest {
                 ItemSheetContent(sheet, actions)
             }
         }
-        compose.onNodeWithText("Mark bought").performClick()
+        compose.onNodeWithText("Mark bought").performScrollTo().performClick()
         assertEquals(listOf("toggle"), events)
         sheet = SHEET.copy(done = true)
         compose.onNodeWithTag("toggle-item").assertTextEquals("Mark not bought")
@@ -157,6 +176,38 @@ class ItemSheetTest {
         compose.onNodeWithTag("edit-qty").performScrollTo().performTextInput("3")
         compose.onNodeWithTag("edit-qty").performImeAction()
         assertEquals(listOf("save ${ItemChanges(amount = "3")}"), events)
+    }
+
+    @Test
+    fun keyboardSaveRequiresTheSameNameAsTheSaveButton() {
+        show()
+        compose.onNodeWithTag("edit-name").performTextReplacement("")
+        compose.onNodeWithTag("edit-qty").performTextReplacement("3")
+        compose.onNodeWithTag("save-item").assertIsNotEnabled()
+        compose.onNodeWithTag("edit-qty").performImeAction()
+        assertEquals(emptyList<String>(), events)
+    }
+
+    @Test
+    fun clearingAnExistingAmountIsValidatedRatherThanTreatedAsUnchanged() {
+        compose.setContent {
+            HyperShopTheme(dynamicColor = false) {
+                ItemSheetContent(
+                    SHEET.copy(amount = "400 g"),
+                    ItemSheetActions(onSave = { ch ->
+                        events += "save $ch"
+                        ch.amount?.let { com.robert4lyf.hypershop.core.parse.QuantityInput.parse(it) != null } ?: true
+                    }),
+                )
+            }
+        }
+        compose.onNodeWithTag("edit-qty").performTextReplacement("")
+        compose.onNodeWithTag("save-item").performClick()
+        compose.onNodeWithText("Enter an amount, like 2 or 200 ml").assertExists()
+        assertEquals(listOf("save ${ItemChanges(amount = "")}"), events)
+        compose.onNodeWithTag("edit-qty").performTextReplacement("500 g")
+        compose.onNodeWithTag("save-item").performClick()
+        assertEquals(listOf("save ${ItemChanges(amount = "")}", "save ${ItemChanges(amount = "500 g")}"), events)
     }
 
     @Test

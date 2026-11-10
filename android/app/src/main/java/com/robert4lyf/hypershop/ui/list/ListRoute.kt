@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.UiMessage
@@ -44,7 +45,7 @@ fun ListRoute(
     /** Bumped when the launcher shortcut asks for the Add field (missing 7 of the review). */
     focusAdd: Int = 0,
 ) {
-    val vm: ListViewModel = viewModel(factory = factoryFor { ListViewModel(container) })
+    val vm: ListViewModel = viewModel(factory = factoryFor { ListViewModel(container, it.createSavedStateHandle()) })
     val ui by vm.ui.collectAsStateWithLifecycle()
     val prep by vm.prep.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
@@ -81,7 +82,13 @@ fun ListRoute(
             onNeed = vm::needIt,
             onView = vm::setView,
             onMode = vm::setMode,
-            onShop = vm::startShopping,
+            onShop = { vm.requestShopping() },
+            onShareText = {
+                scope.launch {
+                    container.awaitReady()
+                    shareNote(context, vm.shoppingText())
+                }
+            },
             onUnavailable = vm::unavailable,
             onAvailable = vm::available,
             onArrange = vm::arrange,

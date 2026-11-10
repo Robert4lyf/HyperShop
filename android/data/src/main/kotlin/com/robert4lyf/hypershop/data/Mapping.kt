@@ -53,12 +53,12 @@ internal object Mapping {
     fun contribution(e: ContributionEntity) =
         Contribution(
             e.id, e.useId, e.recipeLineId, e.itemId, json.decodeFromString(QtyBase.serializer(), e.qtyBase), e.noScale, e.createdListRev,
-            e.coveredBy, e.unitHint?.let { QtyUnit.fromSerial(it) },
+            e.coveredBy, e.unitHint?.let { QtyUnit.fromSerial(it) }, e.homeUsed?.let { json.decodeFromString(QtyBase.serializer(), it) },
         )
 
     fun contribution(c: Contribution) =
         ContributionEntity(
             c.id, c.useId, c.recipeLineId, c.itemId, json.encodeToString(QtyBase.serializer(), c.qty), c.noScale, c.createdListRev,
-            c.coveredBy, c.unitHint?.serial,
+            c.coveredBy, c.unitHint?.serial, c.homeUsed?.let { json.encodeToString(QtyBase.serializer(), it) },
         )
 }

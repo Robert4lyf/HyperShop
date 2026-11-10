@@ -11,7 +11,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The amount field's text reads back as the same total, and a unit chip keeps the number. */
+/** The amount field's text reads back as the same total, and unit conversion preserves physical quantity. */
 class ItemEditTest {
     private fun q(
         key: BaseKey,
@@ -35,11 +35,15 @@ class ItemEditTest {
     }
 
     @Test
-    fun aUnitChipSwapsTheUnitAndKeepsTheNumber() {
-        assertEquals("400 kg", ItemEdit.withUnit("400 g", "kg"))
-        assertEquals("1 1/2 tin", ItemEdit.withUnit("1 1/2 cups", "tin"))
-        assertEquals("2", ItemEdit.withUnit("2 packets", ItemEdit.EACH))
-        assertEquals("1 jar", ItemEdit.withUnit("", "jar"))
+    fun aUnitChipConvertsOnlyCompatibleMeasures() {
+        assertEquals("0.4 kg", ItemEdit.withUnit("400 g", "kg"))
+        assertEquals("0.25 l", ItemEdit.withUnit("250 ml", "l"))
+        assertEquals("400 g", ItemEdit.withUnit("0.4 kg", "g"))
+        assertNull(ItemEdit.withUnit("1 1/2 cups", "tin"))
+        assertNull(ItemEdit.withUnit("2 packets", ItemEdit.EACH))
+        assertNull(ItemEdit.withUnit("", "jar"))
+        assertNull(ItemEdit.withUnit("400 g", "ml"))
+        assertEquals("1/3000 kg", ItemEdit.withUnit("1/3 g", "kg"))
         assertEquals("packet", ItemEdit.unitOf("2 packets"))
         assertEquals(ItemEdit.EACH, ItemEdit.unitOf("3"))
         assertEquals("bunch", ItemEdit.unitOf("2 bunches"))

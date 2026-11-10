@@ -12,13 +12,18 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -45,6 +50,7 @@ fun AislesRoute(
             onMoveAisleTo = { a, i -> vm.moveAisleTo(a, i) },
             onResetAisles = { vm.resetAisleOrder() },
             onEditStore = { vm.editStore(it) },
+            onRenameStore = vm::renameStore,
         ),
         onBack = onBack,
     )
@@ -78,15 +84,22 @@ fun AislesScreen(
                         shape = SegmentedButtonDefaults.itemShape(0, 2),
                         colors = basilSegmentedColors(),
                         modifier = Modifier.testTag("store-1"),
-                    ) { Text("My store") }
+                    ) { Text(ui.storeNames[1] ?: "My store") }
                     SegmentedButton(
                         selected = ui.editingStore == 2L,
                         onClick = { actions.onEditStore(2) },
                         shape = SegmentedButtonDefaults.itemShape(1, 2),
                         colors = basilSegmentedColors(),
                         modifier = Modifier.testTag("store-2"),
-                    ) { Text("Second store") }
+                    ) { Text(ui.storeNames[2] ?: "Second store") }
                 }
+                var storeName by rememberSaveable(ui.editingStore, ui.storeNames) {
+                    mutableStateOf(ui.storeNames[ui.editingStore].orEmpty())
+                }
+                OutlinedTextField(value = storeName, onValueChange = {
+                    storeName = it.take(80)
+                }, label = { Text("Store name") }, modifier = Modifier.fillMaxWidth())
+                TextButton(enabled = storeName.isNotBlank(), onClick = { actions.onRenameStore(storeName) }) { Text("Save store name") }
                 Text(
                     if (ui.editingStore == 2L) {
                         "A second shop's order. Once it differs from your store's, \"Shop\" asks which one you are in."

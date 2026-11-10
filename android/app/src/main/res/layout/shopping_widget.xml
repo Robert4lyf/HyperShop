@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="16dp" android:background="#F4F5EB">
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="HyperShop" android:textColor="#253A2A" android:textSize="18sp" android:textStyle="bold" />
+    <TextView android:id="@+id/widget_items" android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:textColor="#253A2A" android:textSize="16sp" android:maxLines="6"
+        android:ellipsize="end" android:paddingTop="8dp" android:text="Open HyperShop to refresh your list" />
+    <TextView android:id="@+id/widget_add" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:minHeight="48dp" android:gravity="center_vertical" android:text="Add item" android:textStyle="bold"
+        android:textColor="#253A2A" android:textSize="18sp" android:contentDescription="Add an item in HyperShop" />
+</LinearLayout>

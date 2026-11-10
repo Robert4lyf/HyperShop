@@ -9,6 +9,45 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ListDao {
+    @Upsert
+    suspend fun putStore(row: StoreProfileEntity)
+
+    @Query("SELECT * FROM StorePack")
+    suspend fun storePacks(): List<StorePackEntity>
+
+    @Upsert
+    suspend fun putStorePacks(rows: List<StorePackEntity>)
+
+    @Query("DELETE FROM StorePack WHERE storeId = :storeId AND `key` = :key")
+    suspend fun deleteStorePack(
+        storeId: Long,
+        key: String,
+    )
+
+    @Query("DELETE FROM StorePack")
+    suspend fun clearStorePacks()
+
+    @Query("SELECT * FROM StoreProfile ORDER BY id")
+    fun observeStores(): Flow<List<StoreProfileEntity>>
+
+    @Query("DELETE FROM ShelfRank WHERE storeId = :storeId AND `key` IN (:keys)")
+    suspend fun deleteStoreShelfRanks(
+        storeId: Long,
+        keys: List<String>,
+    )
+
+    @Query("DELETE FROM PendingLibraryEdit")
+    suspend fun clearPendingLibraryEdits()
+
+    @Upsert
+    suspend fun putPendingLibraryEdit(row: PendingLibraryEditEntity)
+
+    @Query("SELECT * FROM PendingLibraryEdit ORDER BY id")
+    suspend fun pendingLibraryEdits(): List<PendingLibraryEditEntity>
+
+    @Query("DELETE FROM PendingLibraryEdit WHERE id = :id")
+    suspend fun deletePendingLibraryEdit(id: String)
+
     // ---- Meta -----------------------------------------------------------------
     @Query("SELECT * FROM Meta WHERE id = 1")
     suspend fun meta(): MetaEntity?

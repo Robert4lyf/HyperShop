@@ -101,11 +101,34 @@ class AppContainer(
     // logged by the scope's handler rather than lost on a bare one.
     val repository = ListRepository(db, catalog, clock, applicationScope)
 
+    private val libraryWrites = kotlinx.coroutines.sync.Mutex()
+
+    /** Idempotent outbox replay. A failed file write stays queued, including across process death. */
+    suspend fun flushLibraryEdits() {
+        libraryWrites.lock()
+        try {
+            for (pending in repository.pendingLibraryEdits()) {
+                val edit =
+                    kotlinx.serialization.json.Json.decodeFromString(
+                        com.robert4lyf.hypershop.catalog.EntryEdit.serializer(),
+                        pending.payload,
+                    )
+                val result = library.save(edit)
+                check(result is com.robert4lyf.hypershop.catalog.SaveResult.Saved) { "Ingredient preferences could not be saved: $result" }
+                repository.rekeyIfCatalogChanged()
+                repository.completeLibraryEdit(pending.id)
+            }
+        } finally {
+            libraryWrites.unlock()
+        }
+    }
+
     /** The weekly meal plan, Buy again and the At home check (Release B): all writes through [repository]. */
     val planner = com.robert4lyf.hypershop.data.Planner(repository)
     val buyAgain = com.robert4lyf.hypershop.data.BuyAgain(repository)
     val homeCheck = com.robert4lyf.hypershop.data.HomeCheck(repository)
     val settings = Settings(dataStore)
+    val shopStart = com.robert4lyf.hypershop.shopping.ShopStart(this)
     val log = RingLog()
     val reviewGate = ReviewGate()
     val ruleParser = RuleParser(catalog)
@@ -171,7 +194,10 @@ class AppContainer(
     val pendingReviews = MutableStateFlow<List<Long>>(emptyList())
 
     /** The launcher shortcut asked for the Add field (missing 7 of the review): the app opens Shopping and focuses it. */
-    val addRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val addRequests = MutableSharedFlow<Unit>(replay = 1, extraBufferCapacity = 1)
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun addRequestHandled() = addRequests.resetReplayCache()
 
     /** Backups and restores, one at a time ([BackupManager.recover] runs in [startUp]). */
     val backups by lazy { BackupManager(this, BuildConfig.VERSION_NAME) }
@@ -314,6 +340,7 @@ class AppContainer(
                 }
                 null -> Unit
             }
+            flushLibraryEdits()
             repository.checkEpoch(marker)
             repository.rekeyIfCatalogChanged()
             // Only now: an interrupted restore is resolved, so the photos it brought are named by the database
@@ -329,6 +356,12 @@ class AppContainer(
             return
         }
         startup.value = Startup.Ready
+        applicationScope.launch {
+            repository.observeListRev().collect {
+                runCatching { com.robert4lyf.hypershop.widget.ShoppingWidget.refresh(this@AppContainer) }
+                    .onFailure { Timber.w(it, "Widget refresh failed") }
+            }
+        }
         repository.purgeDeleted()
         importJobs.finishDiscards()
         importJobs.finishThrowaways()

@@ -109,7 +109,7 @@ class MealsViewModelTest {
         assertNull(added.preview)
         assertEquals(2, added.itemsLeft)
         assertEquals(Rational.of(3), onions(c))
-        awaitTrue { got.any { it.text == "Added 2 meals · 2 items" } }
+        awaitTrue { got.any { it.text == "Added 2 meals · 2 items · 2 to check at home" } }
         runBlocking { got.first { it.text.startsWith("Added 2 meals") }.undo!!.invoke() }
         await(vm.ui) { it.meals.size == 2 && it.meals.all { m -> m.shopping == MealShopping.NOT_ON_LIST } }
         assertNull(onions(c))
@@ -281,8 +281,8 @@ class MealsViewModelTest {
         val ui = await(vm.ui) { it.pending == 0 && it.home.isNotEmpty() }
         val rice = ui.home.single { it.name.contains("rice") }
         assertEquals(listOf("Chilli", "Curry"), rice.from.sorted())
-        vm.have(ui.toCheck)
-        await(vm.ui) { it.toCheck.isEmpty() && it.home.all { r -> r.have } }
+        vm.have(ui.toCheck.filter { it.likelyCupboard })
+        await(vm.ui) { it.toCheck.none { r -> r.likelyCupboard } && it.home.filter { r -> r.likelyCupboard }.all { r -> r.have } }
         val l = runBlocking { c.repository.snapshot() }
         assertNull(l.itemByKey(rice.mergeKey))
         assertTrue(l.itemByKey("cat:onion") != null)

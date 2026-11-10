@@ -530,6 +530,8 @@ fun RecipeDetailContent(
     onRemove: () -> Unit = {},
     notes: RecipeNoteActions = RecipeNoteActions(),
 ) {
+    var cooking by rememberSaveable(detail.row.key) { mutableStateOf(false) }
+    if (cooking) CookingView(detail) { cooking = false }
     val open = rememberOpenLink()
     val url = webLink(detail.row.url)
     val row = detail.row
@@ -561,6 +563,7 @@ fun RecipeDetailContent(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                TextButton(onClick = { cooking = true }, modifier = Modifier.testTag("cook-recipe")) { Text("Cooking view") }
                 DetailButtons(onAdd, url?.let { { open(it) } }, onList = detail.row.onList)
             }
         }
