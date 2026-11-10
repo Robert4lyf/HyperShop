@@ -80,3 +80,7 @@ Total: 135 lines from 10 pages.
 ## Label corrections
 
 None yet.
+
+## Label corrections — 2026-11-06
+
+affba87d4577: tq-122: 1 tablespoon plus 1/2 teaspoon = 15 ml + 2.5 ml = 17.5 ml = 7/6 tablespoons. The old label explicitly excluded this compatible volume extra, contrary to the current purchasing requirement. No source line was changed.

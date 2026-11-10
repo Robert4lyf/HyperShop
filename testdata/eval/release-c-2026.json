@@ -3148,7 +3148,7 @@
   "source": "tasteofhome-1",
   "raw": "3 tablespoons plus 1/2 teaspoon sugar",
   "name": "sugar",
-  "quantity": 3,
+  "quantity": 3.1666666666666665,
   "quantity_max": null,
   "unit": "tbsp",
   "optional": false,
@@ -3156,7 +3156,7 @@
   "alternatives": [],
   "pack_size": null,
   "prep": null,
-  "notes": "'plus 1/2 teaspoon' is an extra amount (R3.6)"
+  "notes": "Label correction 2026-11-06: 3 tablespoons plus 1/2 teaspoon = 45 ml + 2.5 ml = 47.5 ml = 19/6 tablespoons. Previous label omitted the quantified extra. Source text is unchanged."
  },
  {
   "id": "rc-197",

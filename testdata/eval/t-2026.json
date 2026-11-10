@@ -1951,7 +1951,7 @@
   "source": "natasha-t1",
   "raw": "1 Tbsp plus 1/2 tsp fine sea salt (divided, plus more to taste)",
   "name": "salt",
-  "quantity": 1,
+  "quantity": 1.1666666666666667,
   "quantity_max": null,
   "unit": "tbsp",
   "optional": false,
@@ -1959,7 +1959,7 @@
   "alternatives": [],
   "pack_size": null,
   "prep": null,
-  "notes": "plus: 1/2 tsp is in a different unit, not added (as rc-196); 'plus more to taste' unquantified; fine sea salt -> salt"
+  "notes": "Label correction 2026-11-06: 1 tablespoon plus 1/2 teaspoon = 15 ml + 2.5 ml = 17.5 ml = 7/6 tablespoons. Previous label omitted the quantified extra. Source text is unchanged."
  },
  {
   "id": "tq-123",

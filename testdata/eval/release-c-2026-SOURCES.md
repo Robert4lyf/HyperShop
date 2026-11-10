@@ -134,3 +134,7 @@ here for that reason. The amounts, units and pack sizes are unchanged.
 |---|---|---|---|
 | rc-074 | name `plum tomatoes` | `tinned plum tomatoes` | "1 x 400g tin of plum tomatoes": a tin, not fresh plum tomatoes |
 | rc-173 | name `whole tomatoes` | `tinned whole tomatoes` | "2 (14.5-oz.) cans whole tomatoes": cans, not fresh tomatoes |
+
+## Label corrections — 2026-11-06
+
+0d793394dc57: rc-196: 3 tablespoons plus 1/2 teaspoon = 45 ml + 2.5 ml = 47.5 ml = 19/6 tablespoons. The old label explicitly excluded this compatible volume extra, contrary to the current purchasing requirement. No source line was changed.

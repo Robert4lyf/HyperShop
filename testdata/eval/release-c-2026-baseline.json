@@ -1,6 +1,6 @@
 {
     "labels": "testdata/eval/release-c-2026.json",
-    "labelsSha256": "76b2e1294107f84f275d9230082923bc0de0eefdf3520e99fa70c9cb638c78d0",
+    "labelsSha256": "0d793394dc57343e37508630fd52c9d10a5683a9dfdd05446e25ef6a48e57d64",
     "lines": 285,
     "right": [
         "rc-001",
