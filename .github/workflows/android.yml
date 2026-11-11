@@ -149,8 +149,13 @@ jobs:
                   # A test skipped on purpose (run on request only) is not a failure.
                   if "AssumptionViolatedException" in text:
                       continue
-                  print(f"::error::{case.get('classname')}.{case.get('name')}")
-                  print((bad.text or bad.get("message") or "")[:3000])
+                  title = f"{case.get('classname')}.{case.get('name')}"
+                  # Keep the cause in the run's annotations, even after its short-lived
+                  # report expires. Escape workflow-command data before printing it.
+                  detail = text[:3000].replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                  title = title.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A").replace(":", "%3A").replace(",", "%2C")
+                  print(f"::error title={title}::{detail or 'No failure details were reported'}")
+                  print(text[:3000])
           PY
           done
 

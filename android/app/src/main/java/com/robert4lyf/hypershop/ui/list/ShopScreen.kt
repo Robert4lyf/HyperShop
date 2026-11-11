@@ -63,6 +63,8 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -500,10 +502,10 @@ private fun BoughtRow(
 }
 
 /**
- * A compact row: the round tick (a 52 dp target) ticks; the rest opens the item
- * card. Only what the basket needs: the main line, and the pack note or "2
- * already bought" under it. TalkBack reads the tick as a checkbox named after
- * the item, then the row.
+ * A compact row: the round tick (a 52 dp target) and name both tick; a long press
+ * opens the item card. Only what the basket needs: the main line, and the pack note or "2
+ * already bought" under it. TalkBack gets one checkbox on the named row, with
+ * Details as its long-press action; the separate touch tick is hidden from it.
  */
 @OptIn(ExperimentalFoundationApi::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
@@ -551,6 +553,7 @@ private fun ShopRow(
                 // UX review 2: in a supermarket the whole row is the tick, under either thumb; the lingering moment
                 // (LINGER_MS) makes a stray tap a second tap away from undone. Details are a long press.
                 .combinedClickable(
+                    role = Role.Checkbox,
                     onClickLabel = if (done) "Mark not bought" else "Mark bought",
                     onLongClickLabel = "Details",
                     onLongClick = { actions.onOpenItem(row) },
@@ -559,6 +562,12 @@ private fun ShopRow(
                 .semantics(mergeDescendants = true) {
                     testTag = "item-${row.id}"
                     stateDescription = state
+                    toggleableState =
+                        when (row.state) {
+                            TickState.DONE -> ToggleableState.On
+                            TickState.PARTIAL -> ToggleableState.Indeterminate
+                            TickState.OPEN -> ToggleableState.Off
+                        }
                 }.padding(start = 4.dp, top = 8.dp, bottom = 8.dp),
             verticalArrangement = Arrangement.Center,
         ) {

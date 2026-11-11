@@ -251,7 +251,7 @@ class PerformanceProbeTest {
         // The ticks still to buy: a row just ticked stays in place for a moment (Release C).
         val ticks =
             SemanticsMatcher("an open tick") {
-                it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("tick-") == true &&
+                it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("item-") == true &&
                     it.config.getOrNull(SemanticsProperties.StateDescription) == "Still needed"
             }
         val each =

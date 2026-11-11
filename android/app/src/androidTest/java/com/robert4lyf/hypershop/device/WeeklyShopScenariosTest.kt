@@ -290,7 +290,9 @@ class WeeklyShopScenariosTest {
         for (line in regulars) type(line)
         // Back to This week for the cupboard check (the list's plan card went in Y.7d: the tab is the way there).
         tap("tab-meals")
-        val cupboard = runBlocking { c.homeCheck.view(c.repository.snapshot()) }.filter { !it.have }.map { it.mergeKey }
+        // The compact default shows cupboard food; fresh/chilled/frozen requirements have an explicit filter.
+        val home = runBlocking { c.homeCheck.view(c.repository.snapshot()) }
+        val cupboard = home.filter { it.likelyCupboard && !it.have }.map { it.mergeKey }
         for (k in cupboard) {
             scrollTo("home-have-$k")
             tap("home-have-$k")

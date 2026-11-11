@@ -99,3 +99,15 @@ All 427 app tests run with the revised home-amount scenario entered through This
 Accelerated emulator execution is unavailable locally (`/dev/kvm` is absent). Phone/watch reconnection, TalkBack/IME/launcher behaviour, private signing/install and live recipe/correction/timing measurements remain the acceptance items below. No release was published and no merge to main was performed.
 
 Acceptance checklist: [2026-11-acceptance.md](2026-11-acceptance.md). Parser label rationale: [2026-11-label-corrections.md](2026-11-label-corrections.md). Release/signing: [safe-builds.md](../releases/safe-builds.md).
+
+### CI follow-up — 11 November 2026
+
+PR #89's first Android run passed Build and test but failed three emulator scenarios. The shopping scenarios still selected the separate touch tick by its old spoken state, although that duplicate state had deliberately been removed. The named shopping row now exposes the checkbox role and checked/indeterminate state, retaining its existing tick action and Details long press. The device scenarios and performance probe select that row. JVM coverage checks the row's name, role, target size and all three checked states while the touch icon keeps no duplicate state announcement.
+
+The item-by-item weekly scenario also used every food row returned by `HomeCheck`, while the screen initially shows only likely cupboard food. Its selection now follows that visible filter; fresh/chilled/frozen requirements remain available through the existing explicit control. No timeout or renderer changes are involved.
+
+Device-test failure annotations now contain the reported cause, escaped for GitHub workflow commands, as well as the test name. This preserves useful diagnostics when the one-day HTML report expires, without increasing artifact retention.
+
+`tools/verify.sh` passes: 919 JVM tests passed and three credential-gated live checks skipped, including all 428 app tests. The gate builds debug, instrumentation-test and unsigned release APKs; checks formatting, manifests, release guards, catalogue, secrets, checksums and protocol parity; explores 113,184 sync states with no violations; and compiles watch debug, release and test sources device-independently. The separate `:app:lintDebug` check and focused 18-test shopping-screen run also pass. The actual CI reporter shell/Python was exercised with a multiline failure, escaped title/data and an assumption skip.
+
+The original Forerunner device job failed at the device-definition download step; its detailed logs could not be retrieved. Both failed device jobs were requested once more, but both workflows ended with `startup_failure`; Android's run page reports an unexpected GitHub error. These retries provide no new device execution evidence. Device-independent watch compilation does not establish a signed Forerunner build or physical reconnection. The real-device checklist remains open.

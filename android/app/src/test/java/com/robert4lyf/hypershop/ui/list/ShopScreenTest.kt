@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsAtLeast
@@ -123,6 +124,10 @@ class ShopScreenTest {
         toggle.performClick()
         compose.onNodeWithTag("item-3").assertExists()
         assertEquals("Bought", compose.onNodeWithTag("item-3").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
+        assertEquals(
+            ToggleableState.On,
+            compose.onNodeWithTag("item-3").fetchSemanticsNode().config.getOrNull(SemanticsProperties.ToggleableState),
+        )
         assertNull(compose.onNodeWithTag("tick-3").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
         // Unticking from the shown bought rows is the same tick target as always.
         compose.onNodeWithTag("tick-3").performClick()
@@ -144,6 +149,24 @@ class ShopScreenTest {
         assertEquals(listOf("open 4", "toggle 4"), events)
         compose.onNodeWithTag("item-4").performClick()
         assertEquals(listOf("open 4", "toggle 4", "toggle 4"), events)
+    }
+
+    @Test
+    fun theSpokenRowHasTheCheckboxRoleNameAndState() {
+        show()
+        for (row in shop.aisles.flatMap { it.second }.filter { it.state != TickState.DONE }) {
+            val item = compose.onNodeWithTag("item-${row.id}")
+            val node = item.fetchSemanticsNode()
+            assertEquals(Role.Checkbox, node.config.getOrNull(SemanticsProperties.Role))
+            assertTrue(node.config.getOrNull(SemanticsProperties.Text).orEmpty().isNotEmpty())
+            assertEquals(
+                if (row.state == TickState.PARTIAL) ToggleableState.Indeterminate else ToggleableState.Off,
+                node.config.getOrNull(SemanticsProperties.ToggleableState),
+            )
+            item.assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
+            // The separate touch icon never repeats the named row's spoken state.
+            assertNull(compose.onNodeWithTag("tick-${row.id}").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
+        }
     }
 
     @Test
