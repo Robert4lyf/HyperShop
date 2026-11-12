@@ -71,11 +71,15 @@ class JourneyTest {
         dialogShown = dialog
     }
 
-    private fun waitFor(tag: String) =
-        compose.waitUntil(10_000) {
+    /** Waits for [tag], idling the main looper between looks; on a timeout, says which tag and where the app was. */
+    private fun waitFor(tag: String) {
+        val end = System.currentTimeMillis() + 10_000
+        while (compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isEmpty()) {
+            check(System.currentTimeMillis() < end) { "\"$tag\" never appeared; route ${route()}" }
             compose.waitForIdle()
-            compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty()
+            Thread.sleep(20)
         }
+    }
 
     private fun node(tag: String): SemanticsNodeInteraction {
         waitFor(tag)
