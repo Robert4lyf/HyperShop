@@ -66,15 +66,43 @@ class ItemSheetTest {
                         onSwap = { to, always -> events += "swap $to $always" },
                         onToggle = { events += "toggle" },
                     ),
+                    initiallyEditing = true,
                 )
             }
         }
 
     @Test
+    fun theSheetOpensOnWhatToBuyAndWhatItIsForWithTheFormBehindChangeAmount() {
+        compose.setContent {
+            HyperShopTheme(dynamicColor = false) {
+                ItemSheetContent(
+                    SHEET.copy(toBuy = listOf("1"), explanation = "Required 2 · At home 0 · Bought 1 · Buy 1"),
+                    ItemSheetActions(onSave = { true }, onToggle = { events += "toggle" }),
+                )
+            }
+        }
+        compose.onNodeWithText("Buy 1").assertExists()
+        compose.onNodeWithText("For Weeknight chilli, Added by hand").assertExists()
+        // No dense form, and the bookkeeping is one tap away.
+        compose.onNodeWithTag("edit-name").assertDoesNotExist()
+        compose.onNodeWithTag("item-breakdown").assertDoesNotExist()
+        compose.onNodeWithTag("delete-item").assertDoesNotExist()
+        compose.onRoot().captureRoboImage(Shots.path("item-summary-light.png"))
+        compose.onNodeWithTag("item-more").performClick()
+        compose.onNodeWithTag("item-breakdown").assertTextEquals("Required 2 · At home 0 · Bought 1 · Buy 1")
+        compose.onNodeWithTag("delete-item").performScrollTo().assertExists()
+        compose.onNodeWithTag("toggle-item").performScrollTo().performClick()
+        compose.onNodeWithTag("item-change").performScrollTo().performClick()
+        compose.onNodeWithTag("edit-qty").assertExists()
+        compose.onNodeWithTag("save-item").assertExists()
+        assertEquals(listOf("toggle"), events)
+    }
+
+    @Test
     fun aChangedDraftSurvivesRecreation() {
         val restore = androidx.compose.ui.test.junit4.StateRestorationTester(compose)
         restore.setContent {
-            HyperShopTheme(dynamicColor = false) { ItemSheetContent(SHEET, ItemSheetActions(onSave = { true })) }
+            HyperShopTheme(dynamicColor = false) { ItemSheetContent(SHEET, ItemSheetActions(onSave = { true }), initiallyEditing = true) }
         }
         compose.onNodeWithTag("edit-name").performTextReplacement("A corrected long ingredient name")
         compose.onNodeWithTag("edit-qty").performTextReplacement("450 g")
@@ -105,6 +133,7 @@ class ItemSheetTest {
                                 ),
                         ),
                         ItemSheetActions(onSave = { true }),
+                        initiallyEditing = true,
                     )
                 }
             }
@@ -163,7 +192,7 @@ class ItemSheetTest {
         compose.setContent {
             HyperShopTheme(dynamicColor = false) {
                 val actions = ItemSheetActions(onSave = { true }, onToggle = { events += "toggle" })
-                ItemSheetContent(sheet, actions)
+                ItemSheetContent(sheet, actions, initiallyEditing = true)
             }
         }
         compose.onNodeWithText("Mark bought").performScrollTo().performClick()
@@ -200,6 +229,7 @@ class ItemSheetTest {
                         events += "save $ch"
                         ch.amount?.let { com.robert4lyf.hypershop.core.parse.QuantityInput.parse(it) != null } ?: true
                     }),
+                    initiallyEditing = true,
                 )
             }
         }

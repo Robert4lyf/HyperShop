@@ -52,6 +52,7 @@ class UnitChangeTest {
                     saves += it
                     true
                 }),
+                initiallyEditing = true,
             )
         }
     }
@@ -149,7 +150,9 @@ class UnitChangeTest {
     @Test
     fun anOpenUnitQuestionAndItsTypedAmountSurviveRecreation() {
         val restore = StateRestorationTester(compose)
-        restore.setContent { HyperShopTheme(dynamicColor = false) { ItemSheetContent(FLOUR, ItemSheetActions(onSave = { true })) } }
+        restore.setContent {
+            HyperShopTheme(dynamicColor = false) { ItemSheetContent(FLOUR, ItemSheetActions(onSave = { true }), initiallyEditing = true) }
+        }
         chip("ml")
         compose.onNodeWithTag("unit-amount").performTextInput("0")
         restore.emulateSavedInstanceStateRestore()

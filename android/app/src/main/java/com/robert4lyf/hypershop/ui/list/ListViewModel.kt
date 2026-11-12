@@ -107,6 +107,8 @@ data class ItemSheet(
     val explanation: String = "",
     val saving: Boolean = false,
     val saveError: String? = null,
+    /** Step Q: what is still to buy (requirement less what is bought and at home), shown first on the sheet. */
+    val toBuy: List<String> = emptyList(),
 )
 
 /** One "From" row: "Weeknight chilli · 400 g", linked to the recipe's page when it has one. */
@@ -722,6 +724,10 @@ class ListViewModel(
             val storeId = c.settings.activeStore.first()
             val packSize = c.repository.packPreference(storeId, item.mergeKey)
             val suggestion = packSize?.let { com.robert4lyf.hypershop.core.merge.PackSuggestion.forNeed(list.toBuy(id), it) }
+            val toBuy =
+                list.toBuy(id).parts.filterValues { it > Rational.ZERO }.mapNotNull { (k, v) ->
+                    Display.amount(QtyBase(mapOf(k to v)), units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy)
+                }
             _sheet.value =
                 ItemSheet(
                     id,
@@ -753,6 +759,7 @@ class ListViewModel(
                             "Bought ${ItemEdit.text(list.purchased(id)).ifBlank { "0" }}",
                             "Buy ${ItemEdit.text(list.toBuy(id)).ifBlank { "0 / see requirement" }}",
                         ).joinToString(" · "),
+                    toBuy = toBuy,
                 )
         }.also { openJob = it }
     }
