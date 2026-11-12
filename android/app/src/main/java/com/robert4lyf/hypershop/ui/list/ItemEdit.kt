@@ -6,6 +6,7 @@ import com.robert4lyf.hypershop.core.model.Dimension
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
+import com.robert4lyf.hypershop.core.parse.QuantityInput
 import com.robert4lyf.hypershop.core.parse.RuleParser
 import java.math.BigDecimal
 
@@ -63,6 +64,50 @@ object ItemEdit {
         if (old.keys != new.keys || old.isPresence || new.isPresence) return null
         val value = q * (parsed.unit?.baseFactor(UnitLocale.METRIC) ?: Rational.ONE) / new.parts.values.single()
         return if (unit == EACH) number(value) else "${number(value)} $unit"
+    }
+
+    /**
+     * The unit chips shown before "More units": the current unit, the ones it converts to exactly, and a plain
+     * count. With no recognised unit, a count, grams and millilitres. In [UNITS] order.
+     */
+    fun commonUnits(current: String?): List<String> {
+        val family =
+            when (current) {
+                "g", "kg" -> setOf("g", "kg")
+                "ml", "l" -> setOf("ml", "l")
+                null, EACH -> setOf("g", "ml")
+                else -> setOf(current)
+            }
+        return UNITS.filter { it == EACH || it in family }
+    }
+
+    /** What the incompatible-unit dialog's amount field reads as: the new amount text, or why it can't be used. */
+    data class Proposal(
+        val text: String?,
+        val error: String?,
+    )
+
+    private val number = Regex("""^[\d\s.,/½¼¾⅓⅔]+$""")
+
+    /**
+     * An amount typed for [unit] when no conversion exists: a positive number ("2", "1.5", "1/3", "1 ½") that the
+     * list reads back as one amount. The number is kept as typed, so fractions stay exact.
+     */
+    fun propose(
+        typed: String,
+        unit: String,
+    ): Proposal {
+        val n = typed.trim()
+        if (n.isEmpty()) return Proposal(null, "Enter the amount in $unit")
+        if (n.startsWith("-") || n.startsWith("−")) return Proposal(null, "Enter an amount above zero")
+        if (!number.matches(n) || n.none { it.isDigit() || it in "½¼¾⅓⅔" }) {
+            return Proposal(null, "Enter a number, like 2, 1.5 or 1/2")
+        }
+        val text = if (unit == EACH) n else "$n $unit"
+        val q = RuleParser().parse("$n x").quantity
+        if (q != null && q.isZero) return Proposal(null, "Enter an amount above zero")
+        if (q == null || QuantityInput.parse(text) == null) return Proposal(null, "Enter a number, like 2, 1.5 or 1/2")
+        return Proposal(text, null)
     }
 
     /** The chip [text]'s unit matches, so the chip shows selected; null when none does. */

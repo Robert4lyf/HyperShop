@@ -18,7 +18,8 @@ import kotlin.math.abs
  * - juice: "2 tbsp fresh lemon juice (from 1 lemon)" is 2 tbsp of lemon juice, not of lemons — taken only when
  *   the rule parser reads the same amount in the same unit.
  *
- * And it flags a line whose amount the rule parser reads differently ([DISAGREE]).
+ * And it flags a line whose amount the rule parser reads differently ([DISAGREE]), and keeps the rule
+ * parser's [Meaning] flags (a part beside the whole, a heaped measure) on a reading that would lose them.
  *
  * Idempotent, so a reading aligned once can be aligned again (the recorded readings are scored through it).
  */
@@ -45,6 +46,9 @@ class ClaudeAlignment(
         // U.2: two readers that disagree on the amount are a line worth a look. Measured on Claude's recorded
         // readings of the labelled sets, this flags about a third of its wrong lines and 3 right ones in 540.
         // The item is not compared: the two name things differently far more often than either is wrong.
+        // A part beside the whole, or a heaped spoon: a reading that drops it would pass silently. The rule
+        // parser's flag stands for the line whatever amount Claude gives (November evaluation).
+        if (!out.check && r.check && r.checkReason in Meaning.REASONS) out = out.copy(check = true, checkReason = r.checkReason)
         if (!out.check && amountsDiffer(out, r)) out = out.copy(check = true, checkReason = DISAGREE)
         return out
     }

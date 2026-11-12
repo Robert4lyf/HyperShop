@@ -350,6 +350,8 @@ class RuleParser(
             }
             if (qty == null && impliedQty != null) qty = impliedQty
             if (unit == QtyUnit.OTHER) flag("an unknown unit")
+            // "2 heaped tablespoons": the level amount is all the model can hold; say so rather than pass it as exact.
+            if (unit in Meaning.SCOOPED && toks.indices.any { word(it) in Meaning.MORE_THAN_LEVEL }) flag(Meaning.HEAPED)
 
             if ("optional" in lower || "if desired" in lower || "if you like" in lower) optional = true
             // Several things on one line ("Toppings: cheese, avocado, lettuce"): one of them would be wrong.
@@ -750,6 +752,17 @@ class RuleParser(
             i = save
             if (more == null) return null
             val same = rest.isEmpty() || entryOf(rest.joinToString(" "))?.let { it == entryOf(name) } == true
+            // "1 large egg plus 1 egg yolk": a yolk is an egg to buy, so the count is summed as before (the T set's
+            // label), but a yolk is not another whole egg. The line keeps "plus 1 egg yolk" in its note and asks for
+            // a look, so the part is not merged away unseen (November evaluation).
+            val named = name.lowercase().split(' ')
+            if (named.any { it in EGG_WORDS }) {
+                val restPart = Meaning.partOf(rest)
+                if (restPart != Meaning.partOf(named) && (restPart != null || same)) {
+                    flag(Meaning.PART)
+                    return compatibleExtra(more, moreUnit, unit)
+                }
+            }
             if (!same) {
                 flag("\"plus\" an amount of something else")
                 return null
@@ -861,6 +874,9 @@ class RuleParser(
         val AND_OR = setOf("and", "or")
 
         val SUB_RECIPE = setOf("recipe", "recipes", "batch", "batches", "quantity")
+
+        /** A name about eggs, whose parts ([Meaning.partOf]) are told apart. */
+        val EGG_WORDS = setOf("egg", "eggs", "yolk", "yolks")
 
         val NOT_LETTERS = Regex("[^a-z]+")
 

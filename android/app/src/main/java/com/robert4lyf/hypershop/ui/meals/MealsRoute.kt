@@ -305,7 +305,14 @@ private fun WeekHeader(
 /** "3 meals · 5 items still needed": what am I cooking, what is left to buy. */
 private fun summary(ui: MealsUi): String? =
     when {
-        ui.meals.isEmpty() -> if (ui.isPast) "Nothing was planned" else "Nothing planned yet"
+        ui.meals.isEmpty() ->
+            when {
+                ui.isPast -> "Nothing was planned"
+                // The next step, in the header where it is seen first: the picks below, or a first recipe.
+                !ui.loaded -> "Nothing planned yet"
+                ui.hasLibrary -> "Nothing planned yet · choose meals below"
+                else -> "Nothing planned yet · add a recipe to start"
+            }
         ui.pending > 0 -> "${plural(ui.meals.size, "meal")} · ${ui.pending} not on the shopping list yet"
         ui.itemsLeft > 0 -> "${plural(ui.meals.size, "meal")} · ${plural(ui.itemsLeft, "item")} still needed"
         else -> plural(ui.meals.size, "meal")
@@ -854,14 +861,29 @@ private fun BottomBar(
                     }
                 }
             }
-        ui.isCurrent && ui.listHasItems ->
+        ui.isCurrent && ui.listHasItems -> {
+            // A shop under way carries on where it is (no store asked again); otherwise one starts.
+            val label = if (ui.shopping) "Continue shopping" else "Start shopping"
+            val detail =
+                when {
+                    ui.listLeft == 0 -> if (ui.shopping) "Everything is ticked · finish on the list" else null
+                    ui.shopping -> "${plural(ui.listLeft, "item")} left to buy"
+                    else -> "${plural(ui.listLeft, "item")} to buy"
+                }
             BottomActionBar(navigationBarInset = false) {
-                Button(onClick = actions.onStartShopping, modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("meals-shop")) {
+                Button(
+                    onClick = if (ui.shopping) actions.onList else actions.onStartShopping,
+                    modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("meals-shop"),
+                ) {
                     Icon(Icons.Rounded.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(8.dp))
-                    Text("Start shopping")
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(label)
+                        detail?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
+                    }
                 }
             }
+        }
         else -> Unit
     }
 }

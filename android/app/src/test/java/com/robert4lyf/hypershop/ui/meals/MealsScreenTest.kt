@@ -1,5 +1,8 @@
 package com.robert4lyf.hypershop.ui.meals
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
@@ -163,6 +166,33 @@ class MealsScreenTest {
         scrollTo("pick-k3")
         compose.onNodeWithTag("pick-add-k3").performClick()
         assertEquals(listOf("shop", "plan Fish pie"), events)
+    }
+
+    @Test
+    fun theBottomActionFollowsWhereTheWeekStands() {
+        val added = ui.meals.map { it.copy(shopping = MealShopping.TO_BUY, progress = UseProgress(1, 0, 0, 0)) }
+        var u by mutableStateOf(ui)
+        compose.setContent { HyperShopTheme(dynamicColor = false) { MealsScreen(u, actions.copy(onList = { events += "list" })) } }
+        // Meals waiting: add them.
+        compose.onNodeWithTag("meals-add-to-list").assertExists()
+        compose.onNodeWithTag("meals-shop").assertDoesNotExist()
+        // All added, a shop to start: how much it is.
+        u = ui.copy(meals = added, preview = null, listLeft = 7)
+        compose.onNodeWithText("Start shopping").assertExists()
+        compose.onNodeWithText("7 items to buy").assertExists()
+        compose.onNodeWithTag("meals-shop").performClick()
+        // A shop under way: carry on, without starting again (no store asked twice).
+        u = ui.copy(meals = added, preview = null, listLeft = 3, shopping = true)
+        compose.onNodeWithText("Continue shopping").assertExists()
+        compose.onNodeWithText("3 items left to buy").assertExists()
+        compose.onNodeWithTag("meals-shop").performClick()
+        u = ui.copy(meals = added, preview = null, listLeft = 0, shopping = true)
+        compose.onNodeWithText("Everything is ticked · finish on the list").assertExists()
+        // Nothing on the list and nothing planned: the header says what to do next.
+        u = ui.copy(meals = emptyList(), preview = null, listHasItems = false, listLeft = 0)
+        compose.onNodeWithTag("meals-shop").assertDoesNotExist()
+        compose.onNodeWithText("19–25 Oct · Nothing planned yet · choose meals below").assertExists()
+        assertEquals(listOf("shop", "list"), events)
     }
 
     @Test

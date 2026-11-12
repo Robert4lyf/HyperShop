@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.UnitLocale
+import com.robert4lyf.hypershop.core.parse.Meaning
 import com.robert4lyf.hypershop.data.ImportJobEntity
 import com.robert4lyf.hypershop.importing.ImportError
 import com.robert4lyf.hypershop.importing.ImportInput
@@ -156,6 +157,41 @@ class ReviewViewModelTest {
         } finally {
             claude.shutdown()
         }
+    }
+
+    @Test
+    fun aMeaningFlagSaysWhyKeepsTheSourceAndAnAmountCorrectionSettlesItByOccurrence() {
+        val c = TestContainer.create()
+        val job =
+            runBlocking {
+                c.readyJob("1 large egg plus 1 egg yolk", "2 heaped tablespoons peanut butter", "2 heaped tablespoons peanut butter")
+            }
+        val vm = ReviewViewModel(c, job)
+        val rows = ready(vm).aisles.flatMap { it.second }
+        val egg = rows.first { it.name.contains("egg") }
+        assertTrue(egg.check)
+        assertEquals(Meaning.PART, egg.checkReason)
+        assertEquals("1 large egg plus 1 egg yolk", egg.raw)
+        assertEquals("2", egg.quantity)
+        assertTrue(ReviewViewModel.plainReason(Meaning.PART).contains("yolk"))
+        assertTrue(ReviewViewModel.plainReason(Meaning.HEAPED).contains("Tap to set the amount"))
+        val pb = rows.first { it.name.contains("peanut") }
+        assertEquals(Meaning.HEAPED, pb.checkReason)
+        // The same line written twice: correcting the first occurrence leaves the second asking.
+        val lines = vm.sheet(pb.key)!!.lines
+        assertEquals(2, lines.size)
+        assertTrue(lines.all { it.checkReason == Meaning.HEAPED })
+        val before = vm.state.value
+        assertTrue(vm.setAmount(lines.first().id, "3 tbsp"))
+        // A new state is published only once the edit has been kept with the job.
+        await(vm.state) { s -> s !== before && s is ReviewState.Ready && vm.sheet(pb.key)?.lines?.count { it.checkReason == null } == 1 }
+        val after = vm.sheet(pb.key)!!.lines
+        assertEquals(listOf(null, Meaning.HEAPED), after.map { it.checkReason })
+        // Kept with the job: opened again, the correction and the remaining flag are as they were.
+        val again = ReviewViewModel(c, job)
+        ready(again)
+        assertEquals(listOf(null, Meaning.HEAPED), again.sheet(pb.key)!!.lines.map { it.checkReason })
+        assertEquals("2 heaped tablespoons peanut butter", again.sheet(pb.key)!!.lines.first().raw)
     }
 
     @Test

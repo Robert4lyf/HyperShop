@@ -25,17 +25,23 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.ui.common.PillShape
 import com.robert4lyf.hypershop.ui.common.SectionLabel
@@ -54,22 +60,25 @@ internal fun ItemEditor(
     onSave: (ItemChanges) -> Boolean,
     modifier: Modifier = Modifier,
     onDirty: (Boolean) -> Unit = {},
+    /** A new value drops the draft: the editor starts again from [sheet] (edits discarded on the sheet). */
+    draft: Int = 0,
     details: @Composable () -> Unit = {},
 ) {
     // Keyed on the item: another row's sheet starts from that row. Survives a rotation.
-    var name by rememberSaveable(sheet.id) { mutableStateOf(sheet.name) }
-    var amount by rememberSaveable(sheet.id) { mutableStateOf(sheet.amount) }
-    var aisle by rememberSaveable(sheet.id) { mutableStateOf(sheet.aisle) }
-    var always by rememberSaveable(sheet.id) { mutableStateOf(true) }
-    var group by rememberSaveable(sheet.id) { mutableStateOf(sheet.group) }
-    var newGroup by rememberSaveable(sheet.id) { mutableStateOf("") }
-    var bad by rememberSaveable(sheet.id) { mutableStateOf(false) }
+    var name by rememberSaveable(sheet.id, draft) { mutableStateOf(sheet.name) }
+    var amount by rememberSaveable(sheet.id, draft) { mutableStateOf(sheet.amount) }
+    var aisle by rememberSaveable(sheet.id, draft) { mutableStateOf(sheet.aisle) }
+    var always by rememberSaveable(sheet.id, draft) { mutableStateOf(true) }
+    var group by rememberSaveable(sheet.id, draft) { mutableStateOf(sheet.group) }
+    var newGroup by rememberSaveable(sheet.id, draft) { mutableStateOf("") }
+    var bad by rememberSaveable(sheet.id, draft) { mutableStateOf(false) }
 
-    var pack by rememberSaveable(sheet.id) { mutableStateOf(sheet.preferredPack) }
-    var advanced by rememberSaveable(sheet.id) { mutableStateOf(false) }
-    var newUnit by rememberSaveable(sheet.id) { mutableStateOf<String?>(null) }
-    var unitAmount by rememberSaveable(sheet.id) { mutableStateOf("") }
-    var confirmRename by rememberSaveable(sheet.id) { mutableStateOf(false) }
+    var pack by rememberSaveable(sheet.id, draft) { mutableStateOf(sheet.preferredPack) }
+    var advanced by rememberSaveable(sheet.id, draft) { mutableStateOf(false) }
+    var newUnit by rememberSaveable(sheet.id, draft) { mutableStateOf<String?>(null) }
+    var unitAmount by rememberSaveable(sheet.id, draft) { mutableStateOf("") }
+    var confirmRename by rememberSaveable(sheet.id, draft) { mutableStateOf(false) }
+    var allUnits by rememberSaveable(sheet.id, draft) { mutableStateOf(false) }
 
     val changes =
         ItemChanges(
@@ -110,7 +119,7 @@ internal fun ItemEditor(
                     amount = it
                     bad = false
                 },
-                label = { Text("Total required, e.g. 3 or 500 g") },
+                label = { Text("Total needed, e.g. 3 or 500 g") },
                 isError = bad,
                 supportingText = if (bad) ({ Text("Enter an amount, like 2 or 200 ml") }) else null,
                 singleLine = true,
@@ -120,22 +129,25 @@ internal fun ItemEditor(
                 modifier = Modifier.fillMaxWidth().testTag("edit-qty"),
             )
             val unit = ItemEdit.unitOf(amount)
+            // The current unit and its exact alternatives first; the rest behind "More units".
+            val common = ItemEdit.commonUnits(unit)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                for (u in ItemEdit.UNITS) {
+                for (u in if (allUnits) ItemEdit.UNITS else common) {
                     FilterChip(
                         enabled = !sheet.saving,
                         selected = u == unit,
                         onClick = {
-                            val converted = ItemEdit.withUnit(amount, u)
-                            if (converted != null) {
-                                amount = converted
-                            } else {
-                                newUnit = u
-                                unitAmount =
-                                    com.robert4lyf.hypershop.core.parse.RuleParser()
-                                        .parse(amount + " hypershopquantity").quantity?.toString().orEmpty()
+                            if (u != unit) {
+                                val converted = ItemEdit.withUnit(amount, u)
+                                if (converted != null) {
+                                    amount = converted
+                                } else {
+                                    // No conversion: the amount is asked for, never carried over as if it were one.
+                                    newUnit = u
+                                    unitAmount = ""
+                                }
+                                bad = false
                             }
-                            bad = false
                         },
                         label = { Text(u) },
                         shape = PillShape,
@@ -143,14 +155,20 @@ internal fun ItemEditor(
                         modifier = Modifier.testTag("unit-$u"),
                     )
                 }
+                TextButton(
+                    onClick = { allUnits = !allUnits },
+                    enabled = !sheet.saving,
+                    modifier = Modifier.heightIn(min = 48.dp).testTag("more-units"),
+                ) { Text(if (allUnits) "Fewer units" else "More units") }
             }
 
             Text(
-                "This edits the total requirement, including amounts already bought or at home. Source contributions are shown below.",
+                "Edits the total needed, including anything bought or at home. Sources are below.",
                 style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             TextButton(onClick = { advanced = !advanced }, modifier = Modifier.testTag("item-preferences")) {
-                Text(if (advanced) "Hide aisle, category and lasting preferences" else "Aisle, category and lasting preferences")
+                Text(if (advanced) "Hide aisle, category and pack" else "Aisle, category and usual pack")
             }
             if (advanced) {
                 OutlinedTextField(
@@ -158,11 +176,7 @@ internal fun ItemEditor(
                     enabled = !sheet.saving,
                     onValueChange = { pack = it },
                     label = { Text("Usual pack at ${sheet.storeName}, e.g. 400 g") },
-                    supportingText = {
-                        Text(
-                            "Optional purchase suggestion. Leave blank to forget it; requirements and purchases stay separate.",
-                        )
-                    },
+                    supportingText = { Text("A buying suggestion only; the amount needed is unchanged. Blank forgets it.") },
                     modifier = Modifier.fillMaxWidth().testTag("preferred-pack"),
                 )
                 SectionLabel("Aisle")
@@ -294,28 +308,91 @@ internal fun ItemEditor(
         )
     }
     newUnit?.let { unit ->
-        val proposed = if (unit == ItemEdit.EACH) unitAmount else "$unitAmount $unit"
-        val valid = com.robert4lyf.hypershop.core.parse.QuantityInput.parse(proposed) != null
-        AlertDialog(
-            onDismissRequest = { newUnit = null },
-            title = { Text("Change the measure to $unit?") },
-            text = {
-                Column {
-                    Text(
-                        "There is no known conversion from this measure. Enter the amount you " +
-                            "intend; pack sizes and densities are not assumed.",
-                    )
-                    Text("New total: $proposed")
-                    Text("Use this as a new amount, then edit the number if needed. No conversion is implied.")
-                }
+        UnitAmountDialog(
+            from = ItemEdit.unitOf(amount),
+            unit = unit,
+            typed = unitAmount,
+            onType = { unitAmount = it },
+            onConfirm = { text ->
+                // The draft only: Save still persists it.
+                amount = text
+                newUnit = null
+                unitAmount = ""
+                bad = false
             },
-            confirmButton = {
-                TextButton(enabled = valid, onClick = {
-                    amount = proposed
-                    newUnit = null
-                }) { Text("Use amount") }
+            onCancel = {
+                newUnit = null
+                unitAmount = ""
             },
-            dismissButton = { TextButton(onClick = { newUnit = null }) { Text("Cancel") } },
         )
     }
+}
+
+/**
+ * A unit with no exact conversion from the current one (g to ml, a count to kg): the amount is typed for the new
+ * unit. Nothing is suggested, so no density or pack size is implied. Use stays off until the amount is a positive
+ * number; what is typed is kept, with what to fix, until it is.
+ */
+@Composable
+private fun UnitAmountDialog(
+    from: String?,
+    unit: String,
+    typed: String,
+    onType: (String) -> Unit,
+    onConfirm: (String) -> Unit,
+    onCancel: () -> Unit,
+) {
+    val proposal = ItemEdit.propose(typed, unit)
+    var tried by rememberSaveable(unit) { mutableStateOf(false) }
+    val showError = proposal.error != null && (typed.isNotBlank() || tried)
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(unit) { runCatching { focus.requestFocus() } }
+    val unitName = if (unit == ItemEdit.EACH) "a count" else unit
+    val fromName =
+        when (from) {
+            null -> "this amount"
+            ItemEdit.EACH -> "a count"
+            else -> from
+        }
+    AlertDialog(
+        onDismissRequest = onCancel,
+        // As the home amount dialog (N.8): a text field in a platform-width dialog never settles its layout.
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).testTag("unit-amount-dialog"),
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        title = { Text("Change to $unitName") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("There is no conversion from $fromName to $unitName. Enter the amount you need.")
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = typed,
+                        onValueChange = onType,
+                        label = { Text("Amount") },
+                        isError = showError,
+                        supportingText = if (showError) ({ Text(proposal.error!!) }) else null,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.medium,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Done),
+                        keyboardActions =
+                            KeyboardActions(onDone = {
+                                val text = proposal.text
+                                if (text != null) onConfirm(text) else tried = true
+                            }),
+                        modifier = Modifier.weight(1f).focusRequester(focus).testTag("unit-amount"),
+                    )
+                    if (unit != ItemEdit.EACH) {
+                        Text(unit, style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag("unit-amount-unit"))
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = proposal.text != null,
+                onClick = { proposal.text?.let(onConfirm) },
+                modifier = Modifier.testTag("unit-amount-use"),
+            ) { Text(proposal.text?.let { "Use $it" } ?: "Use amount") }
+        },
+        dismissButton = { TextButton(onClick = onCancel, modifier = Modifier.testTag("unit-amount-cancel")) { Text("Cancel") } },
+    )
 }

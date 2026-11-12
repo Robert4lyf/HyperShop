@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     companion object {
         /** The launcher shortcut's action (res/xml/shortcuts.xml). */
-        const val ACTION_ADD = "com.robert4lyf.hypershop.action.ADD"
+        const val ACTION_ADD = EntryRequest.ACTION_ADD
     }
 
     private val container get() = (application as HyperShopApplication).container
@@ -60,9 +60,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handle(intent: Intent?) {
-        if (intent?.action == ACTION_ADD) {
-            // The launcher shortcut (missing 7 of the review): the Shopping tab with the Add field focused.
-            if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0) container.addRequests.tryEmit(Unit)
+        if (intent?.action == EntryRequest.ACTION_ADD || intent?.action == EntryRequest.ACTION_OPEN_LIST) {
+            // The widget and the launcher shortcut: the Shopping tab, with the Add field focused only for Add.
+            EntryRequest.from(intent)?.let { container.entryRequests.tryEmit(it) }
             return
         }
         if (intent?.action != Intent.ACTION_SEND) return

@@ -81,12 +81,20 @@ fun AddItemField(
     onAdd: (String) -> Unit,
     suggestions: (String) -> List<String>,
     onPick: (String, String) -> Unit = { _, s -> onAdd(s) },
-    /** Bumped to focus the field from outside (the launcher shortcut, missing 7 of the review). */
+    /** Above zero to focus the field from outside (the widget's or launcher's Add item, missing 7 of the review). */
     focus: Int = 0,
+    /** The request is used up: told once the field has asked for focus, so it is not asked again later. */
+    onFocused: () -> Unit = {},
 ) {
     var text by rememberSaveable { mutableStateOf("") }
     val requester = remember { FocusRequester() }
-    LaunchedEffect(focus) { if (focus > 0) runCatching { requester.requestFocus() } }
+    // One request, one focus: a field composed again later (scrolled back, the tab revisited) does not refocus.
+    LaunchedEffect(focus) {
+        if (focus > 0) {
+            runCatching { requester.requestFocus() }
+            onFocused()
+        }
+    }
     val submit = {
         if (text.isNotBlank()) onAdd(text)
         text = ""
@@ -260,10 +268,11 @@ fun androidx.compose.foundation.lazy.LazyListScope.listHeader(
     ui: ListUi,
     actions: HeaderActions,
     prep: PlanPrep = PlanPrep(),
-    /** Bumped to focus the Add field (the launcher shortcut). */
+    /** Above zero to focus the Add field (the widget's or launcher's Add item). */
     focusAdd: Int = 0,
+    onAddFocused: () -> Unit = {},
 ) {
-    item(key = "add") { AddItemField(actions.onAdd, actions.suggestions, actions.onPick, focus = focusAdd) }
+    item(key = "add") { AddItemField(actions.onAdd, actions.suggestions, actions.onPick, focus = focusAdd, onFocused = onAddFocused) }
     item(key = "ready") { ReadyCard(ui.readyJobs, actions.onReview) }
     // No "Plan this week's shop" card above the list (cut 2 of the review): This week is a tab of its own.
 }

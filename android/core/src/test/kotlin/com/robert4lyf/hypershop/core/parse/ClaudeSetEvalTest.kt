@@ -77,9 +77,12 @@ class ClaudeSetEvalTest {
         // These are re-scored recorded outputs, not a reduced gate for newly generated answers.
         val TOTALS =
             mapOf(
-                "t-2026" to listOf(126, 6, 0),
-                "final-2026" to listOf(125, 7, 1),
-                "release-c-2026" to listOf(259, 14, 2),
+                // Step P meaning flags: Claude's right reading of a heaped or egg-plus-yolk line keeps the rule parser's
+                // flag (ClaudeAlignment), one more right-but-flagged line per set (t: one of tq-017/tq-047, fq-069, rc-115); right and accepted
+                // wrong are unchanged.
+                "t-2026" to listOf(126, 6, 1),
+                "final-2026" to listOf(125, 7, 2),
+                "release-c-2026" to listOf(259, 14, 3),
             )
         val SETS = listOf("t-2026", "final-2026", "release-c-2026")
     }

@@ -43,8 +43,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -78,70 +82,162 @@ data class ItemSheetActions(
     val onWrong: (String, Boolean) -> Unit = { _, _ -> },
 )
 
+/**
+ * What a sheet with unsaved edits was asked to do, held as a description rather than a callback so that it can be
+ * saved with the activity and acted on only when confirmed. [Close] is plain Back or a swipe down.
+ */
+sealed interface PendingSheetAction {
+    /** The confirm button's words: what happens to the edits and what happens next. */
+    val confirm: String
+
+    data object Close : PendingSheetAction {
+        override val confirm = "Discard changes"
+    }
+
+    /** "Mark bought" ([bought] true) or "Mark not bought", as the sheet showed it when tapped. */
+    data class Tick(
+        val bought: Boolean,
+    ) : PendingSheetAction {
+        override val confirm = if (bought) "Discard edits and mark bought" else "Discard edits and mark not bought"
+    }
+
+    data object Remove : PendingSheetAction {
+        override val confirm = "Discard edits and remove"
+    }
+
+    data class Swap(
+        val to: String,
+        val always: Boolean,
+    ) : PendingSheetAction {
+        override val confirm = "Discard edits and swap for $to"
+    }
+
+    companion object {
+        /** Kept as plain strings in the saved state; anything unreadable restores as nothing pending. */
+        val Saver: Saver<PendingSheetAction?, Any> =
+            Saver(
+                save = { a ->
+                    when (a) {
+                        null -> arrayListOf("none")
+                        Close -> arrayListOf("close")
+                        Remove -> arrayListOf("remove")
+                        is Tick -> arrayListOf("tick", a.bought.toString())
+                        is Swap -> arrayListOf("swap", a.to, a.always.toString())
+                    }
+                },
+                restore = { v ->
+                    val l = (v as? List<*>)?.map { it as? String }
+                    when (l?.firstOrNull()) {
+                        "close" -> Close
+                        "remove" -> Remove
+                        "tick" -> l.getOrNull(1)?.toBooleanStrictOrNull()?.let { Tick(it) }
+                        "swap" -> {
+                            val to = l.getOrNull(1)
+                            val always = l.getOrNull(2)?.toBooleanStrictOrNull()
+                            if (to != null && always != null) Swap(to, always) else null
+                        }
+                        else -> null
+                    }
+                },
+            )
+    }
+}
+
+/** Repeated taps closer together than this act once: the sheet closes after the first. */
+private const val REPEAT_TAP_MS = 1_000L
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ItemSheetHost(
     sheet: ItemSheet,
     actions: ItemSheetActions,
     onDismiss: () -> Unit,
+    /** The clock repeated taps are measured on; a test may pass its own. */
+    now: () -> Long = { android.os.SystemClock.uptimeMillis() },
 ) {
     var dirty by rememberSaveable(sheet.id) { mutableStateOf(false) }
-    var discard by rememberSaveable(sheet.id) { mutableStateOf(false) }
-    var pendingAction by remember(sheet.id) { mutableStateOf<(() -> Unit)?>(null) }
-    val guard: (() -> Unit) -> Unit = { action ->
-        if (!sheet.saving) {
-            if (dirty) {
-                pendingAction = action
-                discard = true
-            } else {
-                action()
+    // A description, never a callback: it survives recreation and runs only from the confirmation's button.
+    var pending by rememberSaveable(sheet.id, stateSaver = PendingSheetAction.Saver) { mutableStateOf<PendingSheetAction?>(null) }
+    // Bumped when edits are discarded, so the editor starts again from the item rather than the draft.
+    var draft by rememberSaveable(sheet.id) { mutableIntStateOf(0) }
+    var lastRun by remember(sheet.id) { mutableLongStateOf(Long.MIN_VALUE) }
+    val current by rememberUpdatedState(sheet)
+    val run: (PendingSheetAction) -> Unit = { a ->
+        val t = now()
+        if (lastRun == Long.MIN_VALUE || t - lastRun >= REPEAT_TAP_MS) {
+            lastRun = t
+            when (a) {
+                PendingSheetAction.Close -> onDismiss()
+                PendingSheetAction.Remove -> actions.onDelete()
+                is PendingSheetAction.Swap -> actions.onSwap(a.to, a.always)
+                // Ticked or unticked elsewhere meanwhile (the watch, the list): already as asked, so only close.
+                is PendingSheetAction.Tick -> if (current.done != a.bought) actions.onToggle() else onDismiss()
             }
         }
     }
-    val dismiss = {
-        if (dirty) {
-            pendingAction = null
-            discard = true
-        } else if (!sheet.saving) {
-            onDismiss()
+    val request: (PendingSheetAction) -> Unit = { a ->
+        if (!current.saving) {
+            if (dirty) pending = a else run(a)
         }
     }
     val state =
         rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = {
-            if (it == SheetValue.Hidden && (dirty || sheet.saving)) {
-                if (!sheet.saving) discard = true
+            if (it == SheetValue.Hidden && (dirty || current.saving)) {
+                if (!current.saving) pending = PendingSheetAction.Close
                 false
             } else {
                 true
             }
         })
-    BackHandler { dismiss() }
-    ModalBottomSheet(onDismissRequest = dismiss, sheetState = state) {
+    BackHandler { request(PendingSheetAction.Close) }
+    ModalBottomSheet(onDismissRequest = { request(PendingSheetAction.Close) }, sheetState = state) {
         ItemSheetContent(
             sheet,
             actions.copy(
-                onDelete = { guard(actions.onDelete) },
-                onToggle = { guard(actions.onToggle) },
-                onSwap = { name, always -> guard { actions.onSwap(name, always) } },
+                onDelete = { request(PendingSheetAction.Remove) },
+                onToggle = { request(PendingSheetAction.Tick(bought = !current.done)) },
+                onSwap = { name, always -> request(PendingSheetAction.Swap(name, always)) },
             ),
             Modifier.imePadding(),
             onDirty = { dirty = it },
+            draft = draft,
         )
     }
-    if (discard) {
-        AlertDialog(
-            onDismissRequest = { discard = false },
-            title = { Text("Discard item changes?") },
-            text = { Text("Your changes have not been saved.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    discard = false
-                    onDismiss()
-                }) { Text("Discard changes") }
+    pending?.let { asked ->
+        DiscardDialog(
+            asked,
+            saving = sheet.saving,
+            onConfirm = {
+                // Read and cleared before acting: a second tap, or one in the same frame, finds nothing to run.
+                val a = pending
+                pending = null
+                if (a != null && !current.saving) {
+                    draft++
+                    dirty = false
+                    run(a)
+                }
             },
-            dismissButton = { TextButton(onClick = { discard = false }) { Text("Keep editing") } },
+            onKeep = { pending = null },
         )
     }
+}
+
+@Composable
+private fun DiscardDialog(
+    asked: PendingSheetAction,
+    saving: Boolean,
+    onConfirm: () -> Unit,
+    onKeep: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onKeep,
+        title = { Text("Discard item changes?") },
+        text = { Text("Your edits to this item have not been saved.") },
+        confirmButton = {
+            TextButton(enabled = !saving, onClick = onConfirm, modifier = Modifier.testTag("discard-confirm")) { Text(asked.confirm) }
+        },
+        dismissButton = { TextButton(onClick = onKeep, modifier = Modifier.testTag("discard-keep")) { Text("Keep editing") } },
+    )
 }
 
 /**
@@ -155,13 +251,15 @@ fun ItemSheetContent(
     actions: ItemSheetActions,
     modifier: Modifier = Modifier,
     onDirty: (Boolean) -> Unit = {},
+    /** A new value starts the editor again from [sheet], dropping its draft. */
+    draft: Int = 0,
 ) {
     Surface(modifier, color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Column(
             Modifier.fillMaxWidth().fillMaxHeight(0.9f).padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            ItemEditor(sheet, actions.onSave, Modifier.weight(1f), onDirty) {
+            ItemEditor(sheet, actions.onSave, Modifier.weight(1f), onDirty, draft) {
                 SheetHeader(sheet.name, sheet.aisle)
                 Button(onClick = actions.onToggle, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("toggle-item")) {
                     Icon(if (sheet.done) Icons.Rounded.Undo else Icons.Rounded.Check, contentDescription = null, Modifier.size(20.dp))

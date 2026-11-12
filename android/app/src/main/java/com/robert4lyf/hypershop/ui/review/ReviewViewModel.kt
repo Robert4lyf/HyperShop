@@ -16,6 +16,7 @@ import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.QtyUnit
+import com.robert4lyf.hypershop.core.parse.Meaning
 import com.robert4lyf.hypershop.core.report.WrongReport
 import com.robert4lyf.hypershop.data.ListRepository
 import com.robert4lyf.hypershop.data.StoredRecipe
@@ -1251,6 +1252,10 @@ class ReviewViewModel(
                 reason == "no ingredient name" -> "no ingredient name was found; edit the line"
                 reason == "an amount it couldn't read" -> "an amount it couldn't read; the Amount field sets it"
                 reason == "a name that reads like a sentence" -> "the name reads like a sentence; edit the line"
+                reason == Meaning.PART ->
+                    "part of an ingredient (like a yolk) is asked for too, counted here as one more to buy. " +
+                        "Tap to set how many"
+                reason == Meaning.HEAPED -> "a heaped measure holds more than the level amount shown. Tap to set the amount"
                 else -> reason
             }
 

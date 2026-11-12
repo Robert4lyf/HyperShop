@@ -193,11 +193,14 @@ class AppContainer(
      */
     val pendingReviews = MutableStateFlow<List<Long>>(emptyList())
 
-    /** The launcher shortcut asked for the Add field (missing 7 of the review): the app opens Shopping and focuses it. */
-    val addRequests = MutableSharedFlow<Unit>(replay = 1, extraBufferCapacity = 1)
+    /**
+     * The widget or the launcher shortcut asked for the shopping list, or its Add field (missing 7 of the review).
+     * Kept (the latest only) until the app shell, composed once start-up is ready, takes it.
+     */
+    val entryRequests = MutableSharedFlow<com.robert4lyf.hypershop.EntryRequest>(replay = 1, extraBufferCapacity = 1)
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    fun addRequestHandled() = addRequests.resetReplayCache()
+    fun entryRequestHandled() = entryRequests.resetReplayCache()
 
     /** Backups and restores, one at a time ([BackupManager.recover] runs in [startUp]). */
     val backups by lazy { BackupManager(this, BuildConfig.VERSION_NAME) }

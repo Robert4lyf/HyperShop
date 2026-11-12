@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
@@ -210,6 +211,29 @@ class RecipesScreenTest {
         compose.onNodeWithTag("cooking-view").captureRoboImage(Shots.path("cooking-view-light.png"))
         compose.onNodeWithText("Back to recipe").performClick()
         compose.onNodeWithTag("cooking-view").assertDoesNotExist()
+    }
+
+    @Test
+    fun cookingViewSaysItHoldsNoMethodAndOffersTheOriginal() {
+        // No link and no book: it says plainly what it shows, and invents nothing.
+        var detail by mutableStateOf(DETAIL)
+        compose.setContent { HyperShopTheme(dynamicColor = false) { RecipeDetailContent(detail, onAdd = {}) } }
+        compose.onNodeWithTag("cook-recipe").performClick()
+        compose.onNodeWithTag("cooking-scope").assertTextEquals("Shows the saved ingredients and your notes. The method isn't saved here.")
+        compose.onNodeWithTag("cooking-original").assertDoesNotExist()
+        compose.onNodeWithText("Back to recipe").performClick()
+        // From a book: where the method is.
+        detail = DETAIL.copy(row = DETAIL.row.copy(bookRef = "Ottolenghi Simple · p. 142"))
+        compose.onNodeWithTag("cook-recipe").performClick()
+        compose.onNodeWithTag("cooking-scope").assertTextEquals(
+            "Shows the saved ingredients and your notes. The method is in Ottolenghi Simple · p. 142.",
+        )
+        compose.onNodeWithText("Back to recipe").performClick()
+        // From a page: the original is one tap away.
+        detail = DETAIL.copy(row = DETAIL.row.copy(url = "https://recipes.example/dal"))
+        compose.onNodeWithTag("cook-recipe").performClick()
+        compose.onNodeWithTag("cooking-original").assertExists()
+        compose.onNodeWithTag("cooking-view").captureRoboImage(Shots.path("cooking-view-link-light.png"))
     }
 
     @Test
