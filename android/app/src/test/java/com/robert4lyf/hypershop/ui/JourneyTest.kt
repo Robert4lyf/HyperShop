@@ -9,6 +9,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -109,6 +111,26 @@ class JourneyTest {
         settle()
     }
 
+    /** Swipes [list] up, as a person does, until [tag] is on screen: one scroll however many swipes. */
+    private fun swipeTo(
+        list: String,
+        tag: String,
+    ) {
+        scrolls++
+        val end = System.currentTimeMillis() + 10_000
+        while (compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isEmpty()) {
+            check(System.currentTimeMillis() < end) { "\"$tag\" not found by swiping $list" }
+            compose.onNodeWithTag(list).performTouchInput { swipeUp() }
+            compose.waitForIdle()
+        }
+        // On to the end, as a thumb does, so the row is clear of a snackbar at the bottom.
+        repeat(2) {
+            compose.onNodeWithTag(list).performTouchInput { swipeUp() }
+            compose.waitForIdle()
+        }
+        settle()
+    }
+
     /** Scrolls [list] to [tag] (a scroll, counted apart from taps). */
     private fun scrollTo(
         list: String,
@@ -188,6 +210,8 @@ class JourneyTest {
         // Make shopping list ends on the list; the optional food-at-home check is a chip there.
         tap("meals-add-to-list")
         compose.waitUntil(10_000) { runBlocking { c.repository.snapshot() }.itemByKey("cat:basmati_rice") != null }
+        // The optional extras are below the items (step Q), so the list is scrolled to them.
+        swipeTo("list", "list-home-check")
         tap("list-home-check")
         scrollTo("home-check-list", "home-some-cat:basmati_rice")
         tap("home-some-cat:basmati_rice")

@@ -283,9 +283,18 @@ fun androidx.compose.foundation.lazy.LazyListScope.listHeader(
 ) {
     item(key = "add") { AddItemField(actions.onAdd, actions.suggestions, actions.onPick, focus = focusAdd, onFocused = onAddFocused) }
     item(key = "ready") { ReadyCard(ui.readyJobs, actions.onReview) }
-    // Step Q: the optional extras, one compact row under the field rather than sections of their own.
-    if (prep.returning || prep.toCheck > 0) item(key = "shortcuts") { ListShortcuts(prep, actions) }
     // No "Plan this week's shop" card above the list (cut 2 of the review): This week is a tab of its own.
+}
+
+/**
+ * Step Q: the optional extras after the items (on a small phone a row above them pushed the list off the screen):
+ * Buy again and Check food at home. Both are in the list's menu too.
+ */
+fun androidx.compose.foundation.lazy.LazyListScope.listFooter(
+    prep: PlanPrep,
+    actions: HeaderActions,
+) {
+    if (prep.returning || prep.toCheck > 0) item(key = "shortcuts") { ListShortcuts(prep, actions) }
 }
 
 /**
@@ -299,7 +308,7 @@ private fun ListShortcuts(
     actions: HeaderActions,
 ) {
     FlowRow(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (prep.returning) {

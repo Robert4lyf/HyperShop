@@ -16,6 +16,8 @@ import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.robert4lyf.hypershop.backup.BackupManager
 import com.robert4lyf.hypershop.backup.Inspection
@@ -170,6 +172,26 @@ class WeeklyShopScenariosTest {
         scrolls++
     }
 
+    /**
+     * Swipes the list up, as a person does, until [tag] is on screen (the extras below the items, step Q). One scroll
+     * however many swipes; `performScrollToNode` does not reach that last item of the lazy list.
+     */
+    private fun swipeTo(tag: String) {
+        waitFor { has("list") }
+        val end = System.currentTimeMillis() + 15_000
+        while (!has(tag)) {
+            check(System.currentTimeMillis() < end) { "\"$tag\" not found by swiping the list. On screen: ${tagsOnScreen("")}" }
+            compose.onNodeWithTag("list").performTouchInput { swipeUp() }
+            compose.waitForIdle()
+        }
+        // On to the end, as a thumb does, so the row is clear of a snackbar at the bottom.
+        repeat(2) {
+            compose.onNodeWithTag("list").performTouchInput { swipeUp() }
+            compose.waitForIdle()
+        }
+        scrolls++
+    }
+
     private fun type(line: String) {
         // The field focused and its input session up before typing, as a person taps it first.
         waitFor { has("add-item") }
@@ -251,10 +273,12 @@ class WeeklyShopScenariosTest {
         waitFor { runBlocking { c.planner.week(c.planner.currentWeek()) }.all { it.shopping == MealShopping.TO_BUY } }
         waitFor { has("list") }
         // Buy again is a sheet from the list now, and the food-at-home check a screen of its own.
+        swipeTo("list-buy-again")
         tap("list-buy-again")
         tap("buy-again-all")
         waitFor { runBlocking { c.buyAgain.view() }.regulars.all { it.onList } }
         tap("buy-again-done")
+        swipeTo("list-home-check")
         tap("list-home-check")
         tap("home-have-all")
         waitFor(
@@ -301,6 +325,7 @@ class WeeklyShopScenariosTest {
         waitFor { has("list") }
         for (line in regulars) type(line)
         // The food-at-home check, from the list's chip; cupboard food by default, fresh food behind a switch.
+        swipeTo("list-home-check")
         tap("list-home-check")
         val home = runBlocking { c.homeCheck.view(c.repository.snapshot()) }
         val cupboard = home.filter { it.likelyCupboard && !it.have }.map { it.mergeKey }
@@ -339,6 +364,7 @@ class WeeklyShopScenariosTest {
         waitFor { c.total("cat:onion") == Rational.of(3) }
         // The onion regular is on the list already: shown there, and Add all has nothing to double.
         waitFor { has("list") }
+        swipeTo("list-buy-again")
         tap("list-buy-again")
         waitFor { has("regular-cat:onion") }
         tap("regular-cat:onion")

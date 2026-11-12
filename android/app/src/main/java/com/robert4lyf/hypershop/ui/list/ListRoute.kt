@@ -97,6 +97,8 @@ fun ListRoute(
             onMode = vm::setMode,
             onShop = { vm.requestShopping() },
             onChangeStore = { vm.changeStore() },
+            onBuyAgain = { buyingAgain = true },
+            onHomeCheck = onHomeCheck,
             onShareText = {
                 scope.launch {
                     container.awaitReady()
@@ -122,6 +124,7 @@ fun ListRoute(
             },
         ),
         header = { listHeader(ui, header, prep, focusAdd, onAddFocused) },
+        footer = { listFooter(prep, header) },
         empty = { EmptyState(header.onSample, header.onPasteLink, prep, header.onPlan, header.onLastShop) },
         focusAdd = focusAdd,
     )
