@@ -250,8 +250,9 @@ private fun BuyAgainSheet(
     snackbar: SnackbarHostState,
     onDismiss: () -> Unit,
 ) {
-    val vm: com.robert4lyf.hypershop.ui.meals.MealsViewModel =
-        viewModel(key = "buy-again", factory = factoryFor { com.robert4lyf.hypershop.ui.meals.MealsViewModel(container) })
+    // The light view model (Buy again, the home check and the list only), so the sheet fills at once.
+    val vm: com.robert4lyf.hypershop.ui.meals.PrepViewModel =
+        viewModel(key = "buy-again", factory = factoryFor { com.robert4lyf.hypershop.ui.meals.PrepViewModel(container) })
     val ui by vm.ui.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
     androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -278,11 +279,11 @@ private fun BuyAgainSheet(
                 com.robert4lyf.hypershop.ui.meals.BuyAgainSection(
                     ui,
                     com.robert4lyf.hypershop.ui.meals.MealsActions(
-                        onRegular = { vm.addRegular(it) },
-                        onAllRegulars = { vm.addAllRegulars() },
-                        onRepeatLastShop = { vm.repeatLastShop() },
-                        onPin = { vm.pin(it) },
-                        onHide = { vm.hide(it) },
+                        onRegular = { vm.actions.addRegular(it) },
+                        onAllRegulars = { vm.actions.addAllRegulars() },
+                        onRepeatLastShop = { vm.actions.repeatLastShop() },
+                        onPin = { vm.actions.pin(it) },
+                        onHide = { vm.actions.hide(it) },
                     ),
                 )
             }

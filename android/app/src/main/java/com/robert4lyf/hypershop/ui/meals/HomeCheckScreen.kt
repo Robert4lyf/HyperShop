@@ -54,17 +54,17 @@ fun HomeCheckRoute(
     snackbar: SnackbarHostState,
     onBack: () -> Unit,
 ) {
-    // Its own instance, pinned to the current week: the Meals tab may be showing another week.
-    val vm: MealsViewModel = viewModel(key = "home-check", factory = factoryFor { MealsViewModel(container) })
+    // The light view model (this week's home check and the list only), so the screen opens at once.
+    val vm: PrepViewModel = viewModel(key = "home-check", factory = factoryFor { PrepViewModel(container) })
     val ui by vm.ui.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
     HomeCheckScreen(
         ui,
         MealsActions(
-            onHave = vm::have,
-            onNeed = vm::need,
-            onHaveSome = { r, t, done -> vm.haveSome(r, t, done) },
-            onClearSome = vm::clearSome,
+            onHave = vm.actions::have,
+            onNeed = vm.actions::need,
+            onHaveSome = { r, t, done -> vm.actions.haveSome(r, t, done) },
+            onClearSome = vm.actions::clearSome,
         ),
         onBack = onBack,
     )
