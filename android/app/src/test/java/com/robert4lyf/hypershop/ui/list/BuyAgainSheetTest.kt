@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.ui.list
 
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -25,10 +26,13 @@ import org.robolectric.annotation.Config
 class BuyAgainSheetTest {
     @get:Rule val compose = createComposeRule()
 
-    private fun waitFor(tag: String) {
+    private fun waitFor(
+        tag: String,
+        why: String = "",
+    ) {
         val end = System.currentTimeMillis() + 10_000
         while (compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isEmpty()) {
-            check(System.currentTimeMillis() < end) { "\"$tag\" never appeared" }
+            check(System.currentTimeMillis() < end) { "\"$tag\" never appeared $why".trim() }
             compose.waitForIdle()
             Thread.sleep(20)
         }
@@ -57,8 +61,14 @@ class BuyAgainSheetTest {
             compose.onNodeWithTag("list").performTouchInput { swipeUp() }
             compose.waitForIdle()
         }
-        compose.onNodeWithTag("list-buy-again").performClick()
-        waitFor("buy-again-all")
+        // On to the end, as a thumb does: a chip only just in at the bottom edge takes no tap at its centre.
+        repeat(2) {
+            compose.onNodeWithTag("list").performTouchInput { swipeUp() }
+            compose.waitForIdle()
+        }
+        compose.onNodeWithTag("list-buy-again").assertIsDisplayed().performClick()
+        waitFor("buy-again-sheet", "(the chip's tap did not open the sheet)")
+        waitFor("buy-again-all", "(the sheet opened without the usual things)")
         compose.onNodeWithTag("buy-again-all").performClick()
         val done = System.currentTimeMillis() + 10_000
         while (runBlocking { c.repository.snapshot() }.itemByKey("cat:milk") == null) {
