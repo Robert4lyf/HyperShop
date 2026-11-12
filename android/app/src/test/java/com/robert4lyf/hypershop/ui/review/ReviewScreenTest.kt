@@ -117,7 +117,8 @@ class ReviewScreenTest {
     @Test
     fun headerAndActions() {
         show()
-        compose.onNodeWithText("Add 4 items").assertIsEnabled().performClick()
+        compose.onNodeWithText("4 items to your list").assertExists()
+        compose.onNodeWithText("Save and add meal").assertIsEnabled().performClick()
         compose.onNodeWithText("Cancel").performClick()
         compose.onNodeWithText("Waiting for Claude").fetchSemanticsNode()
         compose.onNodeWithText("Retry with Claude").performClick()

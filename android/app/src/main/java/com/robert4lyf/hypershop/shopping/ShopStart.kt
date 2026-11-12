@@ -13,10 +13,26 @@ class ShopStart(private val c: AppContainer) {
     val choices = MutableStateFlow<List<StoreProfileEntity>>(emptyList())
     private val lock = Mutex()
 
+    /**
+     * Step Q: the store used last is remembered, so Shopping view opens at once; the question is asked only when that
+     * store is no longer configured. [change] asks on purpose (Shopping view's "Change store").
+     */
     suspend fun request() {
         c.awaitReady()
         val stores = c.repository.storeProfiles()
-        if (stores.size > 1) choices.value = stores else start(stores.firstOrNull()?.id ?: 1L)
+        val active = c.settings.activeStore.first()
+        when {
+            stores.any { it.id == active } -> start(active)
+            stores.size > 1 -> choices.value = stores
+            else -> start(stores.firstOrNull()?.id ?: 1L)
+        }
+    }
+
+    /** Shopping view's "Change store": the stores to choose from. */
+    suspend fun change() {
+        c.awaitReady()
+        val stores = c.repository.storeProfiles()
+        if (stores.size > 1) choices.value = stores
     }
 
     suspend fun start(id: Long) =

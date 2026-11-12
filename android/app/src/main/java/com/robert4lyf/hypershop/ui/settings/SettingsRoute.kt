@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AddShoppingCart
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -179,6 +180,8 @@ fun SettingsRoute(
     onVoiceTest: (() -> Unit)? = null,
     /** The app's snackbar host; without one the screen shows its own. */
     snackbar: SnackbarHostState? = null,
+    /** Step Q: Settings is reached from the gear on a main screen; this goes back there. */
+    onBack: (() -> Unit)? = null,
 ) {
     val vm: SettingsViewModel = viewModel(factory = factoryFor { SettingsViewModel(container) })
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -231,6 +234,7 @@ fun SettingsRoute(
             onDeleteWrongNotes = { vm.deleteWrongNotes() },
         ),
         snackbar = own.takeIf { snackbar == null },
+        onBack = onBack,
     )
 }
 
@@ -241,6 +245,7 @@ fun SettingsScreen(
     actions: SettingsActions,
     /** A host to draw at the bottom, when the app's isn't in reach. */
     snackbar: SnackbarHostState? = null,
+    onBack: (() -> Unit)? = null,
 ) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxSize()) {
@@ -250,7 +255,18 @@ fun SettingsScreen(
                 contentPadding = PaddingValues(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                item(key = "top") { ScreenHeader(title = "Settings") }
+                item(key = "top") {
+                    ScreenHeader(
+                        title = "Settings",
+                        actions = {
+                            onBack?.let { back ->
+                                IconButton(onClick = back, modifier = Modifier.testTag("settings-back")) {
+                                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                                }
+                            }
+                        },
+                    )
+                }
                 // Nothing below the header until the saved settings are in, so no control jumps.
                 if (!ui.loaded) {
                     item(key = "loading") {

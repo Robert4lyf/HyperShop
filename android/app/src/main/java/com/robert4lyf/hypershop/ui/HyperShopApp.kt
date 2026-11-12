@@ -29,10 +29,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material.icons.rounded.CalendarMonth
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +41,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -59,6 +58,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -96,10 +96,14 @@ object Routes {
     const val VOICE_TEST = "voice-test"
     const val MEALS = "meals"
 
+    /** Step Q: the focused food-at-home check. */
+    const val HOME = "home"
+
     fun review(job: Long) = "review/$job"
 }
 
-private val TABS = setOf(Routes.MEALS, Routes.LIST, Routes.RECIPES, Routes.SETTINGS)
+/** Step Q: the three main destinations. Settings is reached from the gear at the top of each. */
+private val TABS = setOf(Routes.MEALS, Routes.LIST, Routes.RECIPES)
 
 internal data class Tab(
     val route: String,
@@ -128,13 +132,24 @@ fun HyperShopApp(
         )
         return
     }
-    AppShell(container, nav, debugScreen)
+    // Step Q: where to open, read before anything is drawn, so the app starts there rather than showing the list and
+    // then moving: the main destination last left, the list on a first run, and the list when a widget or shortcut
+    // request is waiting (it says where to go itself).
+    var start by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        val last = container.settings.lastTab.first()?.takeIf { it in TABS }
+        start = if (container.entryRequests.replayCache.isNotEmpty()) Routes.LIST else last ?: Routes.LIST
+    }
+    // A frame or two while the setting is read.
+    val first = start ?: return
+    AppShell(container, nav, startRoute = first, debugScreen = debugScreen)
 }
 
 @Composable
 private fun AppShell(
     container: AppContainer,
     nav: NavHostController,
+    startRoute: String = Routes.LIST,
     debugScreen: (@Composable (AppContainer) -> Unit)?,
 ) {
     val snackbar = remember { SnackbarHostState() }
@@ -193,7 +208,8 @@ private fun AppShell(
     // Each tab keeps its state (and its view model) while you are on another, so coming back doesn't rebuild it.
     val selectTab: (String) -> Unit = { r ->
         nav.navigate(r) {
-            popUpTo(Routes.LIST) { saveState = true }
+            // The graph's start (the destination the app opened on), so the back stack stays one tab deep.
+            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
             launchSingleTop = true
             restoreState = true
         }
@@ -201,8 +217,6 @@ private fun AppShell(
     // The widget and the launcher shortcut (missing 7 of the review): Shopping, and for Add the Add field focused.
     // A focus request waits (above zero) until the field takes it, then is gone: it never comes back later.
     var addFocus by rememberSaveable { mutableIntStateOf(0) }
-    // Once an entry point has said where to go, the start-up choice of tab below leaves it there.
-    var entered by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         container.entryRequests.collect { request ->
             if (request == com.robert4lyf.hypershop.EntryRequest.ADD) {
@@ -212,7 +226,6 @@ private fun AppShell(
             // from a cold start arrives before NavHost has set its graph, and navigating then throws: wait for it.
             withContext(Dispatchers.Main) {
                 nav.currentBackStackEntryFlow.first()
-                entered = true
                 selectTab(Routes.LIST)
                 // Add focuses the field once; the list on its own drops any focus still waiting, so it never comes later.
                 addFocus = if (request == com.robert4lyf.hypershop.EntryRequest.ADD) addFocus + 1 else 0
@@ -220,22 +233,9 @@ private fun AppShell(
             container.entryRequestHandled()
         }
     }
-    // X.10: with nothing to buy the app opens on This week, where a shop starts; otherwise on the shopping list.
-    // Once per launch (not on rotation), and only if nothing has navigated yet (a share's review).
-    var startChosen by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        if (startChosen) return@LaunchedEffect
-        startChosen = true
-        if (container.entryRequests.replayCache.isNotEmpty()) return@LaunchedEffect
-        val empty = container.repository.list.first().liveItems.isEmpty()
-        // Someone who has shopped here before (saved recipes, or a finished trip): a first run stays on Shopping,
-        // where the Add field and the sample list are, not on "No saved recipes yet" (UX review 3).
-        val returning = container.repository.observeLibrary().first().isNotEmpty() || container.buyAgain.observe().first().hasHistory
-        // Navigation's state belongs to the main thread, wherever the list was read.
-        withContext(Dispatchers.Main) {
-            if (!entered && empty && returning && nav.currentBackStackEntry?.destination?.route == Routes.LIST) selectTab(Routes.MEALS)
-        }
-    }
+    // Where to open next time: the main destination last shown.
+    LaunchedEffect(route) { route?.takeIf { it in TABS }?.let { container.settings.setLastTab(it) } }
+    val openSettings: () -> Unit = { nav.navigate(Routes.SETTINGS) { launchSingleTop = true } }
     Scaffold(
         contentWindowInsets =
             if (reviewing) {
@@ -250,19 +250,19 @@ private fun AppShell(
                 snackbar,
                 when {
                     reviewing -> Modifier.navigationBarsPadding().padding(bottom = 80.dp)
-                    route == Routes.MEALS -> Modifier.padding(bottom = 80.dp)
+                    route == Routes.MEALS || route == Routes.HOME -> Modifier.padding(bottom = 80.dp)
                     else -> Modifier
                 },
             )
         },
         bottomBar = {
-            if (route != Routes.REVIEW) {
+            // The three main destinations only: Settings and its screens, and the review, have their own way back.
+            if (route == null || route in TABS) {
                 val tabs =
                     listOf(
-                        Tab(Routes.MEALS, "This week", Icons.Rounded.CalendarMonth, Icons.Outlined.CalendarMonth),
-                        Tab(Routes.LIST, "Shopping", Icons.Rounded.ShoppingCart, Icons.Outlined.ShoppingCart),
+                        Tab(Routes.MEALS, "Meals", Icons.Rounded.CalendarMonth, Icons.Outlined.CalendarMonth),
+                        Tab(Routes.LIST, "Shopping list", Icons.Rounded.ShoppingCart, Icons.Outlined.ShoppingCart),
                         Tab(Routes.RECIPES, "Recipes", Icons.AutoMirrored.Rounded.MenuBook, Icons.AutoMirrored.Outlined.MenuBook),
-                        Tab(Routes.SETTINGS, "Settings", Icons.Rounded.Settings, Icons.Outlined.Settings),
                     )
                 CompactNavBar(tabs, route, selectTab)
             }
@@ -270,87 +270,100 @@ private fun AppShell(
     ) { padding ->
         val openReview: (Long) -> Unit = { nav.navigate(Routes.review(it)) { launchSingleTop = true } }
         // A quick fade, not Navigation's default 700 ms cross-fade, which made tab switches feel slow.
-        NavHost(
-            nav,
-            startDestination = Routes.LIST,
-            modifier = Modifier.padding(padding),
-            enterTransition = { fadeIn(tween(150)) },
-            exitTransition = { fadeOut(tween(100)) },
-            popEnterTransition = { fadeIn(tween(150)) },
-            popExitTransition = { fadeOut(tween(100)) },
-        ) {
-            composable(Routes.LIST) {
-                ListRoute(
-                    container,
-                    snackbar,
-                    onReview = openReview,
-                    onPlan = { selectTab(Routes.MEALS) },
-                    focusAdd = addFocus,
-                    onAddFocused = { addFocus = 0 },
-                )
-            }
-            composable(Routes.RECIPES) {
-                RecipesRoute(
-                    container,
-                    snackbar,
-                    onReview = openReview,
-                    onMeals = { selectTab(Routes.MEALS) },
-                )
-            }
-            composable(Routes.MEALS) {
-                MealsRoute(
-                    container,
-                    snackbar,
-                    // Start shopping: the Shopping tab, which is the root of every stack.
-                    onList = { nav.popBackStack(Routes.LIST, inclusive = false) },
-                    onReview = openReview,
-                )
-            }
-            composable(Routes.SETTINGS) {
-                SettingsRoute(
-                    container,
-                    onDebug = debugScreen?.let { { nav.navigate(Routes.DEBUG) } },
-                    onLibrary = { nav.navigate(Routes.LIBRARY) { launchSingleTop = true } },
-                    onAisles = { nav.navigate(Routes.AISLES) { launchSingleTop = true } },
-                    // A developer harness with a microphone service: not in a release until voice mode exists.
-                    onVoiceTest = if (BuildConfig.DEBUG) ({ nav.navigate(Routes.VOICE_TEST) { launchSingleTop = true } }) else null,
-                    snackbar = snackbar,
-                )
-            }
-            composable(Routes.VOICE_TEST) { VoiceTestRoute(onBack = { nav.popBackStack() }) }
-            composable(Routes.LIBRARY) { LibraryRoute(container, snackbar, onBack = { nav.popBackStack() }) }
-            composable(Routes.AISLES) { AislesRoute(container, onBack = { nav.popBackStack() }) }
-            composable(Routes.REVIEW, arguments = listOf(navArgument("job") { type = NavType.LongType })) { e ->
-                ReviewRoute(
-                    container,
-                    e.arguments!!.getLong("job"),
-                    snackbar,
-                    onDone = {
-                        // Back to the tab the review was opened from, or to Settings › Library (not past it to the
-                        // list, review B.18); the list when it was opened by a share.
-                        val prev = nav.previousBackStackEntry?.destination?.route
-                        if (prev in TABS || prev == Routes.LIBRARY) nav.popBackStack() else nav.popBackStack(Routes.LIST, inclusive = false)
-                    },
-                    // "Try again" opens the new job only while the review is still on screen; left already, the job
-                    // waits on the Shopping tab's card (review B.20).
-                    onSettings = { selectTab(Routes.SETTINGS) },
-                    onReopen = { id ->
-                        if (nav.currentBackStackEntry?.destination?.route == Routes.REVIEW) {
-                            nav.navigate(Routes.review(id)) {
-                                popUpTo(Routes.REVIEW) { inclusive = true }
-                                launchSingleTop = true
+        CompositionLocalProvider(com.robert4lyf.hypershop.ui.common.LocalOpenSettings provides openSettings) {
+            NavHost(
+                nav,
+                startDestination = startRoute,
+                modifier = Modifier.padding(padding),
+                enterTransition = { fadeIn(tween(150)) },
+                exitTransition = { fadeOut(tween(100)) },
+                popEnterTransition = { fadeIn(tween(150)) },
+                popExitTransition = { fadeOut(tween(100)) },
+            ) {
+                composable(Routes.LIST) {
+                    ListRoute(
+                        container,
+                        snackbar,
+                        onReview = openReview,
+                        onPlan = { selectTab(Routes.MEALS) },
+                        focusAdd = addFocus,
+                        onAddFocused = { addFocus = 0 },
+                        onHomeCheck = { nav.navigate(Routes.HOME) { launchSingleTop = true } },
+                    )
+                }
+                composable(Routes.RECIPES) {
+                    RecipesRoute(
+                        container,
+                        snackbar,
+                        onReview = openReview,
+                        onMeals = { selectTab(Routes.MEALS) },
+                    )
+                }
+                composable(Routes.MEALS) {
+                    MealsRoute(
+                        container,
+                        snackbar,
+                        // View shopping list: the Shopping list tab.
+                        onList = { selectTab(Routes.LIST) },
+                        onReview = openReview,
+                        onHomeCheck = { nav.navigate(Routes.HOME) { launchSingleTop = true } },
+                    )
+                }
+                composable(Routes.SETTINGS) {
+                    SettingsRoute(
+                        container,
+                        onDebug = debugScreen?.let { { nav.navigate(Routes.DEBUG) } },
+                        onLibrary = { nav.navigate(Routes.LIBRARY) { launchSingleTop = true } },
+                        onAisles = { nav.navigate(Routes.AISLES) { launchSingleTop = true } },
+                        // A developer harness with a microphone service: not in a release until voice mode exists.
+                        onVoiceTest = if (BuildConfig.DEBUG) ({ nav.navigate(Routes.VOICE_TEST) { launchSingleTop = true } }) else null,
+                        snackbar = snackbar,
+                        onBack = { nav.popBackStack() },
+                    )
+                }
+                composable(Routes.HOME) {
+                    com.robert4lyf.hypershop.ui.meals.HomeCheckRoute(container, snackbar, onBack = { nav.popBackStack() })
+                }
+                composable(Routes.VOICE_TEST) { VoiceTestRoute(onBack = { nav.popBackStack() }) }
+                composable(Routes.LIBRARY) { LibraryRoute(container, snackbar, onBack = { nav.popBackStack() }) }
+                composable(Routes.AISLES) { AislesRoute(container, onBack = { nav.popBackStack() }) }
+                composable(Routes.REVIEW, arguments = listOf(navArgument("job") { type = NavType.LongType })) { e ->
+                    ReviewRoute(
+                        container,
+                        e.arguments!!.getLong("job"),
+                        snackbar,
+                        onDone = {
+                            // Back to the tab the review was opened from, or to Settings › Library (not past it to the
+                            // list, review B.18); the list when it was opened by a share.
+                            val prev = nav.previousBackStackEntry?.destination?.route
+                            if (prev in TABS || prev == Routes.LIBRARY) {
+                                nav.popBackStack()
+                            } else if (!nav.popBackStack(Routes.LIST, inclusive = false)) {
+                                // Opened over another first destination: the list is not on the stack to go back to.
+                                selectTab(Routes.LIST)
                             }
-                        }
-                    },
-                    // Undo after Cancel, up to 10 s later: a review opened meanwhile is left alone (the job is back on the card).
-                    onUndo = { id ->
-                        if (nav.currentBackStackEntry?.destination?.route != Routes.REVIEW) {
-                            nav.navigate(Routes.review(id)) { launchSingleTop = true }
-                        }
-                    },
-                )
+                        },
+                        // "Try again" opens the new job only while the review is still on screen; left already, the job
+                        // waits on the Shopping tab's card (review B.20).
+                        onSettings = openSettings,
+                        onReopen = { id ->
+                            if (nav.currentBackStackEntry?.destination?.route == Routes.REVIEW) {
+                                nav.navigate(Routes.review(id)) {
+                                    popUpTo(Routes.REVIEW) { inclusive = true }
+                                    launchSingleTop = true
+                                }
+                            }
+                        },
+                        // Undo after Cancel, up to 10 s later: a review opened meanwhile is left alone (the job is back on the card).
+                        onUndo = { id ->
+                            if (nav.currentBackStackEntry?.destination?.route != Routes.REVIEW) {
+                                nav.navigate(Routes.review(id)) { launchSingleTop = true }
+                            }
+                        },
+                    )
+                }
+                if (debugScreen != null) composable(Routes.DEBUG) { debugScreen(container) }
             }
-            if (debugScreen != null) composable(Routes.DEBUG) { debugScreen(container) }
         }
     }
 }
@@ -381,9 +394,7 @@ internal fun CompactNavBar(
         ) {
             for ((r, label, on, off) in tabs) {
                 // The ingredient library and the voice test are part of Settings, so its tab stays lit there.
-                val selected =
-                    route == r ||
-                        (r == Routes.SETTINGS && (route == Routes.LIBRARY || route == Routes.AISLES || route == Routes.VOICE_TEST))
+                val selected = route == r
                 Column(
                     Modifier
                         .weight(1f)

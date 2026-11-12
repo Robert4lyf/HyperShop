@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -482,4 +483,16 @@ fun CountPill(
 @Composable
 fun EdgeDivider(modifier: Modifier = Modifier) {
     HorizontalDivider(modifier, color = MaterialTheme.colorScheme.cardEdge)
+}
+
+/** Step Q: opens Settings from the top of a main screen; provided by the app shell, absent elsewhere (previews, tests). */
+val LocalOpenSettings = androidx.compose.runtime.staticCompositionLocalOf<(() -> Unit)?> { null }
+
+/** The gear at the top of Meals, Shopping list and Recipes: one place for Settings on every main screen. */
+@Composable
+fun SettingsButton(modifier: Modifier = Modifier) {
+    val open = LocalOpenSettings.current ?: return
+    androidx.compose.material3.IconButton(onClick = open, modifier = modifier.testTag("open-settings")) {
+        androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Rounded.Settings, contentDescription = "Settings")
+    }
 }

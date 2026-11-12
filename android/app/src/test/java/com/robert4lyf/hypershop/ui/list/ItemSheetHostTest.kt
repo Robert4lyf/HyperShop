@@ -79,7 +79,7 @@ class ItemSheetHostTest {
                     ItemSheetHost(s, actions(), onDismiss = {
                         events += "dismiss"
                         sheet = null
-                    }, now = { clock })
+                    }, now = { clock }, initiallyEditing = true)
                 }
             }
         }
@@ -206,7 +206,10 @@ class ItemSheetHostTest {
         val restore = StateRestorationTester(compose)
         restore.setContent {
             HyperShopTheme(dynamicColor = false) {
-                sheet?.let { s -> ItemSheetHost(s, actions(), onDismiss = { events += "dismiss" }, now = { clock }) }
+                sheet?.let {
+                        s ->
+                    ItemSheetHost(s, actions(), onDismiss = { events += "dismiss" }, now = { clock }, initiallyEditing = true)
+                }
             }
         }
         edit()

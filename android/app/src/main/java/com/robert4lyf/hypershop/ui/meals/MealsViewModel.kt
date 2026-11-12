@@ -11,7 +11,6 @@ import com.robert4lyf.hypershop.core.merge.UseProgress
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.plan.Week
 import com.robert4lyf.hypershop.data.BuyAgainView
-import com.robert4lyf.hypershop.data.HaveSome
 import com.robert4lyf.hypershop.data.HomeRow
 import com.robert4lyf.hypershop.data.MealShopping
 import com.robert4lyf.hypershop.data.PlannedMeal
@@ -363,7 +362,7 @@ class MealsViewModel(
         val write = written { c.planner.plan(w, pick.key) }
         viewModelScope.launch {
             val id = write.await()
-            messages.send(UiMessage("Planned ${pick.title}", undo = { writing.withLock { c.planner.unplanNew(listOf(id)) } }))
+            messages.send(UiMessage("Added ${pick.title}", undo = { writing.withLock { c.planner.unplanNew(listOf(id)) } }))
         }
     }
 
@@ -376,28 +375,27 @@ class MealsViewModel(
             val ids = write.await()
             if (ids.isEmpty()) return@launch
             messages.send(
-                UiMessage("Planned ${plural(ids.size, "meal")} again", undo = { writing.withLock { c.planner.unplanNew(ids) } }),
+                UiMessage("Added the same ${plural(ids.size, "meal")}", undo = { writing.withLock { c.planner.unplanNew(ids) } }),
             )
         }
     }
 
     /** "Add to the list": every waiting meal of the week, merged with what is there, in one go. */
-    fun addToList() {
+    fun addToList(after: ((UiMessage) -> Unit)? = null) {
         val w = week.value
         val write = written { c.planner.addWeekToList(w) }
         viewModelScope.launch {
             val added = write.await() ?: return@launch
-            // UX review 8: "Already at home?" sits below the picks; what it still asks about is said here.
-            val toCheck = c.homeCheck.view(c.repository.snapshot()).count { !it.have }
-            messages.send(
+            // Step Q: the outcome in the list's own terms, with Undo. The food-at-home check is offered on the list.
+            val list = c.repository.snapshot()
+            val left = list.liveItems.count { !list.isDone(it.id) && !list.isUnavailable(it.id) }
+            val m =
                 UiMessage(
-                    listOfNotNull(
-                        "Added ${plural(added.meals.size, "meal")} · ${plural(added.items, "item")}",
-                        toCheck.takeIf { it > 0 }?.let { "$it to check at home" },
-                    ).joinToString(" · "),
+                    "List ready: ${plural(left, "thing")} to buy · ${plural(added.meals.size, "meal")} added",
                     undo = { writing.withLock { c.planner.undoAddWeek(added) } },
-                ),
-            )
+                )
+            // Handed over directly when the caller is about to leave this screen, so it is shown wherever that leads.
+            if (after != null) after(m) else messages.send(m)
         }
     }
 
@@ -454,117 +452,35 @@ class MealsViewModel(
         }
     }
 
-    /** One Buy again chip, or "Add all", or "Repeat last shop": by hand, never doubling what is there. */
+    /** Buy again and the food-at-home check, shared with [PrepViewModel] (step Q). */
+    private val prep = ShopPrepActions(c, viewModelScope, writing, messages) { ui.value.buyAgain }
+
     fun addRegulars(
         rs: List<Regular>,
         what: String,
-    ) {
-        val write = written { c.buyAgain.add(rs) }
-        viewModelScope.launch {
-            val added = write.await()
-            if (added.isEmpty()) {
-                messages.send(UiMessage("Already on the shopping list"))
-                return@launch
-            }
-            messages.send(UiMessage("Added $what", undo = { writing.withLock { c.buyAgain.undo(added) } }))
-        }
-    }
+    ) = prep.addRegulars(rs, what)
 
-    fun addRegular(r: Regular) = addRegulars(listOf(r), r.name)
+    fun addRegular(r: Regular) = prep.addRegular(r)
 
-    fun addAllRegulars() = ui.value.toAdd.takeIf { it.isNotEmpty() }?.let { addRegulars(it, plural(it.size, "item")) }
+    fun addAllRegulars() = prep.addAllRegulars()
 
-    fun repeatLastShop() = ui.value.buyAgain.lastShop.takeIf { it.isNotEmpty() }?.let { addRegulars(it, plural(it.size, "item")) }
+    fun repeatLastShop() = prep.repeatLastShop()
 
-    fun pin(r: Regular) =
-        viewModelScope.launch {
-            c.buyAgain.pin(r)
-            messages.send(UiMessage("${r.name.replaceFirstChar { it.uppercase() }} is always offered"))
-        }
+    fun pin(r: Regular) = prep.pin(r)
 
-    fun hide(r: Regular) =
-        viewModelScope.launch {
-            c.buyAgain.hide(r)
-            // Undo gives back what there was: a pin, or the plain rules.
-            messages.send(UiMessage("Won't suggest ${r.name}", undo = { if (r.pinned) c.buyAgain.pin(r) else c.buyAgain.reset(r) }))
-        }
+    fun hide(r: Regular) = prep.hide(r)
 
-    /** At home check: "Have" (off the list for this shop) or "Need" (back on it), for one or several. */
-    fun have(rows: List<HomeRow>) {
-        val write = written { c.homeCheck.have(rows.map { it.mergeKey }) }
-        viewModelScope.launch {
-            val lines = write.await()
-            if (lines.isEmpty()) return@launch
-            val what = rows.singleOrNull()?.name ?: plural(rows.size, "item")
-            messages.send(UiMessage("$what at home", undo = { writing.withLock { c.homeCheck.needLines(lines) } }))
-        }
-    }
+    fun have(rows: List<HomeRow>) = prep.have(rows)
 
-    fun need(row: HomeRow) {
-        val write = written { c.homeCheck.need(listOf(row.mergeKey)) }
-        viewModelScope.launch {
-            val lines = write.await()
-            if (lines.isEmpty()) return@launch
-            messages.send(UiMessage("${row.name} back on the shopping list", undo = { writing.withLock { c.homeCheck.haveLines(lines) } }))
-        }
-    }
+    fun need(row: HomeRow) = prep.need(row)
 
-    /**
-     * Y.19 "Have some": [text] of the row at home, out of what all the week's recipes need; only the rest stays to buy.
-     * As much as is needed is "Have it".
-     */
     fun haveSome(
         row: HomeRow,
         text: String,
         onResult: (String?) -> Unit = {},
-    ) {
-        val write = written { c.homeCheck.changeSome(row.mergeKey, text) }
-        viewModelScope.launch {
-            val name = row.name.replaceFirstChar { it.uppercase() }
-            val change =
-                try {
-                    write.await()
-                } catch (e: kotlinx.coroutines.CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    val error = "Could not save the amount; your entry is still here."
-                    onResult(error)
-                    messages.send(UiMessage(error))
-                    return@launch
-                }
-            val undo: suspend () -> Unit = {
-                change.undo?.let { token ->
-                    if (!writing.withLock {
-                            c.homeCheck.undoSome(token)
-                        }
-                    ) {
-                        messages.send(UiMessage("The list changed since then, so Undo kept the newer changes."))
-                    }
-                }
-            }
-            val message =
-                when (change.result) {
-                    HaveSome.SET ->
-                        UiMessage("$name: ${text.trim()} at home, the rest stays on the shopping list", undo = undo)
-                    HaveSome.ENOUGH ->
-                        UiMessage("$name: that covers it, at home", undo = undo)
-                    HaveSome.ALREADY_ALLOCATED ->
-                        UiMessage(
-                            "Some home food already covers earlier recipe amounts. Keep that allocation " +
-                                "or correct the source first.",
-                        )
-                    HaveSome.NOT_AN_AMOUNT -> UiMessage("Enter an amount, like 300 g")
-                    HaveSome.DIFFERENT_MEASURE -> UiMessage("Enter it as the list measures it: ${row.needed ?: "the same unit"}")
-                }
-            onResult(if (change.result in setOf(HaveSome.SET, HaveSome.ENOUGH)) null else message.text)
-            messages.send(message)
-        }
-    }
+    ) = prep.haveSome(row, text, onResult)
 
-    /** Takes back "Have some": all of it to buy again. */
-    fun clearSome(row: HomeRow) {
-        written { c.homeCheck.clearSome(row.mergeKey) }
-    }
+    fun clearSome(row: HomeRow) = prep.clearSome(row)
 
     /**
      * Y.21: what is on the list without a recipe (Miscellaneous: household things, extras), still to buy, by name;

@@ -95,7 +95,7 @@ class ListScreenTest {
         // "Finish shopping" sits in the bar at the bottom, in reach, once something is ticked.
         compose.onNodeWithText("Finish shopping").performClick()
         compose.onNodeWithTag("finish").assertExists()
-        compose.onNodeWithText("5 left").fetchSemanticsNode()
+        compose.onNodeWithText("5 to buy").fetchSemanticsNode()
         assertEquals(listOf("open 1", "toggle 1", "finish"), events)
     }
 
@@ -176,7 +176,7 @@ class ListScreenTest {
     @Test
     fun theCountIsAHeading() {
         show()
-        compose.onNode(hasText("5 left") and isHeading()).assertExists()
+        compose.onNode(hasText("5 to buy") and isHeading()).assertExists()
     }
 
     @Test

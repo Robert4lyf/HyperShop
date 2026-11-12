@@ -110,8 +110,13 @@ data class ListActions(
     val onView: (ListView) -> Unit = {},
     /** "Shop" on the planning screen, "Plan" on the shop screen. */
     val onMode: (ListMode) -> Unit = {},
-    /** "Shop" with a store picked, when a second store has a walking order (missing 4 of the review). */
+    /** "Shopping view": the remembered store's order (missing 4 of the review; step Q asks only when it must). */
     val onShop: (Long) -> Unit = {},
+    /** Step Q: Shopping view's "Change store", with a second store to choose. */
+    val onChangeStore: () -> Unit = {},
+    /** Step Q: Buy again and Check food at home, from the menu as well as below the items. */
+    val onBuyAgain: () -> Unit = {},
+    val onHomeCheck: () -> Unit = {},
     val onShareText: () -> Unit = {},
     /** X.8: "Not available" on this trip, and "Found it" to take that back. */
     val onUnavailable: (ListRow) -> Unit = {},
@@ -142,6 +147,8 @@ fun ListScreen(
     empty: @Composable () -> Unit = { Text("Nothing on the list", Modifier.padding(24.dp)) },
     /** Above zero while an Add field request (widget, launcher shortcut) is waiting: the list goes to its top. */
     focusAdd: Int = 0,
+    /** After the items: the optional extras (Buy again, Check food at home), never above what is to buy. */
+    footer: LazyListScope.() -> Unit = {},
 ) {
     if (ui.shopping) {
         ShopScreen(ui, actions)
@@ -152,7 +159,7 @@ fun ListScreen(
             // Pinned: the count and the menu stay in reach on a long list.
             ListTop(ui, actions)
             Box(Modifier.weight(1f)) {
-                if (ui.loaded) ListBody(ui, actions, header, empty, focusAdd) else Loading()
+                if (ui.loaded) ListBody(ui, actions, header, empty, focusAdd, footer) else Loading()
             }
             if (ui.arranging) {
                 BottomActionBar(navigationBarInset = false) {
@@ -190,6 +197,7 @@ private fun ListBody(
     header: LazyListScope.() -> Unit,
     empty: @Composable () -> Unit,
     focusAdd: Int = 0,
+    footer: LazyListScope.() -> Unit = {},
 ) {
     val card = MaterialTheme.colorScheme.card
     // A request for the Add field brings it on screen, so it is focused now rather than whenever it next scrolls in.
@@ -241,7 +249,8 @@ private fun ListBody(
                 .fillMaxSize()
                 .onGloballyPositioned { below = (it.findRootCoordinates().size.height - it.boundsInRoot().bottom).roundToInt() }
                 .testTag("list"),
-        contentPadding = PaddingValues(bottom = 24.dp + keyboard),
+        // Room at the end for a snackbar (List ready, Undo): the extras below the items scroll clear of it.
+        contentPadding = PaddingValues(bottom = 96.dp + keyboard),
     ) {
         if (ui.arranging) {
             item(key = "arrange-hint") {
@@ -328,6 +337,7 @@ private fun ListBody(
             }
         }
         if (ui.inStock.isNotEmpty() && !ui.arranging) inStockSection(ui.inStock, card, actions.onNeed)
+        if (!ui.arranging) footer()
     }
 }
 
@@ -551,8 +561,9 @@ private fun ListTop(
         title =
             when {
                 !ui.loaded -> ""
-                shopping -> "${ui.left} left"
-                else -> "HyperShop"
+                // Where am I, and what is left: the count is the title while there is a list.
+                shopping -> "${ui.left} to buy"
+                else -> "Shopping list"
             },
         // One mosaic for the list, whatever the count says.
         seed = "Shopping list",
@@ -574,9 +585,10 @@ private fun ListTop(
                 ) {
                     Icon(Icons.Rounded.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(6.dp))
-                    Text("Shop")
+                    Text("Shopping view")
                 }
             }
+            com.robert4lyf.hypershop.ui.common.SettingsButton()
             var menu by remember { mutableStateOf(false) }
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
@@ -614,6 +626,14 @@ private fun ListTop(
                         },
                         modifier = Modifier.testTag("arrange"),
                     )
+                    DropdownMenuItem(text = { Text("Buy again") }, onClick = {
+                        menu = false
+                        actions.onBuyAgain()
+                    }, modifier = Modifier.testTag("menu-buy-again"))
+                    DropdownMenuItem(text = { Text("Check food at home") }, onClick = {
+                        menu = false
+                        actions.onHomeCheck()
+                    }, modifier = Modifier.testTag("menu-home-check"))
                     DropdownMenuItem(text = { Text("Share list as text") }, enabled = !ui.isEmpty, onClick = {
                         menu = false
                         actions.onShare()

@@ -51,6 +51,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.yield
 
 enum class TickState { OPEN, PARTIAL, DONE }
 
@@ -107,6 +108,8 @@ data class ItemSheet(
     val explanation: String = "",
     val saving: Boolean = false,
     val saveError: String? = null,
+    /** Step Q: what is still to buy (requirement less what is bought and at home), shown first on the sheet. */
+    val toBuy: List<String> = emptyList(),
 )
 
 /** One "From" row: "Weeknight chilli · 400 g", linked to the recipe's page when it has one. */
@@ -229,6 +232,8 @@ class ListViewModel(
     fun startShopping(storeId: Long) = viewModelScope.launch { c.shopStart.start(storeId) }
 
     fun requestShopping() = viewModelScope.launch { c.shopStart.request() }
+
+    fun changeStore() = viewModelScope.launch { c.shopStart.change() }
 
     private val arranging = MutableStateFlow(false)
     private val messages = Channel<UiMessage>(Channel.BUFFERED)
@@ -655,7 +660,8 @@ class ListViewModel(
             // never found): the shop screen would count that as "left" (review B.14).
             c.settings.setListMode(ListMode.PLAN)
             val left = c.repository.snapshot().liveItems.size
-            val text = "$n bought · $left carried forward"
+            // Step Q: what Finish did, in plain words: the bought things recorded, the rest still on the list.
+            val text = if (left > 0) "Shopping finished: $n bought · $left still on your list" else "Shopping finished: $n bought"
             messages.send(UiMessage(text, undo = { c.repository.undoDelete(stamp) }))
             // Missing 3: what was not bought is asked about once, rather than carried over unnoticed.
             if (left > 0 && n > 0) carryOver.value = left
@@ -690,6 +696,9 @@ class ListViewModel(
         savedState["openItem"] = id
         openJob?.cancel()
         return viewModelScope.launch {
+            // Let a tap that lands with this one (or a close) come first: started inline on the main thread, a load
+            // whose reads return at once would otherwise show this row before the one tapped after it.
+            yield()
             // Read, not the list on screen: a tap right after a tick would otherwise show the sheet as still open.
             val list = c.repository.snapshot()
             val item = list.items[id] ?: return@launch
@@ -719,6 +728,14 @@ class ListViewModel(
             val storeId = c.settings.activeStore.first()
             val packSize = c.repository.packPreference(storeId, item.mergeKey)
             val suggestion = packSize?.let { com.robert4lyf.hypershop.core.merge.PackSuggestion.forNeed(list.toBuy(id), it) }
+            val toBuy =
+                list.toBuy(id).parts.filterValues { it > Rational.ZERO }.mapNotNull { (k, v) ->
+                    Display.amount(QtyBase(mapOf(k to v)), units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy)
+                }
+            // Cancelling an earlier load only takes effect at a suspension point; past its last one, it would still
+            // show its row over the one tapped since, or reopen a sheet closed meanwhile. Only the latest request
+            // ("openItem", set as it is made and cleared by closeItem) may show its sheet.
+            if (savedState.get<Long>("openItem") != id) return@launch
             _sheet.value =
                 ItemSheet(
                     id,
@@ -750,6 +767,7 @@ class ListViewModel(
                             "Bought ${ItemEdit.text(list.purchased(id)).ifBlank { "0" }}",
                             "Buy ${ItemEdit.text(list.toBuy(id)).ifBlank { "0 / see requirement" }}",
                         ).joinToString(" · "),
+                    toBuy = toBuy,
                 )
         }.also { openJob = it }
     }

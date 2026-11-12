@@ -15,8 +15,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Check
@@ -54,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.ImeAction
@@ -154,6 +157,7 @@ fun ItemSheetHost(
     onDismiss: () -> Unit,
     /** The clock repeated taps are measured on; a test may pass its own. */
     now: () -> Long = { android.os.SystemClock.uptimeMillis() },
+    initiallyEditing: Boolean = false,
 ) {
     var dirty by rememberSaveable(sheet.id) { mutableStateOf(false) }
     // A description, never a callback: it survives recreation and runs only from the confirmation's button.
@@ -201,6 +205,7 @@ fun ItemSheetHost(
             Modifier.imePadding(),
             onDirty = { dirty = it },
             draft = draft,
+            initiallyEditing = initiallyEditing,
         )
     }
     pending?.let { asked ->
@@ -253,48 +258,130 @@ fun ItemSheetContent(
     onDirty: (Boolean) -> Unit = {},
     /** A new value starts the editor again from [sheet], dropping its draft. */
     draft: Int = 0,
+    /** Open straight into Change amount (the editor), as after tapping it. */
+    initiallyEditing: Boolean = false,
 ) {
+    // Step Q: first what to buy and what it is for, with three plain actions; the form and the bookkeeping behind
+    // Change amount and More details. A draft survives a rotation, and Change amount stays open with it.
+    var editing by rememberSaveable(sheet.id, draft) { mutableStateOf(initiallyEditing) }
+    var more by rememberSaveable(sheet.id) { mutableStateOf(false) }
+    val full: @Composable () -> Unit = {
+        SheetHeader(sheet.name, sheet.aisle)
+        Button(onClick = actions.onToggle, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("toggle-item")) {
+            Icon(if (sheet.done) Icons.Rounded.Undo else Icons.Rounded.Check, contentDescription = null, Modifier.size(20.dp))
+            Spacer(Modifier.size(8.dp))
+            Text(if (sheet.done) "Mark not bought" else "Mark bought")
+        }
+        if (sheet.totals.isNotEmpty()) {
+            val amount = sheet.totals.joinToString(" + ")
+            Text(
+                buildAnnotatedString {
+                    withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append("On the list: ") }
+                    withStyle(MaterialTheme.typography.titleLarge.toSpanStyle()) { append(amount) }
+                },
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.testTag("totals"),
+            )
+        }
+        sheet.purchaseSuggestion?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        sheet.packNote?.let { InfoBanner("Usually sold as $it", Icons.Rounded.LocalMall) }
+        if (sheet.explanation.isNotBlank()) Text(sheet.explanation, style = MaterialTheme.typography.bodyMedium)
+        if (sheet.sources.isNotEmpty()) Sources(sheet.sources)
+        Swaps(sheet, actions.onSwap)
+        EdgeDivider()
+        OutlinedButton(
+            onClick = actions.onDelete,
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("delete-item"),
+        ) {
+            Icon(Icons.Rounded.DeleteOutline, contentDescription = null, Modifier.size(20.dp))
+            Spacer(Modifier.size(8.dp))
+            Text("Remove from list")
+        }
+        WrongNote(actions.onWrong)
+    }
     Surface(modifier, color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Column(
             Modifier.fillMaxWidth().fillMaxHeight(0.9f).padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            ItemEditor(sheet, actions.onSave, Modifier.weight(1f), onDirty, draft) {
-                SheetHeader(sheet.name, sheet.aisle)
-                Button(onClick = actions.onToggle, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("toggle-item")) {
-                    Icon(if (sheet.done) Icons.Rounded.Undo else Icons.Rounded.Check, contentDescription = null, Modifier.size(20.dp))
-                    Spacer(Modifier.size(8.dp))
-                    Text(if (sheet.done) "Mark not bought" else "Mark bought")
-                }
-                if (sheet.totals.isNotEmpty()) {
-                    val amount = sheet.totals.joinToString(" + ")
-                    Text(
-                        buildAnnotatedString {
-                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append("On the list: ") }
-                            withStyle(MaterialTheme.typography.titleLarge.toSpanStyle()) { append(amount) }
-                        },
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.testTag("totals"),
-                    )
-                }
-                sheet.purchaseSuggestion?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                sheet.packNote?.let { InfoBanner("Usually sold as $it", Icons.Rounded.LocalMall) }
-                if (sheet.explanation.isNotBlank()) Text(sheet.explanation, style = MaterialTheme.typography.bodyMedium)
-                if (sheet.sources.isNotEmpty()) Sources(sheet.sources)
-                Swaps(sheet, actions.onSwap)
-                EdgeDivider()
-                OutlinedButton(
-                    onClick = actions.onDelete,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("delete-item"),
+            if (editing) {
+                ItemEditor(sheet, actions.onSave, Modifier.weight(1f), onDirty, draft) { full() }
+            } else {
+                Column(
+                    Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).testTag("item-summary"),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Icon(Icons.Rounded.DeleteOutline, contentDescription = null, Modifier.size(20.dp))
-                    Spacer(Modifier.size(8.dp))
-                    Text("Remove from list")
+                    SheetHeader(sheet.name, sheet.aisle)
+                    ItemSummary(sheet)
+                    Button(onClick = actions.onToggle, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("toggle-item")) {
+                        Icon(if (sheet.done) Icons.Rounded.Undo else Icons.Rounded.Check, contentDescription = null, Modifier.size(20.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text(if (sheet.done) "Mark not bought" else "Mark bought")
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(
+                            onClick = { editing = true },
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("item-change"),
+                        ) { Text("Change amount") }
+                        TextButton(
+                            onClick = { more = !more },
+                            modifier = Modifier.heightIn(min = 48.dp).testTag("item-more"),
+                        ) { Text(if (more) "Less" else "More details") }
+                    }
+                    // Only a suggestion: it never changes the amount needed or records a purchase.
+                    sheet.purchaseSuggestion?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                    if (more) {
+                        sheet.packNote?.let { InfoBanner("Usually sold as $it", Icons.Rounded.LocalMall) }
+                        if (sheet.explanation.isNotBlank()) {
+                            Text(
+                                sheet.explanation,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.testTag("item-breakdown"),
+                            )
+                        }
+                        if (sheet.sources.isNotEmpty()) Sources(sheet.sources)
+                        Swaps(sheet, actions.onSwap)
+                        EdgeDivider()
+                        OutlinedButton(
+                            onClick = actions.onDelete,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("delete-item"),
+                        ) {
+                            Icon(Icons.Rounded.DeleteOutline, contentDescription = null, Modifier.size(20.dp))
+                            Spacer(Modifier.size(8.dp))
+                            Text("Remove from list")
+                        }
+                        WrongNote(actions.onWrong)
+                    }
                 }
-                WrongNote(actions.onWrong)
             }
+        }
+    }
+}
+
+/** "Buy 3" and "For chilli and soup": what to buy now, and what it is for. */
+@Composable
+private fun ItemSummary(sheet: ItemSheet) {
+    Column(Modifier.semantics(mergeDescendants = true) {}.testTag("item-buy")) {
+        Text(
+            when {
+                sheet.toBuy.isNotEmpty() -> "Buy ${sheet.toBuy.joinToString(" + ")}"
+                sheet.done -> "Bought"
+                sheet.totals.isNotEmpty() -> "Buy ${sheet.totals.joinToString(" + ")}"
+                else -> "Buy some"
+            },
+            style = MaterialTheme.typography.headlineSmall,
+        )
+        val forWhat = sheet.sources.map { it.title }.distinct()
+        if (forWhat.isNotEmpty()) {
+            Text(
+                "For ${forWhat.joinToString(", ")}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

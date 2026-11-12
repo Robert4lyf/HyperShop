@@ -9,12 +9,14 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -84,6 +86,26 @@ class DeviceScenariosTest {
 
     private fun waitFor(what: () -> Boolean) = compose.waitUntil(10_000) { runCatching(what).getOrDefault(false) }
 
+    /** [waitFor], and on a timeout says what was awaited and the texts and tags on screen instead. */
+    private fun waitFor(
+        what: String,
+        until: () -> Boolean,
+    ) {
+        try {
+            waitFor(until)
+        } catch (timeout: androidx.compose.ui.test.ComposeTimeoutException) {
+            val any = SemanticsMatcher("any") { true }
+            val nodes = runCatching { compose.onAllNodes(any, true).fetchSemanticsNodes() }.getOrDefault(emptyList())
+            val seen =
+                nodes.mapNotNull { n ->
+                    val tag = n.config.getOrNull(SemanticsProperties.TestTag)
+                    val text = n.config.getOrNull(SemanticsProperties.Text)?.joinToString()
+                    listOfNotNull(tag, text).joinToString(": ").takeIf { it.isNotEmpty() }
+                }
+            throw AssertionError("Timed out waiting for $what. On screen: $seen", timeout)
+        }
+    }
+
     /** A: typed items, into the shop, every one bought, finished — and Undo is still offered. */
     @Test
     fun a_quickShop() {
@@ -144,7 +166,12 @@ class DeviceScenariosTest {
         // One merged row: 2 + 1 onions. The list capitalises the name ("3 Onions").
         val onion = runBlocking { c.repository.snapshot() }.let { l -> l.total(l.itemByKey("cat:onion")!!.id)[BaseKey.ITEMS] }
         assertEquals(Rational.of(3), onion)
-        waitFor { compose.onAllNodesWithText("3 onions", substring = true, ignoreCase = true).fetchSemanticsNodes().isNotEmpty() }
+        // Scrolled to, as a thumb would: on the CI emulator's small screen the list's header leaves room for little more
+        // than the first aisle's heading.
+        waitFor("\"3 onions\" on the list") {
+            compose.onNodeWithTag("list").performScrollToNode(hasText("3 onions", substring = true, ignoreCase = true))
+            compose.onAllNodesWithText("3 onions", substring = true, ignoreCase = true).fetchSemanticsNodes().isNotEmpty()
+        }
         val uses = runBlocking { c.repository.usesOnList() }
         assertEquals(2, uses.size)
         assertTrue(uses.all { it.progress.state == UseState.STILL_NEEDED })

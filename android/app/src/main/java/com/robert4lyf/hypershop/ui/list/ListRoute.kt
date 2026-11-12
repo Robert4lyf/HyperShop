@@ -2,6 +2,8 @@ package com.robert4lyf.hypershop.ui.list
 
 import android.content.ClipboardManager
 import android.content.Intent
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
@@ -14,13 +16,16 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -46,7 +51,11 @@ fun ListRoute(
     focusAdd: Int = 0,
     /** The Add field took the request; it is not to be repeated. */
     onAddFocused: () -> Unit = {},
+    /** Step Q: the focused food-at-home check. */
+    onHomeCheck: () -> Unit = {},
 ) {
+    var buyingAgain by rememberSaveable { mutableStateOf(false) }
+    if (buyingAgain) BuyAgainSheet(container, snackbar, onDismiss = { buyingAgain = false })
     val vm: ListViewModel = viewModel(factory = factoryFor { ListViewModel(container, it.createSavedStateHandle()) })
     val ui by vm.ui.collectAsStateWithLifecycle()
     val prep by vm.prep.collectAsStateWithLifecycle()
@@ -72,6 +81,8 @@ fun ListRoute(
                 },
                 onPlan = onPlan,
                 onLastShop = vm::addLastShop,
+                onBuyAgain = { buyingAgain = true },
+                onHomeCheck = onHomeCheck,
             )
         }
     ListScreen(
@@ -85,6 +96,9 @@ fun ListRoute(
             onView = vm::setView,
             onMode = vm::setMode,
             onShop = { vm.requestShopping() },
+            onChangeStore = { vm.changeStore() },
+            onBuyAgain = { buyingAgain = true },
+            onHomeCheck = onHomeCheck,
             onShareText = {
                 scope.launch {
                     container.awaitReady()
@@ -110,6 +124,7 @@ fun ListRoute(
             },
         ),
         header = { listHeader(ui, header, prep, focusAdd, onAddFocused) },
+        footer = { listFooter(prep, header) },
         empty = { EmptyState(header.onSample, header.onPasteLink, prep, header.onPlan, header.onLastShop) },
         focusAdd = focusAdd,
     )
@@ -220,6 +235,61 @@ suspend fun SnackbarHostState.showTimed(
             showSnackbar(visuals)
         } finally {
             timer.cancel()
+        }
+    }
+}
+
+/**
+ * Step Q: Buy again as a sheet over the list (it was a section of This week): your usual things and last shop, one tap
+ * each, added as hand-added items are, never doubling what is on the list.
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun BuyAgainSheet(
+    container: AppContainer,
+    snackbar: SnackbarHostState,
+    onDismiss: () -> Unit,
+) {
+    // The light view model (Buy again, the home check and the list only), so the sheet fills at once.
+    val vm: com.robert4lyf.hypershop.ui.meals.PrepViewModel =
+        viewModel(key = "buy-again", factory = factoryFor { com.robert4lyf.hypershop.ui.meals.PrepViewModel(container) })
+    // Read here, not first inside the sheet: the sheet is a window of its own, and a value that lands while its
+    // first composition is starting was missed there (the sheet stayed on "loading" with the data in hand).
+    // Read in this composition, a change recomposes the host, which hands the sheet the new value.
+    val ui = vm.ui.collectAsStateWithLifecycle().value
+    LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
+        androidx.compose.foundation.layout.Column(
+            androidx.compose.ui.Modifier.padding(bottom = 24.dp).testTag("buy-again-sheet"),
+        ) {
+            androidx.compose.foundation.layout.Row(
+                androidx.compose.ui.Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                // The section below names itself ("Buy again"); this row only closes the sheet.
+                androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.weight(1f))
+                androidx.compose.material3.TextButton(
+                    onClick = onDismiss,
+                    modifier = androidx.compose.ui.Modifier.testTag("buy-again-done"),
+                ) { Text("Done") }
+            }
+            if (ui.loaded && ui.buyAgain.regulars.isEmpty() && ui.buyAgain.lastShop.isEmpty()) {
+                Text(
+                    "Nothing to buy again yet. Things you buy often show here after a few shops.",
+                    modifier = androidx.compose.ui.Modifier.padding(20.dp),
+                )
+            } else {
+                com.robert4lyf.hypershop.ui.meals.BuyAgainSection(
+                    ui,
+                    com.robert4lyf.hypershop.ui.meals.MealsActions(
+                        onRegular = { vm.actions.addRegular(it) },
+                        onAllRegulars = { vm.actions.addAllRegulars() },
+                        onRepeatLastShop = { vm.actions.repeatLastShop() },
+                        onPin = { vm.actions.pin(it) },
+                        onHide = { vm.actions.hide(it) },
+                    ),
+                )
+            }
         }
     }
 }

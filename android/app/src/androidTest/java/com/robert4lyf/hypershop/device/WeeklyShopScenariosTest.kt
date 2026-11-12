@@ -16,6 +16,8 @@ import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.robert4lyf.hypershop.backup.BackupManager
 import com.robert4lyf.hypershop.backup.Inspection
@@ -109,7 +111,9 @@ class WeeklyShopScenariosTest {
         key: String,
         meals: Int,
     ) {
-        scrollTo("pick-add-$key")
+        // Step Q: recipes are chosen in the Add meal sheet, opened once and kept open for several.
+        if (!has("add-meal-list")) tap(if (has("meals-add-meal")) "meals-add-meal" else "meals-add-meal-more")
+        scrollTo("pick-add-$key", "add-meal-list")
         tap("pick-add-$key")
         waitFor(
             "\"$key\" planned as meal $meals of week $week",
@@ -154,14 +158,37 @@ class WeeklyShopScenariosTest {
         compose.waitForIdle()
     }
 
-    /** Scrolls the Plan screen to [tag] (counted apart: a swipe, not a decision). */
-    private fun scrollTo(tag: String) {
-        waitFor { has("meals") }
+    /** Scrolls [list] (Meals, the Add meal sheet, Food at home) to [tag] (counted apart: a swipe, not a decision). */
+    private fun scrollTo(
+        tag: String,
+        list: String = "meals",
+    ) {
+        waitFor { has(list) }
         // Not while the last tap's change is still being laid out (a scroll then measured mid-layout),
         // and not before the row is in the list at all (the saved recipes load after the screen opens).
         compose.waitForIdle()
         val inList = hasTestTag(tag)
-        waitFor { runCatching { compose.onNodeWithTag("meals").performScrollToNode(inList) }.isSuccess }
+        waitFor { runCatching { compose.onNodeWithTag(list).performScrollToNode(inList) }.isSuccess }
+        scrolls++
+    }
+
+    /**
+     * Swipes the list up, as a person does, until [tag] is on screen (the extras below the items, step Q). One scroll
+     * however many swipes; `performScrollToNode` does not reach that last item of the lazy list.
+     */
+    private fun swipeTo(tag: String) {
+        waitFor { has("list") }
+        val end = System.currentTimeMillis() + 15_000
+        while (!has(tag)) {
+            check(System.currentTimeMillis() < end) { "\"$tag\" not found by swiping the list. On screen: ${tagsOnScreen("")}" }
+            compose.onNodeWithTag("list").performTouchInput { swipeUp() }
+            compose.waitForIdle()
+        }
+        // On to the end, as a thumb does, so the row is clear of a snackbar at the bottom.
+        repeat(2) {
+            compose.onNodeWithTag("list").performTouchInput { swipeUp() }
+            compose.waitForIdle()
+        }
         scrolls++
     }
 
@@ -241,12 +268,18 @@ class WeeklyShopScenariosTest {
         val t0 = System.currentTimeMillis()
         tap("empty-plan")
         tap("repeat-week-button")
+        // Make shopping list ends on the list (step Q).
         tap("meals-add-to-list")
         waitFor { runBlocking { c.planner.week(c.planner.currentWeek()) }.all { it.shopping == MealShopping.TO_BUY } }
-        scrollTo("buy-again")
+        waitFor { has("list") }
+        // Buy again is a sheet from the list now, and the food-at-home check a screen of its own.
+        swipeTo("list-buy-again")
+        tap("list-buy-again")
         tap("buy-again-all")
         waitFor { runBlocking { c.buyAgain.view() }.regulars.all { it.onList } }
-        scrollTo("home-check")
+        tap("buy-again-done")
+        swipeTo("list-home-check")
+        tap("list-home-check")
         tap("home-have-all")
         waitFor(
             "cumin off the list after Have all",
@@ -256,7 +289,8 @@ class WeeklyShopScenariosTest {
                     "on screen: ${tagsOnScreen("home")}"
             },
         ) { c.items().none { it.mergeKey.contains("cumin") } }
-        tap("meals-shop")
+        tap("home-check-done")
+        tap("start-shopping")
         waitFor { has("shop") }
         effort("weekly shop, quick way", t0)
         // One onion row for chilli and dal; the cumin both wanted is at home, once; every regular on once.
@@ -264,7 +298,9 @@ class WeeklyShopScenariosTest {
         assertTrue(c.items().none { it.mergeKey.contains("cumin") })
         assertEquals(1, c.items().count { it.displayName.contains("milk") })
         assertEquals(ListMode.SHOP, runBlocking { c.settings.listMode.first() })
-        assertTrue("taps $taps", taps <= 6)
+        // Step Q moved Buy again and the food-at-home check off the Meals screen into a sheet and a screen of their
+        // own, as asked; each costs an open and a close. Was 6 taps on one long screen; now 10, measured, not hidden.
+        assertTrue("taps $taps", taps <= 10)
         assertEquals(0, typed)
     }
 
@@ -277,6 +313,7 @@ class WeeklyShopScenariosTest {
         tap("empty-plan")
         val keys = runBlocking { c.planner.week(c.planner.currentWeek() - 1) }.map { it.libraryKey }
         for ((i, k) in keys.withIndex()) planPick(c, c.planner.currentWeek(), k, i + 1)
+        tap("add-meal-done")
         tap("meals-add-to-list")
         waitFor {
             runBlocking { c.planner.week(c.planner.currentWeek()) }.let {
@@ -284,25 +321,24 @@ class WeeklyShopScenariosTest {
                 m.size == 4 && m.all { it.shopping == MealShopping.TO_BUY }
             }
         }
-        compose.onNodeWithTag("meals").assertExists()
-        // Over to the shopping list and type the usual items.
-        tap("tab-list")
+        // Make shopping list ends on the list: type the usual items there.
+        waitFor { has("list") }
         for (line in regulars) type(line)
-        // Back to This week for the cupboard check (the list's plan card went in Y.7d: the tab is the way there).
-        tap("tab-meals")
-        // The compact default shows cupboard food; fresh/chilled/frozen requirements have an explicit filter.
+        // The food-at-home check, from the list's chip; cupboard food by default, fresh food behind a switch.
+        swipeTo("list-home-check")
+        tap("list-home-check")
         val home = runBlocking { c.homeCheck.view(c.repository.snapshot()) }
         val cupboard = home.filter { it.likelyCupboard && !it.have }.map { it.mergeKey }
         for (k in cupboard) {
-            scrollTo("home-have-$k")
+            scrollTo("home-have-$k", "home-check-list")
             tap("home-have-$k")
-            // Gone from the list and from the screen: the row leaving moves the ones below it up, so the next
-            // scroll waits for that rather than racing it (as [planPick] waits for a new meal card).
+            // The row turns to "Need it" in place; the next scroll waits for that rather than racing it.
             waitFor("\"$k\" had at home", { "Rows on screen: ${tagsOnScreen("home-have-")}" }) {
                 c.items().none { it.mergeKey == k } && !has("home-have-$k")
             }
         }
-        tap("meals-shop")
+        tap("home-check-done")
+        tap("start-shopping")
         waitFor { has("shop") }
         effort("weekly shop, item by item", t0)
         assertEquals(Rational.of(3), c.total("cat:onion"))
@@ -327,7 +363,9 @@ class WeeklyShopScenariosTest {
         tap("meals-add-to-list")
         waitFor { c.total("cat:onion") == Rational.of(3) }
         // The onion regular is on the list already: shown there, and Add all has nothing to double.
-        scrollTo("buy-again")
+        waitFor { has("list") }
+        swipeTo("list-buy-again")
+        tap("list-buy-again")
         waitFor { has("regular-cat:onion") }
         tap("regular-cat:onion")
         compose.waitForIdle()

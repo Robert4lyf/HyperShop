@@ -164,8 +164,8 @@ fun ReviewScreen(
                 if (!ui.editing && !ui.byHand && !ui.savedOnly) {
                     item(key = "cupboard-hint") {
                         Text(
-                            "Add everything, then check the cupboard on This week: " +
-                                "it weighs what you have against all the recipes together.",
+                            "Add everything; Check food at home on your list later weighs what you have " +
+                                "against all your meals together.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp).testTag("cupboard-hint"),
@@ -206,7 +206,7 @@ fun ReviewScreen(
                         onClick = onSaveForLater,
                         enabled = !ui.busy,
                         modifier = Modifier.heightIn(min = 56.dp).testTag("save-for-later"),
-                    ) { Text("Save for later", textAlign = TextAlign.Center) }
+                    ) { Text("Save recipe", textAlign = TextAlign.Center) }
                 }
                 Button(
                     onClick = onAdd,
@@ -220,17 +220,27 @@ fun ReviewScreen(
                         modifier = Modifier.size(20.dp),
                     )
                     Spacer(Modifier.size(8.dp))
-                    Text(
-                        when {
-                            ui.editing -> "Save changes"
-                            ui.addCount == 0 && ui.inStockCount > 0 -> "Nothing to add — all at home"
-                            ui.addCount == 0 -> "Nothing to add"
-                            ui.addCount == 1 -> "Add 1 item"
-                            else -> "Add ${ui.addCount} items"
-                        },
-                        style = MaterialTheme.typography.titleMedium,
-                        textAlign = TextAlign.Center,
-                    )
+                    // Step Q: what the button does in the app's words: keep the recipe, add it as a meal of this week, and
+                    // put its items on the list (the one-recipe shortcut for Make shopping list).
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            when {
+                                ui.editing -> "Save changes"
+                                ui.addCount == 0 && ui.inStockCount > 0 -> "Nothing to add — all at home"
+                                ui.addCount == 0 -> "Nothing to add"
+                                else -> "Save and add meal"
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            textAlign = TextAlign.Center,
+                        )
+                        if (!ui.editing && ui.addCount > 0) {
+                            Text(
+                                if (ui.addCount == 1) "1 item to your list" else "${ui.addCount} items to your list",
+                                style = MaterialTheme.typography.labelSmall,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
                 }
             }
         }

@@ -15,6 +15,8 @@ import com.robert4lyf.hypershop.testutil.Photos.saved
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.testutil.awaitTrue
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -76,11 +78,41 @@ class EntryNavigationTest {
     }
 
     @Test
-    fun withoutARequestAReturningUserStillOpensOnThisWeek() {
+    fun launchOpensWhereTheAppWasLeftNotWhereTheEmptyListPointsAndSettingsIsTheGear() {
         val c = TestContainer.create()
+        // A returning user with nothing to buy used to be moved to This week (X.10). Now a first launch is the list.
         c.saved("Weeknight chilli")
         show(c)
+        waitFor("add-item")
+        settle()
+        assertEquals(Routes.LIST, route())
+        // Recipes, then Settings from its gear: a screen of its own, with no tab bar, and Back returns to Recipes.
+        compose.onNodeWithTag("tab-${Routes.RECIPES}").performClick()
+        awaitRoute(Routes.RECIPES)
+        compose.onNodeWithTag("open-settings").performClick()
+        awaitRoute(Routes.SETTINGS)
+        compose.onNodeWithTag("tab-${Routes.LIST}").assertDoesNotExist()
+        compose.onNodeWithTag("settings-back").performClick()
+        awaitRoute(Routes.RECIPES)
+        // Remembered for the next launch.
+        compose.waitUntil(5_000) { runBlocking { c.settings.lastTab.first() } == Routes.RECIPES }
+    }
+
+    @Test
+    fun theNextLaunchRestoresTheLastMainDestination() {
+        val c = TestContainer.create()
+        runBlocking { c.settings.setLastTab(Routes.MEALS) }
+        show(c)
         awaitRoute(Routes.MEALS)
+        // Started there, not shown the list first and moved: Meals is the graph's start and the list never opened.
+        assertEquals(Routes.MEALS, nav.graph.startDestinationRoute)
+        assertEquals(listOf(Routes.MEALS), nav.currentBackStack.value.mapNotNull { it.destination.route })
+        // Tabs still switch, one deep, and back to Meals.
+        compose.onNodeWithTag("tab-${Routes.LIST}").performClick()
+        awaitRoute(Routes.LIST)
+        compose.onNodeWithTag("tab-${Routes.MEALS}").performClick()
+        awaitRoute(Routes.MEALS)
+        assertEquals(listOf(Routes.MEALS), nav.currentBackStack.value.mapNotNull { it.destination.route })
     }
 
     @Test
