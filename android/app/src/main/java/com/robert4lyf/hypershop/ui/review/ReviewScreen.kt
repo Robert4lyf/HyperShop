@@ -164,8 +164,8 @@ fun ReviewScreen(
                 if (!ui.editing && !ui.byHand && !ui.savedOnly) {
                     item(key = "cupboard-hint") {
                         Text(
-                            "Add everything, then check the cupboard on This week: " +
-                                "it weighs what you have against all the recipes together.",
+                            "Add everything; Check food at home on your list later weighs what you have " +
+                                "against all your meals together.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp).testTag("cupboard-hint"),

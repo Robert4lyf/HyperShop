@@ -261,9 +261,10 @@ private fun BuyAgainSheet(
             ) {
                 // The section below names itself ("Buy again"); this row only closes the sheet.
                 androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.weight(1f))
-                androidx.compose.material3.TextButton(onClick = onDismiss, modifier = androidx.compose.ui.Modifier.testTag("buy-again-done")) {
-                    Text("Done")
-                }
+                androidx.compose.material3.TextButton(
+                    onClick = onDismiss,
+                    modifier = androidx.compose.ui.Modifier.testTag("buy-again-done"),
+                ) { Text("Done") }
             }
             if (ui.loaded && ui.buyAgain.regulars.isEmpty() && ui.buyAgain.lastShop.isEmpty()) {
                 Text(
