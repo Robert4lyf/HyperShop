@@ -5,9 +5,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -19,6 +22,8 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Kitchen
+import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -68,6 +73,10 @@ data class HeaderActions(
     val onPlan: () -> Unit = {},
     /** The empty list's "Add last shop's items". */
     val onLastShop: () -> Unit = {},
+    /** Step Q: Buy again, as a sheet over the list. */
+    val onBuyAgain: () -> Unit = {},
+    /** Step Q: the focused food-at-home check. */
+    val onHomeCheck: () -> Unit = {},
 )
 
 /**
@@ -249,7 +258,7 @@ fun EmptyState(
     }
     EmptyHero(
         title = "Your list is empty",
-        body = "Type an item above, share a recipe link to HyperShop, or add a saved recipe from the Recipes tab.",
+        body = "Type an item above, share a recipe link to HyperShop, or choose meals in Meals and make a shopping list.",
         modifier = Modifier.padding(top = 8.dp).testTag("empty"),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -274,5 +283,53 @@ fun androidx.compose.foundation.lazy.LazyListScope.listHeader(
 ) {
     item(key = "add") { AddItemField(actions.onAdd, actions.suggestions, actions.onPick, focus = focusAdd, onFocused = onAddFocused) }
     item(key = "ready") { ReadyCard(ui.readyJobs, actions.onReview) }
+    // Step Q: the optional extras, one compact row under the field rather than sections of their own.
+    if (prep.returning || prep.toCheck > 0) item(key = "shortcuts") { ListShortcuts(prep, actions) }
     // No "Plan this week's shop" card above the list (cut 2 of the review): This week is a tab of its own.
+}
+
+/**
+ * Step Q: Buy again (your usual things and last shop) and, while this week's meals have ingredients to ask about,
+ * Check food at home. Small chips: available, never in the way of the list.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ListShortcuts(
+    prep: PlanPrep,
+    actions: HeaderActions,
+) {
+    FlowRow(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (prep.returning) {
+            val n = prep.buyAgain + prep.lastShop
+            androidx.compose.material3.AssistChip(
+                onClick = actions.onBuyAgain,
+                label = { Text(if (n > 0) "Buy again ($n)" else "Buy again") },
+                leadingIcon = {
+                    Icon(
+                        Icons.Rounded.Replay,
+                        contentDescription = null,
+                        modifier = Modifier.size(androidx.compose.material3.AssistChipDefaults.IconSize),
+                    )
+                },
+                modifier = Modifier.heightIn(min = 48.dp).testTag("list-buy-again"),
+            )
+        }
+        if (prep.toCheck > 0) {
+            androidx.compose.material3.AssistChip(
+                onClick = actions.onHomeCheck,
+                label = { Text("Check food at home (${prep.toCheck})") },
+                leadingIcon = {
+                    Icon(
+                        Icons.Rounded.Kitchen,
+                        contentDescription = null,
+                        modifier = Modifier.size(androidx.compose.material3.AssistChipDefaults.IconSize),
+                    )
+                },
+                modifier = Modifier.heightIn(min = 48.dp).testTag("list-home-check"),
+            )
+        }
+    }
 }

@@ -203,7 +203,7 @@ class ListViewModelTest {
         await(vm.ui) { it.doneCount == 1 }
         vm.finishShopping()
         m = nextMessage(vm)
-        assertEquals("1 bought · 1 carried forward", m.text)
+        assertEquals("Shopping finished: 1 bought · 1 still on your list", m.text)
         await(vm.ui) { it.left == 1 && it.doneCount == 0 }
         vm.clearAll()
         m = nextMessage(vm)
@@ -374,7 +374,7 @@ class ListViewModelTest {
         // Straight after the tick: the screen may not show it yet; the count comes from the write.
         runBlocking { c.repository.tick(ui.row("onion").id) }
         vm.finishShopping()
-        assertEquals("1 bought · 1 carried forward", nextMessage(vm).text)
+        assertEquals("Shopping finished: 1 bought · 1 still on your list", nextMessage(vm).text)
     }
 
     @Test
@@ -446,7 +446,7 @@ class ListViewModelTest {
         assertTrue(await(again.ui) { it.loaded && it.aisles.isNotEmpty() }.shopping)
         // Finishing takes the bought rows away and the shop screen with them, whatever is left (review B.14).
         again.finishShopping()
-        assertEquals("2 bought · 1 carried forward", nextMessage(again).text)
+        assertEquals("Shopping finished: 2 bought · 1 still on your list", nextMessage(again).text)
         // Missing 3: the unbought row is asked about once; "Keep" leaves it for the next trip.
         assertEquals(1, await(again.carryOver) { it != null })
         again.keepLeftovers()

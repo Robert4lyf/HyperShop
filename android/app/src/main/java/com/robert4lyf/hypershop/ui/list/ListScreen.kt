@@ -110,8 +110,10 @@ data class ListActions(
     val onView: (ListView) -> Unit = {},
     /** "Shop" on the planning screen, "Plan" on the shop screen. */
     val onMode: (ListMode) -> Unit = {},
-    /** "Shop" with a store picked, when a second store has a walking order (missing 4 of the review). */
+    /** "Shopping view": the remembered store's order (missing 4 of the review; step Q asks only when it must). */
     val onShop: (Long) -> Unit = {},
+    /** Step Q: Shopping view's "Change store", with a second store to choose. */
+    val onChangeStore: () -> Unit = {},
     val onShareText: () -> Unit = {},
     /** X.8: "Not available" on this trip, and "Found it" to take that back. */
     val onUnavailable: (ListRow) -> Unit = {},

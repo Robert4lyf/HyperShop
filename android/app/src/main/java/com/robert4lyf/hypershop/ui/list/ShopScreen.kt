@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material3.Button
@@ -146,6 +147,7 @@ fun ShopScreen(
                     finding = !finding
                     if (!finding) query = ""
                 },
+                onChangeStore = actions.onChangeStore,
             )
             if (finding) {
                 OutlinedTextField(
@@ -221,6 +223,7 @@ private fun ShopTop(
     onPlan: () -> Unit,
     finding: Boolean = false,
     onFind: () -> Unit = {},
+    onChangeStore: () -> Unit = {},
 ) {
     val total = ui.left + ui.doneCount + ui.unavailable
     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
@@ -249,16 +252,24 @@ private fun ShopTop(
                     Text(
                         listOfNotNull(
                             "${ui.doneCount} of $total bought",
-                            ui.unavailable.takeIf { it > 0 }?.let { "$it not available" },
+                            ui.unavailable.takeIf { it > 0 }?.let { "$it set aside" },
                             now?.let { "Now: ${it.title}" },
                             // UX review 23: whether the watch has this list, said where the shop happens.
                             ui.watch,
-                            // Missing 4: which store's order this is, when there is a choice.
-                            ui.storeName,
+                            // Missing 4: which store's order this is; with a choice, it is the Change store button below.
+                            ui.storeName.takeIf { !ui.secondStore },
                         ).joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    // Step Q: the store used last is used again without asking; changing it is one tap here.
+                    if (ui.secondStore) {
+                        TextButton(
+                            onClick = onChangeStore,
+                            contentPadding = PaddingValues(horizontal = 0.dp),
+                            modifier = Modifier.heightIn(min = 48.dp).testTag("change-store"),
+                        ) { Text("${ui.storeName} · Change store") }
+                    }
                 }
                 IconButton(onClick = onFind, modifier = Modifier.testTag("shop-find-toggle")) {
                     Icon(
@@ -338,7 +349,7 @@ internal fun groups(
     return if (setAside.isEmpty()) {
         aisles
     } else {
-        aisles + ShopGroup("not-available", "Not available today", AisleCode.OTHER, setAside, setAside = true)
+        aisles + ShopGroup("not-available", "Set aside for this trip", AisleCode.OTHER, setAside, setAside = true)
     }
 }
 
@@ -519,7 +530,7 @@ private fun ShopRow(
         when (row.state) {
             TickState.DONE -> "Bought"
             TickState.PARTIAL -> "Partly bought"
-            TickState.OPEN -> if (row.unavailable) "Not available today" else "Still needed"
+            TickState.OPEN -> if (row.unavailable) "Set aside for this trip" else "Still needed"
         }
     val tint: AisleStyle = row.aisle.style
     Row(
@@ -589,23 +600,23 @@ private fun ShopRow(
                     Text("Found it")
                 }
             !done -> {
-                var asking by rememberSaveable(row.id) { mutableStateOf(false) }
-                TextButton(onClick = { asking = true }, modifier = Modifier.heightIn(min = 48.dp).testTag("unavailable-${row.id}")) {
-                    Text("Unavailable")
-                }
-                if (asking) {
-                    androidx.compose.material3.AlertDialog(
-                        onDismissRequest = { asking = false },
-                        title = { Text("Set ${row.name} aside for this trip?") },
-                        text = { Text("It stays on the list for next time. Use Found it if you locate it today.") },
-                        confirmButton = {
-                            TextButton(onClick = {
-                                asking = false
+                // Step Q: "Can't find it" is an action in the row's menu, not a label beside every item. It sets the
+                // row aside for this trip (Undo on the message) and it comes back on the next.
+                var menu by remember(row.id) { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { menu = true }, modifier = Modifier.testTag("unavailable-${row.id}")) {
+                        Icon(Icons.Rounded.MoreVert, contentDescription = "More for ${row.name}")
+                    }
+                    androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text("Can't find it") },
+                            onClick = {
+                                menu = false
                                 actions.onUnavailable(row)
-                            }) { Text("Set aside") }
-                        },
-                        dismissButton = { TextButton(onClick = { asking = false }) { Text("Cancel") } },
-                    )
+                            },
+                            modifier = Modifier.testTag("cant-find-${row.id}"),
+                        )
+                    }
                 }
             }
         }

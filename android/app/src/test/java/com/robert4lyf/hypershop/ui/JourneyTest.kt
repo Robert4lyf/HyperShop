@@ -170,22 +170,28 @@ class JourneyTest {
                 c.saveRecipe("Pesto pasta", "300g penne", "1 jar pesto"),
             )
         show(c)
-        // Current UI: This week is a tab; its saved recipes are listed below the meals.
+        // Step Q: Meals, Add meal (a sheet with the saved recipes), three added, Done.
         if (route() != Routes.MEALS) tap("tab-${Routes.MEALS}")
+        tap("meals-add-meal")
         for (k in keys) {
-            scrollTo("meals", "pick-add-$k")
+            scrollTo("add-meal-list", "pick-add-$k")
             tap("pick-add-$k")
         }
+        tap("add-meal-done")
         val chilli = runBlocking { c.planner.week(c.planner.currentWeek()) }.first { it.title == "Weeknight chilli" }.id
         scrollTo("meals", "meal-more-$chilli")
         tap("meal-more-$chilli")
+        // Make shopping list ends on the list; the optional food-at-home check is a chip there.
         tap("meals-add-to-list")
         compose.waitUntil(10_000) { runBlocking { c.repository.snapshot() }.itemByKey("cat:basmati_rice") != null }
-        scrollTo("meals", "home-some-cat:basmati_rice")
+        tap("list-home-check")
+        scrollTo("home-check-list", "home-some-cat:basmati_rice")
         tap("home-some-cat:basmati_rice")
         type("home-some-amount", "300 g", done = false)
         tap("home-some-set")
-        tap("meals-shop")
+        // The amount is saved, and the dialog closes, before the next tap.
+        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("home-some-dialog")).fetchSemanticsNodes().isEmpty() }
+        tap("home-check-done")
         record("meal-based shopping", c)
         val list = runBlocking { c.repository.snapshot() }
         val rice = list.itemByKey("cat:basmati_rice")!!

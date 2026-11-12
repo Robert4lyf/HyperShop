@@ -17,6 +17,7 @@ import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -86,15 +87,17 @@ class ShopScreenTest {
             )
         show(ui)
         compose.onNodeWithTag("shop-left").assertTextContains("4 left")
-        compose.onNodeWithText("1 of 6 bought · 1 not available · Now: Produce · My store").assertExists()
-        compose.onNodeWithText("Not available today").assertExists()
+        compose.onNodeWithText("1 of 6 bought · 1 set aside · Now: Produce · My store").assertExists()
+        // The state, as the group and on the row: set aside for this trip.
+        assertTrue(compose.onAllNodesWithText("Set aside for this trip").fetchSemanticsNodes().isNotEmpty())
         compose.onNodeWithText("1 for next time").assertExists()
         compose.onNodeWithTag("unavailable-5").assertDoesNotExist()
         compose.onNodeWithTag("available-5").performClick()
         // A bought row has nothing to set aside.
         compose.onNodeWithTag("unavailable-3").assertDoesNotExist()
+        // "Can't find it" is the action, in the row's menu.
         compose.onNodeWithTag("unavailable-2").performClick()
-        compose.onNodeWithText("Set aside").performClick()
+        compose.onNodeWithText("Can't find it").performClick()
         assertEquals(listOf("available 5", "unavailable 2"), events)
         compose.onRoot().captureRoboImage(Shots.path("shop-not-available.png"))
     }

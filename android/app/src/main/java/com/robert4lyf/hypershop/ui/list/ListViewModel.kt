@@ -230,6 +230,8 @@ class ListViewModel(
 
     fun requestShopping() = viewModelScope.launch { c.shopStart.request() }
 
+    fun changeStore() = viewModelScope.launch { c.shopStart.change() }
+
     private val arranging = MutableStateFlow(false)
     private val messages = Channel<UiMessage>(Channel.BUFFERED)
     val events: Flow<UiMessage> = messages.receiveAsFlow()
@@ -655,7 +657,8 @@ class ListViewModel(
             // never found): the shop screen would count that as "left" (review B.14).
             c.settings.setListMode(ListMode.PLAN)
             val left = c.repository.snapshot().liveItems.size
-            val text = "$n bought · $left carried forward"
+            // Step Q: what Finish did, in plain words: the bought things recorded, the rest still on the list.
+            val text = if (left > 0) "Shopping finished: $n bought · $left still on your list" else "Shopping finished: $n bought"
             messages.send(UiMessage(text, undo = { c.repository.undoDelete(stamp) }))
             // Missing 3: what was not bought is asked about once, rather than carried over unnoticed.
             if (left > 0 && n > 0) carryOver.value = left

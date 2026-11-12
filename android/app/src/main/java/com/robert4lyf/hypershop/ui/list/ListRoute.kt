@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.ui.list
 
 import android.content.ClipboardManager
 import android.content.Intent
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
@@ -14,13 +15,16 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -46,7 +50,11 @@ fun ListRoute(
     focusAdd: Int = 0,
     /** The Add field took the request; it is not to be repeated. */
     onAddFocused: () -> Unit = {},
+    /** Step Q: the focused food-at-home check. */
+    onHomeCheck: () -> Unit = {},
 ) {
+    var buyingAgain by rememberSaveable { mutableStateOf(false) }
+    if (buyingAgain) BuyAgainSheet(container, snackbar, onDismiss = { buyingAgain = false })
     val vm: ListViewModel = viewModel(factory = factoryFor { ListViewModel(container, it.createSavedStateHandle()) })
     val ui by vm.ui.collectAsStateWithLifecycle()
     val prep by vm.prep.collectAsStateWithLifecycle()
@@ -72,6 +80,8 @@ fun ListRoute(
                 },
                 onPlan = onPlan,
                 onLastShop = vm::addLastShop,
+                onBuyAgain = { buyingAgain = true },
+                onHomeCheck = onHomeCheck,
             )
         }
     ListScreen(
@@ -85,6 +95,7 @@ fun ListRoute(
             onView = vm::setView,
             onMode = vm::setMode,
             onShop = { vm.requestShopping() },
+            onChangeStore = { vm.changeStore() },
             onShareText = {
                 scope.launch {
                     container.awaitReady()
@@ -220,6 +231,46 @@ suspend fun SnackbarHostState.showTimed(
             showSnackbar(visuals)
         } finally {
             timer.cancel()
+        }
+    }
+}
+
+/**
+ * Step Q: Buy again as a sheet over the list (it was a section of This week): your usual things and last shop, one tap
+ * each, added as hand-added items are, never doubling what is on the list.
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun BuyAgainSheet(
+    container: AppContainer,
+    snackbar: SnackbarHostState,
+    onDismiss: () -> Unit,
+) {
+    val vm: com.robert4lyf.hypershop.ui.meals.MealsViewModel =
+        viewModel(key = "buy-again", factory = factoryFor { com.robert4lyf.hypershop.ui.meals.MealsViewModel(container) })
+    val ui by vm.ui.collectAsStateWithLifecycle()
+    LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
+        androidx.compose.foundation.layout.Column(
+            androidx.compose.ui.Modifier.padding(bottom = 24.dp).testTag("buy-again-sheet"),
+        ) {
+            if (ui.loaded && ui.buyAgain.regulars.isEmpty() && ui.buyAgain.lastShop.isEmpty()) {
+                Text(
+                    "Nothing to buy again yet. Things you buy often show here after a few shops.",
+                    modifier = androidx.compose.ui.Modifier.padding(20.dp),
+                )
+            } else {
+                com.robert4lyf.hypershop.ui.meals.BuyAgainSection(
+                    ui,
+                    com.robert4lyf.hypershop.ui.meals.MealsActions(
+                        onRegular = { vm.addRegular(it) },
+                        onAllRegulars = { vm.addAllRegulars() },
+                        onRepeatLastShop = { vm.repeatLastShop() },
+                        onPin = { vm.pin(it) },
+                        onHide = { vm.hide(it) },
+                    ),
+                )
+            }
         }
     }
 }
