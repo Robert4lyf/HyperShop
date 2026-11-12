@@ -51,6 +51,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.yield
 
 enum class TickState { OPEN, PARTIAL, DONE }
 
@@ -695,6 +696,9 @@ class ListViewModel(
         savedState["openItem"] = id
         openJob?.cancel()
         return viewModelScope.launch {
+            // Let a tap that lands with this one (or a close) come first: started inline on the main thread, a load
+            // whose reads return at once would otherwise show this row before the one tapped after it.
+            yield()
             // Read, not the list on screen: a tap right after a tick would otherwise show the sheet as still open.
             val list = c.repository.snapshot()
             val item = list.items[id] ?: return@launch
