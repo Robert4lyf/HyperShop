@@ -253,7 +253,10 @@ private fun BuyAgainSheet(
     // The light view model (Buy again, the home check and the list only), so the sheet fills at once.
     val vm: com.robert4lyf.hypershop.ui.meals.PrepViewModel =
         viewModel(key = "buy-again", factory = factoryFor { com.robert4lyf.hypershop.ui.meals.PrepViewModel(container) })
-    val ui by vm.ui.collectAsStateWithLifecycle()
+    // Read here, not first inside the sheet: the sheet is a window of its own, and a value that lands while its
+    // first composition is starting was missed there (the sheet stayed on "loading" with the data in hand).
+    // Read in this composition, a change recomposes the host, which hands the sheet the new value.
+    val ui = vm.ui.collectAsStateWithLifecycle().value
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
     androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
         androidx.compose.foundation.layout.Column(
