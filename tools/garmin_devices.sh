@@ -80,4 +80,29 @@ else
   exit 1
 fi
 
-connect-iq-sdk-manager device download --manifest garmin/manifest.xml
+download() { connect-iq-sdk-manager device download --manifest garmin/manifest.xml; }
+
+# The CLI renews the access token only when it is within a day of running out,
+# so one Garmin has withdrawn early (a sign-in elsewhere, a password change)
+# is sent as it is and refused with a 401. The refresh token in GARMIN_TOKEN
+# usually still works: mark the access token run out, which makes the CLI
+# renew it, and try once more.
+renew_token() {
+  python3 - "$root/token.json" <<'PY'
+import json, sys
+with open(sys.argv[1]) as f:
+    token = json.load(f)
+token["expiresAt"] = "2000-01-01T00:00:00Z"
+with open(sys.argv[1], "w") as f:
+    json.dump(token, f)
+PY
+}
+
+if download; then exit 0; fi
+if [[ -z "${GARMIN_TOKEN:-}" ]]; then exit 1; fi
+echo "Garmin refused the saved sign-in; renewing it and trying once more."
+renew_token
+if ! download; then
+  echo "::error::Garmin refused GARMIN_TOKEN even after renewing it: the sign-in has been withdrawn on Garmin's side. Run tools/garmin_token.sh on your computer to make a new one."
+  exit 1
+fi
