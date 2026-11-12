@@ -116,6 +116,24 @@ class MealsViewModelTest {
     }
 
     @Test
+    fun theWeekKnowsWhatIsLeftToBuyAndWhetherAShopIsUnderWay() {
+        val c = container()
+        val vm = MealsViewModel(c).shown()
+        runBlocking {
+            c.repository.manualAdd("bread", QtyBase.of(Rational.ONE, null, UnitLocale.METRIC), null)
+            c.repository.manualAdd("milk", QtyBase.of(Rational.ONE, null, UnitLocale.METRIC), null)
+        }
+        val planning = await(vm.ui) { it.listLeft == 2 }
+        assertTrue(planning.listHasItems)
+        assertTrue(!planning.shopping)
+        runBlocking { c.settings.setListMode(ListMode.SHOP) }
+        await(vm.ui) { it.shopping && it.listLeft == 2 }
+        // A tick leaves one to buy; the shop is still under way.
+        runBlocking { c.repository.toggle(c.repository.snapshot().itemByKey("cat:bread")!!.id) }
+        await(vm.ui) { it.shopping && it.listLeft == 1 }
+    }
+
+    @Test
     fun thisWeekMovesOnWithTheClock() {
         // Review B.12: the view model lives for the process; Monday must not show last week as "This week".
         var now = 1_760_000_000_000L

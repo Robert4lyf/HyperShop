@@ -113,6 +113,10 @@ data class MealsUi(
     val home: List<HomeRow> = emptyList(),
     /** Something on the list to shop for. */
     val listHasItems: Boolean = false,
+    /** Rows on the list not yet bought or set aside: what a shop would still buy. */
+    val listLeft: Int = 0,
+    /** A shop is under way (the list is in shopping mode with something on it): the next step is to carry on. */
+    val shopping: Boolean = false,
 ) {
     val pending: Int get() = meals.count { it.shopping.pending }
 
@@ -203,7 +207,7 @@ class MealsViewModel(
 
     val ui: StateFlow<MealsUi> =
         combine(
-            combine(weekView, c.repository.list) { v, l -> v to l },
+            combine(weekView, c.repository.list, c.settings.listMode) { v, l, m -> Triple(v, l, m) },
             combine(
                 c.repository.observeLibrary(),
                 c.recipePhotos.paths(),
@@ -213,7 +217,7 @@ class MealsViewModel(
             snapshotFlow { query },
             asked,
             extras,
-        ) { (v, list), (lib, photos, notes, planned), q, asked, (buy, home) ->
+        ) { (v, list, mode), (lib, photos, notes, planned), q, asked, (buy, home) ->
             val meals =
                 v.meals.map {
                     it.toMeal().copy(photo = photos[it.libraryKey], notes = notes[it.libraryKey]?.notes).let { m ->
@@ -266,6 +270,8 @@ class MealsViewModel(
                 buyAgain = buy,
                 home = home,
                 listHasItems = list.liveItems.isNotEmpty(),
+                listLeft = list.liveItems.count { !list.isDone(it.id) && !list.isUnavailable(it.id) },
+                shopping = mode == com.robert4lyf.hypershop.settings.ListMode.SHOP && list.liveItems.isNotEmpty(),
             )
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MealsUi())
