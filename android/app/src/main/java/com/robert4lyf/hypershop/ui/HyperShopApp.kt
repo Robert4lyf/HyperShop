@@ -198,14 +198,26 @@ private fun AppShell(
             restoreState = true
         }
     }
-    // The launcher shortcut (missing 7 of the review): Shopping, with the Add field focused.
-    var addFocus by remember { mutableIntStateOf(0) }
+    // The widget and the launcher shortcut (missing 7 of the review): Shopping, and for Add the Add field focused.
+    // A focus request waits (above zero) until the field takes it, then is gone: it never comes back later.
+    var addFocus by rememberSaveable { mutableIntStateOf(0) }
+    // Once an entry point has said where to go, the start-up choice of tab below leaves it there.
+    var entered by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        container.addRequests.collect {
-            container.settings.setListMode(com.robert4lyf.hypershop.settings.ListMode.PLAN)
-            selectTab(Routes.LIST)
-            addFocus++
-            container.addRequestHandled()
+        container.entryRequests.collect { request ->
+            if (request == com.robert4lyf.hypershop.EntryRequest.ADD) {
+                container.settings.setListMode(com.robert4lyf.hypershop.settings.ListMode.PLAN)
+            }
+            // Navigation's state belongs to the main thread, wherever the setting was written. A request waiting
+            // from a cold start arrives before NavHost has set its graph, and navigating then throws: wait for it.
+            withContext(Dispatchers.Main) {
+                nav.currentBackStackEntryFlow.first()
+                entered = true
+                selectTab(Routes.LIST)
+                // Add focuses the field once; the list on its own drops any focus still waiting, so it never comes later.
+                addFocus = if (request == com.robert4lyf.hypershop.EntryRequest.ADD) addFocus + 1 else 0
+            }
+            container.entryRequestHandled()
         }
     }
     // X.10: with nothing to buy the app opens on This week, where a shop starts; otherwise on the shopping list.
@@ -214,13 +226,14 @@ private fun AppShell(
     LaunchedEffect(Unit) {
         if (startChosen) return@LaunchedEffect
         startChosen = true
+        if (container.entryRequests.replayCache.isNotEmpty()) return@LaunchedEffect
         val empty = container.repository.list.first().liveItems.isEmpty()
         // Someone who has shopped here before (saved recipes, or a finished trip): a first run stays on Shopping,
         // where the Add field and the sample list are, not on "No saved recipes yet" (UX review 3).
         val returning = container.repository.observeLibrary().first().isNotEmpty() || container.buyAgain.observe().first().hasHistory
         // Navigation's state belongs to the main thread, wherever the list was read.
         withContext(Dispatchers.Main) {
-            if (empty && returning && nav.currentBackStackEntry?.destination?.route == Routes.LIST) selectTab(Routes.MEALS)
+            if (!entered && empty && returning && nav.currentBackStackEntry?.destination?.route == Routes.LIST) selectTab(Routes.MEALS)
         }
     }
     Scaffold(
@@ -267,7 +280,14 @@ private fun AppShell(
             popExitTransition = { fadeOut(tween(100)) },
         ) {
             composable(Routes.LIST) {
-                ListRoute(container, snackbar, onReview = openReview, onPlan = { selectTab(Routes.MEALS) }, focusAdd = addFocus)
+                ListRoute(
+                    container,
+                    snackbar,
+                    onReview = openReview,
+                    onPlan = { selectTab(Routes.MEALS) },
+                    focusAdd = addFocus,
+                    onAddFocused = { addFocus = 0 },
+                )
             }
             composable(Routes.RECIPES) {
                 RecipesRoute(

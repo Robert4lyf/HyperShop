@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -139,6 +140,8 @@ fun ListScreen(
     actions: ListActions,
     header: LazyListScope.() -> Unit = {},
     empty: @Composable () -> Unit = { Text("Nothing on the list", Modifier.padding(24.dp)) },
+    /** Above zero while an Add field request (widget, launcher shortcut) is waiting: the list goes to its top. */
+    focusAdd: Int = 0,
 ) {
     if (ui.shopping) {
         ShopScreen(ui, actions)
@@ -149,7 +152,7 @@ fun ListScreen(
             // Pinned: the count and the menu stay in reach on a long list.
             ListTop(ui, actions)
             Box(Modifier.weight(1f)) {
-                if (ui.loaded) ListBody(ui, actions, header, empty) else Loading()
+                if (ui.loaded) ListBody(ui, actions, header, empty, focusAdd) else Loading()
             }
             if (ui.arranging) {
                 BottomActionBar(navigationBarInset = false) {
@@ -186,8 +189,12 @@ private fun ListBody(
     actions: ListActions,
     header: LazyListScope.() -> Unit,
     empty: @Composable () -> Unit,
+    focusAdd: Int = 0,
 ) {
     val card = MaterialTheme.colorScheme.card
+    // A request for the Add field brings it on screen, so it is focused now rather than whenever it next scrolls in.
+    val listState = rememberLazyListState()
+    LaunchedEffect(focusAdd) { if (focusAdd > 0) listState.scrollToItem(0) }
     // Collapsed aisles, by name: kept across tab switches and rotation.
     var collapsed by rememberSaveable { mutableStateOf(emptyList<String>()) }
     // An aisle that gains something to buy opens again, so new items are never hidden.
@@ -228,10 +235,12 @@ private fun ListBody(
     val ime = WindowInsets.ime.getBottom(LocalDensity.current)
     val keyboard = with(LocalDensity.current) { (ime - below).coerceAtLeast(0).toDp() }
     LazyColumn(
-        Modifier
-            .fillMaxSize()
-            .onGloballyPositioned { below = (it.findRootCoordinates().size.height - it.boundsInRoot().bottom).roundToInt() }
-            .testTag("list"),
+        state = listState,
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .onGloballyPositioned { below = (it.findRootCoordinates().size.height - it.boundsInRoot().bottom).roundToInt() }
+                .testTag("list"),
         contentPadding = PaddingValues(bottom = 24.dp + keyboard),
     ) {
         if (ui.arranging) {
