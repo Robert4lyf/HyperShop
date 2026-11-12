@@ -263,6 +263,16 @@ class RecipesViewModel(
      */
     fun addFromLibrary(row: LibraryRow) = openSaved(row, ImportResult.LIBRARY)
 
+    /**
+     * Step Q: "Add meal" on a saved recipe: a meal of this week, from the recipe as it was saved and corrected, with no
+     * second review. Its ingredients go on the list with Make shopping list on Meals; Edit changes the recipe itself.
+     */
+    fun addMeal(row: LibraryRow) =
+        viewModelScope.launch {
+            val id = c.planner.plan(c.planner.currentWeek(), row.key)
+            messages.send(UiMessage("${row.title} added to this week's meals", undo = { c.planner.unplanNew(listOf(id)) }))
+        }
+
     /** "Edit" on a saved recipe: the review screen, saving back to the library and leaving the list alone. */
     fun editSaved(row: LibraryRow) = openSaved(row, ImportResult.LIBRARY_EDIT)
 

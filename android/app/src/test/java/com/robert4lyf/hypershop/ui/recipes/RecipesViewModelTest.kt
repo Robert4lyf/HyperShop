@@ -113,6 +113,29 @@ class RecipesViewModelTest {
     }
 
     @Test
+    fun addMealPlansTheSavedRecipeWithNoSecondReviewAndUndoTakesItBack() {
+        // Step Q: a saved (and corrected) recipe is chosen for this week as it is; no review screen, nothing on the list.
+        val c = TestContainer.create()
+        c.add(*CHILLI)
+        val vm = RecipesViewModel(c).shown()
+        val use = await(vm.ui) { it.uses.isNotEmpty() && it.library.isNotEmpty() }.uses.single()
+        vm.remove(use)
+        val saved = await(vm.ui) { it.uses.isEmpty() && it.library.isNotEmpty() }.library.single()
+        val messages = java.util.concurrent.CopyOnWriteArrayList<com.robert4lyf.hypershop.ui.common.UiMessage>()
+        CoroutineScope(Dispatchers.Main).launch { vm.events.collect { messages += it } }
+        val week = c.planner.currentWeek()
+        val before = runBlocking { c.planner.week(week) }.size
+        vm.addMeal(saved)
+        com.robert4lyf.hypershop.testutil.awaitTrue { runBlocking { c.planner.week(week) }.size == before + 1 }
+        val meal = runBlocking { c.planner.week(week) }.last()
+        assertEquals(saved.key, meal.libraryKey)
+        assertTrue("not on the list until Make shopping list", runBlocking { c.repository.snapshot() }.liveItems.isEmpty())
+        com.robert4lyf.hypershop.testutil.awaitTrue { messages.any { it.text == "Weeknight chilli added to this week's meals" } }
+        runBlocking { messages.first { it.text == "Weeknight chilli added to this week's meals" }.undo!!.invoke() }
+        assertEquals(before, runBlocking { c.planner.week(week) }.size)
+    }
+
+    @Test
     fun aRecipeBoughtIsNoLongerOnTheShoppingList() {
         // Y.13: everything bought and the shop finished; the card still said "On the shopping list".
         val c = TestContainer.create()

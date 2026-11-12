@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.ui.list
 
 import android.content.ClipboardManager
 import android.content.Intent
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -254,6 +255,16 @@ private fun BuyAgainSheet(
         androidx.compose.foundation.layout.Column(
             androidx.compose.ui.Modifier.padding(bottom = 24.dp).testTag("buy-again-sheet"),
         ) {
+            androidx.compose.foundation.layout.Row(
+                androidx.compose.ui.Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                // The section below names itself ("Buy again"); this row only closes the sheet.
+                androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.weight(1f))
+                androidx.compose.material3.TextButton(onClick = onDismiss, modifier = androidx.compose.ui.Modifier.testTag("buy-again-done")) {
+                    Text("Done")
+                }
+            }
             if (ui.loaded && ui.buyAgain.regulars.isEmpty() && ui.buyAgain.lastShop.isEmpty()) {
                 Text(
                     "Nothing to buy again yet. Things you buy often show here after a few shops.",

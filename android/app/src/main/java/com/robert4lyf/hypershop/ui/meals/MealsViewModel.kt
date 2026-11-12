@@ -363,7 +363,7 @@ class MealsViewModel(
         val write = written { c.planner.plan(w, pick.key) }
         viewModelScope.launch {
             val id = write.await()
-            messages.send(UiMessage("Planned ${pick.title}", undo = { writing.withLock { c.planner.unplanNew(listOf(id)) } }))
+            messages.send(UiMessage("Added ${pick.title}", undo = { writing.withLock { c.planner.unplanNew(listOf(id)) } }))
         }
     }
 
@@ -376,7 +376,7 @@ class MealsViewModel(
             val ids = write.await()
             if (ids.isEmpty()) return@launch
             messages.send(
-                UiMessage("Planned ${plural(ids.size, "meal")} again", undo = { writing.withLock { c.planner.unplanNew(ids) } }),
+                UiMessage("Added the same ${plural(ids.size, "meal")}", undo = { writing.withLock { c.planner.unplanNew(ids) } }),
             )
         }
     }

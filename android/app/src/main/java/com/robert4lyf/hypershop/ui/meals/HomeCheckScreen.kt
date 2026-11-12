@@ -22,6 +22,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -86,7 +87,18 @@ fun HomeCheckScreen(
                 IconButton(onClick = onBack, modifier = Modifier.testTag("home-check-back")) {
                     Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
                 }
-                Text("Food at home", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
+                Text(
+                    "Food at home",
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.weight(1f).semantics { heading() },
+                )
+                // Everything shown is at home: one tap for a well-stocked cupboard (Undo on the message).
+                val toHave = shown.filter { !it.have }
+                if (toHave.size > 1) {
+                    TextButton(onClick = { actions.onHave(toHave) }, modifier = Modifier.testTag("home-have-all")) {
+                        Text("Have all ${toHave.size}")
+                    }
+                }
             }
             Text(
                 "Optional. Say what you already have for this week's meals; only the rest stays on your list. " +
