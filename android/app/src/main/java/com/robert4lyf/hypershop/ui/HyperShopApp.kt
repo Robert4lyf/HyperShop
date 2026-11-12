@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -131,13 +132,24 @@ fun HyperShopApp(
         )
         return
     }
-    AppShell(container, nav, debugScreen)
+    // Step Q: where to open, read before anything is drawn, so the app starts there rather than showing the list and
+    // then moving: the main destination last left, the list on a first run, and the list when a widget or shortcut
+    // request is waiting (it says where to go itself).
+    var start by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        val last = container.settings.lastTab.first()?.takeIf { it in TABS }
+        start = if (container.entryRequests.replayCache.isNotEmpty()) Routes.LIST else last ?: Routes.LIST
+    }
+    // A frame or two while the setting is read.
+    val first = start ?: return
+    AppShell(container, nav, startRoute = first, debugScreen = debugScreen)
 }
 
 @Composable
 private fun AppShell(
     container: AppContainer,
     nav: NavHostController,
+    startRoute: String = Routes.LIST,
     debugScreen: (@Composable (AppContainer) -> Unit)?,
 ) {
     val snackbar = remember { SnackbarHostState() }
@@ -196,7 +208,8 @@ private fun AppShell(
     // Each tab keeps its state (and its view model) while you are on another, so coming back doesn't rebuild it.
     val selectTab: (String) -> Unit = { r ->
         nav.navigate(r) {
-            popUpTo(Routes.LIST) { saveState = true }
+            // The graph's start (the destination the app opened on), so the back stack stays one tab deep.
+            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
             launchSingleTop = true
             restoreState = true
         }
@@ -204,8 +217,6 @@ private fun AppShell(
     // The widget and the launcher shortcut (missing 7 of the review): Shopping, and for Add the Add field focused.
     // A focus request waits (above zero) until the field takes it, then is gone: it never comes back later.
     var addFocus by rememberSaveable { mutableIntStateOf(0) }
-    // Once an entry point has said where to go, the start-up choice of tab below leaves it there.
-    var entered by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         container.entryRequests.collect { request ->
             if (request == com.robert4lyf.hypershop.EntryRequest.ADD) {
@@ -215,29 +226,11 @@ private fun AppShell(
             // from a cold start arrives before NavHost has set its graph, and navigating then throws: wait for it.
             withContext(Dispatchers.Main) {
                 nav.currentBackStackEntryFlow.first()
-                entered = true
                 selectTab(Routes.LIST)
                 // Add focuses the field once; the list on its own drops any focus still waiting, so it never comes later.
                 addFocus = if (request == com.robert4lyf.hypershop.EntryRequest.ADD) addFocus + 1 else 0
             }
             container.entryRequestHandled()
-        }
-    }
-    // Step Q: the app opens where it was last left (Meals, Shopping list or Recipes), the list on a first run. An
-    // empty list no longer moves it to Meals. Once per launch (not on rotation); a share's review, the widget or the
-    // launcher shortcut, which say where to go, come first.
-    var startChosen by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        if (startChosen) return@LaunchedEffect
-        startChosen = true
-        if (container.entryRequests.replayCache.isNotEmpty()) return@LaunchedEffect
-        val last = container.settings.lastTab.first()?.takeIf { it in TABS }
-        // Navigation's state belongs to the main thread, wherever the setting was read.
-        withContext(Dispatchers.Main) {
-            nav.currentBackStackEntryFlow.first()
-            if (!entered && last != null && last != Routes.LIST && nav.currentBackStackEntry?.destination?.route == Routes.LIST) {
-                selectTab(last)
-            }
         }
     }
     // Where to open next time: the main destination last shown.
@@ -280,7 +273,7 @@ private fun AppShell(
         CompositionLocalProvider(com.robert4lyf.hypershop.ui.common.LocalOpenSettings provides openSettings) {
             NavHost(
                 nav,
-                startDestination = Routes.LIST,
+                startDestination = startRoute,
                 modifier = Modifier.padding(padding),
                 enterTransition = { fadeIn(tween(150)) },
                 exitTransition = { fadeOut(tween(100)) },
@@ -345,11 +338,9 @@ private fun AppShell(
                             val prev = nav.previousBackStackEntry?.destination?.route
                             if (prev in TABS || prev == Routes.LIBRARY) {
                                 nav.popBackStack()
-                            } else {
-                                nav.popBackStack(
-                                    Routes.LIST,
-                                    inclusive = false,
-                                )
+                            } else if (!nav.popBackStack(Routes.LIST, inclusive = false)) {
+                                // Opened over another first destination: the list is not on the stack to go back to.
+                                selectTab(Routes.LIST)
                             }
                         },
                         // "Try again" opens the new job only while the review is still on screen; left already, the job

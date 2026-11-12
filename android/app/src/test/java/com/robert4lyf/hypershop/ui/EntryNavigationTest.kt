@@ -104,6 +104,15 @@ class EntryNavigationTest {
         runBlocking { c.settings.setLastTab(Routes.MEALS) }
         show(c)
         awaitRoute(Routes.MEALS)
+        // Started there, not shown the list first and moved: Meals is the graph's start and the list never opened.
+        assertEquals(Routes.MEALS, nav.graph.startDestinationRoute)
+        assertEquals(listOf(Routes.MEALS), nav.currentBackStack.value.mapNotNull { it.destination.route })
+        // Tabs still switch, one deep, and back to Meals.
+        compose.onNodeWithTag("tab-${Routes.LIST}").performClick()
+        awaitRoute(Routes.LIST)
+        compose.onNodeWithTag("tab-${Routes.MEALS}").performClick()
+        awaitRoute(Routes.MEALS)
+        assertEquals(listOf(Routes.MEALS), nav.currentBackStack.value.mapNotNull { it.destination.route })
     }
 
     @Test
