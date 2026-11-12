@@ -12,8 +12,16 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import java.io.File
 
-/** Observational first run: these labels were authored independently of parser output, before tuning. */
+/**
+ * Observational first run: these labels were authored independently of parser output, before tuning. Since the
+ * meaning flags were tuned against two of its lines, it is a regression set, not an independent evaluation.
+ */
 class NovemberShoppingEvalTest {
+    private companion object {
+        /** Words that name an egg or a part of one: two of them make a part-beside-whole line. */
+        val EGG_MENTIONS = setOf("egg", "eggs", "yolk", "yolks", "white", "whites")
+    }
+
     @Test
     fun reportConsequentialSilentErrorsAndCorrectionCounts() {
         val catalog = CatalogLoader.default
@@ -22,6 +30,8 @@ class NovemberShoppingEvalTest {
         var silent = 0
         var corrections = 0
         var unflaggedMismatches = 0
+        var partLost = 0
+        var qualifierLost = 0
         val rows =
             labels.map { value ->
                 val l = value.jsonObject
@@ -50,7 +60,23 @@ class NovemberShoppingEvalTest {
                 if (!correct) corrections++
                 if (!correct && !p.check) unflaggedMismatches++
                 if ((!identity || !amount) && !p.check) silent++
-                "| ${raw.replace("|", "/")} | ${p.name} | ${qty.parts} | ${p.check} | $correct |"
+                // Meaning, apart from catalogue IDs and arithmetic: a part beside the whole, a heaped measure.
+                val words = raw.lowercase().split(Regex("[^a-z]+")).filter { it.isNotEmpty() }
+                val eggs = words.any { it == "egg" || it == "eggs" }
+                val sourcePart = Meaning.partOf(words).takeIf { eggs && words.count { it in EGG_MENTIONS } >= 2 }
+                val part =
+                    when {
+                        sourcePart == null -> "n/a"
+                        p.check -> "flagged"
+                        else -> "lost".also { partLost++ }
+                    }
+                val qualifier =
+                    when {
+                        words.none { it in Meaning.MORE_THAN_LEVEL } -> "n/a"
+                        p.check -> "flagged"
+                        else -> "lost".also { qualifierLost++ }
+                    }
+                "| ${raw.replace("|", "/")} | ${p.name} | ${qty.parts} | ${p.check} | $correct | $part | $qualifier |"
             }
         val report =
             "# November synthetic shopping evaluation\n\n" +
@@ -58,9 +84,12 @@ class NovemberShoppingEvalTest {
                 "$unflaggedMismatches unflagged label mismatches.\n\n" +
                 "Unflagged identity/quantity mismatches: $silent. " +
                 "Explicit container sizes are expanded; no density is assumed.\n\n" +
+                "Unflagged meaning losses, counted apart from identity/quantity: ingredient part $partLost · " +
+                "consequential qualifier $qualifierLost.\n\n" +
                 "Rule parser only. No live Claude results or user timing measurements. " +
                 "Labels are model-authored, not human-adjudicated.\n\n" +
-                "| Source | Ingredient | Base amount | Flagged | Meets label |\n|---|---|---|---|---|\n" + rows.joinToString("\n")
+                "| Source | Ingredient | Base amount | Flagged | Meets label | Part | Qualifier |\n" +
+                "|---|---|---|---|---|---|---|\n" + rows.joinToString("\n")
         File("build/reports").mkdirs()
         File("build/reports/november-shopping.md").writeText(report)
         println(report)
