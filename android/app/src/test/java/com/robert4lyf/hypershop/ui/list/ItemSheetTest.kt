@@ -138,9 +138,11 @@ class ItemSheetTest {
         compose.onNodeWithTag("save-item").assertIsNotEnabled()
         compose.onNodeWithTag("edit-name").performScrollTo().performTextReplacement("red onion")
         compose.onNodeWithTag("edit-qty").performScrollTo().performTextInput("3")
+        // A count has no conversion to kg: the amount is asked for, not carried over.
+        compose.onNodeWithTag("more-units").performScrollTo().performClick()
         compose.onNodeWithTag("unit-kg").performScrollTo().performClick()
-        compose.onNodeWithText("New total: 3 kg").assertExists()
-        compose.onNodeWithText("Use amount").performClick()
+        compose.onNodeWithTag("unit-amount").performTextInput("3")
+        compose.onNodeWithText("Use 3 kg").performClick()
         compose.onNodeWithTag("edit-qty").assertTextContains("3 kg")
         compose.onNodeWithTag("item-preferences").performScrollTo().performClick()
         compose.onNodeWithTag("aisle-${AisleCode.DAIRY_EGGS.name}").performScrollTo().performClick()
