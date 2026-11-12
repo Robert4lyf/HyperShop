@@ -97,6 +97,11 @@ class Settings(
 
     suspend fun setListMode(m: ListMode) = store.edit { it[LIST_MODE] = m.name }
 
+    /** Step Q: the main destination last shown (a route name), where the next launch opens. Null before the first. */
+    val lastTab: Flow<String?> = store.data.map { it[LAST_TAB] }
+
+    suspend fun setLastTab(route: String) = store.edit { it[LAST_TAB] = route }
+
     suspend fun setKeyLostNotice(on: Boolean) = store.edit { it[KEY_LOST] = on }
 
     /**
@@ -133,6 +138,7 @@ class Settings(
         val DEBUG_LOG = booleanPreferencesKey("debug_log")
         val LIST_VIEW = stringPreferencesKey("list_view")
         val LIST_MODE = stringPreferencesKey("list_mode")
+        val LAST_TAB = stringPreferencesKey("last_tab")
         val KEY_LOST = booleanPreferencesKey("claude_key_lost_notice")
         val KEY_SET = booleanPreferencesKey("claude_key_was_set")
         val REVIEW_SHEET_OPENS = intPreferencesKey("review_sheet_opens")

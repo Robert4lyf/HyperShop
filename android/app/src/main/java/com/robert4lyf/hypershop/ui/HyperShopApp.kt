@@ -43,6 +43,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -99,7 +100,8 @@ object Routes {
     fun review(job: Long) = "review/$job"
 }
 
-private val TABS = setOf(Routes.MEALS, Routes.LIST, Routes.RECIPES, Routes.SETTINGS)
+/** Step Q: the three main destinations. Settings is reached from the gear at the top of each. */
+private val TABS = setOf(Routes.MEALS, Routes.LIST, Routes.RECIPES)
 
 internal data class Tab(
     val route: String,
@@ -220,22 +222,26 @@ private fun AppShell(
             container.entryRequestHandled()
         }
     }
-    // X.10: with nothing to buy the app opens on This week, where a shop starts; otherwise on the shopping list.
-    // Once per launch (not on rotation), and only if nothing has navigated yet (a share's review).
+    // Step Q: the app opens where it was last left (Meals, Shopping list or Recipes), the list on a first run. An
+    // empty list no longer moves it to Meals. Once per launch (not on rotation); a share's review, the widget or the
+    // launcher shortcut, which say where to go, come first.
     var startChosen by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         if (startChosen) return@LaunchedEffect
         startChosen = true
         if (container.entryRequests.replayCache.isNotEmpty()) return@LaunchedEffect
-        val empty = container.repository.list.first().liveItems.isEmpty()
-        // Someone who has shopped here before (saved recipes, or a finished trip): a first run stays on Shopping,
-        // where the Add field and the sample list are, not on "No saved recipes yet" (UX review 3).
-        val returning = container.repository.observeLibrary().first().isNotEmpty() || container.buyAgain.observe().first().hasHistory
-        // Navigation's state belongs to the main thread, wherever the list was read.
+        val last = container.settings.lastTab.first()?.takeIf { it in TABS }
+        // Navigation's state belongs to the main thread, wherever the setting was read.
         withContext(Dispatchers.Main) {
-            if (!entered && empty && returning && nav.currentBackStackEntry?.destination?.route == Routes.LIST) selectTab(Routes.MEALS)
+            nav.currentBackStackEntryFlow.first()
+            if (!entered && last != null && last != Routes.LIST && nav.currentBackStackEntry?.destination?.route == Routes.LIST) {
+                selectTab(last)
+            }
         }
     }
+    // Where to open next time: the main destination last shown.
+    LaunchedEffect(route) { route?.takeIf { it in TABS }?.let { container.settings.setLastTab(it) } }
+    val openSettings: () -> Unit = { nav.navigate(Routes.SETTINGS) { launchSingleTop = true } }
     Scaffold(
         contentWindowInsets =
             if (reviewing) {
@@ -256,13 +262,13 @@ private fun AppShell(
             )
         },
         bottomBar = {
-            if (route != Routes.REVIEW) {
+            // The three main destinations only: Settings and its screens, and the review, have their own way back.
+            if (route == null || route in TABS) {
                 val tabs =
                     listOf(
-                        Tab(Routes.MEALS, "This week", Icons.Rounded.CalendarMonth, Icons.Outlined.CalendarMonth),
-                        Tab(Routes.LIST, "Shopping", Icons.Rounded.ShoppingCart, Icons.Outlined.ShoppingCart),
+                        Tab(Routes.MEALS, "Meals", Icons.Rounded.CalendarMonth, Icons.Outlined.CalendarMonth),
+                        Tab(Routes.LIST, "Shopping list", Icons.Rounded.ShoppingCart, Icons.Outlined.ShoppingCart),
                         Tab(Routes.RECIPES, "Recipes", Icons.AutoMirrored.Rounded.MenuBook, Icons.AutoMirrored.Outlined.MenuBook),
-                        Tab(Routes.SETTINGS, "Settings", Icons.Rounded.Settings, Icons.Outlined.Settings),
                     )
                 CompactNavBar(tabs, route, selectTab)
             }
@@ -270,6 +276,7 @@ private fun AppShell(
     ) { padding ->
         val openReview: (Long) -> Unit = { nav.navigate(Routes.review(it)) { launchSingleTop = true } }
         // A quick fade, not Navigation's default 700 ms cross-fade, which made tab switches feel slow.
+        CompositionLocalProvider(com.robert4lyf.hypershop.ui.common.LocalOpenSettings provides openSettings) {
         NavHost(
             nav,
             startDestination = Routes.LIST,
@@ -315,6 +322,7 @@ private fun AppShell(
                     // A developer harness with a microphone service: not in a release until voice mode exists.
                     onVoiceTest = if (BuildConfig.DEBUG) ({ nav.navigate(Routes.VOICE_TEST) { launchSingleTop = true } }) else null,
                     snackbar = snackbar,
+                    onBack = { nav.popBackStack() },
                 )
             }
             composable(Routes.VOICE_TEST) { VoiceTestRoute(onBack = { nav.popBackStack() }) }
@@ -333,7 +341,7 @@ private fun AppShell(
                     },
                     // "Try again" opens the new job only while the review is still on screen; left already, the job
                     // waits on the Shopping tab's card (review B.20).
-                    onSettings = { selectTab(Routes.SETTINGS) },
+                    onSettings = openSettings,
                     onReopen = { id ->
                         if (nav.currentBackStackEntry?.destination?.route == Routes.REVIEW) {
                             nav.navigate(Routes.review(id)) {
@@ -351,6 +359,7 @@ private fun AppShell(
                 )
             }
             if (debugScreen != null) composable(Routes.DEBUG) { debugScreen(container) }
+        }
         }
     }
 }
@@ -381,9 +390,7 @@ internal fun CompactNavBar(
         ) {
             for ((r, label, on, off) in tabs) {
                 // The ingredient library and the voice test are part of Settings, so its tab stays lit there.
-                val selected =
-                    route == r ||
-                        (r == Routes.SETTINGS && (route == Routes.LIBRARY || route == Routes.AISLES || route == Routes.VOICE_TEST))
+                val selected = route == r
                 Column(
                     Modifier
                         .weight(1f)

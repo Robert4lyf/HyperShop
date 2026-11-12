@@ -167,7 +167,7 @@ class StartupTest {
         c.startUp()
         awaitTrue { c.startup.value == Startup.Ready }
         // A first run (no saved recipes, no finished trip) stays on Shopping, where the Add field and the sample list
-        // are (UX review 3); a returning user's empty list opens on This week (X.10).
+        // are (UX review 3); later launches open where the app was left (step Q).
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("add-item").fetchSemanticsNodes().isNotEmpty() }
     }
 

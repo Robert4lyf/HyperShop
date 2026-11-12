@@ -213,6 +213,7 @@ fun RecipesScreen(
                                 n == 1 -> "1 saved recipe"
                                 else -> "$n saved recipes"
                             },
+                        actions = { com.robert4lyf.hypershop.ui.common.SettingsButton() },
                     )
                 }
                 if (ui.loaded && !ui.hasLibrary) {

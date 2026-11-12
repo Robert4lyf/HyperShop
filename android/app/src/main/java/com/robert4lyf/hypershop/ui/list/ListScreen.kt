@@ -551,8 +551,9 @@ private fun ListTop(
         title =
             when {
                 !ui.loaded -> ""
-                shopping -> "${ui.left} left"
-                else -> "HyperShop"
+                // Where am I, and what is left: the count is the title while there is a list.
+                shopping -> "${ui.left} to buy"
+                else -> "Shopping list"
             },
         // One mosaic for the list, whatever the count says.
         seed = "Shopping list",
@@ -574,9 +575,10 @@ private fun ListTop(
                 ) {
                     Icon(Icons.Rounded.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(6.dp))
-                    Text("Shop")
+                    Text("Shopping view")
                 }
             }
+            com.robert4lyf.hypershop.ui.common.SettingsButton()
             var menu by remember { mutableStateOf(false) }
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
