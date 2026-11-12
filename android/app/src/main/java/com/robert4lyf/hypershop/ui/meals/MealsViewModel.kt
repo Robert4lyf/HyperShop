@@ -19,7 +19,6 @@ import com.robert4lyf.hypershop.data.Regular
 import com.robert4lyf.hypershop.data.WeekPreview
 import com.robert4lyf.hypershop.data.bookRef
 import com.robert4lyf.hypershop.di.AppContainer
-import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.recipes.NewRecipe
 import kotlinx.coroutines.CoroutineStart
@@ -511,24 +510,48 @@ class MealsViewModel(
     fun haveSome(
         row: HomeRow,
         text: String,
+        onResult: (String?) -> Unit = {},
     ) {
-        val write = written { c.homeCheck.haveSome(row.mergeKey, text) }
+        val write = written { c.homeCheck.changeSome(row.mergeKey, text) }
         viewModelScope.launch {
             val name = row.name.replaceFirstChar { it.uppercase() }
-            messages.send(
-                when (write.await()) {
+            val change =
+                try {
+                    write.await()
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    val error = "Could not save the amount; your entry is still here."
+                    onResult(error)
+                    messages.send(UiMessage(error))
+                    return@launch
+                }
+            val undo: suspend () -> Unit = {
+                change.undo?.let { token ->
+                    if (!writing.withLock {
+                            c.homeCheck.undoSome(token)
+                        }
+                    ) {
+                        messages.send(UiMessage("The list changed since then, so Undo kept the newer changes."))
+                    }
+                }
+            }
+            val message =
+                when (change.result) {
                     HaveSome.SET ->
-                        UiMessage("$name: ${text.trim()} at home, the rest stays on the shopping list", undo = {
-                            writing.withLock { c.homeCheck.clearSome(row.mergeKey) }
-                        })
+                        UiMessage("$name: ${text.trim()} at home, the rest stays on the shopping list", undo = undo)
                     HaveSome.ENOUGH ->
-                        UiMessage("$name: that covers it, at home", undo = {
-                            writing.withLock { c.homeCheck.need(listOf(row.mergeKey)) }
-                        })
+                        UiMessage("$name: that covers it, at home", undo = undo)
+                    HaveSome.ALREADY_ALLOCATED ->
+                        UiMessage(
+                            "Some home food already covers earlier recipe amounts. Keep that allocation " +
+                                "or correct the source first.",
+                        )
                     HaveSome.NOT_AN_AMOUNT -> UiMessage("Enter an amount, like 300 g")
                     HaveSome.DIFFERENT_MEASURE -> UiMessage("Enter it as the list measures it: ${row.needed ?: "the same unit"}")
-                },
-            )
+                }
+            onResult(if (change.result in setOf(HaveSome.SET, HaveSome.ENOUGH)) null else message.text)
+            messages.send(message)
         }
     }
 
@@ -581,7 +604,7 @@ class MealsViewModel(
     }
 
     /** "Start shopping": the list in shopping mode. */
-    fun startShopping() = c.applicationScope.launch { c.settings.setListMode(ListMode.SHOP) }
+    fun startShopping() = c.applicationScope.launch { c.shopStart.request() }
 
     private fun plural(
         n: Int,

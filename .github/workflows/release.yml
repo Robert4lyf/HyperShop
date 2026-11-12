@@ -1,135 +1,71 @@
 name: Release APK
 
-# A tap-to-install APK for a phone, which the CI artifact is not: an Actions
-# artifact is a zip behind a GitHub login, and neither of those survives being
-# opened on a phone. This keeps one rolling pre-release whose download URL never
-# changes:
-#
-#   https://github.com/Robert4lyf/HyperShop/releases/latest/download/hypershop-debug.apk
-#
-# Each build is its own tag, `build-<commit count>`, and the older ones are
-# deleted. An updater such as Obtainium tells versions apart by tag, and one
-# tag reused for every build looked to it like nothing ever changed. The URL
-# above keeps working because /releases/latest follows the newest release,
-# whatever its tag is called.
-#
-# It is the debug build, signed with the repository's fixed debug keystore, so
-# each one installs over the last as an ordinary update.
-
 on:
-  push:
+  workflow_run:
+    workflows: [Android, Connect IQ]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
     inputs:
-      fresh_devices:
-        description: Download the device definitions afresh (tests the Garmin sign-in)
-        type: boolean
-        default: false
+      android_run_id:
+        description: Successful main-push Android run to promote (never rebuilds)
+        required: true
+        type: string
 
-# Publishing a release writes to the repository; the PR gate in android.yml
-# still runs read-only.
 permissions:
   contents: write
+  actions: read
 
+# Never cancel a publication halfway through; recheck main immediately before promotion.
 concurrency:
   group: release-apk
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   publish:
-    name: Build and publish
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    outputs:
-      tag: build-${{ steps.name.outputs.build }}
-
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CIQ_SDK_VERSION: '9.2.0'
     steps:
       - uses: actions/checkout@v4
         with:
-          # versionCode is the commit count, so a shallow clone would build
-          # every release as version 1 and none would update the last.
+          ref: main
           fetch-depth: 0
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+      - name: Locate the Android run for this exact commit
+        id: run
+        env:
+          MANUAL_RUN: ${{ inputs.android_run_id }}
+          CHECK_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [ -n "$MANUAL_RUN" ]; then
+            [[ "$MANUAL_RUN" =~ ^[0-9]+$ ]] || exit 1
+            id="$MANUAL_RUN"
+          else
+            id=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/android.yml/runs?head_sha=$CHECK_SHA&event=push&per_page=100" --jq '.workflow_runs | max_by(.id) | .id')
+          fi
+          [[ "$id" =~ ^[0-9]+$ ]] || exit 1
+          sha=$(python3 tools/release/check_verified.py "$id")
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
         with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+          ref: ${{ steps.run.outputs.sha }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
         with:
-          build-root-directory: android
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'platforms;android-36 build-tools;36.0.0 platform-tools'
-
-      - name: Build the debug APK
-        working-directory: android
-        run: ./gradlew :app:assembleDebug --stacktrace
-
-      - name: Name it after the build
+          name: verified-apk-${{ steps.run.outputs.sha }}
+          run-id: ${{ steps.run.outputs.id }}
+          github-token: ${{ github.token }}
+          path: verified-apk
+      - name: Prepare immutable build identity
         id: name
         run: |
+          cp verified-apk/app-debug.apk hypershop-debug.apk
           build=$(git rev-list --count HEAD)
-          cp android/app/build/outputs/apk/debug/app-debug.apk hypershop-debug.apk
           echo "build=$build" >> "$GITHUB_OUTPUT"
-
-      - name: Publish as the latest build
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # Written to a file rather than passed inline: the continuation lines
-          # of a multi-line shell string keep this file's indentation, and ten
-          # leading spaces is an indented code block in Markdown.
-          {
-            printf 'Debug build of `%s`.\n\n' "$GITHUB_SHA"
-            printf 'Install on the phone: %s\n\n' \
-              "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/hypershop-debug.apk"
-            printf 'Signed with the fixed debug keystore, so it installs over the previous build without uninstalling.\n'
-          } > notes.md
-
-          # Not --prerelease, however much a debug build sounds like one.
-          # GitHub's /releases/latest resolves to the most recent release that
-          # is neither a draft nor a pre-release, so marking this one made the
-          # download URL 404 while the asset sat there perfectly intact.
-          tag="build-${{ steps.name.outputs.build }}"
-          # A re-run of the same commit replaces its own release.
-          gh release delete "$tag" --yes --cleanup-tag || true
-          gh release create "$tag" hypershop-debug.apk \
-            --target "$GITHUB_SHA" \
-            --title "Build ${{ steps.name.outputs.build }}" \
-            --notes-file notes.md \
-            --latest
-
-          # Then the rest, the old rolling "latest" tag included. Created
-          # first and pruned after, so the download URL never points at
-          # nothing between the two.
-          gh release list --limit 100 --json tagName --jq '.[].tagName' |
-            { grep -vx "$tag" || true; } |
-            while read -r old; do
-              gh release delete "$old" --yes --cleanup-tag
-            done
-
-  # The watch app for the Connect IQ Store, attached to the same release.
-  #
-  # Garmin has no upload API, so this stops at a file: download hypershop.iq
-  # from the release and upload it as a new version of the beta app, and
-  # Garmin Connect installs it on the watch at its next sync. See
-  # docs/garmin-setup.md, "Updates through the store".
-  #
-  # Skipped, not failed, until the three secrets exist: the APK above must
-  # never wait on the watch. And a failure here leaves the release with the
-  # APK alone rather than taking it down.
-  watch:
-    name: Package the watch app
-    needs: publish
-    runs-on: ubuntu-latest
-    env:
-      CIQ_SDK_VERSION: '9.2.0'
-
-    steps:
+          echo "tag=build-$build-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
       - name: Check the secrets are set
         id: secrets
         env:
@@ -144,8 +80,6 @@ jobs:
             echo "::notice::CIQ_DEVELOPER_KEY and a Garmin sign-in (GARMIN_TOKEN, or GARMIN_USERNAME and GARMIN_PASSWORD) are not all set; no watch package this time."
           fi
 
-      - uses: actions/checkout@v4
-        if: steps.secrets.outputs.ready == 'true'
 
       - name: Set up JDK 21
         if: steps.secrets.outputs.ready == 'true'
@@ -166,7 +100,7 @@ jobs:
       # all; the token or password is only needed when the cache is cold.
       - name: Cache the device definitions
         id: devices
-        if: steps.secrets.outputs.ready == 'true' && !inputs.fresh_devices
+        if: steps.secrets.outputs.ready == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.Garmin/ConnectIQ/Devices
@@ -198,11 +132,10 @@ jobs:
           printf '%s' "$KEY_B64" | base64 -d > "$key"
           CIQ_DEVELOPER_KEY="$key" ./tools/package_watch.sh
 
-      - name: Attach it to the release
-        if: steps.secrets.outputs.ready == 'true'
+      - name: Stage assets, then promote the complete release
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release upload "${{ needs.publish.outputs.tag }}" \
-            garmin/build/hypershop.iq garmin/build/hypershop-fr245.prg \
-            garmin/build/hypershop-fr245-debug.prg --clobber
+          RUN_ID: ${{ steps.run.outputs.id }}
+          EXPECTED_SHA: ${{ steps.run.outputs.sha }}
+          TAG: ${{ steps.name.outputs.tag }}
+          WATCH_READY: ${{ steps.secrets.outputs.ready }}
+        run: tools/release/publish.sh

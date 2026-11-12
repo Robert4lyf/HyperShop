@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.ui.list
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.robert4lyf.hypershop.catalog.EntryEdit
@@ -98,6 +99,14 @@ data class ItemSheet(
     val group: String? = null,
     /** The categories each aisle has, to pick from. */
     val groups: Map<AisleCode, List<String>> = emptyMap(),
+    val revision: Long = 0,
+    val storeId: Long = 1,
+    val storeName: String = "My store",
+    val preferredPack: String = "",
+    val purchaseSuggestion: String? = null,
+    val explanation: String = "",
+    val saving: Boolean = false,
+    val saveError: String? = null,
 )
 
 /** One "From" row: "Weeknight chilli · 400 g", linked to the recipe's page when it has one. */
@@ -136,6 +145,7 @@ data class ListUi(
     val watch: String? = null,
     /** The store whose walking order the list follows, and whether a second store has one (missing 4 of the review). */
     val activeStore: Long = 1,
+    val storeName: String = "My store",
     val secondStore: Boolean = false,
 ) {
     val isEmpty: Boolean get() = loaded && aisles.isEmpty()
@@ -205,24 +215,20 @@ data class RecipeSection(
 @OptIn(ExperimentalCoroutinesApi::class)
 class ListViewModel(
     private val c: AppContainer,
+    private val savedState: SavedStateHandle = SavedStateHandle(),
 ) : ViewModel() {
     /** Re-read on every list change, so a new walking order from Settings (or an arrangement) shows straight away. */
     private val order = c.settings.activeStore.flatMapLatest { c.repository.observeWalkingOrder(it) }
 
     /** Which store is walked, and whether a second one has an order to choose (missing 4 of the review). */
     private val stores =
-        combine(c.settings.activeStore, c.repository.observeListRev()) { s, _ -> s to c.repository.hasSecondStore() }
+        combine(c.settings.activeStore, c.repository.observeStores()) { s, profiles -> s to profiles }
             .distinctUntilChanged()
 
     /** "Shop" with a store picked: the list and the watch walk it, and the shop screen opens. */
-    fun startShopping(storeId: Long) =
-        viewModelScope.launch {
-            if (c.settings.activeStore.first() != storeId) {
-                c.settings.setActiveStore(storeId)
-                c.repository.touchListRev()
-            }
-            c.settings.setListMode(ListMode.SHOP)
-        }
+    fun startShopping(storeId: Long) = viewModelScope.launch { c.shopStart.start(storeId) }
+
+    fun requestShopping() = viewModelScope.launch { c.shopStart.request() }
 
     private val arranging = MutableStateFlow(false)
     private val messages = Channel<UiMessage>(Channel.BUFFERED)
@@ -266,6 +272,7 @@ class ListViewModel(
 
     fun removeUse(use: UseSummary) = useActions.remove(use)
 
+    private val committedSaves = mutableSetOf<Long>().apply { savedState.get<Long>("committedSave")?.let(::add) }
     private val _sheet = MutableStateFlow<ItemSheet?>(null)
     val sheet: StateFlow<ItemSheet?> = _sheet
 
@@ -327,7 +334,8 @@ class ListViewModel(
                     recipes = ui.recipes.map { r -> r.libraryKey?.let { r.copy(photo = photos[it]) } ?: r },
                     watch = watchWord(watch.first, watch.second, list.listRev),
                     activeStore = store.first,
-                    secondStore = store.second,
+                    secondStore = store.second.size > 1,
+                    storeName = store.second.firstOrNull { it.id == store.first }?.name ?: "My store",
                 )
             }
         }.flowOn(Dispatchers.Default)
@@ -555,9 +563,15 @@ class ListViewModel(
     }
 
     /** "Shop" / "Plan": the mode is a setting, so it survives a restart mid-shop. Nothing on the list changes. */
-    fun setMode(m: ListMode) = viewModelScope.launch { c.settings.setListMode(m) }
+    fun setMode(m: ListMode) = viewModelScope.launch { if (m == ListMode.SHOP) c.shopStart.request() else c.settings.setListMode(m) }
 
     init {
+        savedState.get<Long>("openItem")?.let { id ->
+            viewModelScope.launch {
+                c.awaitReady()
+                openItem(id)
+            }
+        }
         // A shop that took everything ends in planning, however the list was emptied (Finish shopping,
         // Clear all, a meal removed, Undo of an add): the next item typed must not land in the shop
         // screen, where there is no field to type into.
@@ -594,7 +608,7 @@ class ListViewModel(
         by: Int,
     ) = viewModelScope.launch {
         val rows = ui.value.aisles.firstOrNull { it.first == row.aisle }?.second.orEmpty().filter { it.group == row.group }
-        c.repository.arrangeWith { it.movedItem(rows.map { r -> r.slot() }, row.slot(), by) }
+        c.repository.arrangeWith(c.settings.activeStore.first()) { it.movedItem(rows.map { r -> r.slot() }, row.slot(), by) }
     }
 
     /** UX review 17: a row to the top or bottom of its group, as shown. */
@@ -603,7 +617,7 @@ class ListViewModel(
         top: Boolean,
     ) = viewModelScope.launch {
         val rows = ui.value.aisles.firstOrNull { it.first == row.aisle }?.second.orEmpty().filter { it.group == row.group }
-        c.repository.arrangeWith { it.movedItemToEnd(rows.map { r -> r.slot() }, row.slot(), top) }
+        c.repository.arrangeWith(c.settings.activeStore.first()) { it.movedItemToEnd(rows.map { r -> r.slot() }, row.slot(), top) }
     }
 
     /** Moves the group [group] one place up or down within [aisle], past the group shown next to it. */
@@ -614,7 +628,9 @@ class ListViewModel(
     ) = viewModelScope.launch {
         val present = ui.value.aisles.firstOrNull { it.first == aisle }?.second.orEmpty().map { it.group }.distinct()
         val known: List<String?> = c.catalog.groupsIn(aisle) + null
-        c.repository.arrangeWith { it.movedGroup(aisle, present, known, group, by) { g -> c.catalog.groupRank(aisle, g) } }
+        c.repository.arrangeWith(c.settings.activeStore.first()) {
+            it.movedGroup(aisle, present, known, group, by) { g -> c.catalog.groupRank(aisle, g) }
+        }
     }
 
     /** "Found it after all": back among what is left. */
@@ -639,18 +655,39 @@ class ListViewModel(
             // never found): the shop screen would count that as "left" (review B.14).
             c.settings.setListMode(ListMode.PLAN)
             val left = c.repository.snapshot().liveItems.size
-            val text =
-                (if (n == 1) "Finished: 1 bought item removed" else "Finished: $n bought items removed") +
-                    (if (left > 0) " · $left still needed" else "")
+            val text = "$n bought · $left carried forward"
             messages.send(UiMessage(text, undo = { c.repository.undoDelete(stamp) }))
             // Missing 3: what was not bought is asked about once, rather than carried over unnoticed.
             if (left > 0 && n > 0) carryOver.value = left
         }
 
+    /** Plain text contains only outstanding shopping, grouped in the selected store's aisle order. */
+    suspend fun shoppingText(): String {
+        val list = c.repository.snapshot()
+        val store = c.settings.activeStore.first()
+        val order = c.repository.aisleOrder(store)
+        val units = c.settings.units.first()
+        val rows = list.liveItems.filter { !list.isDone(it.id) }
+        if (rows.isEmpty()) return "HyperShop — nothing left to buy"
+        return order.mapNotNull { aisle ->
+            val items = rows.filter { it.aisle == aisle }.sortedBy { it.position }
+            if (items.isEmpty()) {
+                null
+            } else {
+                aisle.displayName + "\n" +
+                    items.joinToString("\n") { item ->
+                        "• " + Display.row(list, item, item.catalogId?.let { c.catalog.byId[it] }, units).main +
+                            if (item.unavailableAt != null) " (not available this trip)" else ""
+                    }
+            }
+        }.joinToString("\n\n")
+    }
+
     // ---- the item sheet (5.7) ---------------------------------------------------------------
 
     /** Opens the sheet for [id]. Opening another, or closing, before it loads wins. */
     fun openItem(id: Long): Job {
+        savedState["openItem"] = id
         openJob?.cancel()
         return viewModelScope.launch {
             // Read, not the list on screen: a tap right after a tick would otherwise show the sheet as still open.
@@ -679,6 +716,9 @@ class ListViewModel(
             val swaps = entry?.swaps.orEmpty().mapNotNull { c.catalog.byId[it]?.name }
             val pack = entry?.packNote?.let(Display::compactUnits)
             val row = Display.row(list, item, entry, units)
+            val storeId = c.settings.activeStore.first()
+            val packSize = c.repository.packPreference(storeId, item.mergeKey)
+            val suggestion = packSize?.let { com.robert4lyf.hypershop.core.merge.PackSuggestion.forNeed(list.toBuy(id), it) }
             _sheet.value =
                 ItemSheet(
                     id,
@@ -694,6 +734,22 @@ class ListViewModel(
                     ItemEdit.text(list.total(id)),
                     entry?.group,
                     AisleCode.entries.associateWith { c.catalog.groupsIn(it) },
+                    revision = item.rev,
+                    storeId = storeId,
+                    storeName = c.repository.storeProfiles().firstOrNull { it.id == storeId }?.name ?: "My store",
+                    preferredPack = packSize?.let(ItemEdit::text).orEmpty(),
+                    purchaseSuggestion =
+                        suggestion?.let {
+                            "Suggested purchase: ${it.packs} × ${ItemEdit.text(it.size)} packs. " +
+                                "Requirement unchanged; tick only what you buy."
+                        } ?: packSize?.let { "Usual pack saved; no purchase suggestion is possible in a different measure." },
+                    explanation =
+                        listOf(
+                            "Required ${ItemEdit.text(list.total(id)).ifBlank { "as shown above" }}",
+                            "At home ${item.onHand?.let(ItemEdit::text) ?: "0"}",
+                            "Bought ${ItemEdit.text(list.purchased(id)).ifBlank { "0" }}",
+                            "Buy ${ItemEdit.text(list.toBuy(id)).ifBlank { "0 / see requirement" }}",
+                        ).joinToString(" · "),
                 )
         }.also { openJob = it }
     }
@@ -739,12 +795,16 @@ class ListViewModel(
     }
 
     fun closeItem() {
+        savedState["openItem"] = null
         openJob?.cancel()
         _sheet.value = null
     }
 
     /** After a change made from [id]'s sheet: closes it, unless another item's sheet is open by now. */
-    private fun closeSheetOf(id: Long) = _sheet.update { if (it?.id == id) null else it }
+    private fun closeSheetOf(id: Long) {
+        if (_sheet.value?.id == id) savedState["openItem"] = null
+        _sheet.update { if (it?.id == id) null else it }
+    }
 
     /**
      * The sheet's Save: every change at once, then the sheet closes. False, and nothing
@@ -759,38 +819,64 @@ class ListViewModel(
         id: Long,
         ch: ItemChanges,
     ): Boolean {
-        val total =
-            ch.amount?.let { text ->
-                c.ruleParser.parse(text.trim() + " x").shopBase(UnitLocale.METRIC).takeUnless { it.isPresence } ?: return false
-            }
+        if (_sheet.value?.saving == true) return false
+        val total = ch.amount?.let { com.robert4lyf.hypershop.core.parse.QuantityInput.parse(it) ?: return false }
+        val pack = ch.pack?.takeIf { it.isNotBlank() }?.let { com.robert4lyf.hypershop.core.parse.QuantityInput.parse(it) ?: return false }
+        val opened = _sheet.value?.takeIf { it.id == id }
+        _sheet.update { it?.copy(saving = true, saveError = null) }
         viewModelScope.launch {
-            val before = c.repository.snapshot().items[id]?.aisle
-            val itemId = ch.name?.let { c.repository.renameItem(id, it) } ?: id
-            total?.let { c.repository.editQuantity(itemId, it) }
-            // The aisle the form showed stays, unless another was picked: a new name the
-            // catalogue does not know would otherwise land in a guessed one.
-            val aisle = ch.aisle ?: before
-            if (aisle != null && c.repository.snapshot().items[itemId]?.aisle != aisle) {
-                c.repository.moveAisle(itemId, aisle, ch.aisle != null && ch.alwaysAisle)
+            try {
+                c.awaitReady()
+                if (id in committedSaves) {
+                    c.flushLibraryEdits()
+                    committedSaves.remove(id)
+                    savedState["committedSave"] = null
+                    closeSheetOf(id)
+                    messages.send(UiMessage("Saved"))
+                    return@launch
+                }
+                val before = c.repository.snapshot().items[id] ?: error("This item is no longer on the list")
+                val target = ch.name?.let { c.repository.target(it) }
+                val targetId = if (ch.name != null) target?.catalogId else before.catalogId
+                val entry = targetId?.let { c.catalog.byId[it] }
+                val pending =
+                    if (ch.groupChanged) {
+                        val edit =
+                            entry?.let { EntryEdit.of(it).copy(group = ch.group) }
+                                ?: EntryEdit(
+                                    "user_item_$id", ch.name ?: before.displayName, ch.name ?: before.displayName,
+                                    aisle = (ch.aisle ?: before.aisle).name, custom = true, group = ch.group,
+                                )
+                        com.robert4lyf.hypershop.data.PendingLibraryEditEntity(
+                            java.util.UUID.randomUUID().toString(),
+                            kotlinx.serialization.json.Json.encodeToString(EntryEdit.serializer(), edit),
+                        )
+                    } else {
+                        null
+                    }
+                c.repository.editItem(
+                    id, opened?.revision?.takeIf { it > 0 } ?: before.rev,
+                    ch.name, total, ch.aisle, ch.alwaysAisle, pending, ch.packChanged, pack,
+                    opened?.storeId ?: c.settings.activeStore.first(),
+                )
+                committedSaves.add(id)
+                savedState["committedSave"] = id
+                c.flushLibraryEdits()
+                committedSaves.remove(id)
+                savedState["committedSave"] = null
+                closeSheetOf(id)
+                messages.send(UiMessage("Saved"))
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val text = e.message ?: "Could not save. Your draft is still here."
+                _sheet.update { if (it?.id == id) it.copy(saveError = text) else it }
+                messages.send(UiMessage(text))
+            } finally {
+                _sheet.update { if (it?.id == id) it.copy(saving = false) else it }
             }
-            if (ch.groupChanged) setGroup(itemId, ch.group)
-            closeSheetOf(id)
-            messages.send(UiMessage("Saved"))
         }
         return true
-    }
-
-    private suspend fun setGroup(
-        itemId: Long,
-        group: String?,
-    ) {
-        val item = c.repository.snapshot().items[itemId] ?: return
-        val entry = item.catalogId?.let { c.catalog.byId[it] }
-        val edit =
-            entry?.let { EntryEdit.of(it).copy(group = group) }
-                ?: EntryEdit("", item.displayName, item.displayName, aisle = item.aisle.name, custom = true, group = group)
-        c.library.save(edit)
-        c.repository.rekeyIfCatalogChanged()
     }
 
     // ---- the "Add item" field (5.6b) ----------------------------------------------------

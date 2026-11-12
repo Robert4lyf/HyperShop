@@ -194,6 +194,7 @@ data class ContributionEntity(
     val createdListRev: Long,
     val coveredBy: Long?,
     val unitHint: String?,
+    val homeUsed: String? = null,
 )
 
 @Serializable
@@ -430,8 +431,25 @@ data class RecipeNoteEntity(
  * kept across trips, like the walking order.
  */
 @Serializable
-@Entity(tableName = "ShelfRank")
+@Entity(tableName = "ShelfRank", primaryKeys = ["key", "storeId"])
 data class ShelfRankEntity(
-    @PrimaryKey val key: String,
+    val key: String,
     val rank: Int,
+    @ColumnInfo(defaultValue = "1") val storeId: Long = 1,
+)
+
+/** Durable outbox: the list edit and its ingredient preference commit together. */
+@Entity(tableName = "PendingLibraryEdit")
+data class PendingLibraryEditEntity(
+    @PrimaryKey val id: String,
+    val payload: String,
+)
+
+/** Optional usual pack size at a store, not stock or an amount purchased. */
+@Serializable
+@Entity(tableName = "StorePack", primaryKeys = ["storeId", "key"])
+data class StorePackEntity(
+    val storeId: Long,
+    val key: String,
+    val qty: String,
 )

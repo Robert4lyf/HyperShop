@@ -1,6 +1,8 @@
 package com.robert4lyf.hypershop.ui.meals
 
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -9,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -193,6 +196,40 @@ class MealsScreenTest {
         show(MealsUi(loaded = true, weekName = "This week"))
         compose.onNodeWithText("No saved recipes yet").assertExists()
         compose.onNodeWithTag("meals-shop").assertDoesNotExist()
+    }
+
+    @Test
+    fun aRejectedHomeAmountStaysVisibleForCorrection() {
+        var attempts = 0
+        val row = HomeRow("cat:rice", "rice", listOf("Soup"), false, false, needed = "500 g", onHand = "100 g")
+        compose.setContent {
+            HyperShopTheme(dynamicColor = false) {
+                MealsScreen(
+                    ui.copy(home = listOf(row)),
+                    actions.copy(onHaveSome = { _, _, done ->
+                        attempts++
+                        done(if (attempts == 1) "Keep the amount already allocated to earlier purchases." else null)
+                    }),
+                )
+            }
+        }
+        scrollTo("home-cat:rice")
+        compose.onNodeWithTag("home-some-cat:rice").performClick()
+        compose.onNodeWithTag("home-some-amount").assertTextContains("100 g")
+        compose.onNodeWithTag("home-some-amount").performTextReplacement("not an amount")
+        compose.onNodeWithTag("home-some-set").performClick()
+        compose.onNodeWithText("Enter a positive amount using the requirement's measure, e.g. 300 g.").assertIsDisplayed()
+        assertEquals(0, attempts)
+        compose.onNodeWithTag("home-some-amount").performTextReplacement("200 g")
+        compose.onNodeWithTag("home-some-set").performClick()
+        compose.onNodeWithText("Keep the amount already allocated to earlier purchases.").assertIsDisplayed()
+        compose.onNodeWithTag("home-some-amount").assertTextContains("200 g")
+        compose.onNodeWithTag("home-some-set").assertIsDisplayed()
+        compose.onNodeWithTag("home-some-dialog").captureRoboImage(Shots.path("home-amount-dialog-light.png"))
+        compose.onNodeWithTag("home-some-amount").performTextReplacement("300 g")
+        compose.onNodeWithTag("home-some-set").performClick()
+        compose.onNodeWithTag("home-some-amount").assertDoesNotExist()
+        assertEquals(2, attempts)
     }
 
     @Test

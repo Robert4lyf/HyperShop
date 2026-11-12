@@ -1,0 +1,18 @@
+# Real-device acceptance — dependable shopping
+
+Use a backup of real data; retain the original installation and backup until checks finish. Do these on the phone and Forerunner 245 before considering a release ready.
+
+1. Plan two meals sharing an ingredient; add a household extra. Check combined cupboard requirements, then include fridge/freezer/fresh food. Enter a partial amount, edit it, try invalid text, and confirm the buying amount. Undo once, then repeat with a phone/watch update before Undo: newer state must survive.
+2. Open an imported recipe offline. Compare flagged interpretations with original text; correct identity, amount and alternatives. If an optional Claude key is configured, edit a line during a call, stop it, leave and return: corrections must remain associated with their original occurrence. Record corrections and elapsed time separately for offline and assisted runs.
+3. Change 400 g to kg and 250 ml to l. Verify 0.4 kg and 0.25 l. Try g to ml and packets to g: an amount must be explicitly supplied. Open the keyboard on a small screen; Save must stay reachable. Rotate with a changed draft, then test Back, drag-dismissal and tapping outside; changes must not disappear without confirmation.
+4. Tick an item after a partial home deduction, then increase recipe servings. Home food must not be deducted a second time; already bought quantities stay bought. Review actual purchased amounts versus contribution coverage.
+5. Configure two named stores with different aisle and shelf orders. Start from Shopping, then This week. Both must offer the same choices and remember the chosen store; phone and watch must follow that store's order. Cancel the choice and check that no trip was accidentally started.
+6. Shop offline on phone and watch, tick on each while disconnected, add another requirement on the phone, reconnect, untick on the watch, and verify no later contribution was covered by an older tick. Check unavailable/Found it and Finish; review carried-forward items, purchase history and Undo.
+7. Set a 400 g preferred pack at one store for a 650 g need. See two suggested packs and an unchanged 650 g requirement. Confirm the preference is absent from the other store and never creates a purchase. Share the list; check aisle headings and absence of already bought rows.
+8. Add and resize the widget, including an empty list. Kill the app and use Add item; it must open the normal validated add field. Tick an item in the app and check widget refresh. Treat a stale preview as navigation, not an independent authoritative list.
+9. Save a manual backup with photos; check successful-export date and photo counts. Cancel or fail another export: the earlier successful record must remain. Restore onto another installation, checking recipes/photos, ingredient edits, list, history, named stores, shelf arrangements and pack preferences. A restore must not advance the manual-backup date. Re-enter the optional key separately and reconnect Garmin.
+10. Open Cooking view. Check saved servings, ingredients and notes, source access, scrolling at 200% text and landscape. Background or close it: it must stop keeping the screen awake. Test TalkBack reading/action order, one tick announcement per row, labelled unavailable actions and validation errors throughout.
+
+## Not covered by a desktop/JVM test
+
+Garmin radio reconnects and store package installation; Android launcher-specific widget behaviour; real IME/inset and TalkBack behaviour; signed private-release install/restore; device performance and power behaviour. Do not substitute compilation or screenshots for these checks.

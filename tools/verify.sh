@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The gate (PLAN.md §6 rule 3). Must pass before every commit.
 #
-#   1. ktlint, every unit test, :app:assembleDebug
+#   1. ktlint, every unit test, debug/test APKs and unsigned release build
 #   1b. the catalogue is valid and its generated files are fresh
 #   2. the merged manifest: no CAMERA; only the launcher and share activities exported
 #   3. no Anthropic key committed (sk-ant- scan)
@@ -36,13 +36,17 @@ tools/gradle.sh ktlintCheck --rerun-tasks --no-configuration-cache --no-build-ca
 tools/gradle.sh \
   :core:test :extract:test :claude:test \
   :data:testDebugUnitTest :app:testDebugUnitTest \
-  :app:assembleDebug :app:assembleDebugAndroidTest
+  :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease
+
+step "Release promotion guards"
+python3 -m unittest discover -s tools/release -v
 
 step "Catalogue"
 python3 tools/catalog/build_catalog.py --check
 
 step "Merged manifest"
 python3 tools/check_manifest.py
+python3 tools/check_manifest.py release
 
 step "Secrets scan"
 # A real key is sk-ant- followed by a long token; the bare prefix appears in

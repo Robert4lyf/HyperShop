@@ -7,8 +7,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT/android"
 LOG="$(mktemp)"
 trap 'rm -f "$LOG"' EXIT
+# Let isolated runners avoid a project cache still owned by another session.
+cache_args=()
+if [ -n "${GRADLE_PROJECT_CACHE_DIR:-}" ]; then
+  cache_args=(--project-cache-dir "$GRADLE_PROJECT_CACHE_DIR")
+fi
 for attempt in 1 2 3 4 5 6 7 8; do
-  ./gradlew --max-workers="${GRADLE_WORKERS:-1}" "$@" 2>&1 | tee "$LOG"
+  ./gradlew --max-workers="${GRADLE_WORKERS:-1}" "${cache_args[@]}" "$@" 2>&1 | tee "$LOG"
   status=${PIPESTATUS[0]}
   if [ "$status" -eq 0 ]; then exit 0; fi
   if grep -qE 'HTTP 429|Could not resolve|Could not GET|Could not download|Read timed out|Connection reset' "$LOG"; then

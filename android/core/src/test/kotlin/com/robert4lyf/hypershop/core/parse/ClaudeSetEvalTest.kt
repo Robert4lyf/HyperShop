@@ -73,12 +73,13 @@ class ClaudeSetEvalTest {
     }
 
     private companion object {
-        /** U.2: right, accepted wrong, right but flagged — Claude Haiku 5.5's recording, through today's alignment. */
+        // November label corrections expose one omitted spoon extra in each historical recording.
+        // These are re-scored recorded outputs, not a reduced gate for newly generated answers.
         val TOTALS =
             mapOf(
-                "t-2026" to listOf(127, 6, 0),
+                "t-2026" to listOf(126, 6, 0),
                 "final-2026" to listOf(125, 7, 1),
-                "release-c-2026" to listOf(260, 14, 2),
+                "release-c-2026" to listOf(259, 14, 2),
             )
         val SETS = listOf("t-2026", "final-2026", "release-c-2026")
     }

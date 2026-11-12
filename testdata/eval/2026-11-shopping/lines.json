@@ -1,0 +1,22 @@
+[
+  {"line":"400 g plus 0.1 kg plain flour","ingredient":"plain flour","base":500,"dimension":"mass","review":false},
+  {"line":"1 tbsp plus 1 tsp olive oil","ingredient":"olive oil","base":20,"dimension":"volume","review":false},
+  {"line":"250 ml milk plus 1/4 l milk","ingredient":"milk","base":500,"dimension":"volume","review":false},
+  {"line":"200 g butter plus 2 tbsp oil","ingredient":"unsalted butter","review":true,"reason":"additional ingredient must be checked"},
+  {"line":"200 g flour plus 2 tbsp for dusting","ingredient":"plain flour","review":true,"reason":"no unsupported flour density assumption"},
+  {"line":"2 onions, plus 1 onion","ingredient":"onion","base":3,"dimension":"count","review":false},
+  {"line":"1 large egg plus 1 egg yolk","ingredient":"egg","review":true,"reason":"a yolk is not another whole egg"},
+  {"line":"2 x 400 g tins chopped tomatoes","ingredient":"chopped tomatoes","base":800,"dimension":"mass","review":false},
+  {"line":"half a cucumber","ingredient":"cucumber","review":true,"reason":"worded amount requires correction if unsupported"},
+  {"line":"1½ kg potatoes","ingredient":"potato","base":1500,"dimension":"mass","review":false},
+  {"line":"3/4 litre vegetable stock","ingredient":"vegetable stock","base":750,"dimension":"volume","review":false},
+  {"line":"1 jar pesto","ingredient":"pesto","base":1,"dimension":"count:jar","review":false},
+  {"line":"a 300 g bag of spinach","ingredient":"spinach","base":300,"dimension":"mass","review":false},
+  {"line":"2 heaped tablespoons peanut butter","ingredient":"peanut butter","review":true,"reason":"heaped measure uncertain"},
+  {"line":"200 g chicken or tofu","review":true,"reason":"alternative identity"},
+  {"line":"1 lemon, zest and juice","ingredient":"lemon","base":1,"dimension":"count","review":false},
+  {"line":"a splash of milk","ingredient":"milk","review":true,"reason":"household amount"},
+  {"line":"7 g fresh yeast","ingredient":"fresh yeast","base":7,"dimension":"mass","review":false},
+  {"line":"500 g frozen peas","ingredient":"peas","base":500,"dimension":"mass","review":false},
+  {"line":"2 packs ready rolled puff pastry","ingredient":"puff pastry","base":2,"dimension":"count:packet","review":false}
+]

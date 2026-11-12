@@ -10,7 +10,7 @@ import com.robert4lyf.hypershop.core.catalog.CatalogLoader
 import com.robert4lyf.hypershop.core.model.AisleCode
 
 @Database(
-    version = 12,
+    version = 16,
     exportSchema = true,
     entities = [
         MetaEntity::class, ItemEntity::class, ItemAliasEntity::class, RecipeEntity::class, RecipeLineEntity::class,
@@ -19,7 +19,7 @@ import com.robert4lyf.hypershop.core.model.AisleCode
         CategoryOverrideEntity::class, StapleEntity::class, ClaudeUsageEntity::class, DeletedItemEntity::class,
         WatchInstallEntity::class, WatchOpResultEntity::class, PlannedMealEntity::class, TripEntity::class,
         TripItemEntity::class, RegularEntity::class, RecipeNoteEntity::class,
-        ShelfRankEntity::class,
+        ShelfRankEntity::class, PendingLibraryEditEntity::class, StorePackEntity::class,
     ],
 )
 abstract class HyperShopDatabase : RoomDatabase() {
@@ -178,6 +178,53 @@ abstract class HyperShopDatabase : RoomDatabase() {
                 }
             }
 
+        /** v13: recoverable compound item edits; no existing user rows change. */
+        val MIGRATION_12_13: Migration =
+            object : LiveKeyMigration(12, 13) {
+                override fun migrateTables(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `PendingLibraryEdit` (`id` TEXT NOT NULL, " +
+                            "`payload` TEXT NOT NULL, PRIMARY KEY(`id`))",
+                    )
+                }
+            }
+
+        /** v14: retain the shared shelf arrangement in every existing store; each can now differ. */
+        val MIGRATION_13_14: Migration =
+            object : LiveKeyMigration(13, 14) {
+                override fun migrateTables(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `ShelfRank` RENAME TO `OldShelfRank`")
+                    db.execSQL(
+                        "CREATE TABLE `ShelfRank` (`key` TEXT NOT NULL, `rank` INTEGER NOT NULL, " +
+                            "`storeId` INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(`key`, `storeId`))",
+                    )
+                    db.execSQL(
+                        "INSERT INTO `ShelfRank` (`key`, `rank`, `storeId`) SELECT o.`key`, " +
+                            "o.`rank`, s.`id` FROM `OldShelfRank` o CROSS JOIN `StoreProfile` s",
+                    )
+                    db.execSQL("DROP TABLE `OldShelfRank`")
+                }
+            }
+
+        /** v15: optional per-store pack preferences, initially empty. */
+        val MIGRATION_14_15: Migration =
+            object : LiveKeyMigration(14, 15) {
+                override fun migrateTables(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `StorePack` (`storeId` INTEGER NOT NULL, `key` " +
+                            "TEXT NOT NULL, `qty` TEXT NOT NULL, PRIMARY KEY(`storeId`, `key`))",
+                    )
+                }
+            }
+
+        /** v16: remember which covered amounts came from home, so they are not spent twice. */
+        val MIGRATION_15_16: Migration =
+            object : LiveKeyMigration(15, 16) {
+                override fun migrateTables(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `Contribution` ADD COLUMN `homeUsed` TEXT")
+                }
+            }
+
         /** Seeds aisles, the store and its aisle order, staples and Meta (PLAN §3.4, §4). */
         val CALLBACK =
             object : Callback() {
@@ -234,6 +281,10 @@ abstract class HyperShopDatabase : RoomDatabase() {
                 MIGRATION_9_10,
                 MIGRATION_10_11,
                 MIGRATION_11_12,
+                MIGRATION_12_13,
+                MIGRATION_13_14,
+                MIGRATION_14_15,
+                MIGRATION_15_16,
             )
                 .build()
 

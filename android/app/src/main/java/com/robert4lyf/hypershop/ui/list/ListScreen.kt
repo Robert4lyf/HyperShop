@@ -111,6 +111,7 @@ data class ListActions(
     val onMode: (ListMode) -> Unit = {},
     /** "Shop" with a store picked, when a second store has a walking order (missing 4 of the review). */
     val onShop: (Long) -> Unit = {},
+    val onShareText: () -> Unit = {},
     /** X.8: "Not available" on this trip, and "Found it" to take that back. */
     val onUnavailable: (ListRow) -> Unit = {},
     val onAvailable: (ListRow) -> Unit = {},
@@ -558,30 +559,23 @@ private fun ListTop(
             if (shopping) {
                 // The way into the shop screen: one tap, in reach of either thumb. With a second store's order on
                 // record, the tap asks which store (missing 4 of the review).
-                var pickStore by remember { mutableStateOf(false) }
-                Box {
-                    HeroButton(
-                        onClick = { if (ui.secondStore) pickStore = true else actions.onMode(ListMode.SHOP) },
-                        modifier = Modifier.testTag("start-shopping"),
-                    ) {
-                        Icon(Icons.Rounded.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.size(6.dp))
-                        Text("Shop")
-                    }
-                    DropdownMenu(expanded = pickStore, onDismissRequest = { pickStore = false }) {
-                        for ((id, name) in STORES) {
-                            DropdownMenuItem(text = { Text(name) }, onClick = {
-                                pickStore = false
-                                actions.onShop(id)
-                            }, modifier = Modifier.testTag("shop-store-$id"))
-                        }
-                    }
+                HeroButton(
+                    onClick = { actions.onShop(ui.activeStore) },
+                    modifier = Modifier.testTag("start-shopping"),
+                ) {
+                    Icon(Icons.Rounded.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.size(6.dp))
+                    Text("Shop")
                 }
             }
             var menu by remember { mutableStateOf(false) }
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text("Share shopping list") }, onClick = {
+                        menu = false
+                        actions.onShareText()
+                    })
                     for ((view, label) in VIEWS) {
                         val on = ui.view == view
                         DropdownMenuItem(

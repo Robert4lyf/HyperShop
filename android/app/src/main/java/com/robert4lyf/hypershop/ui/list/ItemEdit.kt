@@ -5,8 +5,9 @@ import com.robert4lyf.hypershop.core.model.BaseKey
 import com.robert4lyf.hypershop.core.model.Dimension
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
+import com.robert4lyf.hypershop.core.model.UnitLocale
+import com.robert4lyf.hypershop.core.parse.RuleParser
 import java.math.BigDecimal
-import java.math.RoundingMode
 
 /**
  * What the item sheet's Save changes. Null means "leave it": [groupChanged] is
@@ -20,8 +21,10 @@ data class ItemChanges(
     val alwaysAisle: Boolean = true,
     val groupChanged: Boolean = false,
     val group: String? = null,
+    val packChanged: Boolean = false,
+    val pack: String? = null,
 ) {
-    val isEmpty: Boolean get() = name == null && amount == null && aisle == null && !groupChanged
+    val isEmpty: Boolean get() = name == null && amount == null && aisle == null && !groupChanged && !packChanged
 }
 
 /** The amount field's text: a total the parser reads back, and its unit swapped by a chip. */
@@ -48,13 +51,18 @@ object ItemEdit {
         }
     }
 
-    /** [text] with its unit replaced by [unit], keeping the number (1 when there is none yet). */
+    /** Exact conversion only. Null asks the user to enter an amount in the new measure. */
     fun withUnit(
         text: String,
         unit: String,
-    ): String {
-        val n = amount.find(text)?.groupValues?.get(1)?.trim().orEmpty().ifEmpty { "1" }
-        return if (unit == EACH) n else "$n $unit"
+    ): String? {
+        val parsed = RuleParser().parse(text.trim() + " x")
+        val q = parsed.quantity ?: return null
+        val old = parsed.base(UnitLocale.METRIC)
+        val new = RuleParser().parse(if (unit == EACH) "1 x" else "1 $unit x").base(UnitLocale.METRIC)
+        if (old.keys != new.keys || old.isPresence || new.isPresence) return null
+        val value = q * (parsed.unit?.baseFactor(UnitLocale.METRIC) ?: Rational.ONE) / new.parts.values.single()
+        return if (unit == EACH) number(value) else "${number(value)} $unit"
     }
 
     /** The chip [text]'s unit matches, so the chip shows selected; null when none does. */
@@ -69,6 +77,8 @@ object ItemEdit {
         if (r.isWhole) {
             r.toString()
         } else {
-            BigDecimal(r.toDouble()).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+            runCatching {
+                BigDecimal(r.num).divide(BigDecimal(r.den)).stripTrailingZeros().toPlainString()
+            }.getOrElse { r.toString() }
         }
 }

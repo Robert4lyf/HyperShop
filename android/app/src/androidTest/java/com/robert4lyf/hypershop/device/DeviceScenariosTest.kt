@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
@@ -66,7 +67,8 @@ class DeviceScenariosTest {
     private fun ticks() =
         compose.onAllNodes(
             SemanticsMatcher("a tick") {
-                it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("tick-") == true
+                it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("item-") == true &&
+                    it.config.getOrNull(SemanticsProperties.Role) == Role.Checkbox
             },
         )
 
@@ -74,7 +76,8 @@ class DeviceScenariosTest {
     private fun openTicks() =
         compose.onAllNodes(
             SemanticsMatcher("an open tick") {
-                it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("tick-") == true &&
+                it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("item-") == true &&
+                    it.config.getOrNull(SemanticsProperties.Role) == Role.Checkbox &&
                     it.config.getOrNull(SemanticsProperties.StateDescription) == "Still needed"
             },
         )
@@ -198,7 +201,8 @@ class DeviceScenariosTest {
         val node = tick.fetchSemanticsNode()
         assertEquals(Role.Checkbox, node.config.getOrNull(SemanticsProperties.Role))
         assertEquals("Still needed", node.config.getOrNull(SemanticsProperties.StateDescription))
-        assertTrue(node.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty().isNotEmpty())
+        assertEquals(ToggleableState.Off, node.config.getOrNull(SemanticsProperties.ToggleableState))
+        assertTrue(node.config.getOrNull(SemanticsProperties.Text).orEmpty().isNotEmpty())
         compose.onNodeWithTag("shop-left").assertIsDisplayed()
     }
 }

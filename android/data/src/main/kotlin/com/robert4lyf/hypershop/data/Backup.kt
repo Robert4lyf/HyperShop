@@ -6,6 +6,7 @@ import com.robert4lyf.hypershop.core.merge.UseKind
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.QtyBase
+import com.robert4lyf.hypershop.core.model.Rational
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -52,6 +53,8 @@ data class BackupData(
     val recipeNotes: List<RecipeNoteEntity> = emptyList(),
     /** X.9: the arranged order within aisles. Absent from older files. */
     val shelfRanks: List<ShelfRankEntity> = emptyList(),
+    val storePacks: List<StorePackEntity> = emptyList(),
+    val arrangementVersion: Int = 0,
 )
 
 /**
@@ -179,6 +182,15 @@ object BackupValidator {
             check(c.recipeLineId == null || c.recipeLineId in lines, "contribution ${c.id}: line ${c.recipeLineId} is missing")
             check(c.coveredBy == null || c.coveredBy in ticks, "contribution ${c.id}: tick ${c.coveredBy} is missing")
             check(c.coveredBy == null || tickItem[c.coveredBy] == c.itemId, "contribution ${c.id}: covered by another item's tick")
+            val home = c.homeUsed?.let { runCatching { json.decodeFromString(QtyBase.serializer(), it) }.getOrNull() }
+            val qty = runCatching { json.decodeFromString(QtyBase.serializer(), c.qtyBase) }.getOrNull()
+            check(
+                c.homeUsed == null || (
+                    home != null && c.coveredBy != null && qty != null &&
+                        home.parts.all { (k, v) -> v >= Rational.ZERO && v <= (qty.parts[k] ?: Rational.ZERO) }
+                ),
+                "contribution ${c.id}: invalid home allocation",
+            )
             check(c.createdListRev <= b.listRev, "contribution ${c.id}: made after the list's own revision")
             check(
                 c.qtyBase.length <= MAX_JSON &&
@@ -264,8 +276,23 @@ object BackupValidator {
         check(b.recipeNotes.size <= MAX_ROWS, "recipeNotes: ${b.recipeNotes.size} rows is more than a backup can hold")
         check(b.recipeNotes.map { it.libraryKey }.toSet().size == b.recipeNotes.size, "duplicate recipe notes")
         check(b.shelfRanks.size <= MAX_ROWS, "shelfRanks: ${b.shelfRanks.size} rows is more than a backup can hold")
-        check(b.shelfRanks.map { it.key }.toSet().size == b.shelfRanks.size, "duplicate shelf ranks")
-        check(b.shelfRanks.all { it.key.length in 1..MAX_TEXT && it.rank >= 0 }, "shelf rank: bad key or rank")
+        check(b.arrangementVersion in 0..1, "unsupported shelf arrangement version")
+        check(b.storePacks.size <= MAX_ROWS, "too many store pack preferences")
+        check(b.storePacks.map { it.storeId to it.key }.distinct().size == b.storePacks.size, "duplicate store packs")
+        for (p in b.storePacks) {
+            val q = runCatching { json.decodeFromString(QtyBase.serializer(), p.qty) }.getOrNull()
+            check(p.storeId in b.stores.map { it.id } && p.key.length in 1..MAX_TEXT, "invalid store pack key")
+            check(
+                q != null && runCatching { q.keys }.isSuccess && q.parts.size == 1 &&
+                    q.parts.values.all { it > Rational.ZERO },
+                "invalid pack amount",
+            )
+        }
+        check(b.shelfRanks.map { it.storeId to it.key }.toSet().size == b.shelfRanks.size, "duplicate shelf ranks")
+        check(
+            b.shelfRanks.all { it.key.length in 1..MAX_TEXT && it.rank >= 0 && it.storeId in b.stores.map { s -> s.id } },
+            "shelf rank: bad key or rank",
+        )
         for (n in b.recipeNotes) {
             check(n.libraryKey.length in 1..ListRepository.MAX_URL, "recipe note: bad recipe key")
             check(n.rating == null || n.rating in 1..ListRepository.MAX_STARS, "recipe note: rating out of range")

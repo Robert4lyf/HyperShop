@@ -215,17 +215,18 @@ class RuleParserTest {
     }
 
     @Test
-    fun r36PlusAmountGoesToTheNote() {
+    fun r36CompatiblePlusQuantitiesAreCombinedAndLocaleDependentOnesAreFlagged() {
         val a = p.parse("1 tablespoon plus 1 teaspoon sugar")
         assertEquals("sugar", a.name)
-        assertEquals(Rational.ONE, a.quantity)
+        assertEquals(Rational.of(4, 3), a.quantity)
         assertEquals(QtyUnit.TBSP, a.unit)
-        assertEquals("plus 1 teaspoon", a.note)
+        assertFalse(a.check)
         val b = p.parse("½ cup plus 2 tbsp sugar")
         assertEquals("sugar", b.name)
         assertEquals(Rational.of(1, 2), b.quantity)
         assertEquals(QtyUnit.CUP, b.unit)
         assertEquals("plus 2 tbsp", b.note)
+        assertTrue(b.check)
         assertEquals("flour", p.parse("1 cup and 2 tablespoons flour").name)
     }
 
@@ -274,7 +275,7 @@ class RuleParserTest {
         assertEquals(Rational.of(480), b.altQuantity)
         // "For dusting", "for greasing": what the extra is for, not another thing.
         val flour = p.parse("200g plain flour, plus 2 tbsp for dusting")
-        assertFalse(flour.check)
+        assertTrue(flour.check)
         assertEquals(Rational.of(200), flour.quantity)
         val butter = p.parse("175g butter, plus 25g for greasing")
         assertFalse(butter.check)
@@ -287,11 +288,11 @@ class RuleParserTest {
         assertEquals("butter", a.name)
         assertEquals(Rational.of(2), a.quantity)
         assertTrue(a.check)
-        // In another unit, after the name: kept, unflagged, as before the sum was added.
+        // Cup/spoon ratios depend on locale, which this parser does not yet know.
         val b = p.parse("1 cup flour plus 2 tbsp")
         assertEquals(Rational.ONE, b.quantity)
         assertEquals(QtyUnit.CUP, b.unit)
-        assertFalse(b.check)
+        assertTrue(b.check)
         // Inside brackets the extra is the cook's, for dusting or serving: never added.
         val c = p.parse("2 tbsp flour (plus 2 tbsp for dusting)")
         assertEquals(Rational.of(2), c.quantity)

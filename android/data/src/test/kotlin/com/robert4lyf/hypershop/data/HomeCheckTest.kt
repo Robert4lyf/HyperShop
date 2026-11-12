@@ -25,7 +25,7 @@ class HomeCheckTest {
     private suspend fun rows() = home.view(r.repo.snapshot())
 
     @Test
-    fun cupboardIngredientsTwoRecipesShareAreOneDecisionAndFreshFoodIsNotAsked() =
+    fun allRequiredFoodIsAvailableWithCupboardMetadataForTheCompactFilter() =
         runBlocking {
             r.import("200 g basmati rice", "2 onions", "Salt, to taste")
             r.import("100 g basmati rice", "1 tbsp olive oil", url = "https://example.com/b")
@@ -33,7 +33,7 @@ class HomeCheckTest {
             val rice = rs.single { it.name.contains("rice") }
             assertEquals(false, rice.have)
             assertEquals(listOf("Recipe"), rice.from)
-            assertTrue(rs.none { it.mergeKey == "cat:onion" })
+            assertTrue(rs.single { it.mergeKey == "cat:onion" }.let { !it.likelyCupboard })
             // Salt went at home on review (a staple): shown as had, and usual.
             assertTrue(rs.single { it.mergeKey == "cat:salt" }.let { it.have && it.usual })
         }
@@ -90,7 +90,7 @@ class HomeCheckTest {
             r.import("2 onions", "500 g spaghetti")
             r.repo.tick(r.repo.snapshot().itemByKey("cat:onion")!!.id)
             r.repo.finish()
-            val pasta = rows().single { !it.have }.mergeKey
+            val pasta = rows().single { !it.have && it.name.contains("spaghetti") }.mergeKey
             val moved = home.have(listOf(pasta))
             // X.13: that was the last thing to buy, so the meal's shopping is done and its cupboard
             // question goes from the screen; the Undo still puts the line back.
@@ -101,7 +101,7 @@ class HomeCheckTest {
         }
 
     @Test
-    fun aLinePartlyBoughtIsNotSetAside() =
+    fun aPartlyBoughtLineCanCheckItsRemainderAndNeedAllNeverDuplicatesPurchases() =
         runBlocking {
             val planner = Planner(r.repo)
             planner.plan(planner.currentWeek(), r.save("Pasta", "500 g spaghetti"))
@@ -109,10 +109,16 @@ class HomeCheckTest {
             val pasta = r.repo.snapshot().liveItems.single()
             r.repo.tick(pasta.id)
             planner.setServings(planner.week(planner.currentWeek()).single().id, 8)
-            assertTrue(rows().none { it.mergeKey == pasta.mergeKey && !it.have })
-            assertTrue(home.have(listOf(pasta.mergeKey)).isEmpty())
-            val l = r.repo.snapshot()
+            assertTrue(rows().any { it.mergeKey == pasta.mergeKey && !it.have })
+            val changed = home.have(listOf(pasta.mergeKey))
+            assertTrue(changed.isNotEmpty())
+            var l = r.repo.snapshot()
+            assertEquals(Rational.of(500), l.covered(pasta.id)[BaseKey.MASS])
+            assertEquals(Rational.of(500), l.total(pasta.id)[BaseKey.MASS])
+            home.needLines(changed)
+            l = r.repo.snapshot()
             assertEquals(Rational.of(1000), l.total(pasta.id)[BaseKey.MASS])
+            assertEquals(Rational.of(500), l.covered(pasta.id)[BaseKey.MASS])
         }
 
     @Test
@@ -120,7 +126,7 @@ class HomeCheckTest {
         runBlocking {
             // X.13: the week bought and finished; "at home" lines were asking about it under an empty list.
             r.import("2 onions", "500 g spaghetti")
-            val pasta = rows().single { !it.have }.mergeKey
+            val pasta = rows().single { !it.have && it.name.contains("spaghetti") }.mergeKey
             home.have(listOf(pasta))
             assertTrue(rows().single { it.mergeKey == pasta }.have)
             r.repo.tick(r.repo.snapshot().itemByKey("cat:onion")!!.id)

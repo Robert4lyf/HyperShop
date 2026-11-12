@@ -6,8 +6,8 @@ import com.robert4lyf.hypershop.core.merge.LineStatus
 import com.robert4lyf.hypershop.core.merge.ShoppingList
 import com.robert4lyf.hypershop.core.merge.UseKind
 import com.robert4lyf.hypershop.core.model.AisleCode
-import com.robert4lyf.hypershop.core.model.UnitLocale
-import com.robert4lyf.hypershop.core.parse.RuleParser
+import com.robert4lyf.hypershop.core.model.QtyBase
+import com.robert4lyf.hypershop.core.parse.QuantityInput
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
@@ -25,10 +25,23 @@ data class HomeRow(
     val needed: String? = null,
     /** Y.19: what was said to be at home of it ("300 g"); only the rest is bought. */
     val onHand: String? = null,
+    val likelyCupboard: Boolean = true,
+    val remaining: String? = null,
+    val bought: String? = null,
+    val exactOnHand: QtyBase? = null,
 )
 
 /** Y.19: what "Have some" did with the amount typed. */
-enum class HaveSome { SET, ENOUGH, NOT_AN_AMOUNT, DIFFERENT_MEASURE }
+enum class HaveSome { SET, ENOUGH, NOT_AN_AMOUNT, DIFFERENT_MEASURE, ALREADY_ALLOCATED }
+
+data class HomeSomeUndo(
+    val before: ShoppingList,
+    val decisions: List<LineDecisionEntity>,
+    val afterRevision: Long,
+    val epoch: Long,
+)
+
+data class HomeSomeChange(val result: HaveSome, val undo: HomeSomeUndo?)
 
 /**
  * The At home check (docs/design/release-b.md): before shopping, the cupboard
@@ -55,10 +68,9 @@ class HomeCheck(
             val need =
                 open(l).groupBy { it.first }.mapNotNull { (itemId, cs) ->
                     val item = l.items[itemId] ?: return@mapNotNull null
-                    if (item.aisle !in CUPBOARD && item.mergeKey !in staples) return@mapNotNull null
                     val entry = repo.catalog.byId[item.catalogId ?: ""]
 
-                    fun text(q: com.robert4lyf.hypershop.core.model.QtyBase) =
+                    fun text(q: QtyBase) =
                         Display.amount(
                             q,
                             produce = item.aisle == AisleCode.PRODUCE,
@@ -71,8 +83,16 @@ class HomeCheck(
                         cs.mapNotNull { titles[it.second.useId] }.distinct(),
                         have = false,
                         usual = item.mergeKey in staples,
-                        needed = text(l.uncovered(item.id)),
+                        needed =
+                            text(
+                                l.contributionsOf(item.id).filter { l.uses[it.useId]?.kind == UseKind.RECIPE }
+                                    .fold(QtyBase.PRESENCE) { q, c -> q + c.qty },
+                            ),
+                        bought = text(l.purchased(item.id)) ?: "0",
+                        likelyCupboard = item.aisle in CUPBOARD || item.mergeKey in staples,
+                        remaining = text(l.toBuy(item.id)) ?: "0",
                         onHand = item.onHand?.let { text(it) },
+                        exactOnHand = item.onHand,
                     )
                 }
             val have =
@@ -83,6 +103,7 @@ class HomeCheck(
                         lines.map { it.recipeTitle }.distinct(),
                         have = true,
                         usual = key in staples,
+                        likelyCupboard = lines.first().target.aisle in CUPBOARD || key in staples,
                     )
                 }
             (need + have.filter { h -> need.none { it.mergeKey == h.mergeKey } }).sortedBy { it.name.lowercase() }
@@ -90,16 +111,12 @@ class HomeCheck(
 
     /**
      * Recipe lines on live rows not bought yet, by item: what "Have it" can take off.
-     * A line part of which is bought is not among them: it stays on the list as it
-     * is (its amount can be edited), since setting aside the rest would leave a line
-     * both bought and "at home" that Need it could not put back at the right amount.
+     * Covered portions stay intact; Need it restores only the current requirement minus covered shares.
      */
     private fun open(l: ShoppingList): List<Pair<Long, com.robert4lyf.hypershop.core.merge.Contribution>> {
-        val partly = l.contributions.filter { it.coveredBy != null && it.recipeLineId != null }.map { it.useId to it.recipeLineId }.toSet()
         return l.contributions
             .filter { c ->
                 c.coveredBy == null && c.recipeLineId != null && l.items[c.itemId]?.deletedAt == null &&
-                    (c.useId to c.recipeLineId) !in partly &&
                     l.uses[c.useId]?.let { it.kind == UseKind.RECIPE && it.archivedAt == null } == true
             }.map { it.itemId to it }
     }
@@ -121,7 +138,12 @@ class HomeCheck(
             val wanted = keys.toSet()
             val moving = open(old).map { it.second }.filter { old.items[it.itemId]?.mergeKey in wanted }
             val next = old.withdraw(moving.map { it.id }.toSet()) ?: return@withTransaction emptyList()
-            repo.persist(old, next)
+            var changed = next
+            for (id in moving.map { it.itemId }.distinct()) {
+                val consumed = old.homeConsumed(id).takeUnless { it.isPresence }
+                changed.setOnHand(id, consumed)?.let { changed = it }
+            }
+            repo.persist(old, changed)
             val lines = moving.map { it.useId to it.recipeLineId!! }.distinct()
             dao.putDecisions(lines.map { (u, line) -> LineDecisionEntity(u, line, LineStatus.IN_STOCK.name) })
             lines
@@ -136,30 +158,64 @@ class HomeCheck(
         key: String,
         text: String,
     ): HaveSome {
-        val parsed = RuleParser().parse("${text.trim()} x")
-        if (parsed.quantity == null) return HaveSome.NOT_AN_AMOUNT
-        val have = parsed.shopBase(UnitLocale.METRIC)
-        val enough =
-            db.withTransaction {
-                val old = repo.load()
-                val item = old.itemByKey(key) ?: return@withTransaction null
-                val need = old.uncovered(item.id)
-                if (have.keys.none { it in need.keys }) return@withTransaction null
-                if (need.minusClamped(have).isPresence) return@withTransaction true
+        val have = QuantityInput.parse(text) ?: return HaveSome.NOT_AN_AMOUNT
+        return db.withTransaction {
+            val old = repo.load()
+            val item = old.itemByKey(key) ?: return@withTransaction HaveSome.DIFFERENT_MEASURE
+            val need = open(old).filter { it.first == item.id }.fold(QtyBase.PRESENCE) { q, c -> q + c.second.qty }
+            if (have.keys.any { it !in need.keys } || need.isPresence) return@withTransaction HaveSome.DIFFERENT_MEASURE
+            val consumed = old.homeConsumed(item.id)
+            if (consumed.parts.any { (k, v) -> (have.parts[k] ?: com.robert4lyf.hypershop.core.model.Rational.ZERO) < v }) {
+                return@withTransaction HaveSome.ALREADY_ALLOCATED
+            }
+            val homeRequired = need + consumed
+            if (homeRequired.minusClamped(have).isPresence) {
+                // Same transaction as the decision: no watch tick or servings edit can slip between them.
+                have(listOf(key))
+                HaveSome.ENOUGH
+            } else {
                 old.setOnHand(item.id, have)?.let { repo.persist(old, it) }
-                false
-            } ?: return HaveSome.DIFFERENT_MEASURE
-        if (!enough) return HaveSome.SET
-        have(listOf(key))
-        return HaveSome.ENOUGH
+                HaveSome.SET
+            }
+        }
     }
+
+    /** Capture exactly this change for Undo, including an earlier partial amount. */
+    suspend fun changeSome(
+        key: String,
+        text: String,
+    ): HomeSomeChange =
+        db.withTransaction {
+            val before = repo.load()
+            val decisions = dao.allDecisions()
+            val result = haveSome(key, text)
+            val after = repo.load()
+            HomeSomeChange(result, HomeSomeUndo(before, decisions, after.listRev, dao.meta()!!.listEpoch).takeIf { before != after })
+        }
+
+    /** Refuse a stale Undo rather than overwrite a later phone/watch action or reuse ids. */
+    suspend fun undoSome(undo: HomeSomeUndo): Boolean =
+        db.withTransaction {
+            val current = repo.load()
+            if (current.listRev != undo.afterRevision || dao.meta()!!.listEpoch != undo.epoch) return@withTransaction false
+            val restored =
+                undo.before.copy(
+                    listRev = current.listRev + 1,
+                    nextId = maxOf(current.nextId, undo.before.nextId),
+                    items = undo.before.items.mapValues { (id, item) -> item.copy(rev = maxOf(item.rev, current.items[id]?.rev ?: 0) + 1) },
+                )
+            repo.persist(current, restored)
+            dao.clearDecisions()
+            dao.putDecisions(undo.decisions)
+            true
+        }
 
     /** Takes back "Have some": the whole of [key] to buy again. */
     suspend fun clearSome(key: String) =
         db.withTransaction {
             val old = repo.load()
             val item = old.itemByKey(key) ?: return@withTransaction
-            old.setOnHand(item.id, null)?.let { repo.persist(old, it) }
+            old.setOnHand(item.id, old.homeConsumed(item.id).takeUnless { it.isPresence })?.let { repo.persist(old, it) }
         }
 
     /** Undo of [need]: exactly those lines at home again. */
@@ -188,7 +244,7 @@ class HomeCheck(
     }
 
     companion object {
-        /** Where the things you may well have in already live. Fresh food is bought, not checked for. */
+        /** Default compact filter only; fresh, chilled and frozen food remains available. */
         val CUPBOARD =
             setOf(
                 AisleCode.BAKING,

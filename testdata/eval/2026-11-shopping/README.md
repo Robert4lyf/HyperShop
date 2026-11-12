@@ -1,0 +1,15 @@
+# November shopping holdout
+
+Labels were written before running the current parser or changing its compound-quantity handling. They express intended purchasing meaning, independently of parser output. They are model-authored, not externally human-adjudicated. Preserve this initial file in history. Once inspected for tuning, this is a regression set, not an unseen test.
+
+Metric UK measures. A flagged compound is acceptable only when it retains the source and explains the unrepresented amount. Identity errors take priority over spelling. Review labels record necessary review; flags on otherwise supported lines count as unnecessary corrections. No labels or existing baselines may be changed to fit output.
+
+Basket scenarios: (1) two recipes each need 200 g flour, one includes 100 g extra; (2) a recipe needs 500 g milk and another 250 ml, which remain separate dimensions; (3) 2 x 400 g tomatoes plus another 200 g recipe totals 1 kg; (4) two alternatives must not auto-merge into a single identity.
+
+Manual timing protocol: fresh install of the same build, airplane mode, paste each recipe, start at Share confirmation, stop when the usable shopping list appears. Record elapsed seconds and ingredient corrections for each attempt, three repetitions. Repeat with live Claude separately, with model, call cost and network recorded. No timing or live-assisted results have been measured yet.
+
+`rule-baseline.md` freezes the observed first reading, including the known mismatches. The test reports those errors and fails on any later reading change; it does not label them correct or lower existing quality floors. Review improvements and regressions line by line before intentionally updating that snapshot.
+
+Scoring correction: the initial scorer compared a primary count of two explicitly sized 400 g tins with an 800 g physical label without expanding the size. The corrected scorer compares 2 × 400 g = 800 g. It also separates missing-review-policy flags from actual identity/quantity mismatches. `initial-scorer.md` preserves the first result. No ingredient label or parser reading changed for this correction, and the score change is not an implementation improvement. Review-only labels remain provisional model-authored judgments, including household quantities; they are not human-adjudicated defects.
+
+The zero identity/quantity-mismatch subtotal is limited to catalogue IDs and base arithmetic. It does **not** prove zero consequential silent errors: `1 large egg plus 1 egg yolk` loses the part distinction without a flag, and `2 heaped tablespoons peanut butter` reports a level 30 ml without signalling the qualifier. These are unresolved interpretation risks. The splash and half-cucumber review judgments also need human adjudication. Do not present the subtotal as end-to-end import accuracy.

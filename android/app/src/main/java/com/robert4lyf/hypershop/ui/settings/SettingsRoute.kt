@@ -134,6 +134,7 @@ data class SettingsActions(
     val onRanOut: (String) -> Unit = {},
     /** Aisles: which store's order is being edited (missing 4 of the review). */
     val onEditStore: (Long) -> Unit = {},
+    val onRenameStore: (String) -> Unit = {},
     val onMoveAisle: (AisleCode, Int) -> Unit = { _, _ -> },
     /** "Move to top" (0) / "Move to bottom" (last). */
     val onMoveAisleTo: (AisleCode, Int) -> Unit = { _, _ -> },
@@ -558,6 +559,13 @@ private fun DataGroup(
     actions: SettingsActions,
 ) {
     Hint("Your recipes, list, ingredient edits and settings go in one file you choose. Your Claude key never does.")
+    Hint(ui.backupHealth ?: "No successful manual backup recorded on this installation.")
+    Hint(
+        "Manual export includes available recipe photos and works on another " +
+            "installation. Android-managed backup depends on your device settings and " +
+            "system limits; HyperShop cannot confirm when it last ran. A restore does " +
+            "not count as a new backup.",
+    )
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         FilledTonalButton(
             onClick = actions.onBackup,

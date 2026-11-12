@@ -264,7 +264,7 @@ object Display {
         units: UnitsSetting = UnitsSetting.METRIC,
     ): RowText {
         val done = list.isDone(item.id)
-        val shownQty = if (done) list.total(item.id) else list.toBuy(item.id)
+        val shownQty = if (done) list.purchased(item.id) else list.toBuy(item.id)
         val produce = item.aisle == AisleCode.PRODUCE
         val hint = hintOf(list.contributionsOf(item.id).map { it.unitHint })
         val bought = buy(shownQty, entry, units, hint)
@@ -292,7 +292,7 @@ object Display {
                 bought?.need != null && !partial -> bought.need
                 partial ->
                     amount(
-                        list.covered(item.id),
+                        list.purchased(item.id),
                         units,
                         produce,
                         hint,

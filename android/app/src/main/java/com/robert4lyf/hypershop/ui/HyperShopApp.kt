@@ -49,6 +49,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -81,6 +82,7 @@ import com.robert4lyf.hypershop.ui.settings.SettingsRoute
 import com.robert4lyf.hypershop.ui.voicetest.VoiceTestRoute
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 object Routes {
@@ -147,6 +149,29 @@ private fun AppShell(
         }
         container.shareHandled(s)
     }
+    val storeChoices by container.shopStart.choices.collectAsState()
+    val shopScope = rememberCoroutineScope()
+    if (storeChoices.isNotEmpty()) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { container.shopStart.choices.value = emptyList() },
+            title = { Text("Which store are you shopping in?") },
+            text = {
+                androidx.compose.foundation.layout.Column {
+                    storeChoices.forEach { store ->
+                        androidx.compose.material3.TextButton(
+                            onClick = { shopScope.launch { container.shopStart.start(store.id) } },
+                        ) { Text(store.name) }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = { container.shopStart.choices.value = emptyList() },
+                ) { Text("Cancel") }
+            },
+        )
+    }
     val notice by container.notice.collectAsState()
     LaunchedEffect(notice) {
         val n = notice ?: return@LaunchedEffect
@@ -177,8 +202,10 @@ private fun AppShell(
     var addFocus by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         container.addRequests.collect {
+            container.settings.setListMode(com.robert4lyf.hypershop.settings.ListMode.PLAN)
             selectTab(Routes.LIST)
             addFocus++
+            container.addRequestHandled()
         }
     }
     // X.10: with nothing to buy the app opens on This week, where a shop starts; otherwise on the shopping list.

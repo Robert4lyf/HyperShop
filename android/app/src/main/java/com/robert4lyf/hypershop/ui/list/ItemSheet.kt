@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.ui.list
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -8,15 +9,14 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Check
@@ -36,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,6 +44,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -83,9 +85,62 @@ fun ItemSheetHost(
     actions: ItemSheetActions,
     onDismiss: () -> Unit,
 ) {
-    // Opens in full, so the fields near the bottom are reachable, and lifts above the keyboard.
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        ItemSheetContent(sheet, actions, Modifier.imePadding())
+    var dirty by rememberSaveable(sheet.id) { mutableStateOf(false) }
+    var discard by rememberSaveable(sheet.id) { mutableStateOf(false) }
+    var pendingAction by remember(sheet.id) { mutableStateOf<(() -> Unit)?>(null) }
+    val guard: (() -> Unit) -> Unit = { action ->
+        if (!sheet.saving) {
+            if (dirty) {
+                pendingAction = action
+                discard = true
+            } else {
+                action()
+            }
+        }
+    }
+    val dismiss = {
+        if (dirty) {
+            pendingAction = null
+            discard = true
+        } else if (!sheet.saving) {
+            onDismiss()
+        }
+    }
+    val state =
+        rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = {
+            if (it == SheetValue.Hidden && (dirty || sheet.saving)) {
+                if (!sheet.saving) discard = true
+                false
+            } else {
+                true
+            }
+        })
+    BackHandler { dismiss() }
+    ModalBottomSheet(onDismissRequest = dismiss, sheetState = state) {
+        ItemSheetContent(
+            sheet,
+            actions.copy(
+                onDelete = { guard(actions.onDelete) },
+                onToggle = { guard(actions.onToggle) },
+                onSwap = { name, always -> guard { actions.onSwap(name, always) } },
+            ),
+            Modifier.imePadding(),
+            onDirty = { dirty = it },
+        )
+    }
+    if (discard) {
+        AlertDialog(
+            onDismissRequest = { discard = false },
+            title = { Text("Discard item changes?") },
+            text = { Text("Your changes have not been saved.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    discard = false
+                    onDismiss()
+                }) { Text("Discard changes") }
+            },
+            dismissButton = { TextButton(onClick = { discard = false }) { Text("Keep editing") } },
+        )
     }
 }
 
@@ -99,46 +154,49 @@ fun ItemSheetContent(
     sheet: ItemSheet,
     actions: ItemSheetActions,
     modifier: Modifier = Modifier,
+    onDirty: (Boolean) -> Unit = {},
 ) {
     Surface(modifier, color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
+            Modifier.fillMaxWidth().fillMaxHeight(0.9f).padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            SheetHeader(sheet.name, sheet.aisle)
-            Button(onClick = actions.onToggle, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("toggle-item")) {
-                Icon(if (sheet.done) Icons.Rounded.Undo else Icons.Rounded.Check, contentDescription = null, Modifier.size(20.dp))
-                Spacer(Modifier.size(8.dp))
-                Text(if (sheet.done) "Mark not bought" else "Mark bought")
+            ItemEditor(sheet, actions.onSave, Modifier.weight(1f), onDirty) {
+                SheetHeader(sheet.name, sheet.aisle)
+                Button(onClick = actions.onToggle, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("toggle-item")) {
+                    Icon(if (sheet.done) Icons.Rounded.Undo else Icons.Rounded.Check, contentDescription = null, Modifier.size(20.dp))
+                    Spacer(Modifier.size(8.dp))
+                    Text(if (sheet.done) "Mark not bought" else "Mark bought")
+                }
+                if (sheet.totals.isNotEmpty()) {
+                    val amount = sheet.totals.joinToString(" + ")
+                    Text(
+                        buildAnnotatedString {
+                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append("On the list: ") }
+                            withStyle(MaterialTheme.typography.titleLarge.toSpanStyle()) { append(amount) }
+                        },
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.testTag("totals"),
+                    )
+                }
+                sheet.purchaseSuggestion?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                sheet.packNote?.let { InfoBanner("Usually sold as $it", Icons.Rounded.LocalMall) }
+                if (sheet.explanation.isNotBlank()) Text(sheet.explanation, style = MaterialTheme.typography.bodyMedium)
+                if (sheet.sources.isNotEmpty()) Sources(sheet.sources)
+                Swaps(sheet, actions.onSwap)
+                EdgeDivider()
+                OutlinedButton(
+                    onClick = actions.onDelete,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("delete-item"),
+                ) {
+                    Icon(Icons.Rounded.DeleteOutline, contentDescription = null, Modifier.size(20.dp))
+                    Spacer(Modifier.size(8.dp))
+                    Text("Remove from list")
+                }
+                WrongNote(actions.onWrong)
             }
-            if (sheet.totals.isNotEmpty()) {
-                val amount = sheet.totals.joinToString(" + ")
-                Text(
-                    buildAnnotatedString {
-                        withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append("On the list: ") }
-                        withStyle(MaterialTheme.typography.titleLarge.toSpanStyle()) { append(amount) }
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.testTag("totals"),
-                )
-            }
-            sheet.packNote?.let { InfoBanner("Usually sold as $it", Icons.Rounded.LocalMall) }
-            if (sheet.sources.isNotEmpty()) Sources(sheet.sources)
-            Swaps(sheet, actions.onSwap)
-            EdgeDivider()
-            ItemEditor(sheet, actions.onSave)
-            EdgeDivider()
-            OutlinedButton(
-                onClick = actions.onDelete,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("delete-item"),
-            ) {
-                Icon(Icons.Rounded.DeleteOutline, contentDescription = null, Modifier.size(20.dp))
-                Spacer(Modifier.size(8.dp))
-                Text("Remove from list")
-            }
-            WrongNote(actions.onWrong)
         }
     }
 }

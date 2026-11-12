@@ -3,4 +3,5 @@
     <string name="app_name">HyperShop</string>
     <string name="shortcut_add_short">Add item</string>
     <string name="shortcut_add_long">Add an item to the shopping list</string>
+    <string name="widget_description">Shopping list preview and quick add</string>
 </resources>
