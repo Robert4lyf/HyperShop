@@ -728,6 +728,10 @@ class ListViewModel(
                 list.toBuy(id).parts.filterValues { it > Rational.ZERO }.mapNotNull { (k, v) ->
                     Display.amount(QtyBase(mapOf(k to v)), units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy)
                 }
+            // Cancelling an earlier load only takes effect at a suspension point; past its last one, it would still
+            // show its row over the one tapped since, or reopen a sheet closed meanwhile. Only the latest request
+            // ("openItem", set as it is made and cleared by closeItem) may show its sheet.
+            if (savedState.get<Long>("openItem") != id) return@launch
             _sheet.value =
                 ItemSheet(
                     id,
