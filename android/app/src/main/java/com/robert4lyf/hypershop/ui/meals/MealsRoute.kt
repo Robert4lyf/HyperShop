@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -33,24 +34,26 @@ import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Replay
-import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilledTonalIconToggleButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -69,6 +72,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -80,7 +84,6 @@ import com.robert4lyf.hypershop.data.MealShopping
 import com.robert4lyf.hypershop.data.Regular
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.BottomActionBar
-import com.robert4lyf.hypershop.ui.common.EmptyHero
 import com.robert4lyf.hypershop.ui.common.PillShape
 import com.robert4lyf.hypershop.ui.common.SectionLabel
 import com.robert4lyf.hypershop.ui.common.cardLift
@@ -124,6 +127,8 @@ data class MealsActions(
     val onList: () -> Unit = {},
     /** X.10: "New recipe": the add-a-recipe sheet, here where the week is planned. */
     val onNewRecipe: () -> Unit = {},
+    /** Step Q: "Check food at home", the focused check of what the week's meals need. */
+    val onHomeCheck: () -> Unit = {},
 )
 
 @Composable
@@ -132,6 +137,8 @@ fun MealsRoute(
     snackbar: SnackbarHostState,
     onList: () -> Unit,
     onReview: (Long) -> Unit,
+    /** Step Q: the focused food-at-home check. */
+    onHomeCheck: () -> Unit = {},
 ) {
     val vm: MealsViewModel = viewModel(factory = factoryFor { MealsViewModel(container) })
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -151,7 +158,6 @@ fun MealsRoute(
             hasKey = hasKey,
         )
     }
-    val misc by vm.misc.collectAsStateWithLifecycle()
     MealsScreen(
         ui,
         MealsActions(
@@ -164,7 +170,14 @@ fun MealsRoute(
             onNextWeek = vm::nextWeek,
             onThisWeek = vm::thisWeek,
             onRepeat = vm::repeat,
-            onAddToList = vm::addToList,
+            // Make shopping list ends on the list, with what it did and its Undo.
+            onAddToList = {
+                vm.addToList { m ->
+                    show(container, snackbar, m)
+                    onList()
+                }
+            },
+            onHomeCheck = onHomeCheck,
             onRegular = { vm.addRegular(it) },
             onAllRegulars = { vm.addAllRegulars() },
             onRepeatLastShop = { vm.repeatLastShop() },
@@ -182,7 +195,6 @@ fun MealsRoute(
             onList = onList,
             onNewRecipe = { adding = true },
         ),
-        misc = misc,
     )
 }
 
@@ -197,12 +209,10 @@ fun MealsRoute(
 fun MealsScreen(
     ui: MealsUi,
     actions: MealsActions,
-    /** Y.21: what is on the shopping list without a recipe. */
-    misc: List<String> = emptyList(),
 ) {
-    var allFood by rememberSaveable { mutableStateOf(false) }
-    val shownHome = ui.home.filter { allFood || it.likelyCupboard }
-    var allPicks by rememberSaveable { mutableStateOf(false) }
+    // Step Q: the week's meals and one next step. Choosing a recipe opens from Add meal; Buy again, extras and the
+    // food-at-home check live with the shopping list and on their own screen.
+    var choosing by rememberSaveable { mutableStateOf(false) }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().imePadding()) {
             WeekHeader(ui, actions)
@@ -212,7 +222,6 @@ fun MealsScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (ui.meals.isNotEmpty()) {
-                    item(key = "planned") { SectionLabel("Meals", Modifier.padding(horizontal = 20.dp)) }
                     items(ui.meals, key = { "meal-${it.id}" }) { m ->
                         MealCard(
                             m,
@@ -222,49 +231,169 @@ fun MealsScreen(
                             onCooked = { actions.onCooked(m) },
                         )
                     }
-                } else if (ui.loaded && ui.repeatFrom != null && !ui.isPast) {
-                    item(key = "repeat") { RepeatCard(ui, actions.onRepeat) }
-                }
-                // Choosing meals comes with the meals, before Buy again and the home check.
-                if (ui.hasLibrary && !ui.isPast) pickSection(ui, actions, allPicks) { allPicks = true }
-                if (ui.loaded && !ui.isPast) {
-                    item(key = "new-recipe") {
-                        OutlinedButton(
-                            onClick = actions.onNewRecipe,
-                            modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth().testTag("new-recipe"),
-                        ) {
-                            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.size(8.dp))
-                            Text("New recipe: link, typed or photo")
+                    if (!ui.isPast) {
+                        item(key = "add-meal") {
+                            OutlinedButton(
+                                onClick = { choosing = true },
+                                modifier =
+                                    Modifier.padding(
+                                        horizontal = 16.dp,
+                                    ).fillMaxWidth().heightIn(min = 48.dp).testTag("meals-add-meal-more"),
+                            ) {
+                                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.size(8.dp))
+                                Text("Add meal")
+                            }
                         }
                     }
+                } else if (ui.loaded) {
+                    item(key = "empty") { EmptyWeek(ui) }
+                    if (ui.repeatFrom != null && !ui.isPast) item(key = "repeat") { RepeatCard(ui, actions.onRepeat) }
                 }
-                if (ui.isCurrent && (ui.buyAgain.regulars.isNotEmpty() || ui.buyAgain.lastShop.isNotEmpty())) {
-                    item(key = "buy-again") { BuyAgainSection(ui, actions) }
+                // Optional, once the meals are on the list: the food-at-home check is a task of its own.
+                if (ui.isCurrent && ui.toCheck.isNotEmpty() && ui.meals.any { !it.shopping.pending }) {
+                    item(key = "home-check") { CheckHomeRow(ui.toCheck.size, actions.onHomeCheck) }
                 }
-                if (ui.loaded && ui.isCurrent) item(key = "misc") { MiscSection(misc, actions.onAddMisc) }
-                if (ui.isCurrent && ui.home.isNotEmpty()) {
-                    item(key = "home-label") {
-                        HomeHeader(ui.copy(home = shownHome), actions)
-                        TextButton(
-                            onClick = { allFood = !allFood },
-                            modifier = Modifier.padding(horizontal = 16.dp).testTag("home-all-food"),
-                        ) {
-                            Text(if (allFood) "Show likely cupboard items" else "Include fridge, freezer and fresh food (${ui.home.size})")
-                        }
+            }
+            BottomBar(ui, actions, onAddMeal = { choosing = true })
+        }
+    }
+    if (choosing) {
+        AddMealSheet(
+            ui,
+            actions.copy(onNewRecipe = {
+                choosing = false
+                actions.onNewRecipe()
+            }),
+            onDismiss = {
+                choosing = false
+                actions.onSearch("")
+            },
+        )
+    }
+}
+
+/** No meals yet for the week shown: what this screen is for, and (with no recipes) where they come from. */
+@Composable
+private fun EmptyWeek(ui: MealsUi) {
+    Column(
+        Modifier.padding(horizontal = 24.dp, vertical = 24.dp).testTag("meals-empty"),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            if (ui.isPast) "Nothing was planned for this week" else "No meals for ${ui.weekName.ifEmpty { "this week" }.lowercase()} yet",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        if (!ui.isPast) {
+            Text(
+                if (ui.hasLibrary) {
+                    "Add the meals you want to cook, then make one shopping list for them."
+                } else {
+                    "Save a recipe first: share a recipe link to HyperShop, or tap Add meal › New recipe."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** "Check food at home": one row, opening the focused check for everything this week's meals need. */
+@Composable
+private fun CheckHomeRow(
+    n: Int,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clip(MaterialTheme.shapes.large)
+            .background(MaterialTheme.colorScheme.card)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .testTag("meals-home-check"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Check food at home", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Optional · ${plural(n, "ingredient")} your meals need",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
+    }
+}
+
+/**
+ * Add meal: the saved recipes, searchable, each with Add (or Add another, when the week has it already). The sheet
+ * stays open, so several meals are chosen in one go; Done closes it.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun AddMealSheet(
+    ui: MealsUi,
+    actions: MealsActions,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(Modifier.fillMaxWidth().fillMaxHeight(0.92f).imePadding().testTag("add-meal-sheet")) {
+            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Add meal to ${ui.weekName.ifEmpty { "this week" }.lowercase()}",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f).semantics { heading() },
+                )
+                TextButton(onClick = onDismiss, modifier = Modifier.testTag("add-meal-done")) { Text("Done") }
+            }
+            OutlinedTextField(
+                value = ui.query,
+                onValueChange = actions.onSearch,
+                placeholder = { Text("Search your recipes") },
+                leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (ui.query.isNotEmpty()) {
+                        IconButton(onClick = { actions.onSearch("") }) { Icon(Icons.Rounded.Close, contentDescription = "Clear search") }
                     }
-                    items(shownHome, key = { "home-${it.mergeKey}" }) { r -> HomeRowItem(r, actions) }
-                }
+                },
+                singleLine = true,
+                shape = PillShape,
+                colors = pillFieldColors(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).fieldLift().testTag("meals-search"),
+            )
+            LazyColumn(
+                Modifier.weight(1f).fillMaxWidth().testTag("add-meal-list"),
+                contentPadding = PaddingValues(bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 if (ui.loaded && !ui.hasLibrary) {
                     item(key = "none") {
-                        EmptyHero(
-                            "No saved recipes yet",
-                            body = "Every recipe you add is saved. Share a link to HyperShop, or tap New recipe.",
+                        Text(
+                            "No saved recipes yet. Add one below; it is saved in Recipes for next time.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                         )
+                    }
+                } else if (ui.picks.isEmpty() && ui.query.isNotBlank()) {
+                    item(key = "no-match") {
+                        Text("No matches", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 20.dp))
+                    }
+                }
+                items(ui.picks, key = { "pick-${it.key}" }) { p -> PickRow(p, onAdd = { actions.onPlan(p) }) }
+                item(key = "new-recipe") {
+                    OutlinedButton(
+                        onClick = actions.onNewRecipe,
+                        modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth().heightIn(min = 48.dp).testTag("new-recipe"),
+                    ) {
+                        Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text("New recipe: link, typed or photo")
                     }
                 }
             }
-            BottomBar(ui, actions)
         }
     }
 }
@@ -299,21 +428,16 @@ private fun WeekHeader(
         IconButton(onClick = actions.onNextWeek, modifier = Modifier.testTag("week-next")) {
             Icon(Icons.Rounded.ChevronRight, contentDescription = "Next week")
         }
+        com.robert4lyf.hypershop.ui.common.SettingsButton()
     }
 }
 
 /** "3 meals · 5 items still needed": what am I cooking, what is left to buy. */
 private fun summary(ui: MealsUi): String? =
     when {
-        ui.meals.isEmpty() ->
-            when {
-                ui.isPast -> "Nothing was planned"
-                // The next step, in the header where it is seen first: the picks below, or a first recipe.
-                !ui.loaded -> "Nothing planned yet"
-                ui.hasLibrary -> "Nothing planned yet · choose meals below"
-                else -> "Nothing planned yet · add a recipe to start"
-            }
-        ui.pending > 0 -> "${plural(ui.meals.size, "meal")} · ${ui.pending} not on the shopping list yet"
+        // The next step is the Add meal button; the summary only says where the week stands.
+        ui.meals.isEmpty() -> if (ui.isPast) "Nothing was planned" else "Nothing planned yet"
+        ui.pending > 0 -> "${plural(ui.meals.size, "meal")} · ${ui.pending} not on your list yet"
         ui.itemsLeft > 0 -> "${plural(ui.meals.size, "meal")} · ${plural(ui.itemsLeft, "item")} still needed"
         else -> plural(ui.meals.size, "meal")
     }
@@ -340,7 +464,7 @@ private fun RepeatCard(
             FilledTonalButton(onClick = onRepeat, modifier = Modifier.testTag("repeat-week-button")) {
                 Icon(Icons.Rounded.Replay, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(6.dp))
-                Text("Plan the same ${plural(ui.repeatTitles.size, "meal")}")
+                Text("Add the same ${plural(ui.repeatTitles.size, "meal")}")
             }
         }
     }
@@ -348,13 +472,14 @@ private fun RepeatCard(
 
 private fun mealState(m: Meal): String =
     when (m.shopping) {
-        MealShopping.NOT_ON_LIST -> "Not on the shopping list yet"
+        MealShopping.NOT_ON_LIST -> "Not on your list yet"
         MealShopping.TO_BUY -> m.progress!!.label()
         MealShopping.BOUGHT -> "All bought"
         MealShopping.NOTHING_TO_BUY -> "Nothing to buy"
-        MealShopping.TAKEN_OFF -> "Taken off the shopping list"
+        MealShopping.TAKEN_OFF -> "Taken off your list"
     }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MealCard(
     m: Meal,
@@ -402,37 +527,60 @@ private fun MealCard(
                             ).semantics { contentDescription = "Your notes: $it" }.testTag("meal-notes-${m.id}"),
                     )
                 }
-                m.servings?.takeIf { !past }?.let { s ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 2.dp).semantics(mergeDescendants = true) { contentDescription = "Serves $s" },
-                    ) {
-                        IconButton(onClick = { onServings(-1) }, enabled = s > 1, modifier = Modifier.testTag("meal-fewer-${m.id}")) {
-                            Icon(Icons.Rounded.Remove, contentDescription = "Fewer servings")
-                        }
-                        Text("Serves $s", style = MaterialTheme.typography.labelLarge, modifier = Modifier.testTag("meal-serves-${m.id}"))
-                        IconButton(
-                            onClick = { onServings(1) },
-                            enabled = s < MealsViewModel.MAX_SERVINGS,
-                            modifier = Modifier.testTag("meal-more-${m.id}"),
+                // Servings and "Cooked" on one line under the title, so the title and its state keep the row's width.
+                // A flow: on a narrow row or with large text, Cooked goes onto its own line rather than squeezing.
+                FlowRow(modifier = Modifier.padding(top = 2.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    m.servings?.takeIf { !past }?.let { s ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 2.dp).semantics(mergeDescendants = true) { contentDescription = "Serves $s" },
                         ) {
-                            Icon(Icons.Rounded.Add, contentDescription = "More servings")
+                            IconButton(onClick = { onServings(-1) }, enabled = s > 1, modifier = Modifier.testTag("meal-fewer-${m.id}")) {
+                                Icon(Icons.Rounded.Remove, contentDescription = "Fewer servings")
+                            }
+                            Text(
+                                "Serves $s",
+                                style = MaterialTheme.typography.labelLarge,
+                                modifier = Modifier.testTag("meal-serves-${m.id}"),
+                            )
+                            IconButton(
+                                onClick = { onServings(1) },
+                                enabled = s < MealsViewModel.MAX_SERVINGS,
+                                modifier = Modifier.testTag("meal-more-${m.id}"),
+                            ) {
+                                Icon(Icons.Rounded.Add, contentDescription = "More servings")
+                            }
                         }
                     }
-                }
-            }
-            // "Cooked it": counts for "your usual" and asks for stars; any week's meal, since last week's got cooked too.
-            if (m.saved) {
-                // A toggle that shows its state (X.14): filled once cooked, and a second tap takes it back.
-                FilledTonalIconToggleButton(
-                    checked = m.cooked,
-                    onCheckedChange = { onCooked() },
-                    modifier = Modifier.testTag("meal-cooked-${m.id}"),
-                ) {
-                    Icon(
-                        if (m.cooked) Icons.Rounded.Check else Icons.Rounded.Restaurant,
-                        contentDescription = "Cooked ${m.title}",
-                    )
+                    // "Cooked it": counts for "your usual" and asks for stars; any week's meal, since last week's got cooked too.
+                    if (m.saved) {
+                        Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
+                            // Step Q: a labelled toggle, so it reads as "record that I cooked it", not "open the recipe".
+                            FilterChip(
+                                selected = m.cooked,
+                                onClick = onCooked,
+                                label = { Text("Cooked", maxLines = 1, softWrap = false) },
+                                leadingIcon =
+                                    if (m.cooked) {
+                                        (
+                                            {
+                                                Icon(
+                                                    Icons.Rounded.Check,
+                                                    contentDescription = null,
+                                                    Modifier.size(18.dp),
+                                                )
+                                            }
+                                        )
+                                    } else {
+                                        null
+                                    },
+                                modifier =
+                                    Modifier.testTag("meal-cooked-${m.id}").semantics {
+                                        contentDescription = if (m.cooked) "${m.title} cooked; tap to undo" else "Mark ${m.title} cooked"
+                                    },
+                            )
+                        }
+                    }
                 }
             }
             if (!past) {
@@ -451,7 +599,7 @@ private fun MealCard(
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun BuyAgainSection(
+internal fun BuyAgainSection(
     ui: MealsUi,
     actions: MealsActions,
 ) {
@@ -546,7 +694,7 @@ private fun RegularChip(
 }
 
 @Composable
-private fun HomeHeader(
+internal fun HomeHeader(
     ui: MealsUi,
     actions: MealsActions,
 ) {
@@ -572,7 +720,7 @@ private fun HomeHeader(
  * the whole shop is in one place, and on the shopping list under Miscellaneous. One item per line also works.
  */
 @Composable
-private fun MiscSection(
+internal fun MiscSection(
     items: List<String>,
     onAdd: (String) -> Unit,
 ) {
@@ -654,6 +802,17 @@ internal fun HaveSomeDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().testTag("home-some-amount"),
                 )
+                // What it will mean, before Set: "300 g at home → buy 200 g". Only for one measure, worked exactly.
+                if (error == null) {
+                    buyingPreview(text, r.needed)?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.testTag("home-some-preview"),
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
@@ -675,10 +834,33 @@ internal fun HaveSomeDialog(
     )
 }
 
+/**
+ * "300 g at home → buy 200 g": what typing [typed] against [needed] leaves to buy, when both are one amount in the same
+ * measure. Null otherwise (nothing typed, an unreadable amount, or measures that do not compare), and no guess is made.
+ */
+internal fun buyingPreview(
+    typed: String,
+    needed: String?,
+): String? {
+    if (typed.isBlank() || needed == null) return null
+    val have = com.robert4lyf.hypershop.core.parse.QuantityInput.parse(typed) ?: return null
+    val need = com.robert4lyf.hypershop.core.parse.QuantityInput.parse(needed) ?: return null
+    val (key, n) = need.parts.entries.singleOrNull() ?: return null
+    val h = have.parts.entries.singleOrNull()?.takeIf { it.key == key }?.value ?: return null
+    val left = n - h
+    return if (left <= com.robert4lyf.hypershop.core.model.Rational.ZERO) {
+        "${typed.trim()} at home → nothing to buy"
+    } else {
+        "${typed.trim()} at home → buy ${com.robert4lyf.hypershop.ui.list.ItemEdit.text(
+            com.robert4lyf.hypershop.core.model.QtyBase(mapOf(key to left)),
+        ).ifEmpty { left.toString() }}"
+    }
+}
+
 /** One ingredient, one decision: "Have" or "Need", however many recipes want it. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun HomeRowItem(
+internal fun HomeRowItem(
     r: HomeRow,
     actions: MealsActions,
 ) {
@@ -697,26 +879,31 @@ private fun HomeRowItem(
         // One TalkBack node for the name and what it is for; the button stays its own.
         Column(Modifier.semantics(mergeDescendants = true) {}) {
             Text(r.name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleSmall)
+            // Step Q: the week's combined need, once per ingredient, then what that means for the list.
+            val forWhat = if (r.from.size == 1) r.from.single() else "${r.from.size} meals"
             Text(
-                listOfNotNull(
-                    // Y.19: what all the recipes need together, and what was said to be in already.
-                    listOfNotNull(r.needed, "for ${r.from.joinToString(", ")}").joinToString(" "),
-                    r.onHand?.let { "$it at home" },
-                    r.remaining?.let { "Buy $it" },
-                    "usually at home".takeIf { r.usual },
-                ).joinToString(" · "),
+                listOfNotNull(r.needed?.let { "Need $it" } ?: "Needed", "for $forWhat").joinToString(" "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            val outcome =
+                when {
+                    r.have -> "At home · not on your list"
+                    r.onHand != null -> listOfNotNull("${r.onHand} at home", r.remaining?.let { "buy $it" }).joinToString(" → ")
+                    r.usual -> "Usually at home"
+                    else -> null
+                }
+            outcome?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.testTag("home-outcome-${r.mergeKey}"),
+                )
+            }
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (r.have) {
-                Text(
-                    "At home",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                )
                 TextButton(onClick = { actions.onNeed(r) }, modifier = Modifier.testTag("home-need-${r.mergeKey}")) { Text("Need it") }
             } else {
                 var asking by rememberSaveable(r.mergeKey) { mutableStateOf(false) }
@@ -725,17 +912,17 @@ private fun HomeRowItem(
                         focus.clearFocus()
                         asking = true
                     }, modifier = Modifier.testTag("home-some-${r.mergeKey}")) {
-                        Text(if (r.onHand != null) "Edit amount" else "Have some")
+                        Text(if (r.onHand != null) "Change amount" else "Have some")
                     }
                 }
                 if (r.onHand != null) {
                     TextButton(
                         onClick = { actions.onClearSome(r) },
                         modifier = Modifier.testTag("home-clear-${r.mergeKey}"),
-                    ) { Text("Need all") }
+                    ) { Text("Need it") }
                 }
                 OutlinedButton(onClick = { actions.onHave(listOf(r)) }, modifier = Modifier.testTag("home-have-${r.mergeKey}")) {
-                    Text("Have it")
+                    Text("Have enough")
                 }
                 if (asking) {
                     HaveSomeDialog(
@@ -749,54 +936,6 @@ private fun HomeRowItem(
     }
 }
 
-/**
- * The saved recipes to plan: the most recently added first, a handful of them
- * until a search or "Show all", so a long library never buries the screen.
- */
-private fun androidx.compose.foundation.lazy.LazyListScope.pickSection(
-    ui: MealsUi,
-    actions: MealsActions,
-    all: Boolean,
-    onAll: () -> Unit,
-) {
-    // Already in "your usual" order (MealsViewModel): the first handful until a search or "Show all".
-    val shown = if (all || ui.query.isNotBlank()) ui.picks else ui.picks.take(PICKS_SHOWN)
-    item(key = "pick") {
-        Column(Modifier.padding(horizontal = 20.dp).padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            SectionLabel(if (ui.meals.isEmpty()) "Choose meals" else "Add a meal")
-            OutlinedTextField(
-                value = ui.query,
-                onValueChange = actions.onSearch,
-                placeholder = { Text("Search your recipes") },
-                leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-                trailingIcon = {
-                    if (ui.query.isNotEmpty()) {
-                        IconButton(onClick = { actions.onSearch("") }) { Icon(Icons.Rounded.Close, contentDescription = "Clear search") }
-                    }
-                },
-                singleLine = true,
-                shape = PillShape,
-                colors = pillFieldColors(),
-                modifier = Modifier.fillMaxWidth().fieldLift().testTag("meals-search"),
-            )
-            if (ui.picks.isEmpty()) {
-                Text("No matches", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-    items(shown, key = { "pick-${it.key}" }) { p -> PickRow(p, onAdd = { actions.onPlan(p) }) }
-    if (shown.size < ui.picks.size) {
-        item(key = "picks-all") {
-            TextButton(onClick = onAll, modifier = Modifier.padding(horizontal = 20.dp).testTag("picks-all")) {
-                Text("Show all ${ui.picks.size} recipes")
-            }
-        }
-    }
-}
-
-/** Recent recipes shown before a search: about a screenful. */
-private const val PICKS_SHOWN = 8
-
 @Composable
 private fun PickRow(
     p: Pick,
@@ -809,7 +948,7 @@ private fun PickRow(
             .cardLift(MaterialTheme.shapes.large)
             .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.card)
-            .clickable(onClickLabel = if (p.planned > 0) "Plan again" else "Plan for this week", onClick = onAdd)
+            .clickable(onClickLabel = if (p.planned > 0) "Add another" else "Add meal", onClick = onAdd)
             .padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)
             .testTag("pick-${p.key}"),
         verticalAlignment = Alignment.CenterVertically,
@@ -824,8 +963,8 @@ private fun PickRow(
                     p.source,
                     when (p.planned) {
                         0 -> null
-                        1 -> "Planned"
-                        else -> "Planned ×${p.planned}"
+                        1 -> "Added"
+                        else -> "Added ×${p.planned}"
                     },
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
@@ -835,55 +974,62 @@ private fun PickRow(
         FilledTonalButton(onClick = onAdd, modifier = Modifier.testTag("pick-add-${p.key}")) {
             Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.size(4.dp))
-            Text(if (p.planned > 0) "Again" else "Plan")
+            Text(if (p.planned > 0) "Add another" else "Add")
         }
     }
 }
 
 /**
- * One primary action, chosen by where the week stands: meals waiting to go on
- * the list come first, then shopping. A past week has none.
+ * One primary action, chosen by where the week stands (step Q): Add meal with none, Make shopping list while any
+ * wait, then View shopping list. A past week has none.
  */
 @Composable
 private fun BottomBar(
     ui: MealsUi,
     actions: MealsActions,
+    onAddMeal: () -> Unit,
 ) {
     if (!ui.loaded || ui.isPast) return
     val p = ui.preview
     when {
-        p != null && ui.pending > 0 ->
+        ui.meals.isEmpty() ->
             BottomActionBar(navigationBarInset = false) {
-                Button(onClick = actions.onAddToList, modifier = Modifier.weight(1f).heightIn(min = 56.dp).testTag("meals-add-to-list")) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(if (ui.pending == 1) "Add 1 meal to the shopping list" else "Add ${ui.pending} meals to the shopping list")
-                        Text(previewLine(p), style = MaterialTheme.typography.labelSmall)
+                Button(onClick = onAddMeal, modifier = Modifier.weight(1f).heightIn(min = 56.dp).testTag("meals-add-meal")) {
+                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.size(8.dp))
+                    Text("Add meal")
+                }
+            }
+        ui.pending > 0 ->
+            if (p != null) {
+                BottomActionBar(navigationBarInset = false) {
+                    Button(
+                        onClick = actions.onAddToList,
+                        modifier = Modifier.weight(1f).heightIn(min = 56.dp).testTag("meals-add-to-list"),
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Make shopping list")
+                            // A later week's meals go on the one list there is: said, never done unseen.
+                            Text(
+                                previewLine(p) + if (ui.isCurrent) "" else " · adds to your current list",
+                                style = MaterialTheme.typography.labelSmall,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                     }
                 }
             }
-        ui.isCurrent && ui.listHasItems -> {
-            // A shop under way carries on where it is (no store asked again); otherwise one starts.
-            val label = if (ui.shopping) "Continue shopping" else "Start shopping"
-            val detail =
-                when {
-                    ui.listLeft == 0 -> if (ui.shopping) "Everything is ticked · finish on the list" else null
-                    ui.shopping -> "${plural(ui.listLeft, "item")} left to buy"
-                    else -> "${plural(ui.listLeft, "item")} to buy"
-                }
+        ui.listHasItems ->
             BottomActionBar(navigationBarInset = false) {
-                Button(
-                    onClick = if (ui.shopping) actions.onList else actions.onStartShopping,
-                    modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("meals-shop"),
-                ) {
+                Button(onClick = actions.onList, modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("meals-shop")) {
                     Icon(Icons.Rounded.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(8.dp))
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(label)
-                        detail?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
+                        Text("View shopping list")
+                        if (ui.listLeft > 0) Text("${plural(ui.listLeft, "item")} to buy", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
-        }
         else -> Unit
     }
 }

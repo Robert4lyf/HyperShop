@@ -107,6 +107,7 @@ class MealsScreenTest {
             onHave = { rs -> events += "have ${rs.joinToString { it.name }}" },
             onNeed = { events += "need ${it.name}" },
             onStartShopping = { events += "shop" },
+            onList = { events += "list" },
             onRepeat = { events += "repeat" },
         )
 
@@ -118,10 +119,10 @@ class MealsScreenTest {
     fun theWeekSaysWhatIsCookingAndWhatTheButtonWillDo() {
         show()
         compose.onNodeWithText("This week").assertExists()
-        compose.onNodeWithText("19–25 Oct · 2 meals · 1 not on the shopping list yet").assertExists()
+        compose.onNodeWithText("19–25 Oct · 2 meals · 1 not on your list yet").assertExists()
         compose.onNodeWithText("6 still needed · bbcgoodfood.com").assertExists()
-        compose.onNodeWithText("Not on the shopping list yet · Ottolenghi Simple · p. 142").assertExists()
-        compose.onNodeWithText("Add 1 meal to the shopping list").assertExists()
+        compose.onNodeWithText("Not on your list yet · Ottolenghi Simple · p. 142").assertExists()
+        compose.onNodeWithText("Make shopping list").assertExists()
         compose.onNodeWithText("5 new items · 2 already on it · 1 usually at home").assertExists()
         compose.onNodeWithTag("meals-add-to-list").performClick()
         compose.onNodeWithTag("meal-more-1").performClick()
@@ -139,9 +140,18 @@ class MealsScreenTest {
     }
 
     @Test
-    fun buyAgainChipsAndTheAtHomeCheck() {
+    fun buyAgainAndTheHomeCheckAreNotOnTheMealsScreen() {
+        // Step Q: they live with the list (a sheet) and on the focused home check.
         show()
-        scrollTo("buy-again")
+        compose.onNodeWithTag("buy-again").assertDoesNotExist()
+        compose.onNodeWithTag("home-cat:cumin").assertDoesNotExist()
+        compose.onNodeWithTag("misc-add").assertDoesNotExist()
+        compose.onNodeWithTag("pick-k3").assertDoesNotExist()
+    }
+
+    @Test
+    fun theBuyAgainSectionAddsChipsAllAndLastShop() {
+        compose.setContent { HyperShopTheme(dynamicColor = false) { BuyAgainSection(ui, actions) } }
         compose.onNodeWithTag("regular-cat:milk").assertHeightIsAtLeast(48.dp)
         compose.onNodeWithTag("regular-cat:milk").performClick()
         // On the list already: a tap does nothing.
@@ -149,50 +159,62 @@ class MealsScreenTest {
         compose.onNodeWithTag("buy-again-all").performClick()
         compose.onNodeWithText("Add all 2").assertExists()
         compose.onNodeWithTag("repeat-last-shop").performClick()
-        scrollTo("home-check")
-        compose.onNodeWithText("Have all 2").performClick()
-        scrollTo("home-cat:salt")
-        compose.onNodeWithTag("home-need-cat:salt").performClick()
-        assertEquals(
-            listOf("regular milk", "all regulars", "last shop", "have ground cumin, basmati rice", "need salt"),
-            events,
-        )
+        assertEquals(listOf("regular milk", "all regulars", "last shop"), events)
     }
 
     @Test
-    fun withEverythingOnTheListTheButtonIsStartShoppingAndPicksPlan() {
+    fun theHomeCheckAsksOncePerIngredientWithPlainActions() {
+        compose.setContent { HyperShopTheme(dynamicColor = false) { HomeCheckScreen(ui, actions, onBack = { events += "back" }) } }
+        compose.onNodeWithText("Food at home").assertExists()
+        // Combined: rice is wanted by two meals, asked about once.
+        compose.onNodeWithText("Needed for 2 meals").assertExists()
+        compose.onNodeWithTag("home-have-cat:cumin").assertTextEquals("Have enough")
+        compose.onNodeWithTag("home-have-cat:cumin").performClick()
+        compose.onNodeWithTag("home-need-cat:salt").performClick()
+        compose.onNodeWithTag("home-check-done").performClick()
+        assertEquals(listOf("have ground cumin", "need salt", "back"), events)
+        compose.onRoot().captureRoboImage(Shots.path("home-check-light.png"))
+    }
+
+    @Test
+    fun withEverythingOnTheListTheButtonViewsTheListAndAddMealAddsAnother() {
         show(ui.copy(meals = ui.meals.map { it.copy(shopping = MealShopping.TO_BUY, progress = UseProgress(1, 0, 0, 0)) }, preview = null))
+        compose.onNodeWithText("View shopping list").assertExists()
         compose.onNodeWithTag("meals-shop").performClick()
-        scrollTo("pick-k3")
+        // Add meal opens the saved recipes; one planned already says Add another.
+        scrollTo("meals-add-meal-more")
+        compose.onNodeWithTag("meals-add-meal-more").performClick()
+        compose.onNodeWithTag("pick-add-k1").assertTextEquals("Add another")
         compose.onNodeWithTag("pick-add-k3").performClick()
-        assertEquals(listOf("shop", "plan Fish pie"), events)
+        compose.onNodeWithTag("add-meal-done").performClick()
+        compose.onNodeWithTag("add-meal-sheet").assertDoesNotExist()
+        assertEquals(listOf("list", "plan Fish pie"), events)
     }
 
     @Test
     fun theBottomActionFollowsWhereTheWeekStands() {
         val added = ui.meals.map { it.copy(shopping = MealShopping.TO_BUY, progress = UseProgress(1, 0, 0, 0)) }
         var u by mutableStateOf(ui)
-        compose.setContent { HyperShopTheme(dynamicColor = false) { MealsScreen(u, actions.copy(onList = { events += "list" })) } }
-        // Meals waiting: add them.
-        compose.onNodeWithTag("meals-add-to-list").assertExists()
+        compose.setContent { HyperShopTheme(dynamicColor = false) { MealsScreen(u, actions) } }
+        // Meals waiting: make the list.
+        compose.onNodeWithText("Make shopping list").assertExists()
         compose.onNodeWithTag("meals-shop").assertDoesNotExist()
-        // All added, a shop to start: how much it is.
+        // All on the list: view it, and how much is left.
         u = ui.copy(meals = added, preview = null, listLeft = 7)
-        compose.onNodeWithText("Start shopping").assertExists()
+        compose.onNodeWithText("View shopping list").assertExists()
         compose.onNodeWithText("7 items to buy").assertExists()
-        compose.onNodeWithTag("meals-shop").performClick()
-        // A shop under way: carry on, without starting again (no store asked twice).
-        u = ui.copy(meals = added, preview = null, listLeft = 3, shopping = true)
-        compose.onNodeWithText("Continue shopping").assertExists()
-        compose.onNodeWithText("3 items left to buy").assertExists()
-        compose.onNodeWithTag("meals-shop").performClick()
-        u = ui.copy(meals = added, preview = null, listLeft = 0, shopping = true)
-        compose.onNodeWithText("Everything is ticked · finish on the list").assertExists()
-        // Nothing on the list and nothing planned: the header says what to do next.
+        // A later week says where its ingredients go.
+        u = ui.copy(isCurrent = false, weekName = "Next week")
+        compose.onNodeWithText("5 new items · 2 already on it · 1 usually at home · adds to your current list").assertExists()
+        // No meals: Add meal is the one action.
         u = ui.copy(meals = emptyList(), preview = null, listHasItems = false, listLeft = 0)
         compose.onNodeWithTag("meals-shop").assertDoesNotExist()
-        compose.onNodeWithText("19–25 Oct · Nothing planned yet · choose meals below").assertExists()
-        assertEquals(listOf("shop", "list"), events)
+        compose.onNodeWithTag("meals-add-meal").assertExists()
+        compose.onNodeWithText("19–25 Oct · Nothing planned yet").assertExists()
+        // A past week: history, no actions.
+        u = ui.copy(isCurrent = false, isPast = true, preview = null)
+        compose.onNodeWithTag("meals-add-to-list").assertDoesNotExist()
+        compose.onNodeWithTag("meals-add-meal").assertDoesNotExist()
     }
 
     @Test
@@ -224,8 +246,10 @@ class MealsScreenTest {
     @Test
     fun emptyLibraryExplainsWhereRecipesComeFrom() {
         show(MealsUi(loaded = true, weekName = "This week"))
-        compose.onNodeWithText("No saved recipes yet").assertExists()
+        compose.onNodeWithText("Save a recipe first: share a recipe link to HyperShop, or tap Add meal › New recipe.").assertExists()
         compose.onNodeWithTag("meals-shop").assertDoesNotExist()
+        compose.onNodeWithTag("meals-add-meal").performClick()
+        compose.onNodeWithTag("new-recipe").assertExists()
     }
 
     @Test
@@ -234,16 +258,17 @@ class MealsScreenTest {
         val row = HomeRow("cat:rice", "rice", listOf("Soup"), false, false, needed = "500 g", onHand = "100 g")
         compose.setContent {
             HyperShopTheme(dynamicColor = false) {
-                MealsScreen(
+                HomeCheckScreen(
                     ui.copy(home = listOf(row)),
                     actions.copy(onHaveSome = { _, _, done ->
                         attempts++
                         done(if (attempts == 1) "Keep the amount already allocated to earlier purchases." else null)
                     }),
+                    onBack = {},
                 )
             }
         }
-        scrollTo("home-cat:rice")
+        compose.onNodeWithText("100 g at home").assertExists()
         compose.onNodeWithTag("home-some-cat:rice").performClick()
         compose.onNodeWithTag("home-some-amount").assertTextContains("100 g")
         compose.onNodeWithTag("home-some-amount").performTextReplacement("not an amount")
@@ -251,6 +276,8 @@ class MealsScreenTest {
         compose.onNodeWithText("Enter a positive amount using the requirement's measure, e.g. 300 g.").assertIsDisplayed()
         assertEquals(0, attempts)
         compose.onNodeWithTag("home-some-amount").performTextReplacement("200 g")
+        // What it will mean, before Set.
+        compose.onNodeWithTag("home-some-preview").assertTextEquals("200 g at home → buy 300 g")
         compose.onNodeWithTag("home-some-set").performClick()
         compose.onNodeWithText("Keep the amount already allocated to earlier purchases.").assertIsDisplayed()
         compose.onNodeWithTag("home-some-amount").assertTextContains("200 g")

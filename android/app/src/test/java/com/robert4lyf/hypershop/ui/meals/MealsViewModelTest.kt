@@ -109,8 +109,8 @@ class MealsViewModelTest {
         assertNull(added.preview)
         assertEquals(2, added.itemsLeft)
         assertEquals(Rational.of(3), onions(c))
-        awaitTrue { got.any { it.text == "Added 2 meals · 2 items · 2 to check at home" } }
-        runBlocking { got.first { it.text.startsWith("Added 2 meals") }.undo!!.invoke() }
+        awaitTrue { got.any { it.text == "List ready: 2 things to buy · 2 meals added" } }
+        runBlocking { got.first { it.text.startsWith("List ready") }.undo!!.invoke() }
         await(vm.ui) { it.meals.size == 2 && it.meals.all { m -> m.shopping == MealShopping.NOT_ON_LIST } }
         assertNull(onions(c))
     }

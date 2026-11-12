@@ -485,7 +485,6 @@ fun EdgeDivider(modifier: Modifier = Modifier) {
     HorizontalDivider(modifier, color = MaterialTheme.colorScheme.cardEdge)
 }
 
-
 /** Step Q: opens Settings from the top of a main screen; provided by the app shell, absent elsewhere (previews, tests). */
 val LocalOpenSettings = androidx.compose.runtime.staticCompositionLocalOf<(() -> Unit)?> { null }
 

@@ -382,22 +382,21 @@ class MealsViewModel(
     }
 
     /** "Add to the list": every waiting meal of the week, merged with what is there, in one go. */
-    fun addToList() {
+    fun addToList(after: ((UiMessage) -> Unit)? = null) {
         val w = week.value
         val write = written { c.planner.addWeekToList(w) }
         viewModelScope.launch {
             val added = write.await() ?: return@launch
-            // UX review 8: "Already at home?" sits below the picks; what it still asks about is said here.
-            val toCheck = c.homeCheck.view(c.repository.snapshot()).count { !it.have }
-            messages.send(
+            // Step Q: the outcome in the list's own terms, with Undo. The food-at-home check is offered on the list.
+            val list = c.repository.snapshot()
+            val left = list.liveItems.count { !list.isDone(it.id) && !list.isUnavailable(it.id) }
+            val m =
                 UiMessage(
-                    listOfNotNull(
-                        "Added ${plural(added.meals.size, "meal")} · ${plural(added.items, "item")}",
-                        toCheck.takeIf { it > 0 }?.let { "$it to check at home" },
-                    ).joinToString(" · "),
+                    "List ready: ${plural(left, "thing")} to buy · ${plural(added.meals.size, "meal")} added",
                     undo = { writing.withLock { c.planner.undoAddWeek(added) } },
-                ),
-            )
+                )
+            // Handed over directly when the caller is about to leave this screen, so it is shown wherever that leads.
+            if (after != null) after(m) else messages.send(m)
         }
     }
 
