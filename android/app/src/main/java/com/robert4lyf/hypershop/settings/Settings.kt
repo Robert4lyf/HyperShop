@@ -68,11 +68,6 @@ class Settings(
 
     suspend fun setKeyNudged() = store.edit { it[KEY_NUDGED] = true }
 
-    /** How often a review row's sheet has been opened: the review's "tap an ingredient" hint stops after a few. */
-    val reviewSheetOpens: Flow<Int> = store.data.map { it[REVIEW_SHEET_OPENS] ?: 0 }
-
-    suspend fun bumpReviewSheetOpens() = store.edit { it[REVIEW_SHEET_OPENS] = (it[REVIEW_SHEET_OPENS] ?: 0) + 1 }
-
     suspend fun setUnits(u: UnitsSetting) = store.edit { it[UNITS] = u.name }
 
     suspend fun setTheme(t: ThemeMode) = store.edit { it[THEME] = t.name }
@@ -130,7 +125,6 @@ class Settings(
         val LAST_TAB = stringPreferencesKey("last_tab")
         val KEY_LOST = booleanPreferencesKey("claude_key_lost_notice")
         val KEY_SET = booleanPreferencesKey("claude_key_was_set")
-        val REVIEW_SHEET_OPENS = intPreferencesKey("review_sheet_opens")
         val ACTIVE_STORE = intPreferencesKey("active_store")
         val KEY_NUDGED = booleanPreferencesKey("claude_key_nudged")
     }

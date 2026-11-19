@@ -292,6 +292,9 @@ class ReviewRowSheetScreenTest {
         // Said under the field: the change itself may be a word on a row further up the screen.
         compose.onNodeWithText("Set to 300 ml").fetchSemanticsNode()
         // A chip asks: just this time, or always.
+        // The aisles are behind "Change aisle".
+        compose.onNodeWithText("Frozen").assertDoesNotExist()
+        compose.onNodeWithTag("change-aisle").performScrollTo().performClick()
         compose.onNodeWithText("Frozen").performScrollTo().performClick()
         compose.onNodeWithText("Just this time").performClick()
         compose.onNodeWithText("Chilled").performScrollTo().performClick()

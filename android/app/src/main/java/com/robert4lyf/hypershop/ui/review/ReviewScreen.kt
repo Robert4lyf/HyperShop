@@ -31,13 +31,10 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.HourglassTop
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Refresh
@@ -54,7 +51,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -75,7 +71,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -137,7 +132,7 @@ fun ReviewScreen(
     val addFocus = remember { FocusRequester() }
     // "Add an ingredient" in the menu: the field is the last item, so scroll it in, then focus it.
     var focusAdd by remember { mutableIntStateOf(0) }
-    val itemCount = (if (ui.hint) 2 else 1) + (if (ui.notice != null) 1 else 0) + ui.aisles.sumOf { it.second.size + 1 } + 1
+    val itemCount = 1 + (if (ui.notice != null) 1 else 0) + ui.aisles.sumOf { it.second.size + 1 } + 1
     LaunchedEffect(focusAdd) {
         if (focusAdd == 0) return@LaunchedEffect
         list.animateScrollToItem(itemCount - 1)
@@ -145,7 +140,13 @@ fun ReviewScreen(
     }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().imePadding()) {
-            TopBar(onCancel, onClearInStock.takeUnless { ui.savedOnly }, onAddIngredient = { focusAdd++ }, onLater = onLater)
+            TopBar(
+                onCancel,
+                onClearInStock.takeUnless { ui.savedOnly },
+                onAddIngredient = { focusAdd++ },
+                onLater = onLater,
+                onSaveOnly = onSaveForLater.takeIf { !ui.editing && !ui.byHand && !ui.savedOnly && !ui.busy },
+            )
             val card = MaterialTheme.colorScheme.card
             LazyColumn(Modifier.weight(1f), state = list, contentPadding = PaddingValues(bottom = 16.dp)) {
                 item(key = "hero") { Hero(ui, onServings, onRetryClaude, onStopRetry, edits.onTitle, edits.onBook) }
@@ -156,17 +157,6 @@ fun ReviewScreen(
                             Icons.Rounded.Info,
                             Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp).testTag("notice"),
                             Tone.PRIMARY,
-                        )
-                    }
-                }
-                // X.4: the sheet behind each row is where a line is changed or swapped; said while that is new (UX review 20).
-                if (ui.hint) {
-                    item(key = "edit-hint") {
-                        Text(
-                            "Tap an ingredient to change its amount, swap it or rename it.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp).testTag("edit-hint"),
                         )
                     }
                 }
@@ -188,13 +178,7 @@ fun ReviewScreen(
                 item(key = "add-line") { AddLine(edits.onAddLine, enabled = !ui.busy, focus = addFocus) }
             }
             BottomActionBar {
-                if (!ui.editing && !ui.byHand && !ui.savedOnly) {
-                    OutlinedButton(
-                        onClick = onSaveForLater,
-                        enabled = !ui.busy,
-                        modifier = Modifier.heightIn(min = 56.dp).testTag("save-for-later"),
-                    ) { Text("Save recipe", textAlign = TextAlign.Center) }
-                }
+                // Step Z: one button; "Save recipe only" is in the menu.
                 Button(
                     onClick = onAdd,
                     // An edit can be saved with nothing to add (everything now in stock).
@@ -207,26 +191,17 @@ fun ReviewScreen(
                         modifier = Modifier.size(20.dp),
                     )
                     Spacer(Modifier.size(8.dp))
-                    // Step Z: the one word for putting a recipe's ingredients on the list, wherever it is done.
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            when {
-                                ui.editing -> "Save changes"
-                                ui.addCount == 0 && ui.inStockCount > 0 -> "Nothing to add — all at home"
-                                ui.addCount == 0 -> "Nothing to add"
-                                else -> "Add to list"
-                            },
-                            style = MaterialTheme.typography.titleMedium,
-                            textAlign = TextAlign.Center,
-                        )
-                        if (!ui.editing && ui.addCount > 0) {
-                            Text(
-                                if (ui.addCount == 1) "1 item to your list" else "${ui.addCount} items to your list",
-                                style = MaterialTheme.typography.labelSmall,
-                                textAlign = TextAlign.Center,
-                            )
-                        }
-                    }
+                    Text(
+                        when {
+                            ui.editing -> "Save changes"
+                            ui.addCount == 0 && ui.inStockCount > 0 -> "Nothing to add — all at home"
+                            ui.addCount == 0 -> "Nothing to add"
+                            ui.addCount == 1 -> "Add to list · 1 item"
+                            else -> "Add to list · ${ui.addCount} items"
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center,
+                    )
                 }
             }
         }
@@ -240,6 +215,8 @@ private fun TopBar(
     onClearInStock: (() -> Unit)?,
     onAddIngredient: () -> Unit,
     onLater: (() -> Unit)? = null,
+    /** "Save recipe only": keeps the recipe, adds nothing (X.11); null where it does not apply. */
+    onSaveOnly: (() -> Unit)? = null,
 ) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         if (onLater != null) {
@@ -260,8 +237,16 @@ private fun TopBar(
         Spacer(Modifier.weight(1f))
         var menu by rememberSaveable { mutableStateOf(false) }
         Box {
-            IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
+            IconButton(onClick = { menu = true }, modifier = Modifier.testTag("review-more")) {
+                Icon(Icons.Rounded.MoreVert, contentDescription = "More")
+            }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                onSaveOnly?.let { save ->
+                    DropdownMenuItem(text = { Text("Save recipe only") }, onClick = {
+                        menu = false
+                        save()
+                    }, modifier = Modifier.testTag("save-for-later"))
+                }
                 DropdownMenuItem(text = { Text("Add an ingredient") }, onClick = {
                     menu = false
                     onAddIngredient()
@@ -296,16 +281,6 @@ private fun Hero(
 ) {
     var renaming by rememberSaveable { mutableStateOf(false) }
     if (renaming) TitleDialog(ui.title, onDismiss = { renaming = false }) { onTitle(it) }
-    var explainOffline by rememberSaveable { mutableStateOf(false) }
-    if (explainOffline) {
-        AlertDialog(
-            onDismissRequest = { explainOffline = false },
-            icon = { Icon(Icons.Rounded.CloudOff, contentDescription = null) },
-            title = { Text("Parsed offline") },
-            text = { Text(ui.claudeNote ?: "Read without Claude.") },
-            confirmButton = { TextButton(onClick = { explainOffline = false }) { Text("OK") } },
-        )
-    }
     var sourcing by rememberSaveable { mutableStateOf(false) }
     if (sourcing) BookDialog(ui.book, ui.page, onDismiss = { sourcing = false }, onSave = onBook)
     val open = rememberOpenLink()
@@ -331,22 +306,9 @@ private fun Hero(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     val centred = Modifier.align(Alignment.CenterVertically)
-                    when (ui.badge) {
-                        Badge.CLAUDE -> Badge("Read by Claude", Icons.Rounded.AutoAwesome, centred)
-                        Badge.CLAUDE_PENDING -> Badge("Waiting for Claude", Icons.Rounded.HourglassTop, centred)
-                        // Typed by hand: there is nothing for Claude to have read.
-                        Badge.RULES ->
-                            if (!ui.byHand) {
-                                Badge(
-                                    "Read offline",
-                                    Icons.Rounded.CloudOff,
-                                    centred,
-                                    onClick = { explainOffline = true },
-                                )
-                            }
-                    }
-                    // With a key: a second opinion is one tap away, whether Claude could not run or was not needed.
-                    if (ui.canAskClaude && !ui.retrying) {
+                    // Step Z: Claude's status shows only when it failed or was skipped (the note below says which),
+                    // with Retry there; a reading that worked, or one still running, has no badge of its own.
+                    if (ui.claudeNote != null && ui.canAskClaude && !ui.retrying) {
                         TextButton(
                             onClick = onRetryClaude,
                             enabled = !ui.busy,
@@ -355,16 +317,11 @@ private fun Hero(
                         ) {
                             Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.size(6.dp))
-                            Text(if (ui.badge == Badge.CLAUDE_PENDING) "Retry with Claude" else "Ask Claude")
+                            Text("Retry with Claude")
                         }
                     }
                     if (ui.retrying) {
-                        CircularProgressIndicator(centred.size(20.dp), color = Brand.OnHero, strokeWidth = 2.dp)
-                        Text(
-                            "Asking Claude…",
-                            centred.progressSemantics(),
-                            style = MaterialTheme.typography.labelLarge,
-                        )
+                        CircularProgressIndicator(centred.size(20.dp).progressSemantics(), color = Brand.OnHero, strokeWidth = 2.dp)
                         TextButton(onClick = onStopRetry, colors = onHero, modifier = centred.testTag("stop-retry")) {
                             Text("Stop")
                         }
@@ -372,15 +329,13 @@ private fun Hero(
                         CircularProgressIndicator(centred.size(20.dp), color = Brand.OnHero, strokeWidth = 2.dp)
                     }
                 }
-                if (ui.badge != Badge.CLAUDE) {
-                    ui.claudeNote?.let {
-                        Text(
-                            it,
-                            Modifier.testTag("claude-note"),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Brand.OnHero,
-                        )
-                    }
+                ui.claudeNote?.let {
+                    Text(
+                        it,
+                        Modifier.testTag("claude-note"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Brand.OnHero,
+                    )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f, fill = false).testTag("hero-text")) {
@@ -567,33 +522,6 @@ private fun AddLine(
             enabled = enabled && text.isNotBlank(),
             modifier = Modifier.testTag("add-line-go"),
         ) { Text("Add") }
-    }
-}
-
-/** A chip-shaped label. Only a chip with something to do (an explanation) is a button. */
-@Composable
-private fun Badge(
-    text: String,
-    icon: ImageVector,
-    modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
-) {
-    val content: @Composable () -> Unit = {
-        Row(
-            Modifier.heightIn(min = 32.dp).padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
-            Text(text, style = MaterialTheme.typography.labelLarge)
-        }
-    }
-    if (onClick != null) {
-        Surface(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(50), color = Color.White, contentColor = HERO_INK) {
-            content()
-        }
-    } else {
-        Surface(modifier, shape = RoundedCornerShape(50), color = Color.White, contentColor = HERO_INK) { content() }
     }
 }
 

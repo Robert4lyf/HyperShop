@@ -441,7 +441,7 @@ class ReviewViewModelTest {
         assertEquals("\"A or B\": one of two", flagged.checkReason)
         assertTrue(ui.row("cat:onion").adds)
         assertTrue("a staple, pre-ticked", ui.row("cat:salt").inStock)
-        assertEquals("Planned for this week · 3 to add · 1 at home · 1 to check", ui.summary)
+        assertEquals("3 to add · 1 at home", ui.summary)
     }
 
     @Test

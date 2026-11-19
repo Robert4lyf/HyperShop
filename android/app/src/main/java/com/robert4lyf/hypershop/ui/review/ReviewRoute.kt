@@ -126,10 +126,7 @@ fun ReviewRoute(
             ReviewScreen(
                 ui = s.ui,
                 onInStock = vm::setInStock,
-                onRow = {
-                    sheetKey = it
-                    vm.noteSheetOpened()
-                },
+                onRow = { sheetKey = it },
                 onServings = vm::setServings,
                 onAdd = vm::confirm,
                 onSaveForLater = vm::saveForLater,

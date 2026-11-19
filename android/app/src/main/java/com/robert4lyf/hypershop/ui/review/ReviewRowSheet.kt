@@ -190,8 +190,26 @@ fun ReviewRowSheet(
                 for (line in sheet.lines) key(line.origin ?: line.id) { LineEditor(line, actions) }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            // Asks "always or just this time?" on the chip, like the list's sheet; the move is announced with Undo.
-            MoveAisle(sheet.aisle, actions.onMoveAisle)
+            // Step Z: the 17 aisles behind one row. A chip asks "always or just this time?", like the list's sheet; the
+            // move is announced with Undo.
+            var aisles by rememberSaveable(sheet.key) { mutableStateOf(false) }
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .clickable(onClickLabel = if (aisles) "Collapse" else "Expand", role = Role.Button) { aisles = !aisles }
+                    .testTag("change-aisle"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Change aisle", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    sheet.aisle.displayName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Icon(if (aisles) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, contentDescription = null)
+            }
+            if (aisles) MoveAisle(sheet.aisle, actions.onMoveAisle)
             if (sheet.canRemove) {
                 for (line in sheet.lines) {
                     TextButton(
