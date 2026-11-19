@@ -110,7 +110,7 @@ fun RecipesRoute(
         ui,
         library =
             LibraryActions(
-                onAdd = vm::addMeal,
+                onAdd = vm::addToList,
                 onRemove = vm::removeFromLibrary,
                 onOpen = vm::openDetail,
                 onRename = { row, title -> vm.renameSaved(row, title) },
@@ -152,8 +152,8 @@ fun RecipesRoute(
             d,
             onAdd = {
                 vm.closeDetail()
-                // Step Q: a meal of this week, as saved; no second review (Edit is the way to change the recipe).
-                vm.addMeal(d.row)
+                // As saved, straight on to the list; Edit is the way to change the recipe.
+                vm.addToList(d.row)
             },
             onRemove = {
                 vm.closeDetail()
@@ -455,7 +455,7 @@ private fun LibraryCard(
                     }
                 }
                 FilledTonalButton(onClick = onAdd, modifier = Modifier.testTag("lib-add-${row.key}")) {
-                    Text("Add meal")
+                    Text("Add to list")
                 }
                 var menu by remember { mutableStateOf(false) }
                 Box {
@@ -627,7 +627,7 @@ private fun DetailButtons(
         Button(onClick = onAdd, modifier = Modifier.testTag("detail-add")) {
             Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.size(8.dp))
-            Text("Add meal")
+            Text("Add to list")
         }
         onOpen?.let {
             OutlinedButton(onClick = it) {

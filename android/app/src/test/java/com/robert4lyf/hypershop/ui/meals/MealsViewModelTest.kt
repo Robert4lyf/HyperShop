@@ -10,7 +10,6 @@ import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.parse.RuleParser
 import com.robert4lyf.hypershop.data.MealShopping
 import com.robert4lyf.hypershop.di.AppContainer
-import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.testutil.await
 import com.robert4lyf.hypershop.testutil.awaitTrue
@@ -19,7 +18,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -89,7 +87,7 @@ class MealsViewModelTest {
         runBlocking { c.repository.snapshot() }.let { l -> l.itemByKey("cat:onion")?.let { l.total(it.id)[BaseKey.ITEMS] } }
 
     @Test
-    fun planTwoMealsThenOneTapPutsTheWeekOnTheListMergedAndUndoTakesItOff() {
+    fun addToListPutsEachRecipeOnTheListAtOnceMergedAndUndoTakesItOff() {
         val c = container()
         save(c, "Chilli", "2 onions", "Salt, to taste")
         save(c, "Soup", "1 onion", "2 carrots")
@@ -98,39 +96,15 @@ class MealsViewModelTest {
         val ui = await(vm.ui) { it.picks.size == 2 }
         assertEquals("This week", ui.weekName)
         ui.picks.forEach { vm.plan(it) }
-        val planned = await(vm.ui) { it.meals.size == 2 && it.preview != null }
-        assertEquals(2, planned.pending)
-        // 2 rows new (the onion once, carrots), salt left off as usually at home.
-        assertEquals(2, planned.preview!!.newItems)
-        assertEquals(1, planned.preview!!.atHome)
-        assertTrue(planned.picks.all { it.planned == 1 })
-        vm.addToList()
-        val added = await(vm.ui) { it.meals.all { m -> m.shopping == MealShopping.TO_BUY } }
-        assertNull(added.preview)
+        // Step Z: no second step; each is planned and on the list, the onion once, salt left off as usually at home.
+        val added = await(vm.ui) { it.meals.size == 2 && it.meals.all { m -> m.shopping == MealShopping.TO_BUY } }
         assertEquals(2, added.itemsLeft)
         assertEquals(Rational.of(3), onions(c))
-        awaitTrue { got.any { it.text == "List ready: 2 things to buy · 2 meals added" } }
-        runBlocking { got.first { it.text.startsWith("List ready") }.undo!!.invoke() }
-        await(vm.ui) { it.meals.size == 2 && it.meals.all { m -> m.shopping == MealShopping.NOT_ON_LIST } }
-        assertNull(onions(c))
-    }
-
-    @Test
-    fun theWeekKnowsWhatIsLeftToBuyAndWhetherAShopIsUnderWay() {
-        val c = container()
-        val vm = MealsViewModel(c).shown()
-        runBlocking {
-            c.repository.manualAdd("bread", QtyBase.of(Rational.ONE, null, UnitLocale.METRIC), null)
-            c.repository.manualAdd("milk", QtyBase.of(Rational.ONE, null, UnitLocale.METRIC), null)
-        }
-        val planning = await(vm.ui) { it.listLeft == 2 }
-        assertTrue(planning.listHasItems)
-        assertTrue(!planning.shopping)
-        runBlocking { c.settings.setListMode(ListMode.SHOP) }
-        await(vm.ui) { it.shopping && it.listLeft == 2 }
-        // A tick leaves one to buy; the shop is still under way.
-        runBlocking { c.repository.toggle(c.repository.snapshot().itemByKey("cat:bread")!!.id) }
-        await(vm.ui) { it.shopping && it.listLeft == 1 }
+        assertNull(runBlocking { c.repository.snapshot() }.itemByKey("cat:salt"))
+        awaitTrue { got.any { it.text == "Added Soup · 2 to buy" } }
+        runBlocking { got.first { it.text == "Added Soup · 2 to buy" }.undo!!.invoke() }
+        await(vm.ui) { it.meals.size == 1 }
+        assertEquals(Rational.of(2), onions(c))
     }
 
     @Test
@@ -196,20 +170,6 @@ class MealsViewModelTest {
     }
 
     @Test
-    fun aRepeatedTapOnAddAddsTheWeekOnce() {
-        val c = container()
-        save(c, "Chilli", "2 onions")
-        val vm = MealsViewModel(c).shown()
-        vm.plan(await(vm.ui) { it.picks.isNotEmpty() }.picks.single())
-        await(vm.ui) { it.pending == 1 }
-        repeat(3) { vm.addToList() }
-        await(vm.ui) { it.pending == 0 && it.meals.isNotEmpty() }
-        awaitTrue { onions(c) != null }
-        Thread.sleep(200)
-        assertEquals(Rational.of(2), onions(c))
-    }
-
-    @Test
     fun weeksMoveAndAnEmptyWeekOffersTheLastPlannedOne() {
         val c = container()
         val chilli = save(c, "Chilli", "2 onions")
@@ -245,8 +205,6 @@ class MealsViewModelTest {
         val vm = MealsViewModel(c).shown()
         val got = messages(vm)
         vm.plan(await(vm.ui) { it.picks.isNotEmpty() }.picks.single())
-        await(vm.ui) { it.pending == 1 }
-        vm.addToList()
         val meal = await(vm.ui) { it.meals.singleOrNull()?.shopping == MealShopping.TO_BUY }.meals.single()
         vm.stepServings(meal, 2)
         await(vm.ui) { it.meals.single().servings == 6 }
@@ -294,9 +252,7 @@ class MealsViewModelTest {
         save(c, "Curry", "100 g basmati rice", "1 tsp cumin")
         val vm = MealsViewModel(c).shown()
         await(vm.ui) { it.picks.size == 2 }.picks.forEach { vm.plan(it) }
-        await(vm.ui) { it.pending == 2 }
-        vm.addToList()
-        val ui = await(vm.ui) { it.pending == 0 && it.home.isNotEmpty() }
+        val ui = await(vm.ui) { it.meals.size == 2 && it.home.any { r -> r.name.contains("rice") && r.from.size == 2 } }
         val rice = ui.home.single { it.name.contains("rice") }
         assertEquals(listOf("Chilli", "Curry"), rice.from.sorted())
         vm.have(ui.toCheck.filter { it.likelyCupboard })
@@ -304,7 +260,5 @@ class MealsViewModelTest {
         val l = runBlocking { c.repository.snapshot() }
         assertNull(l.itemByKey(rice.mergeKey))
         assertTrue(l.itemByKey("cat:onion") != null)
-        vm.startShopping()
-        awaitTrue { runBlocking { c.settings.listMode.first() } == ListMode.SHOP }
     }
 }

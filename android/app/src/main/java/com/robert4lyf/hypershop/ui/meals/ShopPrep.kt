@@ -175,7 +175,6 @@ class PrepViewModel(
                 loaded = true,
                 buyAgain = buy,
                 home = home,
-                listHasItems = list.liveItems.isNotEmpty(),
                 listLeft = list.liveItems.count { !list.isDone(it.id) && !list.isUnavailable(it.id) },
             )
         }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MealsUi())

@@ -127,8 +127,6 @@ class ReleaseCScenariosTest {
         val meals = MealsViewModel(c).shown()
         val said = messages(meals.events)
         await(meals.ui) { it.picks.size == 2 }.picks.forEach { meals.plan(it) }
-        await(meals.ui) { it.meals.size == 2 && it.preview != null }
-        meals.addToList()
         await(meals.ui) { it.meals.all { m -> m.shopping == MealShopping.TO_BUY } }
 
         // In the shop: the onions (both meals' share) and the mince are bought, the carrots not yet.

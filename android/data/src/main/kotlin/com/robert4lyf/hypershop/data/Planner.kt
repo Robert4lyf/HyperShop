@@ -167,6 +167,29 @@ class Planner(
         }
 
     /**
+     * Step Z "Add to list": the saved recipe's current copy on the list at its own servings, as the review would put
+     * it with nothing changed, and planned for this week and linked to its use in the same transaction
+     * ([ListRepository.apply]'s plan path, the review's own). Null when the recipe is gone or has no lines.
+     */
+    suspend fun addToList(libraryKey: String): ApplyResult? {
+        val r = latestCopy(libraryKey) ?: return null
+        return repo.addSavedRecipe(r.id, plan = true)
+    }
+
+    /**
+     * Undo of [addToList] (and of the review's add): the meal planned with use [useId] leaves the plan, and only what
+     * is still unbought leaves the list ([unplan]: a purchase is never undone). With no meal linked, the use comes off
+     * the list the same way ([ListRepository.removeFromList]).
+     */
+    suspend fun takeBack(useId: Long) {
+        db.withTransaction {
+            val meals = dao.mealsOfUse(useId)
+            if (meals.isEmpty()) repo.removeFromList(useId)
+            for (m in meals) unplan(m.id)
+        }
+    }
+
+    /**
      * "Remove": the meal leaves the plan. If its use still needs something on the
      * list, that comes off too (bought items stay bought); a meal already shopped
      * for leaves the list alone. Null when it was gone already.

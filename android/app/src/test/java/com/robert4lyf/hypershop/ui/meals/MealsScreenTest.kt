@@ -1,8 +1,5 @@
 package com.robert4lyf.hypershop.ui.meals
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
@@ -25,7 +22,6 @@ import com.robert4lyf.hypershop.data.BuyAgainView
 import com.robert4lyf.hypershop.data.HomeRow
 import com.robert4lyf.hypershop.data.MealShopping
 import com.robert4lyf.hypershop.data.Regular
-import com.robert4lyf.hypershop.data.WeekPreview
 import com.robert4lyf.hypershop.testutil.Shots
 import com.robert4lyf.hypershop.testutil.TestPhotos
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
@@ -71,7 +67,6 @@ class MealsScreenTest {
                     ),
                     Meal(2, "Red lentil dal", null, MealShopping.NOT_ON_LIST, null, "Ottolenghi Simple · p. 142"),
                 ),
-            preview = WeekPreview(meals = 1, newItems = 5, joined = 2, atHome = 1),
             itemsLeft = 6,
             picks =
                 listOf(
@@ -92,7 +87,6 @@ class MealsScreenTest {
                     HomeRow("cat:rice", "basmati rice", listOf("Weeknight chilli", "Red lentil dal"), have = false, usual = false),
                     HomeRow("cat:salt", "salt", listOf("Weeknight chilli"), have = true, usual = true),
                 ),
-            listHasItems = true,
         )
     private val actions =
         MealsActions(
@@ -100,13 +94,11 @@ class MealsScreenTest {
             onServings = { m, n -> events += "serves ${m.id} $n" },
             onRemove = { events += "remove ${it.id}" },
             onCooked = { events += "cooked ${it.id}" },
-            onAddToList = { events += "add week" },
             onRegular = { events += "regular ${it.name}" },
             onAllRegulars = { events += "all regulars" },
             onRepeatLastShop = { events += "last shop" },
             onHave = { rs -> events += "have ${rs.joinToString { it.name }}" },
             onNeed = { events += "need ${it.name}" },
-            onStartShopping = { events += "shop" },
             onList = { events += "list" },
             onRepeat = { events += "repeat" },
         )
@@ -116,19 +108,24 @@ class MealsScreenTest {
     private fun scrollTo(tag: String) = compose.onNodeWithTag("meals").performScrollToNode(hasTestTag(tag))
 
     @Test
-    fun theWeekSaysWhatIsCookingAndWhatTheButtonWillDo() {
+    fun theWeekSaysWhatIsCookingAndAddToListIsTheOneAction() {
         show()
         compose.onNodeWithText("This week").assertExists()
-        compose.onNodeWithText("19–25 Oct · 2 meals · 1 not on your list yet").assertExists()
+        compose.onNodeWithText("19–25 Oct · 2 meals · 6 items still needed").assertExists()
         compose.onNodeWithText("6 still needed · bbcgoodfood.com").assertExists()
-        compose.onNodeWithText("Not on your list yet · Ottolenghi Simple · p. 142").assertExists()
-        compose.onNodeWithText("Make shopping list").assertExists()
-        compose.onNodeWithText("5 new items · 2 already on it · 1 usually at home").assertExists()
-        compose.onNodeWithTag("meals-add-to-list").performClick()
+        // Step Z: no "Not on your list yet" and no Make shopping list.
+        compose.onNodeWithText("Ottolenghi Simple · p. 142").assertExists()
+        compose.onNodeWithText("Make shopping list").assertDoesNotExist()
         compose.onNodeWithTag("meal-more-1").performClick()
         // No stepper for a recipe that doesn't say how many it serves.
         compose.onNodeWithTag("meal-serves-2").assertDoesNotExist()
-        assertEquals(listOf("add week", "serves 1 1"), events)
+        // Add to list opens the saved recipes; each one's button puts it on the list.
+        compose.onNodeWithTag("meals-add-meal").performClick()
+        compose.onNodeWithTag("pick-add-k1").assertTextEquals("Add to list")
+        compose.onNodeWithTag("pick-add-k3").performClick()
+        compose.onNodeWithTag("add-meal-done").performClick()
+        compose.onNodeWithTag("add-meal-sheet").assertDoesNotExist()
+        assertEquals(listOf("serves 1 1", "plan Fish pie"), events)
     }
 
     @Test
@@ -177,52 +174,10 @@ class MealsScreenTest {
     }
 
     @Test
-    fun withEverythingOnTheListTheButtonViewsTheListAndAddMealAddsAnother() {
-        show(ui.copy(meals = ui.meals.map { it.copy(shopping = MealShopping.TO_BUY, progress = UseProgress(1, 0, 0, 0)) }, preview = null))
-        compose.onNodeWithText("View shopping list").assertExists()
-        compose.onNodeWithTag("meals-shop").performClick()
-        // Add meal opens the saved recipes; one planned already says Add another.
-        scrollTo("meals-add-meal-more")
-        compose.onNodeWithTag("meals-add-meal-more").performClick()
-        compose.onNodeWithTag("pick-add-k1").assertTextEquals("Add another")
-        compose.onNodeWithTag("pick-add-k3").performClick()
-        compose.onNodeWithTag("add-meal-done").performClick()
-        compose.onNodeWithTag("add-meal-sheet").assertDoesNotExist()
-        assertEquals(listOf("list", "plan Fish pie"), events)
-    }
-
-    @Test
-    fun theBottomActionFollowsWhereTheWeekStands() {
-        val added = ui.meals.map { it.copy(shopping = MealShopping.TO_BUY, progress = UseProgress(1, 0, 0, 0)) }
-        var u by mutableStateOf(ui)
-        compose.setContent { HyperShopTheme(dynamicColor = false) { MealsScreen(u, actions) } }
-        // Meals waiting: make the list.
-        compose.onNodeWithText("Make shopping list").assertExists()
-        compose.onNodeWithTag("meals-shop").assertDoesNotExist()
-        // All on the list: view it, and how much is left.
-        u = ui.copy(meals = added, preview = null, listLeft = 7)
-        compose.onNodeWithText("View shopping list").assertExists()
-        compose.onNodeWithText("7 items to buy").assertExists()
-        // A later week says where its ingredients go.
-        u = ui.copy(isCurrent = false, weekName = "Next week")
-        compose.onNodeWithText("5 new items · 2 already on it · 1 usually at home · adds to your current list").assertExists()
-        // No meals: Add meal is the one action.
-        u = ui.copy(meals = emptyList(), preview = null, listHasItems = false, listLeft = 0)
-        compose.onNodeWithTag("meals-shop").assertDoesNotExist()
-        compose.onNodeWithTag("meals-add-meal").assertExists()
-        compose.onNodeWithText("19–25 Oct · Nothing planned yet").assertExists()
-        // A past week: history, no actions.
-        u = ui.copy(isCurrent = false, isPast = true, preview = null)
-        compose.onNodeWithTag("meals-add-to-list").assertDoesNotExist()
-        compose.onNodeWithTag("meals-add-meal").assertDoesNotExist()
-    }
-
-    @Test
     fun anEmptyWeekOffersTheLastOne() {
         show(
             ui.copy(
                 meals = emptyList(),
-                preview = null,
                 repeatFrom = week - 1,
                 repeatName = "last week",
                 repeatTitles = listOf("Chilli", "Soup"),
@@ -236,9 +191,9 @@ class MealsScreenTest {
 
     @Test
     fun aPastWeekIsToLookBackAtOnly() {
-        show(ui.copy(isCurrent = false, isPast = true, weekName = "Last week", preview = null))
+        show(ui.copy(isCurrent = false, isPast = true, weekName = "Last week"))
         compose.onNodeWithTag("meal-remove-1").assertDoesNotExist()
-        compose.onNodeWithTag("meals-add-to-list").assertDoesNotExist()
+        compose.onNodeWithTag("meals-add-meal").assertDoesNotExist()
         compose.onNodeWithTag("buy-again").assertDoesNotExist()
         compose.onNodeWithTag("meals-search").assertDoesNotExist()
     }
@@ -246,8 +201,7 @@ class MealsScreenTest {
     @Test
     fun emptyLibraryExplainsWhereRecipesComeFrom() {
         show(MealsUi(loaded = true, weekName = "This week"))
-        compose.onNodeWithText("Save a recipe first: share a recipe link to HyperShop, or tap Add meal › New recipe.").assertExists()
-        compose.onNodeWithTag("meals-shop").assertDoesNotExist()
+        compose.onNodeWithText("Save a recipe first: share a recipe link to HyperShop, or tap Add to list › New recipe.").assertExists()
         compose.onNodeWithTag("meals-add-meal").performClick()
         compose.onNodeWithTag("new-recipe").assertExists()
     }

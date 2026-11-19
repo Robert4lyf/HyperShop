@@ -220,15 +220,14 @@ fun ReviewScreen(
                         modifier = Modifier.size(20.dp),
                     )
                     Spacer(Modifier.size(8.dp))
-                    // Step Q: what the button does in the app's words: keep the recipe, add it as a meal of this week, and
-                    // put its items on the list (the one-recipe shortcut for Make shopping list).
+                    // Step Z: the one word for putting a recipe's ingredients on the list, wherever it is done.
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             when {
                                 ui.editing -> "Save changes"
                                 ui.addCount == 0 && ui.inStockCount > 0 -> "Nothing to add — all at home"
                                 ui.addCount == 0 -> "Nothing to add"
-                                else -> "Save and add meal"
+                                else -> "Add to list"
                             },
                             style = MaterialTheme.typography.titleMedium,
                             textAlign = TextAlign.Center,

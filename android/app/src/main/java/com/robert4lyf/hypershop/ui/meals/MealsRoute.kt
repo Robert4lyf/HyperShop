@@ -35,7 +35,6 @@ import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -72,7 +71,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -109,7 +107,6 @@ data class MealsActions(
     val onNextWeek: () -> Unit = {},
     val onThisWeek: () -> Unit = {},
     val onRepeat: () -> Unit = {},
-    val onAddToList: () -> Unit = {},
     val onRegular: (Regular) -> Unit = {},
     val onAllRegulars: () -> Unit = {},
     val onRepeatLastShop: () -> Unit = {},
@@ -122,7 +119,6 @@ data class MealsActions(
     val onClearSome: (HomeRow) -> Unit = {},
     /** Y.21: lines typed under Miscellaneous (household things, extras). */
     val onAddMisc: (String) -> Unit = {},
-    val onStartShopping: () -> Unit = {},
     /** "Go to the list": the Shopping tab, where the combined ingredients are. */
     val onList: () -> Unit = {},
     /** X.10: "New recipe": the add-a-recipe sheet, here where the week is planned. */
@@ -170,13 +166,6 @@ fun MealsRoute(
             onNextWeek = vm::nextWeek,
             onThisWeek = vm::thisWeek,
             onRepeat = vm::repeat,
-            // Make shopping list ends on the list, with what it did and its Undo.
-            onAddToList = {
-                vm.addToList { m ->
-                    show(container, snackbar, m)
-                    onList()
-                }
-            },
             onHomeCheck = onHomeCheck,
             onRegular = { vm.addRegular(it) },
             onAllRegulars = { vm.addAllRegulars() },
@@ -188,10 +177,6 @@ fun MealsRoute(
             onHaveSome = { r, t, done -> vm.haveSome(r, t, done) },
             onClearSome = vm::clearSome,
             onAddMisc = vm::addMisc,
-            onStartShopping = {
-                vm.startShopping()
-                onList()
-            },
             onList = onList,
             onNewRecipe = { adding = true },
         ),
@@ -231,21 +216,6 @@ fun MealsScreen(
                             onCooked = { actions.onCooked(m) },
                         )
                     }
-                    if (!ui.isPast) {
-                        item(key = "add-meal") {
-                            OutlinedButton(
-                                onClick = { choosing = true },
-                                modifier =
-                                    Modifier.padding(
-                                        horizontal = 16.dp,
-                                    ).fillMaxWidth().heightIn(min = 48.dp).testTag("meals-add-meal-more"),
-                            ) {
-                                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.size(8.dp))
-                                Text("Add meal")
-                            }
-                        }
-                    }
                 } else if (ui.loaded) {
                     item(key = "empty") { EmptyWeek(ui) }
                     if (ui.repeatFrom != null && !ui.isPast) item(key = "repeat") { RepeatCard(ui, actions.onRepeat) }
@@ -255,7 +225,7 @@ fun MealsScreen(
                     item(key = "home-check") { CheckHomeRow(ui.toCheck.size, actions.onHomeCheck) }
                 }
             }
-            BottomBar(ui, actions, onAddMeal = { choosing = true })
+            BottomBar(ui, onAddMeal = { choosing = true })
         }
     }
     if (choosing) {
@@ -287,9 +257,9 @@ private fun EmptyWeek(ui: MealsUi) {
         if (!ui.isPast) {
             Text(
                 if (ui.hasLibrary) {
-                    "Add the meals you want to cook, then make one shopping list for them."
+                    "Add the recipes you want to cook; their ingredients go on your list."
                 } else {
-                    "Save a recipe first: share a recipe link to HyperShop, or tap Add meal › New recipe."
+                    "Save a recipe first: share a recipe link to HyperShop, or tap Add to list › New recipe."
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -342,7 +312,7 @@ internal fun AddMealSheet(
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.92f).imePadding().testTag("add-meal-sheet")) {
             Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Add meal to ${ui.weekName.ifEmpty { "this week" }.lowercase()}",
+                    "Add to list",
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.weight(1f).semantics { heading() },
                 )
@@ -437,7 +407,6 @@ private fun summary(ui: MealsUi): String? =
     when {
         // The next step is the Add meal button; the summary only says where the week stands.
         ui.meals.isEmpty() -> if (ui.isPast) "Nothing was planned" else "Nothing planned yet"
-        ui.pending > 0 -> "${plural(ui.meals.size, "meal")} · ${ui.pending} not on your list yet"
         ui.itemsLeft > 0 -> "${plural(ui.meals.size, "meal")} · ${plural(ui.itemsLeft, "item")} still needed"
         else -> plural(ui.meals.size, "meal")
     }
@@ -470,9 +439,9 @@ private fun RepeatCard(
     }
 }
 
-private fun mealState(m: Meal): String =
+private fun mealState(m: Meal): String? =
     when (m.shopping) {
-        MealShopping.NOT_ON_LIST -> "Not on your list yet"
+        MealShopping.NOT_ON_LIST -> null
         MealShopping.TO_BUY -> m.progress!!.label()
         MealShopping.BOUGHT -> "All bought"
         MealShopping.NOTHING_TO_BUY -> "Nothing to buy"
@@ -504,11 +473,7 @@ private fun MealCard(
                         bits.joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         color =
-                            if (m.shopping.pending && !past) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
+                            MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.testTag("meal-state-${m.id}"),
                     )
                 }
@@ -948,7 +913,7 @@ private fun PickRow(
             .cardLift(MaterialTheme.shapes.large)
             .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.card)
-            .clickable(onClickLabel = if (p.planned > 0) "Add another" else "Add meal", onClick = onAdd)
+            .clickable(onClickLabel = "Add to list", onClick = onAdd)
             .padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)
             .testTag("pick-${p.key}"),
         verticalAlignment = Alignment.CenterVertically,
@@ -974,73 +939,26 @@ private fun PickRow(
         FilledTonalButton(onClick = onAdd, modifier = Modifier.testTag("pick-add-${p.key}")) {
             Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.size(4.dp))
-            Text(if (p.planned > 0) "Add another" else "Add")
+            Text("Add to list")
         }
     }
 }
 
-/**
- * One primary action, chosen by where the week stands (step Q): Add meal with none, Make shopping list while any
- * wait, then View shopping list. A past week has none.
- */
+/** Step Z: one action, Add to list (the saved recipes to choose from); a past week has none. */
 @Composable
 private fun BottomBar(
     ui: MealsUi,
-    actions: MealsActions,
     onAddMeal: () -> Unit,
 ) {
     if (!ui.loaded || ui.isPast) return
-    val p = ui.preview
-    when {
-        ui.meals.isEmpty() ->
-            BottomActionBar(navigationBarInset = false) {
-                Button(onClick = onAddMeal, modifier = Modifier.weight(1f).heightIn(min = 56.dp).testTag("meals-add-meal")) {
-                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.size(8.dp))
-                    Text("Add meal")
-                }
-            }
-        ui.pending > 0 ->
-            if (p != null) {
-                BottomActionBar(navigationBarInset = false) {
-                    Button(
-                        onClick = actions.onAddToList,
-                        modifier = Modifier.weight(1f).heightIn(min = 56.dp).testTag("meals-add-to-list"),
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Make shopping list")
-                            // A later week's meals go on the one list there is: said, never done unseen.
-                            Text(
-                                previewLine(p) + if (ui.isCurrent) "" else " · adds to your current list",
-                                style = MaterialTheme.typography.labelSmall,
-                                textAlign = TextAlign.Center,
-                            )
-                        }
-                    }
-                }
-            }
-        ui.listHasItems ->
-            BottomActionBar(navigationBarInset = false) {
-                Button(onClick = actions.onList, modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("meals-shop")) {
-                    Icon(Icons.Rounded.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(8.dp))
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("View shopping list")
-                        if (ui.listLeft > 0) Text("${plural(ui.listLeft, "item")} to buy", style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-            }
-        else -> Unit
+    BottomActionBar(navigationBarInset = false) {
+        Button(onClick = onAddMeal, modifier = Modifier.weight(1f).heightIn(min = 56.dp).testTag("meals-add-meal")) {
+            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.size(8.dp))
+            Text("Add to list")
+        }
     }
 }
-
-/** "12 new items · 3 join the list · 2 usually at home": exactly what the button will do. */
-private fun previewLine(p: com.robert4lyf.hypershop.data.WeekPreview): String =
-    listOfNotNull(
-        plural(p.newItems, "new item"),
-        p.joined.takeIf { it > 0 }?.let { "$it already on it" },
-        p.atHome.takeIf { it > 0 }?.let { "$it usually at home" },
-    ).joinToString(" · ")
 
 private fun plural(
     n: Int,

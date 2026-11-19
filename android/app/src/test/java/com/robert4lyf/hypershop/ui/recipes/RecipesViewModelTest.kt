@@ -113,8 +113,8 @@ class RecipesViewModelTest {
     }
 
     @Test
-    fun addMealPlansTheSavedRecipeWithNoSecondReviewAndUndoTakesItBack() {
-        // Step Q: a saved (and corrected) recipe is chosen for this week as it is; no review screen, nothing on the list.
+    fun addToListPutsTheSavedRecipeOnTheListPlannedAndUndoTakesBackOnlyWhatIsUnbought() {
+        // Step Z: a saved (and corrected) recipe goes on the list at once, as it is, planned and linked; no review screen.
         val c = TestContainer.create()
         c.add(*CHILLI)
         val vm = RecipesViewModel(c).shown()
@@ -124,15 +124,21 @@ class RecipesViewModelTest {
         val messages = java.util.concurrent.CopyOnWriteArrayList<com.robert4lyf.hypershop.ui.common.UiMessage>()
         CoroutineScope(Dispatchers.Main).launch { vm.events.collect { messages += it } }
         val week = c.planner.currentWeek()
-        val before = runBlocking { c.planner.week(week) }.size
-        vm.addMeal(saved)
-        com.robert4lyf.hypershop.testutil.awaitTrue { runBlocking { c.planner.week(week) }.size == before + 1 }
-        val meal = runBlocking { c.planner.week(week) }.last()
+        vm.addToList(saved)
+        com.robert4lyf.hypershop.testutil.awaitTrue { messages.any { it.text.startsWith("Added Weeknight chilli · ") } }
+        val meal = runBlocking { c.planner.week(week) }.single { it.useId != null }
         assertEquals(saved.key, meal.libraryKey)
-        assertTrue("not on the list until Make shopping list", runBlocking { c.repository.snapshot() }.liveItems.isEmpty())
-        com.robert4lyf.hypershop.testutil.awaitTrue { messages.any { it.text == "Weeknight chilli added to this week's meals" } }
-        runBlocking { messages.first { it.text == "Weeknight chilli added to this week's meals" }.undo!!.invoke() }
-        assertEquals(before, runBlocking { c.planner.week(week) }.size)
+        val list = runBlocking { c.repository.snapshot() }
+        assertTrue(list.liveItems.isNotEmpty())
+        assertTrue(meal.useId in list.uses)
+        // One item bought, then Undo: the purchase stays, the rest comes off, the meal leaves the plan.
+        val bought = list.liveItems.first().id
+        runBlocking { c.repository.tick(bought) }
+        runBlocking { messages.first { it.text.startsWith("Added Weeknight chilli") }.undo!!.invoke() }
+        val after = runBlocking { c.repository.snapshot() }
+        assertEquals(listOf(bought), after.liveItems.map { it.id })
+        assertTrue(after.isDone(bought))
+        assertTrue(runBlocking { c.planner.week(week) }.none { it.id == meal.id })
     }
 
     @Test

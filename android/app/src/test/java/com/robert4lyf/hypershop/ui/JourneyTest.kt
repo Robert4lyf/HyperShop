@@ -257,11 +257,12 @@ class JourneyTest {
             tap("pick-add-$k")
         }
         tap("add-meal-done")
+        compose.waitUntil(10_000) { runBlocking { c.planner.week(c.planner.currentWeek()) }.size == 3 }
         val chilli = runBlocking { c.planner.week(c.planner.currentWeek()) }.first { it.title == "Weeknight chilli" }.id
         scrollTo("meals", "meal-more-$chilli")
         tap("meal-more-$chilli")
-        // Make shopping list ends on the list; the optional food-at-home check is a chip there.
-        tap("meals-add-to-list")
+        // Step Z: each Add to list put its recipe on the list at once; the list is the next tab.
+        tap("tab-${Routes.LIST}")
         compose.waitUntil(10_000) { runBlocking { c.repository.snapshot() }.itemByKey("cat:basmati_rice") != null }
         // The optional extras are below the items (step Q), so the list is scrolled to them.
         swipeTo("list", "list-home-check")

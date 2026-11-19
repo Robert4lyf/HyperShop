@@ -15,11 +15,11 @@ import com.robert4lyf.hypershop.data.HomeRow
 import com.robert4lyf.hypershop.data.MealShopping
 import com.robert4lyf.hypershop.data.PlannedMeal
 import com.robert4lyf.hypershop.data.Regular
-import com.robert4lyf.hypershop.data.WeekPreview
 import com.robert4lyf.hypershop.data.bookRef
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.recipes.NewRecipe
+import com.robert4lyf.hypershop.ui.recipes.addRecipeToList
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -101,8 +101,6 @@ data class MealsUi(
     val repeatFrom: Week? = null,
     val repeatName: String = "",
     val repeatTitles: List<String> = emptyList(),
-    /** What "Add to the list" would do; null when no meal is waiting to go on. */
-    val preview: WeekPreview? = null,
     /** Rows on the list this week's meals still need, each once. */
     val itemsLeft: Int = 0,
     val picks: List<Pick> = emptyList(),
@@ -110,15 +108,9 @@ data class MealsUi(
     val query: String = "",
     val buyAgain: BuyAgainView = BuyAgainView(),
     val home: List<HomeRow> = emptyList(),
-    /** Something on the list to shop for. */
-    val listHasItems: Boolean = false,
     /** Rows on the list not yet bought or set aside: what a shop would still buy. */
     val listLeft: Int = 0,
-    /** A shop is under way (the list is in shopping mode with something on it): the next step is to carry on. */
-    val shopping: Boolean = false,
 ) {
-    val pending: Int get() = meals.count { it.shopping.pending }
-
     /** Buy again chips not on the list yet: what "Add all" adds. */
     val toAdd: List<Regular> get() = buyAgain.regulars.filter { !it.onList }
 
@@ -187,11 +179,9 @@ class MealsViewModel(
     private val weekView =
         week.onStart { refreshWeek() }.flatMapLatest { w ->
             c.planner.observeWeek(w).map { meals ->
-                val pending = meals.any { it.shopping.pending }
-                val preview = if (pending && w >= current) c.planner.previewWeek(w) else null
                 val repeat = if (meals.isEmpty()) c.planner.previousPlannedWeek(w) else null
                 val repeatTitles = repeat?.let { r -> c.planner.week(r).map { it.title } }.orEmpty()
-                WeekView(w, meals, preview, repeat, repeatTitles)
+                WeekView(w, meals, repeat, repeatTitles)
             }
         }
 
@@ -206,7 +196,7 @@ class MealsViewModel(
 
     val ui: StateFlow<MealsUi> =
         combine(
-            combine(weekView, c.repository.list, c.settings.listMode) { v, l, m -> Triple(v, l, m) },
+            combine(weekView, c.repository.list) { v, l -> v to l },
             combine(
                 c.repository.observeLibrary(),
                 c.recipePhotos.paths(),
@@ -216,7 +206,7 @@ class MealsViewModel(
             snapshotFlow { query },
             asked,
             extras,
-        ) { (v, list, mode), (lib, photos, notes, planned), q, asked, (buy, home) ->
+        ) { (v, list), (lib, photos, notes, planned), q, asked, (buy, home) ->
             val meals =
                 v.meals.map {
                     it.toMeal().copy(photo = photos[it.libraryKey], notes = notes[it.libraryKey]?.notes).let { m ->
@@ -261,16 +251,13 @@ class MealsViewModel(
                 repeatFrom = v.repeat,
                 repeatName = v.repeat?.name(current)?.replaceFirstChar { it.lowercase() }.orEmpty(),
                 repeatTitles = v.repeatTitles,
-                preview = v.preview,
                 itemsLeft = list.rowsStillNeeded(v.meals.mapNotNull { it.useId }).size,
                 picks = picks,
                 hasLibrary = lib.isNotEmpty(),
                 query = q,
                 buyAgain = buy,
                 home = home,
-                listHasItems = list.liveItems.isNotEmpty(),
                 listLeft = list.liveItems.count { !list.isDone(it.id) && !list.isUnavailable(it.id) },
-                shopping = mode == com.robert4lyf.hypershop.settings.ListMode.SHOP && list.liveItems.isNotEmpty(),
             )
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MealsUi())
@@ -285,7 +272,6 @@ class MealsViewModel(
     private class WeekView(
         val week: Week,
         val meals: List<PlannedMeal>,
-        val preview: WeekPreview?,
         val repeat: Week?,
         val repeatTitles: List<String>,
     )
@@ -356,14 +342,10 @@ class MealsViewModel(
         }
     }
 
-    /** A saved recipe joins the week shown. Twice is allowed: a second chilli is a choice. */
+    /** Step Z "Add to list": the saved recipe's ingredients on the list at once, planned for this week, with Undo. */
     fun plan(pick: Pick) {
-        val w = week.value
-        val write = written { c.planner.plan(w, pick.key) }
-        viewModelScope.launch {
-            val id = write.await()
-            messages.send(UiMessage("Added ${pick.title}", undo = { writing.withLock { c.planner.unplanNew(listOf(id)) } }))
-        }
+        val write = written { c.addRecipeToList(pick.key, pick.title) }
+        viewModelScope.launch { messages.send(write.await()) }
     }
 
     /** "Repeat": the latest earlier week's meals planned again for this one. */
@@ -377,25 +359,6 @@ class MealsViewModel(
             messages.send(
                 UiMessage("Added the same ${plural(ids.size, "meal")}", undo = { writing.withLock { c.planner.unplanNew(ids) } }),
             )
-        }
-    }
-
-    /** "Add to the list": every waiting meal of the week, merged with what is there, in one go. */
-    fun addToList(after: ((UiMessage) -> Unit)? = null) {
-        val w = week.value
-        val write = written { c.planner.addWeekToList(w) }
-        viewModelScope.launch {
-            val added = write.await() ?: return@launch
-            // Step Q: the outcome in the list's own terms, with Undo. The food-at-home check is offered on the list.
-            val list = c.repository.snapshot()
-            val left = list.liveItems.count { !list.isDone(it.id) && !list.isUnavailable(it.id) }
-            val m =
-                UiMessage(
-                    "List ready: ${plural(left, "thing")} to buy · ${plural(added.meals.size, "meal")} added",
-                    undo = { writing.withLock { c.planner.undoAddWeek(added) } },
-                )
-            // Handed over directly when the caller is about to leave this screen, so it is shown wherever that leads.
-            if (after != null) after(m) else messages.send(m)
         }
     }
 
@@ -524,9 +487,6 @@ class MealsViewModel(
             )
         }
     }
-
-    /** "Start shopping": the list in shopping mode. */
-    fun startShopping() = c.applicationScope.launch { c.shopStart.request() }
 
     private fun plural(
         n: Int,
