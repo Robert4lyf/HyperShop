@@ -354,3 +354,18 @@ Feedback: "confusing, convoluted and not effortless". States, actions and vocabu
 - [x] Q.14 Emulator scenario B (two saved recipes, one onion row): on the CI emulator's small screen the list's header leaves room for little more than the first aisle's heading, so the "3 onions" row sat just below the fold. The scenario now scrolls the list to the row, as a thumb would, and still requires the merged row. Noted as a limit: on very small screens the first items sit lower than before Q (the list header is taller there) — check: emulator-test compile, ktlint
 - [x] Q.15 BuyAgainSheetTest failed once on CI ("Add all" never appeared). The test now swipes the chip fully into view, asserts it is displayed and waits for the sheet and its contents separately. Correction (Q.16): the local runs recorded here never ran (a duplicated `--max-workers` made Gradle print its usage and stop), and the guess that the tap missed the chip was wrong; the sheet opened and stayed empty. The real cause and fix are Q.16
 - [x] Q.16 Buy again sheet stuck on loading, about one run in three (found once the test really ran). Traced: `PrepViewModel` produced the data, the sheet's collector received it, but the state was read for the first time inside the ModalBottomSheet's own window composition, whose first pass read the old value and was never invalidated. `BuyAgainSheet` now reads the state in the host composition and hands the sheet the value (`AddMealSheet` already did). BuyAgainSheetTest: 0 failures in 20 runs after, against 2 in 5 before; its timeout message now lists what is on screen. The emulator crash on a4467fc (scenario B, `performMeasureAndLayout called during measure layout`) came in the same Buy again step; whether this fixes it is for the next device run to show — check: the test 20×, the app suite (469), ktlint
+
+## Step Z — fewer concepts (`claude/step-z-fewer-concepts-rvynea`, from b5a49da)
+
+Feedback, again: "confusing and complicated". A review found the cause is the number of concepts, not the layout; Step Q rearranged screens and its own journey count went up (meal-based shopping 9 taps / 2 screen changes before Q, 13 / 6 after). This step removes things. It overrides Step Q.1/Q.2's three-tab design (Z.3). Vocabulary: `docs/design/simple-ux.md`. Report: `docs/reports/step-z.md`. No Room schema, watch protocol, golden data, version or `:core` merge/tick change.
+
+- [x] Z.0 Baseline on b5a49da, counted by `JourneyTest` through the real app shell: quick shopping 7 taps, 2 typed, 0 scrolls, 0 screen changes; meal-based shopping 13 taps, 1 typed, 6 scrolls, 6 screen changes (Q.11's numbers, confirmed). New journey for the core job (`coreShareToFinish`): a recipe link shared (an offline page served on this machine, no Claude key; queued as `importShared` queues a link), the review accepted as it is, every item ticked, Finish: 6 taps, 0 typed, 0 scrolls, 2 screen changes. It found that the review's "Added" snackbar sits over the list's Finish bar for its 5 s (the journey waits it out; not a tap) — check: `JourneyTest`
+- [ ] Z.1 "Add to list" means one thing
+- [ ] Z.2 One list screen
+- [ ] Z.3 No Meals tab
+- [ ] Z.4 "At home" in one place
+- [ ] Z.5 Lighter review
+- [ ] Z.6 No instructions on screens
+- [ ] Z.7 One word per idea
+- [ ] Z.8 Recipes without clutter
+- [ ] Z.9 Verify and report

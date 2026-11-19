@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.ui
 
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -18,9 +19,12 @@ import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.parse.RuleParser
 import com.robert4lyf.hypershop.di.AppContainer
+import com.robert4lyf.hypershop.importing.ImportInput
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
 import kotlinx.coroutines.runBlocking
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -28,6 +32,16 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.io.File
+
+/** A small recipe page with its ingredients in JSON-LD, as most recipe sites publish them. */
+private val CHILLI_PAGE =
+    """
+    <html><head><title>Weeknight chilli</title>
+    <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"Recipe","name":"Weeknight chilli","recipeYield":"4",
+     "recipeIngredient":["2 onions","500g beef mince","400g tin chopped tomatoes","400g tin kidney beans","1 tsp salt"]}
+    </script></head><body><h1>Weeknight chilli</h1></body></html>
+    """.trimIndent()
 
 /**
  * The two everyday journeys through the real app shell, counted: taps (clicks and keyboard actions), entries typed,
@@ -169,6 +183,45 @@ class JourneyTest {
         }
 
     private fun AppContainer.itemId(key: String) = runBlocking { repository.snapshot() }.itemByKey(key)!!.id
+
+    /**
+     * The core job: a recipe link shared to the app (an offline page served on this machine, no Claude key), the review
+     * accepted as it is, every item ticked, the trip finished.
+     */
+    @Test
+    fun coreShareToFinish() {
+        val server = MockWebServer().apply { start() }
+        server.enqueue(MockResponse().setHeader("Content-Type", "text/html; charset=utf-8").setBody(CHILLI_PAGE))
+        try {
+            val c = TestContainer.create(pages = server)
+            show(c)
+            // The share happens outside the app, so it is not a tap. It is queued as importShared queues a shared link
+            // (the page is on plain http on this machine, which a real share's link parsing would not keep).
+            runBlocking {
+                c.awaitReady()
+                c.queueReview(c.importJobs.enqueue(ImportInput(server.url("/chilli").toString())))
+            }
+            settle()
+            tap("add")
+            compose.waitUntil(10_000) { runBlocking { c.repository.snapshot() }.liveItems.size >= 4 }
+            waitFor("tick-${runBlocking { c.repository.snapshot() }.liveItems.first().id}")
+            settle()
+            for (item in runBlocking { c.repository.snapshot() }.liveItems) {
+                val tag = "tick-${item.id}"
+                if (compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isEmpty()) scrollTo("list", tag)
+                tap(tag)
+            }
+            // The review's "Added" message sits over the Finish bar for its few seconds; a person waits it out.
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(6))
+            compose.waitUntil(5_000) { compose.onAllNodes(hasText("Undo")).fetchSemanticsNodes().isEmpty() }
+            tap("finish")
+            compose.waitUntil(10_000) { runBlocking { c.repository.snapshot() }.liveItems.isEmpty() }
+            record("core share to finish", c)
+            assertTrue(runBlocking { c.repository.snapshot() }.liveItems.isEmpty())
+        } finally {
+            server.shutdown()
+        }
+    }
 
     /** Quick shopping: a first run, two things typed, both bought, the trip finished. */
     @Test
