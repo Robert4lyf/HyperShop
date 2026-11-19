@@ -64,14 +64,14 @@ class DeviceScenariosTest {
         )
 
     /** The ticks of rows still to buy: a row just ticked stays in place for a moment (Release C), so "the first tick" may be it. */
-    private fun openTicks() =
-        compose.onAllNodes(
-            SemanticsMatcher("an open tick") {
-                it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("tick-") == true &&
-                    it.config.getOrNull(SemanticsProperties.Role) == Role.Checkbox &&
-                    it.config.getOrNull(SemanticsProperties.StateDescription) == "To buy"
-            },
-        )
+    private fun openTicks() = compose.onAllNodes(openTick)
+
+    private val openTick =
+        SemanticsMatcher("an open tick") {
+            it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("tick-") == true &&
+                it.config.getOrNull(SemanticsProperties.Role) == Role.Checkbox &&
+                it.config.getOrNull(SemanticsProperties.StateDescription) == "To buy"
+        }
 
     private fun waitFor(what: () -> Boolean) = compose.waitUntil(10_000) { runCatching(what).getOrDefault(false) }
 
@@ -127,6 +127,10 @@ class DeviceScenariosTest {
         // wait for the database, so each tap waits for its own effect, as a shopper looks before the next tap.
         val bought = { runBlocking { c.repository.snapshot() }.let { l -> l.liveItems.count { l.isDone(it.id) } } }
         repeat(4) { i ->
+            // Step Z: no Shopping view to switch to, so the keyboard from the Add field is still up and on a small
+            // screen the rows can be outside the list's composed window: the list is scrolled to the next one, as a
+            // person scrolls (or closes the keyboard) before the first tick.
+            waitFor { runCatching { compose.onNodeWithTag("list").performScrollToNode(openTick) }.isSuccess }
             waitFor { openTicks().fetchSemanticsNodes().isNotEmpty() }
             openTicks()[0].performClick()
             waitFor { bought() == i + 1 }
