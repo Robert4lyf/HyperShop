@@ -674,10 +674,10 @@ private fun AisleTitle(
         AisleBadge(aisle, size = 36.dp)
         Text(aisle.displayName, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
         if (left == 0) {
-            Text("Done ✓", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Text("Bought ✓", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         } else {
             // A white pill on the tint, in the aisle's own colour: the count reads at a glance.
-            CountPill("$left left", tint.content)
+            CountPill("$left to buy", tint.content)
         }
         Icon(
             if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
@@ -730,7 +730,7 @@ private fun ListRowItem(
         when (row.state) {
             TickState.DONE -> "Bought"
             TickState.PARTIAL -> "Partly bought"
-            TickState.OPEN -> if (row.unavailable) "Set aside for this trip" else "Still needed"
+            TickState.OPEN -> if (row.unavailable) "Set aside for this trip" else "To buy"
         }
     val done = row.state == TickState.DONE
     Row(
@@ -782,7 +782,7 @@ private fun ListRowItem(
                     color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                     textDecoration = if (done) TextDecoration.LineThrough else null,
                 )
-                // Can't find it: still needed, back on the next trip.
+                // Can't find it: still to buy, back on the next trip.
                 if (row.unavailable) {
                     Text(
                         "Set aside for this trip",
@@ -864,9 +864,9 @@ private fun RecipeTitle(
             modifier = Modifier.weight(1f),
         )
         if (left == 0) {
-            Text("Done ✓", style = MaterialTheme.typography.labelLarge, color = content)
+            Text("Bought ✓", style = MaterialTheme.typography.labelLarge, color = content)
         } else {
-            CountPill("$left left", content)
+            CountPill("$left to buy", content)
         }
         if (section.kind != RecipeSection.Kind.SHARED) {
             // The recipe's own actions, here on its card (cut 1 of the review): the Recipes tab is the recipe book.

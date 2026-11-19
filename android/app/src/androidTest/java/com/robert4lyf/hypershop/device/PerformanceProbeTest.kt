@@ -250,7 +250,7 @@ class PerformanceProbeTest {
         val ticks =
             SemanticsMatcher("an open tick") {
                 it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("tick-") == true &&
-                    it.config.getOrNull(SemanticsProperties.StateDescription) == "Still needed"
+                    it.config.getOrNull(SemanticsProperties.StateDescription) == "To buy"
             }
         val each =
             (1..10).map { i ->

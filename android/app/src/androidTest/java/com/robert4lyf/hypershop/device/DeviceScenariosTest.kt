@@ -69,7 +69,7 @@ class DeviceScenariosTest {
             SemanticsMatcher("an open tick") {
                 it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("tick-") == true &&
                     it.config.getOrNull(SemanticsProperties.Role) == Role.Checkbox &&
-                    it.config.getOrNull(SemanticsProperties.StateDescription) == "Still needed"
+                    it.config.getOrNull(SemanticsProperties.StateDescription) == "To buy"
             },
         )
 
@@ -123,7 +123,7 @@ class DeviceScenariosTest {
         note("after waiting")
         assertTrue("Four typed items did not all land:\n$transcript", four.isSuccess)
         // A ticked row stays in place for a moment and then folds away under "N bought", so the next item
-        // to buy is the first tick still "Still needed", once the last tap has landed. waitForIdle does not
+        // to buy is the first tick still "To buy", once the last tap has landed. waitForIdle does not
         // wait for the database, so each tap waits for its own effect, as a shopper looks before the next tap.
         val bought = { runBlocking { c.repository.snapshot() }.let { l -> l.liveItems.count { l.isDone(it.id) } } }
         repeat(4) { i ->
@@ -212,7 +212,7 @@ class DeviceScenariosTest {
         tick.assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
         val node = tick.fetchSemanticsNode()
         assertEquals(Role.Checkbox, node.config.getOrNull(SemanticsProperties.Role))
-        assertEquals("Still needed", node.config.getOrNull(SemanticsProperties.StateDescription))
+        assertEquals("To buy", node.config.getOrNull(SemanticsProperties.StateDescription))
         assertTrue(node.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty().isNotEmpty())
     }
 }

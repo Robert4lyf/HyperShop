@@ -582,7 +582,7 @@ class ListViewModel(
             val (stamp, n) = c.repository.finish()
             val left = c.repository.snapshot().liveItems.size
             // Step Q: what Finish did, in plain words: the bought things recorded, the rest still on the list.
-            val text = if (left > 0) "Shopping finished: $n bought · $left still on your list" else "Shopping finished: $n bought"
+            val text = if (left > 0) "Shopping finished: $n bought · $left to buy" else "Shopping finished: $n bought"
             messages.send(UiMessage(text, undo = { c.repository.undoDelete(stamp) }))
             // Missing 3: what was not bought is asked about once, rather than carried over unnoticed.
             if (left > 0 && n > 0) carryOver.value = left
@@ -595,7 +595,7 @@ class ListViewModel(
         val order = c.repository.aisleOrder(store)
         val units = c.settings.units.first()
         val rows = list.liveItems.filter { !list.isDone(it.id) }
-        if (rows.isEmpty()) return "HyperShop — nothing left to buy"
+        if (rows.isEmpty()) return "HyperShop — nothing to buy"
         return order.mapNotNull { aisle ->
             val items = rows.filter { it.aisle == aisle }.sortedBy { it.position }
             if (items.isEmpty()) {

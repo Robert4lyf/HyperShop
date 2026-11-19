@@ -1,57 +1,57 @@
-# Simpler everyday use (step Q): states, actions and what they change
+# Simpler everyday use: structure, words and what each action changes
 
-An implementation aid for step Q, written before the code changes. The data model is unchanged. Every action below
-calls an existing operation, and each line says which one and what it changes.
+Step Q wrote the first version of this page. Step Z ("fewer concepts") replaced it: the app has fewer screens,
+fewer modes and one word per idea. The data model is unchanged; every action calls an existing operation.
 
 ## Structure
 
-| Destination | Answers | Primary action by state |
+| Destination | Answers | Main action |
 |---|---|---|
-| **Meals** (selected week) | Which meals, how many servings, are their ingredients on the list? | No meals: **Add meal**. Meals not yet on the list: **Make shopping list**. All on the list: **View shopping list**. Past week: none. |
-| **Shopping list** | What is left to buy, in store order? | Type to add. Ticked items: **Finish shopping**. |
-| **Recipes** | What is saved? | Add a recipe (link, typed, photo). |
+| **Shopping list** | What is there to buy, in store order? | Type to add. Tick. **Finish shopping** once something is bought. |
+| **Recipes** | What is saved? | **Add to list** on a recipe. Add a recipe (link, typed, photo). |
 
-- Settings is a gear button at the top of each of the three screens. Its routes (Library, Aisles, Debug, Voice test)
-  are unchanged.
-- Launch opens the last of the three destinations used. An empty list no longer switches the app to Meals.
-- A share, the widget and the launcher shortcut take precedence over that.
+- Settings is a gear at the top of each. Its own screens (Ingredient library, Walking order, Debug, Voice test) have
+  a back arrow.
+- A share opens the review; the widget and the launcher shortcut open the list.
+- There is no Meals tab, no shopping mode and no food-at-home check. Planned meals are still written for the current
+  week (an import plans itself, an edit relinks), so backups and the data rules hold; they have no screen of their own.
 
-## Vocabulary
+## One word per idea
 
-| Words | Action | Changes |
+| Idea | The word | Not |
 |---|---|---|
-| **Add meal** | Puts a saved recipe in the selected week | `Planner.plan` (a `PlannedMeal`; the list is untouched) |
-| **Add another** | The same, when the week already has it | `Planner.plan` again (a second meal) |
-| **Make shopping list** | Puts every meal of the week that is not on the list yet on it, combined | `Planner.addWeekToList` (review `apply`, linked uses; pending meals only) |
-| **On your list** | A meal's ingredients are on the list | (state: `MealShopping.TO_BUY`) |
-| **Check food at home** | For each ingredient the week's meals need, say whether it is at home | `HomeCheck.have / need / haveSome` (unbought shares only, never manual extras) |
-| **Need it / Have some / Have enough** | One ingredient's answer | `need` / `haveSome(amount)` / `have` |
-| **Shopping view** | The same list, large and focused, kept awake | `ListMode.SHOP` (presentation only; ticks work in either view) |
-| **Can't find it** | Sets a row aside for this trip | `markUnavailable` (state shown: *Set aside for this trip*; back next trip) |
-| **Finish shopping** | Records what was bought; anything unbought stays on the list | `ListRepository.finish` (history kept; Undo) |
-| **Buy again** | Your usual items and last shop, as a sheet from the list | `BuyAgain.add*` (manual items) |
-| **Save recipe** | Keeps an import in Recipes only | review `saveForLater` |
-| **Save and add meal** | Keeps it, adds it as a meal this week and puts its items on the list | review `apply` (as before: a single-recipe shortcut) |
-| **Cooked it** | Records that a meal was cooked (a toggle) | `Planner.setCooked` |
+| Put a saved recipe's ingredients on the list | **Add to list** | Add meal, Plan, Save and add meal, Make shopping list |
+| How many unbought items | **N to buy** | N left, still needed, to add (on the list) |
+| An item or a recipe's items all bought | **bought** ("2 bought", "Bought ✓", "All bought") | done, Done ✓ |
+| Take a recipe's items off the list | **Remove from list** (only what is unbought goes) | Remove meal, ✕ |
+| Delete a saved recipe | **Delete recipe** | Remove from your recipes |
+| Something is already at home | **At home** (the review row's toggle; staples in Settings start on) | Have it, Have some, I have some |
+| Can't get it on this trip | **Can't find it** → *Set aside for this trip*; **Found it** takes it back | Unavailable, Not available today |
+| End the trip | **Finish shopping** | Done |
+| Keep a reviewed recipe without adding it | **Save recipe only** (review ⋮ menu) | Save recipe, Save for later |
 
-"Plan", "Again", "Plan again", "Start shopping", "Unavailable" and "Not available today" are retired from the UI.
+On the review, lines still to go on the list are counted as **N to add** ("4 to add · 1 at home") and the button reads
+**Add to list · N items**: they become "to buy" once they are on the list.
 
-## Meal states (Meals screen)
+## Actions and what they change
 
-| State | Shown on the meal | What changes it |
+| Words | Where | Changes |
 |---|---|---|
-| Not on the list | *Not on your list yet* | Make shopping list |
-| On the list | *On your list · N to buy* | ticks, Finish |
-| Bought | *Bought* | — |
-| Nothing to buy | *All at home* | — |
-| Servings changed after Make shopping list | the list follows at once (`Planner.setServings` rescales the use in the same transaction) | — |
-| Future week | as above. Make shopping list says it adds to the current list. | — |
-| Past week | history only; no actions | — |
+| **Add to list** | Recipes card and sheet | `Planner.addToList` → `ListRepository.addSavedRecipe(plan = true)`: the review's own `apply`, planned for this week and linked in its transaction. Undo: `Planner.takeBack` (`unplan`: only unbought shares) |
+| **Add to list · N items** | Review | review `apply` (plans itself; an edit relinks) |
+| **Save recipe only** | Review ⋮ | review `saveForLater` |
+| **At home** | Review row | the row's decision (in stock); staples from Settings › Always at home start on |
+| **Servings (N)** | A recipe's card on the list (Group by recipe), ⋮ | `Planner.setUseServings` (the meal and the use rescaled together; what was bought stays bought) |
+| **Remove from list** | A recipe's card on the list, ⋮; its ingredients sheet | `ListRepository.removeFromList` (the use goes only when nothing of it is bought; otherwise unbought shares are withdrawn) |
+| **Can't find it** / **Found it** | The item's sheet | `markUnavailable` / `markAvailable` |
+| **Change store** | List ⋮, only with two or more stores | `ShopStart.change` → active store |
+| **Store order / Group by recipe**, **Arrange items** | List ⋮ | `Settings.listView`; `arrangeWith` |
+| **Finish shopping** | List, once something is ticked | `ListRepository.finish` (Undo) |
+| **Buy again** | List ⋮ and a chip below the items | `BuyAgain.add*` |
 
-## Not changed in this step
+## On the list
 
-- The item sheet still edits the total needed, not the amount still to buy. "Buy N" needs a new repository operation
-  that maps a buying amount through covered contributions, home allocations and mixed dimensions. That is not done
-  here: a naive subtraction would be wrong, and the brief rules it out.
-- The review's single-recipe add stays one step, now labelled *Save and add meal*. Splitting it into add meal, then
-  Make shopping list, would add a step for anyone importing one recipe to shop.
+- Bought rows fold under one **"N bought"** row per aisle; a row just ticked stays in place for 2.5 s, so a second tap
+  undoes it. The screen stays awake while anything is ticked.
+- The title is **N to buy**; the subtitle "2 of 8 bought", then "1 set aside" and the watch's state when there are any.
+- No instructions on screens: a control that needed a paragraph was relabelled or removed.

@@ -165,7 +165,7 @@ class RecipesViewModelTest {
         val use = await(vm.ui) { it.uses.isNotEmpty() && it.library.isNotEmpty() }.uses.single()
         vm.remove(use)
         await(vm.ui) { it.uses.isEmpty() && got.size == 1 }
-        assertEquals("Removed Weeknight chilli from the shopping list", got[0].text)
+        assertEquals("Removed Weeknight chilli from the list", got[0].text)
         runBlocking { got[0].undo!!.invoke() }
         // Back as it was: the use, its items and the library's "on your list".
         val back = await(vm.ui) { it.uses.size == 1 && it.library.single().onList }
@@ -173,7 +173,7 @@ class RecipesViewModelTest {
         assertTrue(runBlocking { c.repository.snapshot() }.itemByKey("cat:onion") != null)
         vm.removeFromLibrary(back.library.single())
         await(vm.ui) { it.library.isEmpty() && got.size == 2 }
-        assertEquals("Removed Weeknight chilli from your recipes", got[1].text)
+        assertEquals("Deleted Weeknight chilli", got[1].text)
         runBlocking { got[1].undo!!.invoke() }
         assertEquals("Weeknight chilli", await(vm.ui) { it.library.size == 1 }.library.single().title)
         watching.cancel()

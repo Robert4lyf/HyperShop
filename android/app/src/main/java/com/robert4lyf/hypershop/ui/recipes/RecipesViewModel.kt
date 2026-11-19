@@ -360,11 +360,11 @@ class RecipesViewModel(
 
     fun closeUse() = useActions.closeDetail()
 
-    /** "Remove from your recipes" (what's on the list stays); Undo brings it back. */
+    /** "Delete recipe" (what's on the list stays); Undo brings it back. */
     fun removeFromLibrary(row: LibraryRow) =
         viewModelScope.launch {
             val copies = c.repository.removeFromLibrary(row.key)
-            messages.send(UiMessage("Removed ${row.title} from your recipes", undo = { c.repository.restoreToLibrary(copies) }))
+            messages.send(UiMessage("Deleted ${row.title}", undo = { c.repository.restoreToLibrary(copies) }))
         }
 
     private val messages = Channel<UiMessage>(Channel.BUFFERED)

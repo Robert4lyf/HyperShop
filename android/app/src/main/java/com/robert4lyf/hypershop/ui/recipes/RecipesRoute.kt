@@ -465,7 +465,7 @@ private fun LibraryCard(
                             menu = false
                             onEdit()
                         })
-                        DropdownMenuItem(text = { Text("Remove from your recipes") }, onClick = {
+                        DropdownMenuItem(text = { Text("Delete recipe") }, onClick = {
                             menu = false
                             onRemove()
                         })
@@ -519,7 +519,7 @@ private fun RecipeDetailSheet(
     ModalBottomSheet(onDismissRequest = onDismiss) { RecipeDetailContent(detail, onAdd, onRemove, notes) }
 }
 
-/** A saved recipe's ingredients, as written, with "Add to list", its page and "Remove from your recipes". */
+/** A saved recipe's ingredients, as written, with "Add to list", its page and "Delete recipe". */
 @Composable
 fun RecipeDetailContent(
     detail: RecipeDetail,
@@ -603,7 +603,7 @@ fun RecipeDetailContent(
                 onClick = onRemove,
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 modifier = Modifier.padding(top = 16.dp).testTag("detail-remove"),
-            ) { Text("Remove from your recipes") }
+            ) { Text("Delete recipe") }
         }
     }
 }

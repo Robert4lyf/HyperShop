@@ -143,14 +143,14 @@ class ReleaseCScenariosTest {
         runBlocking { c.settings.setListView(ListView.RECIPE) }
         val card = await(list.ui) { it.recipes.any { r -> r.title == "Chilli" } }.recipes.first { it.title == "Chilli" }
         list.removeUse(card)
-        awaitTrue { said.any { it.text == "Removed Chilli from the shopping list" } }
+        awaitTrue { said.any { it.text == "Removed Chilli from the list" } }
         ui = await(list.ui) { it.loaded && it.doneCount == 2 }
         assertEquals(TickState.DONE, ui.row("onion").state)
         assertEquals(TickState.DONE, ui.row("beef mince").state)
         assertEquals(Rational.of(3), covered(c, "cat:onion", BaseKey.ITEMS))
         assertEquals(1, ui.left)
         // Undo puts it back, and the list is as it was.
-        runBlocking { said.first { it.text == "Removed Chilli from the shopping list" }.undo!!.invoke() }
+        runBlocking { said.first { it.text == "Removed Chilli from the list" }.undo!!.invoke() }
         ui = await(list.ui) { it.doneCount == 2 && it.left == 1 }
         assertEquals(Rational.of(3), covered(c, "cat:onion", BaseKey.ITEMS))
 
