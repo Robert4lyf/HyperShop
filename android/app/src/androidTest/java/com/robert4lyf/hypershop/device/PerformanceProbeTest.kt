@@ -24,7 +24,6 @@ import com.robert4lyf.hypershop.core.search.RecipeSearch
 import com.robert4lyf.hypershop.core.sync.WatchCodec
 import com.robert4lyf.hypershop.core.sync.WatchMessage
 import com.robert4lyf.hypershop.di.AppContainer
-import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.ui.HyperShopApp
 import com.robert4lyf.hypershop.ui.list.ListViewModel
 import com.robert4lyf.hypershop.ui.recipes.RecipesViewModel
@@ -228,11 +227,10 @@ class PerformanceProbeTest {
     }
 
     @Test
-    fun theShopScreenAt150ItemsOnTheMainThread() {
+    fun theListAt150ItemsOnTheMainThread() {
         assumeTrue("run on request only", enabled)
         val c = DeviceContainer.create()
         c.fill(150)
-        runBlocking { c.settings.setListMode(ListMode.SHOP) }
         // Disk reads and writes on the main thread, while the screen is used.
         val violations = CopyOnWriteArrayList<String>()
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -245,13 +243,13 @@ class PerformanceProbeTest {
         val (_, first) =
             timed {
                 compose.setContent { HyperShopTheme { HyperShopApp(c) } }
-                compose.waitUntil(30_000) { compose.onAllNodesWithTag("shop").fetchSemanticsNodes().isNotEmpty() }
+                compose.waitUntil(30_000) { compose.onAllNodesWithTag("list").fetchSemanticsNodes().isNotEmpty() }
             }
         budget("shop screen: first frame with 150 items", first, 4000.0)
         // The ticks still to buy: a row just ticked stays in place for a moment (Release C).
         val ticks =
             SemanticsMatcher("an open tick") {
-                it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("item-") == true &&
+                it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("tick-") == true &&
                     it.config.getOrNull(SemanticsProperties.StateDescription) == "Still needed"
             }
         val each =

@@ -9,7 +9,6 @@ import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.sync.WatchMessage
 import com.robert4lyf.hypershop.di.AppContainer
-import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.settings.ThemeMode
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.ui.list.add
@@ -57,7 +56,6 @@ class RestoreRecoveryTest {
             c.repository.clearAll()
             c.repository.manualAdd("bananas", QtyBase.of(Rational.of(3), null, UnitLocale.METRIC), null)
             c.settings.setTheme(ThemeMode.LIGHT)
-            c.settings.setListMode(ListMode.SHOP)
             c.library.reset("user_zorblax")
         }
         return c to file
@@ -67,7 +65,6 @@ class RestoreRecoveryTest {
         runBlocking {
             assertEquals(setOf("cat:onion", "cat:carrot"), repository.snapshot().liveItems.map { it.mergeKey }.toSet())
             assertEquals(ThemeMode.DARK, settings.theme.first())
-            assertEquals(ListMode.PLAN, settings.listMode.first())
             assertEquals(setOf("user_zorblax"), library.edits.value.keys)
             assertEquals("sk-ant-test", apiKeyStore.get())
         }

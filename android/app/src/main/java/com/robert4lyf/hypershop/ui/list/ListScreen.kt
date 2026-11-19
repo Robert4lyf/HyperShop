@@ -35,7 +35,6 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -49,11 +48,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -66,6 +67,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -80,12 +82,10 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
-import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.ui.common.AisleBadge
 import com.robert4lyf.hypershop.ui.common.BottomActionBar
 import com.robert4lyf.hypershop.ui.common.CountPill
-import com.robert4lyf.hypershop.ui.common.HeroButton
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
 import com.robert4lyf.hypershop.ui.common.TickMark
 import com.robert4lyf.hypershop.ui.common.sectionItem
@@ -96,6 +96,8 @@ import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.theme.style
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 data class ListActions(
@@ -108,19 +110,12 @@ data class ListActions(
     val onNeed: (InStockRow) -> Unit = {},
     /** The menu's choice of layout: store order or by recipe. */
     val onView: (ListView) -> Unit = {},
-    /** "Shop" on the planning screen, "Plan" on the shop screen. */
-    val onMode: (ListMode) -> Unit = {},
-    /** "Shopping view": the remembered store's order (missing 4 of the review; step Q asks only when it must). */
-    val onShop: (Long) -> Unit = {},
-    /** Step Q: Shopping view's "Change store", with a second store to choose. */
+    /** Step Z: "Change store" in the menu, with two or more stores to choose from. */
     val onChangeStore: () -> Unit = {},
     /** Step Q: Buy again and Check food at home, from the menu as well as below the items. */
     val onBuyAgain: () -> Unit = {},
     val onHomeCheck: () -> Unit = {},
     val onShareText: () -> Unit = {},
-    /** X.8: "Not available" on this trip, and "Found it" to take that back. */
-    val onUnavailable: (ListRow) -> Unit = {},
-    val onAvailable: (ListRow) -> Unit = {},
     /** X.9: "Arrange items" and its "Done"; a row or a group moved one place (-1 up, +1 down), or to an end (true = top). */
     val onArrange: (Boolean) -> Unit = {},
     val onMoveItem: (ListRow, Int) -> Unit = { _, _ -> },
@@ -136,8 +131,8 @@ data class ListActions(
 /**
  * The list (PLAN §3.5), stateless: the count and progress, then [header] (the
  * "Add item" field and cards, Step 5.6b), then one card per aisle, and once
- * something is ticked a "Finish shopping" bar within thumb's reach. This is
- * the planning screen; in shopping mode the same state draws as [ShopScreen].
+ * something is ticked a "Finish shopping" bar within thumb's reach. Step Z: the
+ * one list screen, for planning and in the shop alike (there is no shopping mode).
  */
 @Composable
 fun ListScreen(
@@ -150,9 +145,13 @@ fun ListScreen(
     /** After the items: the optional extras (Buy again, Check food at home), never above what is to buy. */
     footer: LazyListScope.() -> Unit = {},
 ) {
-    if (ui.shopping) {
-        ShopScreen(ui, actions)
-        return
+    // Missing 1 of the review: a list that locks every 30 s is the first thing a shopper notices. Kept awake once
+    // something is ticked, which is when a shop is under way.
+    val view = LocalView.current
+    val shopping = ui.doneCount > 0
+    DisposableEffect(view, shopping) {
+        view.keepScreenOn = shopping
+        onDispose { view.keepScreenOn = false }
     }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
@@ -200,6 +199,27 @@ private fun ListBody(
     footer: LazyListScope.() -> Unit = {},
 ) {
     val card = MaterialTheme.colorScheme.card
+    // A row just ticked stays where it is for a moment, tick filled, so a mis-tap is undone by tapping it again; then
+    // it folds into its aisle's "N bought" row. Only the latest tick's timer lets the row fold.
+    var stamps by remember { mutableStateOf(emptyMap<Long, Int>()) }
+    val lingering = stamps.keys
+    val scope = rememberCoroutineScope()
+    val actions =
+        remember(actions) {
+            actions.copy(onToggle = { row ->
+                if (row.state != TickState.DONE) {
+                    val stamp = (stamps[row.id] ?: 0) + 1
+                    stamps = stamps + (row.id to stamp)
+                    scope.launch {
+                        delay(LINGER_MS)
+                        if (stamps[row.id] == stamp) stamps = stamps - row.id
+                    }
+                }
+                actions.onToggle(row)
+            })
+        }
+    // Aisles whose bought rows are shown: kept across tab switches and rotation.
+    var shownBought by rememberSaveable { mutableStateOf(emptyList<String>()) }
     // A request for the Add field brings it on screen, so it is focused now rather than whenever it next scrolls in.
     val listState = rememberLazyListState()
     LaunchedEffect(focusAdd) { if (focusAdd > 0) listState.scrollToItem(0) }
@@ -295,11 +315,18 @@ private fun ListBody(
         }
         for ((aisle, rows) in if (byRecipe) emptyList() else ui.aisles) {
             val open = aisle.name !in collapsed
+            // Step Z: bought rows fold under one "N bought" row per aisle (all of them shown while arranging).
+            val toBuy = if (ui.arranging) rows else rows.filter { it.state != TickState.DONE || it.id in lingering }
+            val bought = rows - toBuy.toSet()
+            val showBought = aisle.name in shownBought
             // Categorised: a label above each group, when the aisle has more than one.
             val groups = rows.map { it.group }.distinct()
             // Group labels whenever an aisle has more than one group (cut 5 of the review: the "Group by type" view went).
             val labelled = groups.size > 1
-            val cells = if (labelled) withLabels(rows) else rows.map { Cell.Item(it) }
+            val cells =
+                (if (labelled) withLabels(toBuy) else toBuy.map { Cell.Item(it) }) +
+                    (if (showBought) bought.map { Cell.Item(it) } else emptyList()) +
+                    (if (bought.isEmpty()) emptyList() else listOf(Cell.Bought(bought.size, showBought)))
             val count = if (open) cells.size + 1 else 1
             item(key = "aisle-${aisle.name}", contentType = "aisle") {
                 AisleTitle(
@@ -331,6 +358,10 @@ private fun ListBody(
                                 ArrangeGroup(aisle, c, groups.first() != c.group, groups.last() != c.group, actions, tile)
                             } else {
                                 GroupLabel(c.name, tile)
+                            }
+                        is Cell.Bought ->
+                            BoughtRow(aisle, c, tile) {
+                                shownBought = if (c.shown) shownBought - aisle.name else shownBought + aisle.name
                             }
                     }
                 }
@@ -431,6 +462,49 @@ private sealed interface Cell {
         val group: String?,
     ) : Cell {
         override fun key(aisle: AisleCode): Any = "group-${aisle.name}-$name"
+    }
+
+    /** "3 bought": the aisle's bought rows, out of the way until asked for (and the untick one tap away). */
+    data class Bought(
+        val count: Int,
+        val shown: Boolean,
+    ) : Cell {
+        override fun key(aisle: AisleCode): Any = "bought-${aisle.name}"
+    }
+}
+
+/** How long a ticked row stays in place before it folds into "N bought". */
+internal const val LINGER_MS = 2_500L
+
+@Composable
+private fun BoughtRow(
+    aisle: AisleCode,
+    cell: Cell.Bought,
+    tile: Modifier,
+    onToggle: () -> Unit,
+) {
+    Row(
+        tile
+            .background(MaterialTheme.colorScheme.card)
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(onClickLabel = if (cell.shown) "Hide bought" else "Show bought", role = Role.Button, onClick = onToggle)
+            .padding(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
+            .semantics(mergeDescendants = true) { stateDescription = if (cell.shown) "Expanded" else "Collapsed" }
+            .testTag("bought-${aisle.name}"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "${cell.count} bought",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            if (cell.shown) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -556,7 +630,7 @@ private fun ListTop(
     actions: ListActions,
 ) {
     val shopping = ui.loaded && !ui.isEmpty
-    val total = ui.left + ui.doneCount
+    val total = ui.left + ui.doneCount + ui.unavailable
     ScreenHeader(
         title =
             when {
@@ -572,22 +646,15 @@ private fun ListTop(
             when {
                 !ui.loaded -> null
                 !shopping -> null
-                ui.left == 0 -> "All bought"
-                else -> "${ui.doneCount} of $total bought"
+                else ->
+                    listOfNotNull(
+                        if (ui.left == 0) "All bought" else "${ui.doneCount} of $total bought",
+                        ui.unavailable.takeIf { it > 0 }?.let { "$it set aside" },
+                        // UX review 23: whether the watch has this list.
+                        ui.watch,
+                    ).joinToString(" · ")
             },
         actions = {
-            if (shopping) {
-                // The way into the shop screen: one tap, in reach of either thumb. With a second store's order on
-                // record, the tap asks which store (missing 4 of the review).
-                HeroButton(
-                    onClick = { actions.onShop(ui.activeStore) },
-                    modifier = Modifier.testTag("start-shopping"),
-                ) {
-                    Icon(Icons.Rounded.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(6.dp))
-                    Text("Shopping view")
-                }
-            }
             com.robert4lyf.hypershop.ui.common.SettingsButton()
             var menu by remember { mutableStateOf(false) }
             Box {
@@ -615,6 +682,13 @@ private fun ListTop(
                                     }
                                     .testTag("view-${view.name}"),
                         )
+                    }
+                    // Missing 4 of the review: which store's walking order; only offered when there is a choice.
+                    if (ui.secondStore) {
+                        DropdownMenuItem(text = { Text("Change store (${ui.storeName})") }, onClick = {
+                            menu = false
+                            actions.onChangeStore()
+                        }, modifier = Modifier.testTag("change-store"))
                     }
                     HorizontalDivider()
                     DropdownMenuItem(
@@ -746,7 +820,7 @@ private fun ListRowItem(
         when (row.state) {
             TickState.DONE -> "Bought"
             TickState.PARTIAL -> "Partly bought"
-            TickState.OPEN -> "Still needed"
+            TickState.OPEN -> if (row.unavailable) "Set aside for this trip" else "Still needed"
         }
     val done = row.state == TickState.DONE
     Row(
@@ -798,6 +872,15 @@ private fun ListRowItem(
                     color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                     textDecoration = if (done) TextDecoration.LineThrough else null,
                 )
+                // Can't find it: still needed, back on the next trip.
+                if (row.unavailable) {
+                    Text(
+                        "Set aside for this trip",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag("set-aside-${row.id}"),
+                    )
+                }
                 for (line in subLines(row)) {
                     Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

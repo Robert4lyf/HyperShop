@@ -11,7 +11,6 @@ import com.robert4lyf.hypershop.data.MealShopping
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.importing.ImportError
 import com.robert4lyf.hypershop.importing.ImportResult
-import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.testutil.await
 import com.robert4lyf.hypershop.testutil.awaitTrue
@@ -132,8 +131,6 @@ class ReleaseCScenariosTest {
         // In the shop: the onions (both meals' share) and the mince are bought, the carrots not yet.
         val list = tracked(ListViewModel(c))
         var ui = await(list.ui) { it.loaded && it.row("onion").main == "3 onions" }
-        list.setMode(ListMode.SHOP)
-        ui = await(list.ui) { it.shopping }
         list.toggle(ui.row("onion"))
         list.toggle(ui.row("beef mince"))
         ui = await(list.ui) { it.doneCount == 2 && it.left == 1 }

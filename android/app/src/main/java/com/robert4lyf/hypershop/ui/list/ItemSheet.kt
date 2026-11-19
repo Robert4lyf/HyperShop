@@ -83,6 +83,9 @@ data class ItemSheetActions(
     val onToggle: () -> Unit = {},
     /** W.4 "This is wrong": what was expected, and whether to share the note too. */
     val onWrong: (String, Boolean) -> Unit = { _, _ -> },
+    /** Step Z (from the old shop screen): "Can't find it" sets the item aside for this trip; "Found it" takes that back. */
+    val onCantFind: () -> Unit = {},
+    val onFound: () -> Unit = {},
 )
 
 /**
@@ -329,6 +332,17 @@ fun ItemSheetContent(
                             onClick = { more = !more },
                             modifier = Modifier.heightIn(min = 48.dp).testTag("item-more"),
                         ) { Text(if (more) "Less" else "More details") }
+                    }
+                    if (sheet.unavailable) {
+                        OutlinedButton(
+                            onClick = actions.onFound,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("item-found"),
+                        ) { Text("Found it") }
+                    } else if (!sheet.done) {
+                        TextButton(
+                            onClick = actions.onCantFind,
+                            modifier = Modifier.heightIn(min = 48.dp).testTag("item-cant-find"),
+                        ) { Text("Can't find it") }
                     }
                     // Only a suggestion: it never changes the amount needed or records a purchase.
                     sheet.purchaseSuggestion?.let { Text(it, style = MaterialTheme.typography.bodySmall) }

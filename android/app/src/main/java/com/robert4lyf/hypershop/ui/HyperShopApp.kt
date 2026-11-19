@@ -219,9 +219,6 @@ private fun AppShell(
     var addFocus by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         container.entryRequests.collect { request ->
-            if (request == com.robert4lyf.hypershop.EntryRequest.ADD) {
-                container.settings.setListMode(com.robert4lyf.hypershop.settings.ListMode.PLAN)
-            }
             // Navigation's state belongs to the main thread, wherever the setting was written. A request waiting
             // from a cold start arrives before NavHost has set its graph, and navigating then throws: wait for it.
             withContext(Dispatchers.Main) {

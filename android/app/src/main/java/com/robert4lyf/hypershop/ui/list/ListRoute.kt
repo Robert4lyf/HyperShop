@@ -94,8 +94,6 @@ fun ListRoute(
             onOpenItem = { vm.openItem(it.id) },
             onNeed = vm::needIt,
             onView = vm::setView,
-            onMode = vm::setMode,
-            onShop = { vm.requestShopping() },
             onChangeStore = { vm.changeStore() },
             onBuyAgain = { buyingAgain = true },
             onHomeCheck = onHomeCheck,
@@ -105,8 +103,6 @@ fun ListRoute(
                     shareNote(context, vm.shoppingText())
                 }
             },
-            onUnavailable = vm::unavailable,
-            onAvailable = vm::available,
             onArrange = vm::arrange,
             onMoveItem = { r, by -> vm.moveItem(r, by) },
             onMoveItemTo = { r, top -> vm.moveItemToEnd(r, top) },
@@ -168,6 +164,8 @@ fun ListRoute(
                     vm.toggle(s.id)
                     vm.closeItem()
                 },
+                onCantFind = { vm.cantFind(s.id, s.name) },
+                onFound = { vm.found(s.id) },
                 onWrong = { expected, share ->
                     scope.launch {
                         val text = vm.wrongNote(s, expected)

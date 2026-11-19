@@ -29,10 +29,8 @@ import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.plan.Week
 import com.robert4lyf.hypershop.data.MealShopping
 import com.robert4lyf.hypershop.di.AppContainer
-import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.ui.HyperShopApp
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -63,7 +61,7 @@ class WeeklyShopScenariosTest {
         // An empty list opens on This week (X.10); these scenarios start from the shopping list, as a person
         // switching tabs would. Once the start screen has settled, so the switch is not undone by it.
         compose.waitUntil(10_000) {
-            listOf("meals", "list", "shop").any { compose.onAllNodesWithTag(it).fetchSemanticsNodes().isNotEmpty() }
+            listOf("meals", "list").any { compose.onAllNodesWithTag(it).fetchSemanticsNodes().isNotEmpty() }
         }
         if (compose.onAllNodesWithTag("meals").fetchSemanticsNodes().isNotEmpty()) {
             compose.onNodeWithTag("tab-list").performClick()
@@ -256,8 +254,6 @@ class WeeklyShopScenariosTest {
         for (line in listOf("milk", "bread", "6 eggs")) type(line)
         waitFor { c.items().size == 3 }
         assertTrue(!has("empty-plan"))
-        tap("start-shopping")
-        waitFor { has("shop") }
     }
 
     /** B: last week's meals again, the usual items, the cupboard checked, shopping: the quick way. */
@@ -290,14 +286,11 @@ class WeeklyShopScenariosTest {
             },
         ) { c.items().none { it.mergeKey.contains("cumin") } }
         tap("home-check-done")
-        tap("start-shopping")
-        waitFor { has("shop") }
         effort("weekly shop, quick way", t0)
         // One onion row for chilli and dal; the cumin both wanted is at home, once; every regular on once.
         assertEquals(Rational.of(3), c.total("cat:onion"))
         assertTrue(c.items().none { it.mergeKey.contains("cumin") })
         assertEquals(1, c.items().count { it.displayName.contains("milk") })
-        assertEquals(ListMode.SHOP, runBlocking { c.settings.listMode.first() })
         // Step Q moved Buy again and the food-at-home check off the Meals screen into a sheet and a screen of their
         // own, as asked; each costs an open and a close. Was 6 taps on one long screen; now 10, measured, not hidden.
         assertTrue("taps $taps", taps <= 10)
@@ -338,8 +331,6 @@ class WeeklyShopScenariosTest {
             }
         }
         tap("home-check-done")
-        tap("start-shopping")
-        waitFor { has("shop") }
         effort("weekly shop, item by item", t0)
         assertEquals(Rational.of(3), c.total("cat:onion"))
     }

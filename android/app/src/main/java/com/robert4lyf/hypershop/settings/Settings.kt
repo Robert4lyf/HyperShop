@@ -47,12 +47,6 @@ class Settings(
     val listView: Flow<ListView> =
         store.data.map { p -> p[LIST_VIEW]?.let { runCatching { ListView.valueOf(it) }.getOrNull() } ?: ListView.STORE }
 
-    /** Planning the list, or shopping with it: kept across process death, so a shop survives a restart. */
-    val listMode: Flow<ListMode> =
-        store.data
-            .map { p -> p[LIST_MODE]?.let { runCatching { ListMode.valueOf(it) }.getOrNull() } ?: ListMode.PLAN }
-            .distinctUntilChanged()
-
     /** The one-time "your key could not be read" notice is pending. */
     val keyLostNotice: Flow<Boolean> = store.data.map { it[KEY_LOST] ?: false }
 
@@ -95,8 +89,6 @@ class Settings(
 
     suspend fun setListView(v: ListView) = store.edit { it[LIST_VIEW] = v.name }
 
-    suspend fun setListMode(m: ListMode) = store.edit { it[LIST_MODE] = m.name }
-
     /** Step Q: the main destination last shown (a route name), where the next launch opens. Null before the first. */
     val lastTab: Flow<String?> = store.data.map { it[LAST_TAB] }
 
@@ -106,8 +98,7 @@ class Settings(
 
     /**
      * A backup's settings in one write, so a restore never leaves half of them
-     * changed; null leaves that one as it is. The list comes back planned, not
-     * mid-shop. The key's own flags are not touched: the key never travels.
+     * changed; null leaves that one as it is. The key's own flags are not touched: the key never travels.
      */
     suspend fun restore(
         units: UnitsSetting?,
@@ -123,7 +114,6 @@ class Settings(
         model?.let { p[MODEL] = it.id }
         monthlyCapUsd?.takeIf { it.isFinite() }?.let { p[MONTHLY_CAP] = it.coerceIn(0.0, 100.0) }
         dailyCalls?.let { p[DAILY_CALLS] = it.coerceIn(0, 1000) }
-        p[LIST_MODE] = ListMode.PLAN.name
     }
 
     suspend fun guard(): SpendGuard = SpendGuard(monthlyCapUsd.first(), dailyCalls.first())
@@ -137,7 +127,6 @@ class Settings(
         val CLAUDE_ALWAYS = booleanPreferencesKey("claude_always")
         val DEBUG_LOG = booleanPreferencesKey("debug_log")
         val LIST_VIEW = stringPreferencesKey("list_view")
-        val LIST_MODE = stringPreferencesKey("list_mode")
         val LAST_TAB = stringPreferencesKey("last_tab")
         val KEY_LOST = booleanPreferencesKey("claude_key_lost_notice")
         val KEY_SET = booleanPreferencesKey("claude_key_was_set")
@@ -149,6 +138,3 @@ class Settings(
 
 /** The list's layouts: aisles in walking order (groups labelled when an aisle has more than one), or one card per recipe. */
 enum class ListView { STORE, RECIPE }
-
-/** What the List tab is for right now: planning (add, review, edit) or shopping (tick, next aisle, finish). */
-enum class ListMode { PLAN, SHOP }

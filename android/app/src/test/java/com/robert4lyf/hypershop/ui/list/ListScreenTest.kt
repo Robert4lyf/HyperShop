@@ -28,7 +28,6 @@ import com.robert4lyf.hypershop.testutil.Shots
 import com.robert4lyf.hypershop.testutil.TestPhotos
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -91,6 +90,9 @@ class ListScreenTest {
         assertEquals(Role.Checkbox, tick.config.getOrNull(SemanticsProperties.Role))
         compose.onNodeWithTag("item-1").performClick()
         compose.onNodeWithTag("tick-1").performClick()
+        // The bought carrot is folded under its aisle's "1 bought" row until that is opened.
+        compose.onNodeWithTag("tick-3").assertDoesNotExist()
+        compose.onNodeWithTag("bought-PRODUCE").performClick()
         assertEquals("Bought", compose.onNodeWithTag("tick-3").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
         // "Finish shopping" sits in the bar at the bottom, in reach, once something is ticked.
         compose.onNodeWithText("Finish shopping").performClick()
@@ -209,23 +211,88 @@ class ListScreenTest {
     }
 
     @Test
-    fun aTickedRowStillSlidesToTheBottomOfItsAisle() {
+    fun boughtRowsFoldUnderOneRowPerAisleAndComeBackOnTap() {
+        // Step Z: from the old shop screen, now on the one list.
+        show()
+        compose.onNodeWithTag("item-3").assertDoesNotExist()
+        compose.onNodeWithTag("item-1").assertExists()
+        val toggle = compose.onNodeWithTag("bought-PRODUCE")
+        assertEquals("Collapsed", toggle.fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
+        compose.onNodeWithText("1 bought").assertExists()
+        toggle.performClick()
+        compose.onNodeWithTag("item-3").assertExists()
+        // Unticking from the shown bought rows is the same tick target as always.
+        compose.onNodeWithTag("tick-3").performClick()
+        assertEquals(listOf("toggle 3"), events)
+        compose.onNodeWithTag("bought-PRODUCE").performClick()
+        compose.onNodeWithTag("item-3").assertDoesNotExist()
+        // An aisle with nothing bought has no such row.
+        compose.onNodeWithTag("bought-DAIRY_EGGS").assertDoesNotExist()
+    }
+
+    @Test
+    fun aTickedRowStaysAMomentSoTappingAgainUndoesItThenFolds() {
         var ui by mutableStateOf(SAMPLE_LIST)
-        compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions) } }
-        val milk = compose.onNodeWithTag("item-4")
-        val before = milk.getBoundsInRoot().top
+        val live =
+            actions.copy(onToggle = { r ->
+                events += "toggle ${r.id}"
+                ui =
+                    ui.copy(
+                        aisles =
+                            ui.aisles.map { (a, rows) ->
+                                a to
+                                    rows.map {
+                                        when {
+                                            it.id != r.id -> it
+                                            it.state == TickState.DONE -> it.copy(state = TickState.OPEN)
+                                            else -> it.copy(state = TickState.DONE)
+                                        }
+                                    }
+                            },
+                    )
+            })
         compose.mainClock.autoAdvance = false
-        // Milk is ticked: it sinks below butter.
-        val (aisle, rows) = SAMPLE_LIST.aisles[1]
-        val ticked = listOf(rows[1], rows[0].copy(state = TickState.DONE))
-        ui = SAMPLE_LIST.copy(aisles = SAMPLE_LIST.aisles.map { if (it.first == aisle) aisle to ticked else it })
-        compose.mainClock.advanceTimeByFrame()
-        compose.mainClock.advanceTimeByFrame()
-        val moving = milk.getBoundsInRoot().top
-        compose.mainClock.advanceTimeBy(2_000)
-        val after = milk.getBoundsInRoot().top
-        assertTrue("it moved down", after > before)
-        assertTrue("on its way, not there yet", moving < after)
+        compose.setContent { HyperShopTheme(dark = false, dynamicColor = false) { ListScreen(ui, live) } }
+        compose.onNodeWithTag("tick-4").performClick()
+        compose.mainClock.advanceTimeBy(300)
+        // Still in place, read as bought: a second tap unticks it.
+        compose.onNodeWithTag("tick-4").assertExists()
+        compose.onNodeWithTag("tick-4").performClick()
+        compose.mainClock.advanceTimeBy(LINGER_MS + 500)
+        compose.onNodeWithTag("tick-4").assertExists()
+        assertEquals(listOf("toggle 4", "toggle 4"), events)
+        // Ticked, unticked and ticked again inside the moment: the moment runs from the last tap, and left ticked,
+        // the row then folds into the aisle's "bought" row.
+        compose.onNodeWithTag("tick-4").performClick()
+        compose.mainClock.advanceTimeBy(LINGER_MS - 1000)
+        compose.onNodeWithTag("tick-4").performClick()
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithTag("tick-4").performClick()
+        compose.mainClock.advanceTimeBy(LINGER_MS - 500)
+        compose.onNodeWithTag("tick-4").assertExists()
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithTag("tick-4").assertDoesNotExist()
+        compose.onNodeWithTag("bought-DAIRY_EGGS").assertExists()
+    }
+
+    @Test
+    fun changeStoreIsInTheMenuOnlyWithASecondStore() {
+        var ui by mutableStateOf(SAMPLE_LIST)
+        compose.setContent {
+            HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions.copy(onChangeStore = { events += "store" })) }
+        }
+        compose.onNodeWithContentDescription("More").performClick()
+        compose.onNodeWithTag("change-store").assertDoesNotExist()
+        compose.onNodeWithTag("view-STORE").assertExists()
+        compose.onNodeWithTag("arrange").assertExists()
+        // No shopping mode: nothing to switch into.
+        compose.onNodeWithText("Shopping view").assertDoesNotExist()
+        // Any choice closes the menu.
+        compose.onNodeWithText("Share shopping list").performClick()
+        ui = SAMPLE_LIST.copy(secondStore = true, storeName = "Big shop")
+        compose.onNodeWithContentDescription("More").performClick()
+        compose.onNodeWithText("Change store (Big shop)").performClick()
+        assertEquals(listOf("store"), events)
     }
 
     @Test
