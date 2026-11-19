@@ -265,7 +265,7 @@ private fun BuyAgainSheet(
             }
             if (ui.loaded && ui.buyAgain.regulars.isEmpty() && ui.buyAgain.lastShop.isEmpty()) {
                 Text(
-                    "Nothing to buy again yet. Things you buy often show here after a few shops.",
+                    "Nothing to buy again yet.",
                     modifier = androidx.compose.ui.Modifier.padding(20.dp),
                 )
             } else {

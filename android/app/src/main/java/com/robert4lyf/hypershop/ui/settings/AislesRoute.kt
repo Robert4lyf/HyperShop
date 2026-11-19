@@ -100,16 +100,6 @@ fun AislesScreen(
                     storeName = it.take(80)
                 }, label = { Text("Store name") }, modifier = Modifier.fillMaxWidth())
                 TextButton(enabled = storeName.isNotBlank(), onClick = { actions.onRenameStore(storeName) }) { Text("Save store name") }
-                Text(
-                    if (ui.editingStore == 2L) {
-                        "A second shop's order. Once it differs from your store's, \"Shop\" asks which one you are in."
-                    } else {
-                        "The order the list and the watch follow."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                )
                 if (ui.loaded) AislesGroup(ui, actions)
             }
         }

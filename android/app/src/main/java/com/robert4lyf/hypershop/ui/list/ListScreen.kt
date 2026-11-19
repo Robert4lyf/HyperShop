@@ -272,19 +272,7 @@ private fun ListBody(
         // Room at the end for a snackbar (List ready, Undo): the extras below the items scroll clear of it.
         contentPadding = PaddingValues(bottom = 96.dp + keyboard),
     ) {
-        if (ui.arranging) {
-            item(key = "arrange-hint") {
-                Text(
-                    "Move things into the order you find them in the shop: the arrows one place, ⋮ to the top or bottom. " +
-                        "Groups move together; the order is kept for every trip.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp).testTag("arrange-hint"),
-                )
-            }
-        } else {
-            header()
-        }
+        if (!ui.arranging) header()
         if (ui.isEmpty) item { empty() }
         if (byRecipe) {
             for (section in ui.recipes) {

@@ -60,19 +60,7 @@ internal fun CookingView(
                 TextButton(onClick = onClose) { Text("Back to recipe") }
                 Text(detail.row.title, style = MaterialTheme.typography.headlineMedium)
                 Text(detail.servings?.let { "Saved recipe · serves $it" } ?: "Saved recipe · servings not recorded")
-                // What this view is: the ingredients and notes kept here. The method is the recipe's own, not copied.
                 val url = webLink(detail.row.url)
-                Text(
-                    when {
-                        url != null ->
-                            "Shows the saved ingredients and your notes. The method isn't saved here: open the original for the steps."
-                        detail.row.bookRef != null -> "Shows the saved ingredients and your notes. The method is in ${detail.row.bookRef}."
-                        else -> "Shows the saved ingredients and your notes. The method isn't saved here."
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp).testTag("cooking-scope"),
-                )
                 url?.let {
                     FilledTonalButton(
                         onClick = { open(it) },

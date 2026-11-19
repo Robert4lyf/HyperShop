@@ -162,11 +162,6 @@ internal fun ItemEditor(
                 ) { Text(if (allUnits) "Fewer units" else "More units") }
             }
 
-            Text(
-                "Edits the total needed, including anything bought or at home. Sources are below.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             TextButton(onClick = { advanced = !advanced }, modifier = Modifier.testTag("item-preferences")) {
                 Text(if (advanced) "Hide aisle, category and pack" else "Aisle, category and usual pack")
             }
@@ -176,7 +171,6 @@ internal fun ItemEditor(
                     enabled = !sheet.saving,
                     onValueChange = { pack = it },
                     label = { Text("Usual pack at ${sheet.storeName}, e.g. 400 g") },
-                    supportingText = { Text("A buying suggestion only; the amount needed is unchanged. Blank forgets it.") },
                     modifier = Modifier.fillMaxWidth().testTag("preferred-pack"),
                 )
                 SectionLabel("Aisle")
@@ -294,8 +288,7 @@ internal fun ItemEditor(
             title = { Text("Rename ${sheet.name}?") },
             text = {
                 Text(
-                    "If this ingredient is already on the list, their contributions and " +
-                        "purchases will be combined. A combined amount must be edited after merging.",
+                    "If it is already on the list, the two become one row.",
                 )
             },
             confirmButton = {

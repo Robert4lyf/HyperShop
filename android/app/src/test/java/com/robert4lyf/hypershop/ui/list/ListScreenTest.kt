@@ -111,7 +111,8 @@ class ListScreenTest {
             )
         val ui = SAMPLE_LIST.copy(aisles = listOf(AisleCode.PRODUCE to produce), arranging = true)
         compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions) } }
-        compose.onNodeWithTag("arrange-hint").assertExists()
+        // Step Z: no instructions; the arrows and "Done arranging" say what to do.
+        compose.onNodeWithTag("arrange-hint").assertDoesNotExist()
         // Arrows instead of ticks; the first of a group cannot go up, the last cannot go down.
         compose.onNodeWithTag("tick-1").assertDoesNotExist()
         compose.onNodeWithTag("up-1").assertIsNotEnabled()

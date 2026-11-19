@@ -10,7 +10,6 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
-import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
@@ -214,20 +213,18 @@ class RecipesScreenTest {
     }
 
     @Test
-    fun cookingViewSaysItHoldsNoMethodAndOffersTheOriginal() {
-        // No link and no book: it says plainly what it shows, and invents nothing.
+    fun cookingViewOffersTheOriginalOnlyWithALink() {
+        // Step Z: no paragraph about what the view holds; no link and no book, and it invents nothing.
         var detail by mutableStateOf(DETAIL)
         compose.setContent { HyperShopTheme(dynamicColor = false) { RecipeDetailContent(detail, onAdd = {}) } }
         compose.onNodeWithTag("cook-recipe").performClick()
-        compose.onNodeWithTag("cooking-scope").assertTextEquals("Shows the saved ingredients and your notes. The method isn't saved here.")
+        compose.onNodeWithTag("cooking-scope").assertDoesNotExist()
         compose.onNodeWithTag("cooking-original").assertDoesNotExist()
         compose.onNodeWithText("Back to recipe").performClick()
         // From a book: where the method is.
         detail = DETAIL.copy(row = DETAIL.row.copy(bookRef = "Ottolenghi Simple · p. 142"))
         compose.onNodeWithTag("cook-recipe").performClick()
-        compose.onNodeWithTag("cooking-scope").assertTextEquals(
-            "Shows the saved ingredients and your notes. The method is in Ottolenghi Simple · p. 142.",
-        )
+        compose.onNodeWithTag("cooking-original").assertDoesNotExist()
         compose.onNodeWithText("Back to recipe").performClick()
         // From a page: the original is one tap away.
         detail = DETAIL.copy(row = DETAIL.row.copy(url = "https://recipes.example/dal"))
