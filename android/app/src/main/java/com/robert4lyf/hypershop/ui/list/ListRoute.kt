@@ -45,8 +45,6 @@ fun ListRoute(
     container: AppContainer,
     snackbar: SnackbarHostState,
     onReview: (Long) -> Unit,
-    /** "Plan this week's shop": the Plan screen. */
-    onPlan: () -> Unit = {},
     /** Above zero while the widget or launcher shortcut asks for the Add field (missing 7 of the review). */
     focusAdd: Int = 0,
     /** The Add field took the request; it is not to be repeated. */
@@ -65,7 +63,7 @@ fun ListRoute(
     val scope = rememberCoroutineScope()
     // Built once per view model: a new object on every recomposition would recompose the whole header.
     val header =
-        remember(vm, context, onReview, onPlan) {
+        remember(vm, context, onReview) {
             HeaderActions(
                 onAdd = vm::addTyped,
                 suggestions = vm::suggestions,
@@ -79,7 +77,6 @@ fun ListRoute(
                     val text = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
                     container.applicationScope.launch { container.importShared(text, null) }
                 },
-                onPlan = onPlan,
                 onLastShop = vm::addLastShop,
                 onBuyAgain = { buyingAgain = true },
                 onHomeCheck = onHomeCheck,
@@ -111,6 +108,7 @@ fun ListRoute(
             onUseEdit = vm::editUse,
             onUseRename = { s, t -> vm.renameUse(s, t) },
             onUseRemove = vm::removeUse,
+            onUseServings = { s, n -> vm.setServings(s, n) },
             onShare = {
                 val send =
                     Intent(Intent.ACTION_SEND)
@@ -121,7 +119,7 @@ fun ListRoute(
         ),
         header = { listHeader(ui, header, prep, focusAdd, onAddFocused) },
         footer = { listFooter(prep, header) },
-        empty = { EmptyState(header.onSample, header.onPasteLink, prep, header.onPlan, header.onLastShop) },
+        empty = { EmptyState(header.onSample, header.onPasteLink, prep, header.onLastShop) },
         focusAdd = focusAdd,
     )
     val carry by vm.carryOver.collectAsStateWithLifecycle()
@@ -279,7 +277,7 @@ private fun BuyAgainSheet(
             } else {
                 com.robert4lyf.hypershop.ui.meals.BuyAgainSection(
                     ui,
-                    com.robert4lyf.hypershop.ui.meals.MealsActions(
+                    com.robert4lyf.hypershop.ui.meals.PrepActions(
                         onRegular = { vm.actions.addRegular(it) },
                         onAllRegulars = { vm.actions.addAllRegulars() },
                         onRepeatLastShop = { vm.actions.repeatLastShop() },

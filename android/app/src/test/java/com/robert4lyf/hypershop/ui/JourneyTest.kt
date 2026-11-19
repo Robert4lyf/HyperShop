@@ -238,7 +238,7 @@ class JourneyTest {
         assertTrue(runBlocking { c.repository.snapshot() }.liveItems.isEmpty())
     }
 
-    /** Meal-based shopping: three saved recipes chosen for this week, one served to 5, put on the list, rice partly at home. */
+    /** Meal-based shopping: three saved recipes put on the list, one served to 5, rice partly at home. */
     @Test
     fun mealBasedShopping() {
         val c = TestContainer.create()
@@ -249,29 +249,30 @@ class JourneyTest {
                 c.saveRecipe("Pesto pasta", "300g penne", "1 jar pesto"),
             )
         show(c)
-        // Step Q: Meals, Add meal (a sheet with the saved recipes), three added, Done.
-        if (route() != Routes.MEALS) tap("tab-${Routes.MEALS}")
-        tap("meals-add-meal")
+        // Step Z: Recipes, Add to list on each of the three: each goes on the list at once, planned for this week.
+        tap("tab-${Routes.RECIPES}")
         for (k in keys) {
-            scrollTo("add-meal-list", "pick-add-$k")
-            tap("pick-add-$k")
+            scrollTo("recipes", "lib-add-$k")
+            tap("lib-add-$k")
         }
-        tap("add-meal-done")
-        compose.waitUntil(10_000) { runBlocking { c.planner.week(c.planner.currentWeek()) }.size == 3 }
-        val chilli = runBlocking { c.planner.week(c.planner.currentWeek()) }.first { it.title == "Weeknight chilli" }.id
-        scrollTo("meals", "meal-more-$chilli")
-        tap("meal-more-$chilli")
-        // Step Z: each Add to list put its recipe on the list at once; the list is the next tab.
+        compose.waitUntil(10_000) { runBlocking { c.planner.week(c.planner.currentWeek()) }.count { it.useId != null } == 3 }
         tap("tab-${Routes.LIST}")
-        compose.waitUntil(10_000) { runBlocking { c.repository.snapshot() }.itemByKey("cat:basmati_rice") != null }
-        // The optional extras are below the items (step Q), so the list is scrolled to them.
+        // The chilli for 5: Servings on its card, in the list grouped by recipe.
+        val chilli = runBlocking { c.planner.week(c.planner.currentWeek()) }.first { it.title == "Weeknight chilli" }.useId
+        tap("list-more")
+        tap("view-RECIPE")
+        tap("recipe-more-use-$chilli")
+        tap("recipe-servings-use-$chilli")
+        tap("servings-more")
+        tap("servings-done")
+        compose.waitUntil(10_000) { runBlocking { c.repository.snapshot() }.uses[chilli!!]?.servings == 5 }
+        // Rice partly at home: the optional food-at-home check, a chip below the items.
         swipeTo("list", "list-home-check")
         tap("list-home-check")
         scrollTo("home-check-list", "home-some-cat:basmati_rice")
         tap("home-some-cat:basmati_rice")
         type("home-some-amount", "300 g", done = false)
         tap("home-some-set")
-        // The amount is saved, and the dialog closes, before the next tap.
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("home-some-dialog")).fetchSemanticsNodes().isEmpty() }
         tap("home-check-done")
         record("meal-based shopping", c)

@@ -11,6 +11,7 @@ import com.robert4lyf.hypershop.data.MealShopping
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.importing.ImportError
 import com.robert4lyf.hypershop.importing.ImportResult
+import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.testutil.await
 import com.robert4lyf.hypershop.testutil.awaitTrue
@@ -20,8 +21,8 @@ import com.robert4lyf.hypershop.ui.list.ListUi
 import com.robert4lyf.hypershop.ui.list.ListViewModel
 import com.robert4lyf.hypershop.ui.list.TickState
 import com.robert4lyf.hypershop.ui.list.add
-import com.robert4lyf.hypershop.ui.meals.MealsViewModel
 import com.robert4lyf.hypershop.ui.recipes.RecipesViewModel
+import com.robert4lyf.hypershop.ui.recipes.addRecipeToList
 import com.robert4lyf.hypershop.ui.review.Badge
 import com.robert4lyf.hypershop.ui.review.ReviewState
 import com.robert4lyf.hypershop.ui.review.ReviewUi
@@ -70,8 +71,6 @@ class ReleaseCScenariosTest {
 
     private fun ReviewUi.row(key: String) = aisles.flatMap { it.second }.first { it.key == key }
 
-    private fun MealsViewModel.shown(): MealsViewModel = tracked(this).also { vm -> collectors.launch { vm.ui.collect {} } }
-
     private fun messages(events: kotlinx.coroutines.flow.Flow<UiMessage>): MutableList<UiMessage> {
         val got = CopyOnWriteArrayList<UiMessage>()
         collectors.launch { events.collect { got += it } }
@@ -98,6 +97,7 @@ class ReleaseCScenariosTest {
                 parsed,
             )
         c.repository.saveToLibrary(stored.recipe.id, null)
+        c.repository.libraryKeyOf(stored.recipe.id)!!
     }
 
     private fun covered(
@@ -119,34 +119,38 @@ class ReleaseCScenariosTest {
     }
 
     @Test
-    fun scenarioD_aWeekPlannedShoppedInPartAndAMealRemovedKeepsWhatWasBought() {
+    fun scenarioD_twoRecipesShoppedInPartAndOneRemovedKeepsWhatWasBought() {
         val c = TestContainer.create()
-        save(c, "Chilli", "2 onions", "500g beef mince")
-        save(c, "Soup", "1 onion", "2 carrots")
-        val meals = MealsViewModel(c).shown()
-        val said = messages(meals.events)
-        await(meals.ui) { it.picks.size == 2 }.picks.forEach { meals.plan(it) }
-        await(meals.ui) { it.meals.all { m -> m.shopping == MealShopping.TO_BUY } }
+        val chilli = save(c, "Chilli", "2 onions", "500g beef mince")
+        val soup = save(c, "Soup", "1 onion", "2 carrots")
+        // Step Z: Add to list, each recipe on the list at once and planned for this week.
+        runBlocking {
+            c.addRecipeToList(chilli, "Chilli")
+            c.addRecipeToList(soup, "Soup")
+        }
+        assertTrue(runBlocking { c.planner.week(c.planner.currentWeek()) }.all { it.shopping == MealShopping.TO_BUY })
 
-        // In the shop: the onions (both meals' share) and the mince are bought, the carrots not yet.
+        // In the shop: the onions (both recipes' share) and the mince are bought, the carrots not yet.
         val list = tracked(ListViewModel(c))
+        val said = messages(list.events)
         var ui = await(list.ui) { it.loaded && it.row("onion").main == "3 onions" }
         list.toggle(ui.row("onion"))
         list.toggle(ui.row("beef mince"))
         ui = await(list.ui) { it.doneCount == 2 && it.left == 1 }
 
-        // Chilli comes off the plan mid-shop: nothing bought is undone, only its unbought share would go (there is none).
-        meals.remove(await(meals.ui) { it.meals.isNotEmpty() }.meals.first { it.title == "Chilli" })
-        await(meals.ui) { it.meals.size == 1 }
+        // Chilli comes off the list mid-shop (its card's Remove from list): nothing bought is undone, only its
+        // unbought share would go (there is none).
+        runBlocking { c.settings.setListView(ListView.RECIPE) }
+        val card = await(list.ui) { it.recipes.any { r -> r.title == "Chilli" } }.recipes.first { it.title == "Chilli" }
+        list.removeUse(card)
+        awaitTrue { said.any { it.text == "Removed Chilli from the shopping list" } }
         ui = await(list.ui) { it.loaded && it.doneCount == 2 }
         assertEquals(TickState.DONE, ui.row("onion").state)
         assertEquals(TickState.DONE, ui.row("beef mince").state)
         assertEquals(Rational.of(3), covered(c, "cat:onion", BaseKey.ITEMS))
         assertEquals(1, ui.left)
-        // Undo puts the meal back, and the list is as it was.
-        awaitTrue { said.any { it.text == "Removed Chilli" } }
-        runBlocking { said.first { it.text == "Removed Chilli" }.undo!!.invoke() }
-        await(meals.ui) { it.meals.size == 2 }
+        // Undo puts it back, and the list is as it was.
+        runBlocking { said.first { it.text == "Removed Chilli from the shopping list" }.undo!!.invoke() }
         ui = await(list.ui) { it.doneCount == 2 && it.left == 1 }
         assertEquals(Rational.of(3), covered(c, "cat:onion", BaseKey.ITEMS))
 
@@ -154,7 +158,7 @@ class ReleaseCScenariosTest {
         list.finishShopping()
         ui = await(list.ui) { it.doneCount == 0 && it.aisles.isNotEmpty() }
         assertEquals(listOf("carrot"), ui.aisles.flatMap { it.second }.map { it.name })
-        assertEquals(2, await(meals.ui) { it.meals.size == 2 }.meals.size)
+        assertEquals(2, runBlocking { c.planner.week(c.planner.currentWeek()) }.size)
     }
 
     @Test

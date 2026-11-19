@@ -69,8 +69,6 @@ data class HeaderActions(
     val onPick: (String, String) -> Unit = { _, s -> onAdd(s) },
     /** "Paste a link" on the empty state: imports the link on the clipboard. */
     val onPasteLink: () -> Unit = {},
-    /** "Plan this week's shop": the Plan screen. */
-    val onPlan: () -> Unit = {},
     /** The empty list's "Add last shop's items". */
     val onLastShop: () -> Unit = {},
     /** Step Q: Buy again, as a sheet over the list. */
@@ -218,39 +216,24 @@ fun ReadyCard(
 
 /**
  * An empty list. The first time: a sample to try, and a paste of a copied link.
- * Someone who has shopped before gets their own shortcuts instead: plan the week,
- * or put last shop's household items straight back on.
+ * Someone who has shopped before can put last shop's household items straight back on.
  */
 @Composable
 fun EmptyState(
     onSample: () -> Unit,
     onPasteLink: () -> Unit = {},
     prep: PlanPrep = PlanPrep(),
-    onPlan: () -> Unit = {},
     onLastShop: () -> Unit = {},
 ) {
-    if (prep.weekDone) {
-        EmptyHero(
-            title = "This week's shopping is done",
-            body = "All ${if (prep.meals == 1) "1 meal" else "${prep.meals} meals"} bought. Type an item above for anything else.",
-            modifier = Modifier.padding(top = 8.dp).testTag("empty"),
-        ) {
-            OutlinedButton(onClick = onPlan, modifier = Modifier.testTag("empty-plan")) { Text("See this week") }
-        }
-        return
-    }
     if (prep.returning) {
         EmptyHero(
             title = "Nothing on the list",
-            body = "Type an item above, or start from what you usually buy.",
+            body = "Type an item above or share a recipe link.",
             modifier = Modifier.padding(top = 8.dp).testTag("empty"),
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onPlan, modifier = Modifier.testTag("empty-plan")) { Text("Plan this week") }
-                if (prep.lastShop > 0) {
-                    OutlinedButton(onClick = onLastShop, modifier = Modifier.testTag("empty-last-shop")) {
-                        Text("Last shop's ${prep.lastShop} items")
-                    }
+            if (prep.lastShop > 0) {
+                OutlinedButton(onClick = onLastShop, modifier = Modifier.testTag("empty-last-shop")) {
+                    Text("Last shop's ${prep.lastShop} items")
                 }
             }
         }
@@ -258,7 +241,7 @@ fun EmptyState(
     }
     EmptyHero(
         title = "Your list is empty",
-        body = "Type an item above, share a recipe link to HyperShop, or choose meals in Meals and make a shopping list.",
+        body = "Type an item above or share a recipe link.",
         modifier = Modifier.padding(top = 8.dp).testTag("empty"),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -283,7 +266,6 @@ fun androidx.compose.foundation.lazy.LazyListScope.listHeader(
 ) {
     item(key = "add") { AddItemField(actions.onAdd, actions.suggestions, actions.onPick, focus = focusAdd, onFocused = onAddFocused) }
     item(key = "ready") { ReadyCard(ui.readyJobs, actions.onReview) }
-    // No "Plan this week's shop" card above the list (cut 2 of the review): This week is a tab of its own.
 }
 
 /**

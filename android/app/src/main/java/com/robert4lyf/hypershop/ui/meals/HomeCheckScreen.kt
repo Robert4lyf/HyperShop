@@ -60,7 +60,7 @@ fun HomeCheckRoute(
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
     HomeCheckScreen(
         ui,
-        MealsActions(
+        PrepActions(
             onHave = vm.actions::have,
             onNeed = vm.actions::need,
             onHaveSome = { r, t, done -> vm.actions.haveSome(r, t, done) },
@@ -72,8 +72,8 @@ fun HomeCheckRoute(
 
 @Composable
 fun HomeCheckScreen(
-    ui: MealsUi,
-    actions: MealsActions,
+    ui: PrepUi,
+    actions: PrepActions,
     onBack: () -> Unit,
 ) {
     BackHandler(onBack = onBack)

@@ -26,7 +26,7 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * Step Q: Buy again and the food-at-home check, as their own screens use them: one write at a time ([writing]),
- * every change with Undo on [messages]. Shared by [MealsViewModel] and [PrepViewModel], so the rules live once.
+ * every change with Undo on [messages]. Used by [PrepViewModel].
  */
 class ShopPrepActions(
     private val c: AppContainer,
@@ -160,8 +160,7 @@ class ShopPrepActions(
 
 /**
  * Step Q: what the Buy again sheet and the Food at home screen need, and nothing else: Buy again, this week's
- * home check and the list's count. Light, so each opens at once; a [MealsViewModel] would first work out the
- * whole week (meals, previews, the recipe library) before showing anything.
+ * home check and the list's count. Light, so each opens at once.
  */
 class PrepViewModel(
     c: AppContainer,
@@ -169,15 +168,15 @@ class PrepViewModel(
     private val messages = Channel<UiMessage>(Channel.BUFFERED)
     val events: Flow<UiMessage> = messages.receiveAsFlow()
 
-    val ui: StateFlow<MealsUi> =
+    val ui: StateFlow<PrepUi> =
         combine(c.buyAgain.observe(), c.homeCheck.observe(), c.repository.list) { buy, home, list ->
-            MealsUi(
+            PrepUi(
                 loaded = true,
                 buyAgain = buy,
                 home = home,
                 listLeft = list.liveItems.count { !list.isDone(it.id) && !list.isUnavailable(it.id) },
             )
-        }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MealsUi())
+        }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PrepUi())
 
     val actions = ShopPrepActions(c, viewModelScope, Mutex(), messages) { ui.value.buyAgain }
 }

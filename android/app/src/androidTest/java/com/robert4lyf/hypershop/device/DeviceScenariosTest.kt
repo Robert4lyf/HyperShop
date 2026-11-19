@@ -51,15 +51,8 @@ class DeviceScenariosTest {
     private fun show(c: AppContainer) {
         compose.setContent { HyperShopTheme { HyperShopApp(c) } }
         compose.waitForIdle()
-        // An empty list opens on This week (X.10); these scenarios start from the shopping list, as a person
-        // switching tabs would. Once the start screen has settled, so the switch is not undone by it.
-        compose.waitUntil(10_000) {
-            listOf("meals", "list").any { compose.onAllNodesWithTag(it).fetchSemanticsNodes().isNotEmpty() }
-        }
-        if (compose.onAllNodesWithTag("meals").fetchSemanticsNodes().isNotEmpty()) {
-            compose.onNodeWithTag("tab-list").performClick()
-            compose.waitForIdle()
-        }
+        // Step Z: the app opens on the list (two tabs: the list and Recipes).
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("list").fetchSemanticsNodes().isNotEmpty() }
     }
 
     private fun ticks() =

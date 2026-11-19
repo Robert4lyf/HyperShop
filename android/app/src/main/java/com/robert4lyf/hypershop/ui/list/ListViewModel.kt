@@ -19,7 +19,6 @@ import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.report.WrongReport
 import com.robert4lyf.hypershop.data.InStockLine
 import com.robert4lyf.hypershop.data.MANUAL_TITLE
-import com.robert4lyf.hypershop.data.MealShopping
 import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.settings.ListView
@@ -159,12 +158,9 @@ data class ListUi(
     val doneCount: Int get() = aisles.sumOf { (_, r) -> r.count { it.state == TickState.DONE } }
 }
 
-/** The "This week" card: how far the week's shop is prepared (docs/design/release-b.md). */
+/** What the list offers around its items: Buy again, last shop, and the food-at-home check. */
 data class PlanPrep(
     val loaded: Boolean = false,
-    val meals: Int = 0,
-    /** Meals planned and not on the list yet. */
-    val pending: Int = 0,
     /** Buy again suggestions not on the list. */
     val buyAgain: Int = 0,
     /** Last trip's hand-added items not on the list. */
@@ -173,27 +169,7 @@ data class PlanPrep(
     val toCheck: Int = 0,
     /** Has saved recipes or a finished trip: someone who has shopped here before. */
     val returning: Boolean = false,
-    /** This week's meals whose shopping is done (bought, or nothing to buy). */
-    val bought: Int = 0,
-) {
-    /** Every meal of the week planned and bought: the empty list is a finished shop, not one to start. */
-    val weekDone: Boolean get() = meals > 0 && pending == 0 && bought == meals
-
-    /** "2 meals · 1 not on the list · 5 to buy again · 3 to check at home". */
-    fun summary(): String =
-        listOfNotNull(
-            if (meals == 0) {
-                "No meals planned"
-            } else if (meals == 1) {
-                "1 meal"
-            } else {
-                "$meals meals"
-            },
-            pending.takeIf { it > 0 }?.let { "$it not on the list" },
-            buyAgain.takeIf { it > 0 }?.let { "$it to buy again" },
-            toCheck.takeIf { it > 0 }?.let { "$it to check at home" },
-        ).joinToString(" · ")
-}
+)
 
 /** One card of the recipe view: a recipe's items, or those several recipes share, or those added by hand. */
 data class RecipeSection(
@@ -205,6 +181,8 @@ data class RecipeSection(
     val libraryKey: String? = null,
     /** The recipe's photo on this phone, or null (its mosaic is drawn). */
     val photo: String? = null,
+    /** How many the recipe is on the list for (a recipe's card only). */
+    val servings: Int? = null,
 ) {
     enum class Kind { RECIPE, SHARED, BY_HAND }
 }
@@ -265,6 +243,24 @@ class ListViewModel(
     ) = viewModelScope.launch { useOf(section)?.let { useActions.rename(it, title) } }
 
     fun removeUse(section: RecipeSection) = viewModelScope.launch { useOf(section)?.let { useActions.remove(it) } }
+
+    /**
+     * Step Z "Servings" on a recipe's card (it was the meal's stepper on Meals): the meal and its items on the list
+     * follow at once, what was bought stays bought; Undo sets it back.
+     */
+    fun setServings(
+        section: RecipeSection,
+        servings: Int,
+    ) = viewModelScope.launch {
+        val use = useOf(section) ?: return@launch
+        val was = section.servings ?: return@launch
+        if (servings == was) return@launch
+        if (!c.planner.setUseServings(use.useId, servings)) {
+            messages.send(UiMessage("${section.title} doesn't say how many it serves"))
+            return@launch
+        }
+        messages.send(UiMessage("${section.title} serves $servings", undo = { c.planner.setUseServings(use.useId, was) }))
+    }
 
     fun removeUse(use: UseSummary) = useActions.remove(use)
 
@@ -345,22 +341,16 @@ class ListViewModel(
 
     private fun prepFlow(): Flow<PlanPrep> =
         combine(
-            // The week is read again with every change to the list, so a card left open over Sunday
-            // midnight shows the new week (this view model lives as long as the app).
-            c.repository.list.map { c.planner.currentWeek() }.distinctUntilChanged().flatMapLatest { c.planner.observeWeek(it) },
             c.buyAgain.observe(),
             c.homeCheck.observe(),
             c.repository.observeLibrary().map { it.isNotEmpty() },
-        ) { meals, buy, home, saved ->
+        ) { buy, home, saved ->
             PlanPrep(
                 loaded = true,
-                meals = meals.size,
-                pending = meals.count { it.shopping.pending },
                 buyAgain = buy.regulars.count { !it.onList },
                 lastShop = buy.lastShop.size,
                 toCheck = home.count { !it.have },
                 returning = saved || buy.hasHistory,
-                bought = meals.count { it.shopping == MealShopping.BOUGHT || it.shopping == MealShopping.NOTHING_TO_BUY },
             )
         }
 
@@ -443,6 +433,7 @@ class ListViewModel(
                             it.copy(from = null)
                         },
                         libraryKey = src.keys[key.removePrefix("use-").toLong()],
+                        servings = list.uses[key.removePrefix("use-").toLong()]?.servings,
                     )
             }
         }

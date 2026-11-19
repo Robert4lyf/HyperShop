@@ -101,18 +101,30 @@ class EntryNavigationTest {
     @Test
     fun theNextLaunchRestoresTheLastMainDestination() {
         val c = TestContainer.create()
-        runBlocking { c.settings.setLastTab(Routes.MEALS) }
+        runBlocking { c.settings.setLastTab(Routes.RECIPES) }
         show(c)
-        awaitRoute(Routes.MEALS)
-        // Started there, not shown the list first and moved: Meals is the graph's start and the list never opened.
-        assertEquals(Routes.MEALS, nav.graph.startDestinationRoute)
-        assertEquals(listOf(Routes.MEALS), nav.currentBackStack.value.mapNotNull { it.destination.route })
-        // Tabs still switch, one deep, and back to Meals.
+        awaitRoute(Routes.RECIPES)
+        // Started there, not shown the list first and moved: Recipes is the graph's start and the list never opened.
+        assertEquals(Routes.RECIPES, nav.graph.startDestinationRoute)
+        assertEquals(listOf(Routes.RECIPES), nav.currentBackStack.value.mapNotNull { it.destination.route })
+        // Tabs still switch, one deep, and back to Recipes.
         compose.onNodeWithTag("tab-${Routes.LIST}").performClick()
         awaitRoute(Routes.LIST)
-        compose.onNodeWithTag("tab-${Routes.MEALS}").performClick()
-        awaitRoute(Routes.MEALS)
-        assertEquals(listOf(Routes.MEALS), nav.currentBackStack.value.mapNotNull { it.destination.route })
+        compose.onNodeWithTag("tab-${Routes.RECIPES}").performClick()
+        awaitRoute(Routes.RECIPES)
+        assertEquals(listOf(Routes.RECIPES), nav.currentBackStack.value.mapNotNull { it.destination.route })
+    }
+
+    @Test
+    fun aRememberedMealsTabFromBeforeOpensTheList() {
+        // Step Z: Meals went; a "meals" saved by Step Q falls back to the list, and there are two tabs.
+        val c = TestContainer.create()
+        runBlocking { c.settings.setLastTab("meals") }
+        show(c)
+        awaitRoute(Routes.LIST)
+        assertEquals(Routes.LIST, nav.graph.startDestinationRoute)
+        compose.onNodeWithTag("tab-meals").assertDoesNotExist()
+        compose.onNodeWithTag("tab-${Routes.RECIPES}").assertExists()
     }
 
     @Test
@@ -135,24 +147,24 @@ class EntryNavigationTest {
         val c = TestContainer.create()
         show(c)
         waitFor("add-item")
-        compose.onNodeWithTag("tab-${Routes.MEALS}").performClick()
-        awaitRoute(Routes.MEALS)
+        compose.onNodeWithTag("tab-${Routes.RECIPES}").performClick()
+        awaitRoute(Routes.RECIPES)
         // The widget's preview while the app is open on another tab.
         c.entryRequests.tryEmit(EntryRequest.LIST)
         awaitRoute(Routes.LIST)
         waitFor("add-item")
         compose.onNodeWithTag("add-item").assertIsNotFocused()
-        // Add item from This week.
-        compose.onNodeWithTag("tab-${Routes.MEALS}").performClick()
-        awaitRoute(Routes.MEALS)
+        // Add item from Recipes.
+        compose.onNodeWithTag("tab-${Routes.RECIPES}").performClick()
+        awaitRoute(Routes.RECIPES)
         c.entryRequests.tryEmit(EntryRequest.ADD)
         awaitRoute(Routes.LIST)
         waitFor("add-item")
         compose.waitForIdle()
         compose.onNodeWithTag("add-item").assertIsFocused()
         // Away and back by the tabs: the request was used up, so the field is not focused again.
-        compose.onNodeWithTag("tab-${Routes.MEALS}").performClick()
-        awaitRoute(Routes.MEALS)
+        compose.onNodeWithTag("tab-${Routes.RECIPES}").performClick()
+        awaitRoute(Routes.RECIPES)
         compose.onNodeWithTag("tab-${Routes.LIST}").performClick()
         awaitRoute(Routes.LIST)
         waitFor("add-item")

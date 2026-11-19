@@ -5,9 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
-import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ShoppingCart
-import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -32,7 +30,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
-/** The tab bar at 200 % font scale: the three main destinations' labels whole (step Q). */
+/** The tab bar at 200 % font scale: the two main destinations' labels whole (step Z). */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34], qualifiers = "w411dp-h891dp-xxhdpi")
 class NavBarTest {
@@ -40,7 +38,6 @@ class NavBarTest {
 
     private val tabs =
         listOf(
-            Tab(Routes.MEALS, "Meals", Icons.Rounded.CalendarMonth, Icons.Outlined.CalendarMonth),
             Tab(Routes.LIST, "Shopping list", Icons.Rounded.ShoppingCart, Icons.Outlined.ShoppingCart),
             Tab(Routes.RECIPES, "Recipes", Icons.AutoMirrored.Rounded.MenuBook, Icons.AutoMirrored.Outlined.MenuBook),
         )
@@ -51,14 +48,14 @@ class NavBarTest {
             // The real density, only the font scaled: the bounds below are read in the root's own dp.
             val density = LocalDensity.current.density
             CompositionLocalProvider(LocalDensity provides Density(density, fontScale = 2f)) {
-                HyperShopTheme(dynamicColor = false) { CompactNavBar(tabs, route = Routes.MEALS, onSelect = {}) }
+                HyperShopTheme(dynamicColor = false) { CompactNavBar(tabs, route = Routes.RECIPES, onSelect = {}) }
             }
         }
-        for (label in listOf("Meals", "Shopping list", "Recipes")) {
+        for (label in listOf("Shopping list", "Recipes")) {
             val node = compose.onNodeWithText(label)
             assertEquals(label, node.getUnclippedBoundsInRoot(), node.getBoundsInRoot())
         }
-        compose.onNodeWithText("Meals").assertIsSelected()
+        compose.onNodeWithText("Recipes").assertIsSelected()
         compose.onNodeWithText("Shopping list").assertIsNotSelected()
         // Taller than 60 dp for the big labels, but a bar, not a screen: Scaffold offers it the whole screen.
         val height = compose.onRoot().getBoundsInRoot().height

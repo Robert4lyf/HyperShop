@@ -252,6 +252,26 @@ class Planner(
         }
 
     /**
+     * Step Z "Servings" on a recipe's group on the list: its meal's servings and the list's amounts, in one transaction
+     * ([setServings]: what was bought stays bought). A use with no meal (from before the plan) is rescaled alone. False
+     * when the use is gone or its recipe says nothing about servings.
+     */
+    suspend fun setUseServings(
+        useId: Long,
+        servings: Int,
+    ): Boolean =
+        db.withTransaction {
+            if (servings < 1) return@withTransaction false
+            val meals = dao.mealsOfUse(useId)
+            if (meals.isNotEmpty()) return@withTransaction meals.map { setServings(it.id, servings) }.all { it }
+            val l = repo.load()
+            val use = l.uses[useId] ?: return@withTransaction false
+            if (use.recipeId?.let { dao.recipe(it) }?.servingsOriginal == null) return@withTransaction false
+            repo.persist(l, l.rescaleUse(useId, servings))
+            true
+        }
+
+    /**
      * X.14 "Cooked it" on meal [id], or ([cooked] false) taking it back: the meal says so, and its
      * recipe counts one cooking more or less for "your usual", in one transaction. False when the
      * meal is gone or already in that state, so a double tap never counts twice.

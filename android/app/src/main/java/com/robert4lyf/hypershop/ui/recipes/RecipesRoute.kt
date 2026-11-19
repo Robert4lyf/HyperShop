@@ -98,7 +98,6 @@ fun RecipesRoute(
     container: AppContainer,
     snackbar: SnackbarHostState,
     onReview: (Long) -> Unit,
-    onMeals: () -> Unit = {},
 ) {
     val vm: RecipesViewModel = viewModel(factory = factoryFor { RecipesViewModel(container) })
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -134,7 +133,6 @@ fun RecipesRoute(
                 onPhoto = { uri, book, page -> vm.addPhoto(uri, book, page) },
             ),
         hasKey = hasKey,
-        onMeals = onMeals,
     )
     val detail by vm.detail.collectAsStateWithLifecycle()
     // The photo picker: the system's, so no permission; the recipe it is for is kept across the trip there.
@@ -187,8 +185,6 @@ fun RecipesScreen(
     search: SearchBox = SearchBox(),
     /** A Claude key is saved: the photo option needs one. */
     hasKey: Boolean = true,
-    /** "Meals this week": pick saved recipes for the list. */
-    onMeals: () -> Unit = {},
 ) {
     // Which saved recipe a dialog is about, by key, so it survives a rotation.
     var renamingSaved by rememberSaveable { mutableStateOf<String?>(null) }

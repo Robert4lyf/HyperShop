@@ -391,19 +391,18 @@ class ListScreenTest {
     }
 
     @Test
-    fun aWeekBoughtSaysItsShoppingIsDoneRatherThanOfferingToPlanIt() {
-        // X.13: seven meals bought and the trip finished; the empty list said "Plan this week".
-        val prep = PlanPrep(loaded = true, meals = 7, pending = 0, bought = 7, returning = true)
+    fun aReturningShopperIsOfferedLastShopAndNoPlanning() {
+        // Step Z: no "Plan this week" (Meals went); someone who has shopped before can put last shop back on.
+        val prep = PlanPrep(loaded = true, lastShop = 4, returning = true)
         compose.setContent {
             HyperShopTheme(dynamicColor = false) {
-                ListScreen(ListUi(loaded = true), actions, empty = { EmptyState({}, {}, prep, onPlan = { events += "plan" }) })
+                ListScreen(ListUi(loaded = true), actions, empty = { EmptyState({}, {}, prep, onLastShop = { events += "last" }) })
             }
         }
-        compose.onNodeWithText("This week's shopping is done").assertExists()
-        compose.onNodeWithText("All 7 meals bought", substring = true).assertExists()
-        compose.onNodeWithText("Nothing on the list").assertDoesNotExist()
-        compose.onNodeWithTag("empty-plan").performClick()
-        assertEquals(listOf("plan"), events)
+        compose.onNodeWithText("Nothing on the list").assertExists()
+        compose.onNodeWithTag("empty-plan").assertDoesNotExist()
+        compose.onNodeWithTag("empty-last-shop").performClick()
+        assertEquals(listOf("last"), events)
     }
 
     @Test

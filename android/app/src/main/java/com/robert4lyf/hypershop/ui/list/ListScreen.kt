@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DoneAll
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -126,6 +128,8 @@ data class ListActions(
     val onUseEdit: (RecipeSection) -> Unit = {},
     val onUseRename: (RecipeSection, String) -> Unit = { _, _ -> },
     val onUseRemove: (RecipeSection) -> Unit = {},
+    /** Step Z: "Servings" on a recipe's card. */
+    val onUseServings: (RecipeSection, Int) -> Unit = { _, _ -> },
 )
 
 /**
@@ -658,7 +662,9 @@ private fun ListTop(
             com.robert4lyf.hypershop.ui.common.SettingsButton()
             var menu by remember { mutableStateOf(false) }
             Box {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
+                IconButton(onClick = { menu = true }, modifier = Modifier.testTag("list-more")) {
+                    Icon(Icons.Rounded.MoreVert, contentDescription = "More")
+                }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(text = { Text("Share shopping list") }, onClick = {
                         menu = false
@@ -962,6 +968,7 @@ private fun RecipeTitle(
             // The recipe's own actions, here on its card (cut 1 of the review): the Recipes tab is the recipe book.
             var menu by remember { mutableStateOf(false) }
             var renaming by rememberSaveable { mutableStateOf(false) }
+            var serving by rememberSaveable { mutableStateOf(false) }
             Box {
                 IconButton(onClick = { menu = true }, modifier = Modifier.testTag("recipe-more-${section.key}")) {
                     Icon(Icons.Rounded.MoreVert, contentDescription = "More for ${section.title}", tint = content)
@@ -979,11 +986,20 @@ private fun RecipeTitle(
                         menu = false
                         renaming = true
                     })
+                    section.servings?.let { n ->
+                        DropdownMenuItem(text = { Text("Servings ($n)") }, onClick = {
+                            menu = false
+                            serving = true
+                        }, modifier = Modifier.testTag("recipe-servings-${section.key}"))
+                    }
                     DropdownMenuItem(text = { Text("Remove from list") }, onClick = {
                         menu = false
                         actions.onUseRemove(section)
                     }, modifier = Modifier.testTag("recipe-remove-${section.key}"))
                 }
+            }
+            if (serving) {
+                ServingsDialog(section.servings ?: 1, onDismiss = { serving = false }) { actions.onUseServings(section, it) }
             }
             if (renaming) {
                 val byHand = section.kind == RecipeSection.Kind.BY_HAND
@@ -997,4 +1013,35 @@ private fun RecipeTitle(
         }
         Icon(if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, contentDescription = null, tint = content)
     }
+}
+
+/** "Servings" on a recipe's card: one more or one fewer, then Done. */
+@Composable
+private fun ServingsDialog(
+    from: Int,
+    onDismiss: () -> Unit,
+    onSet: (Int) -> Unit,
+) {
+    var n by rememberSaveable { mutableIntStateOf(from) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Servings") },
+        text = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconButton(onClick = { n = (n - 1).coerceAtLeast(1) }, enabled = n > 1, modifier = Modifier.testTag("servings-fewer")) {
+                    Icon(Icons.Rounded.Remove, contentDescription = "Fewer")
+                }
+                Text("$n", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.testTag("servings-n"))
+                IconButton(onClick = { n = (n + 1).coerceAtMost(99) }, modifier = Modifier.testTag("servings-more")) {
+                    Icon(Icons.Rounded.Add, contentDescription = "More")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onDismiss()
+                onSet(n)
+            }, modifier = Modifier.testTag("servings-done")) { Text("Done") }
+        },
+    )
 }
