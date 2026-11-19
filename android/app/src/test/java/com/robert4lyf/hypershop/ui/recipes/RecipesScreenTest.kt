@@ -360,7 +360,7 @@ class RecipesScreenTest {
     }
 
     @Test
-    fun savedHasASortAndAHighlyRatedChipAndSaysWhenNothingIsRatedSo() {
+    fun sortAndTheHighlyRatedChipWaitForTenRecipesAndSayWhenNothingIsRatedSo() {
         val got = mutableListOf<String>()
         // Step Z: with fewer than ten saved recipes, no sort and no filter.
         var ui by mutableStateOf(USES)
@@ -372,6 +372,10 @@ class RecipesScreenTest {
                 )
             }
         }
+        compose.onNodeWithTag("library-sort").assertDoesNotExist()
+        compose.onNodeWithTag("filter-highly-rated").assertDoesNotExist()
+        ui = USES.copy(savedCount = SORT_FROM)
+        compose.waitForIdle()
         compose.onNodeWithTag("library-sort").performClick()
         compose.onNodeWithTag("sort-RATING").performClick()
         compose.onNodeWithTag("filter-highly-rated").performClick()

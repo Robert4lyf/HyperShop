@@ -40,6 +40,8 @@ data class RecipesUi(
     val library: List<LibraryRow> = emptyList(),
     /** The library has recipes (the search box shows even when nothing matches). */
     val hasLibrary: Boolean = library.isNotEmpty(),
+    /** How many recipes are saved, whatever the search or filter shows. */
+    val savedCount: Int = library.size,
     /** What is being searched for (chips, then the text being typed); empty when not searching. */
     val terms: List<String> = emptyList(),
     /** The book of the cookbook recipe added most recently: the photo form starts with it. */
@@ -194,6 +196,7 @@ class RecipesViewModel(
                 loaded = true,
                 library = shown,
                 hasLibrary = rows.isNotEmpty(),
+                savedCount = rows.size,
                 terms = q,
                 lastBook = lastBook,
                 photos = photos,
