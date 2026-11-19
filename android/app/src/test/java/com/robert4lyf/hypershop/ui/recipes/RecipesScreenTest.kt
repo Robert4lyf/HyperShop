@@ -365,6 +365,7 @@ class RecipesScreenTest {
     @Test
     fun savedHasASortAndAHighlyRatedChipAndSaysWhenNothingIsRatedSo() {
         val got = mutableListOf<String>()
+        // Step Z: with fewer than ten saved recipes, no sort and no filter.
         var ui by mutableStateOf(USES)
         compose.setContent {
             HyperShopTheme(dynamicColor = false) {

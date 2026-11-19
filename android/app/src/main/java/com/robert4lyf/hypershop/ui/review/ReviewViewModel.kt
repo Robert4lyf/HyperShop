@@ -971,15 +971,6 @@ class ReviewViewModel(
             p.note?.let { "($it)" },
         ).joinToString(" ")
 
-    /** "Always at home": a staple from now on, and marked here. */
-    fun alwaysInStock(key: String) =
-        act {
-            c.repository.setStaple(key, true)
-            decisions[key] = (decisions[key] ?: RowDecision()).copy(inStock = true)
-            changed = true
-            recompute()
-        }
-
     /** "Move aisle": always (a CategoryOverride) or just this time. */
     fun moveAisle(
         key: String,

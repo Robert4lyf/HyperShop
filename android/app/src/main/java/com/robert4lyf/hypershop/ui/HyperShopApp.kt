@@ -92,9 +92,6 @@ object Routes {
     const val AISLES = "aisles"
     const val VOICE_TEST = "voice-test"
 
-    /** Step Q: the focused food-at-home check. */
-    const val HOME = "home"
-
     fun review(job: Long) = "review/$job"
 }
 
@@ -246,7 +243,6 @@ private fun AppShell(
                 snackbar,
                 when {
                     reviewing -> Modifier.navigationBarsPadding().padding(bottom = 80.dp)
-                    route == Routes.HOME -> Modifier.padding(bottom = 80.dp)
                     else -> Modifier
                 },
             )
@@ -282,7 +278,6 @@ private fun AppShell(
                         onReview = openReview,
                         focusAdd = addFocus,
                         onAddFocused = { addFocus = 0 },
-                        onHomeCheck = { nav.navigate(Routes.HOME) { launchSingleTop = true } },
                     )
                 }
                 composable(Routes.RECIPES) {
@@ -303,9 +298,6 @@ private fun AppShell(
                         snackbar = snackbar,
                         onBack = { nav.popBackStack() },
                     )
-                }
-                composable(Routes.HOME) {
-                    com.robert4lyf.hypershop.ui.meals.HomeCheckRoute(container, snackbar, onBack = { nav.popBackStack() })
                 }
                 composable(Routes.VOICE_TEST) { VoiceTestRoute(onBack = { nav.popBackStack() }) }
                 composable(Routes.LIBRARY) { LibraryRoute(container, snackbar, onBack = { nav.popBackStack() }) }

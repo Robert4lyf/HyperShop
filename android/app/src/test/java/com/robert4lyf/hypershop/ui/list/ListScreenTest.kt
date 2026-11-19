@@ -18,7 +18,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -70,7 +69,6 @@ class ListScreenTest {
             onOpenItem = { events += "open ${it.id}" },
             onFinish = { events += "finish" },
             onClearAll = { events += "clear" },
-            onNeed = { events += "need ${it.key}" },
             onArrange = { events += "arrange $it" },
             onMoveItem = { r, by -> events += "move ${r.id} $by" },
             onMoveGroup = { a, g, by -> events += "group $a $g $by" },
@@ -352,23 +350,6 @@ class ListScreenTest {
         assertEquals(listOf("remove use-2", "open use-2"), events.filter { it.endsWith("use-2") })
         TestPhotos.settle(compose)
         compose.onRoot().captureRoboImage(Shots.path("list-recipes-light.png"))
-    }
-
-    @Test
-    fun inStockOpensAndNeedItAdds() {
-        val ui =
-            SAMPLE_LIST.copy(
-                aisles = SAMPLE_LIST.aisles.take(1),
-                inStock = listOf(InStockRow("cat:olive_oil", "olive oil", "2tbsp olive oil", "Weeknight chilli", AisleCode.OILS_VINEGARS)),
-            )
-        compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions) } }
-        // Open to start with, so what to check isn't hidden; the header closes and reopens it.
-        compose.onNodeWithText("2tbsp olive oil").assertExists()
-        compose.onNodeWithTag("in-stock").performScrollTo().performClick()
-        compose.onNodeWithTag("need-cat:olive_oil").assertDoesNotExist()
-        compose.onNodeWithTag("in-stock").performScrollTo().performClick()
-        compose.onNodeWithTag("need-cat:olive_oil").performScrollTo().performClick()
-        assertEquals(listOf("need cat:olive_oil"), events)
     }
 
     private fun showWithHeader(

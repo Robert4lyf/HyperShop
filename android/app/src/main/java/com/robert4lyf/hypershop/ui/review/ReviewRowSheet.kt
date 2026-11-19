@@ -23,7 +23,6 @@ import androidx.compose.material.icons.automirrored.rounded.TrendingFlat
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.Inventory
 import androidx.compose.material.icons.rounded.LocalMall
 import androidx.compose.material.icons.rounded.ReportProblem
 import androidx.compose.material.icons.rounded.SwapHoriz
@@ -33,7 +32,6 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -77,7 +75,6 @@ import kotlinx.coroutines.launch
 
 /** Callbacks of the row sheet. */
 data class SheetActions(
-    val onAlwaysInStock: () -> Unit,
     val onSwap: (Long) -> Unit,
     val onMoveAisle: (AisleCode, Boolean) -> Unit,
     val onEditLine: (Long, String) -> Unit,
@@ -88,8 +85,6 @@ data class SheetActions(
     val onRemoveLine: (Long) -> Unit = {},
     /** The line's amount from typed text ("2 tbsp"); false when none can be read. */
     val onSetAmount: (Long, String) -> Boolean = { _, _ -> false },
-    /** The "In stock" switch. */
-    val onInStock: (Boolean) -> Unit = {},
     /** Where a new name would go: "Joins maple syrup in Baking". */
     val renamePreview: (String) -> String? = { null },
     /** False when the name is the row's own item under another word: Rename would change nothing. */
@@ -124,10 +119,6 @@ internal fun ReviewRowSheetHost(
         ReviewRowSheet(
             sheet,
             SheetActions(
-                onAlwaysInStock = {
-                    vm.alwaysInStock(key)
-                    onDismiss()
-                },
                 onSwap = { vm.swap(it, onKey) },
                 onMoveAisle = { a, always ->
                     vm.moveAisle(key, a, always)
@@ -138,7 +129,6 @@ internal fun ReviewRowSheetHost(
                 onRename = { vm.rename(key, it, onKey) },
                 onRemoveLine = vm::removeLine,
                 onSetAmount = vm::setAmount,
-                onInStock = { vm.setInStock(key, it) },
                 renamePreview = { vm.renamePreview(it, key) },
                 renameChanges = { vm.renameChanges(key, it) },
                 onWrong = { expected, share ->
@@ -169,8 +159,8 @@ fun ReviewRowSheet(
             for (reason in sheet.lines.mapNotNull { it.checkReason }.distinct()) {
                 InfoBanner("Check: ${ReviewViewModel.plainReason(reason)}", Icons.Rounded.ReportProblem, tone = Tone.WARNING)
             }
-            // UX review 6: in the order corrections are made. The amount first (the commonest), then a swap, at home,
-            // the line's words behind "Edit the line" (one place for the text and the name: cut 6), the aisle, the rest.
+            // UX review 6: in the order corrections are made. The amount first (the commonest), then a swap, the line's
+            // words behind "Edit the line" (one place for the text and the name: cut 6), the aisle, the rest.
             for (line in sheet.lines) key(line.origin ?: line.id) { AmountRow(line, sheet.lines.size > 1, actions) }
             if (sheet.swaps.isNotEmpty()) SwapFor(sheet.swaps, actions.onRename)
             for (line in sheet.lines) {
@@ -182,7 +172,6 @@ fun ReviewRowSheet(
                     }
                 }
             }
-            SwitchRow("At home", sheet.inStock, actions.onInStock)
             var editing by rememberSaveable(sheet.key) { mutableStateOf(false) }
             Row(
                 Modifier
@@ -203,13 +192,6 @@ fun ReviewRowSheet(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             // Asks "always or just this time?" on the chip, like the list's sheet; the move is announced with Undo.
             MoveAisle(sheet.aisle, actions.onMoveAisle)
-            if (!sheet.isStaple) {
-                FilledTonalButton(onClick = actions.onAlwaysInStock) {
-                    Icon(Icons.Rounded.Inventory, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(8.dp))
-                    Text("Always at home")
-                }
-            }
             if (sheet.canRemove) {
                 for (line in sheet.lines) {
                     TextButton(

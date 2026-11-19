@@ -159,19 +159,6 @@ fun ReviewScreen(
                         )
                     }
                 }
-                // Y.20: what is at home is checked once, against every recipe's need together, on This week; a recipe's own
-                // lines are not asked about one by one (300 g in the cupboard may not cover three recipes).
-                if (!ui.editing && !ui.byHand && !ui.savedOnly) {
-                    item(key = "cupboard-hint") {
-                        Text(
-                            "Add everything; Check food at home on your list later weighs what you have " +
-                                "against all your meals together.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp).testTag("cupboard-hint"),
-                        )
-                    }
-                }
                 // X.4: the sheet behind each row is where a line is changed or swapped; said while that is new (UX review 20).
                 if (ui.hint) {
                     item(key = "edit-hint") {
@@ -822,9 +809,9 @@ private fun ReviewRowItem(
                 }
             }
         }
-        // Y.20: only a row already at home (an "always at home" staple) shows it, so it can be taken back; the rest
-        // are checked on This week, and a row's own sheet still has the switch.
-        onInStock?.takeIf { row.inStock }?.let { toggle -> InStockPill(true, name) { toggle(row.key, it) } }
+        // Step Z: the one place to say a recipe's ingredient is at home (the food-at-home check and the row sheet's
+        // switch went); staples from Settings › Always at home start on.
+        onInStock?.let { toggle -> InStockPill(row.inStock, name) { toggle(row.key, it) } }
         Icon(
             Icons.Rounded.ChevronRight,
             contentDescription = null,

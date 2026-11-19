@@ -49,8 +49,6 @@ fun ListRoute(
     focusAdd: Int = 0,
     /** The Add field took the request; it is not to be repeated. */
     onAddFocused: () -> Unit = {},
-    /** Step Q: the focused food-at-home check. */
-    onHomeCheck: () -> Unit = {},
 ) {
     var buyingAgain by rememberSaveable { mutableStateOf(false) }
     if (buyingAgain) BuyAgainSheet(container, snackbar, onDismiss = { buyingAgain = false })
@@ -79,7 +77,6 @@ fun ListRoute(
                 },
                 onLastShop = vm::addLastShop,
                 onBuyAgain = { buyingAgain = true },
-                onHomeCheck = onHomeCheck,
             )
         }
     ListScreen(
@@ -89,11 +86,9 @@ fun ListRoute(
             onFinish = vm::finishShopping,
             onClearAll = vm::clearAll,
             onOpenItem = { vm.openItem(it.id) },
-            onNeed = vm::needIt,
             onView = vm::setView,
             onChangeStore = { vm.changeStore() },
             onBuyAgain = { buyingAgain = true },
-            onHomeCheck = onHomeCheck,
             onShareText = {
                 scope.launch {
                     container.awaitReady()
@@ -246,9 +241,8 @@ private fun BuyAgainSheet(
     snackbar: SnackbarHostState,
     onDismiss: () -> Unit,
 ) {
-    // The light view model (Buy again, the home check and the list only), so the sheet fills at once.
-    val vm: com.robert4lyf.hypershop.ui.meals.PrepViewModel =
-        viewModel(key = "buy-again", factory = factoryFor { com.robert4lyf.hypershop.ui.meals.PrepViewModel(container) })
+    // A light view model (Buy again only), so the sheet fills at once.
+    val vm: BuyAgainViewModel = viewModel(key = "buy-again", factory = factoryFor { BuyAgainViewModel(container) })
     // Read here, not first inside the sheet: the sheet is a window of its own, and a value that lands while its
     // first composition is starting was missed there (the sheet stayed on "loading" with the data in hand).
     // Read in this composition, a change recomposes the host, which hands the sheet the new value.
@@ -275,14 +269,14 @@ private fun BuyAgainSheet(
                     modifier = androidx.compose.ui.Modifier.padding(20.dp),
                 )
             } else {
-                com.robert4lyf.hypershop.ui.meals.BuyAgainSection(
+                BuyAgainSection(
                     ui,
-                    com.robert4lyf.hypershop.ui.meals.PrepActions(
-                        onRegular = { vm.actions.addRegular(it) },
-                        onAllRegulars = { vm.actions.addAllRegulars() },
-                        onRepeatLastShop = { vm.actions.repeatLastShop() },
-                        onPin = { vm.actions.pin(it) },
-                        onHide = { vm.actions.hide(it) },
+                    BuyAgainActions(
+                        onRegular = { vm.addRegular(it) },
+                        onAllRegulars = { vm.addAllRegulars() },
+                        onRepeatLastShop = { vm.repeatLastShop() },
+                        onPin = { vm.pin(it) },
+                        onHide = { vm.hide(it) },
                     ),
                 )
             }

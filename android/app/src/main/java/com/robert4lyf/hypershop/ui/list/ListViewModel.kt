@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.robert4lyf.hypershop.catalog.EntryEdit
 import com.robert4lyf.hypershop.core.catalog.CatalogEntry
-import com.robert4lyf.hypershop.core.catalog.DisplayPolicy
 import com.robert4lyf.hypershop.core.merge.Display
 import com.robert4lyf.hypershop.core.merge.ShelfOrder
 import com.robert4lyf.hypershop.core.merge.ShoppingList
@@ -17,7 +16,6 @@ import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.report.WrongReport
-import com.robert4lyf.hypershop.data.InStockLine
 import com.robert4lyf.hypershop.data.MANUAL_TITLE
 import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.di.AppContainer
@@ -118,21 +116,8 @@ data class ItemSource(
     val url: String? = null,
 )
 
-/** One ingredient you marked in stock on review, for the recipes on the list. */
-data class InStockRow(
-    val key: String,
-    val name: String,
-    /** "2tbsp olive oil", or just "Salt". */
-    val main: String,
-    /** The recipes that need it. */
-    val from: String,
-    val aisle: AisleCode,
-)
-
 data class ListUi(
     val aisles: List<Pair<AisleCode, List<ListRow>>> = emptyList(),
-    /** The "In stock" section, below the aisles. */
-    val inStock: List<InStockRow> = emptyList(),
     val loaded: Boolean = false,
     /** Imports waiting for review: the "1 recipe ready to review" card. */
     val readyJobs: List<Long> = emptyList(),
@@ -158,15 +143,13 @@ data class ListUi(
     val doneCount: Int get() = aisles.sumOf { (_, r) -> r.count { it.state == TickState.DONE } }
 }
 
-/** What the list offers around its items: Buy again, last shop, and the food-at-home check. */
+/** What the list offers around its items: Buy again and last shop. */
 data class PlanPrep(
     val loaded: Boolean = false,
     /** Buy again suggestions not on the list. */
     val buyAgain: Int = 0,
     /** Last trip's hand-added items not on the list. */
     val lastShop: Int = 0,
-    /** Cupboard ingredients still to buy that may be at home. */
-    val toCheck: Int = 0,
     /** Has saved recipes or a finished trip: someone who has shopped here before. */
     val returning: Boolean = false,
 )
@@ -287,25 +270,20 @@ class ListViewModel(
         val arranging: Boolean,
     )
 
-    /**
-     * The list with its in-stock lines and recipe titles, read together on every
-     * list change (an import, a removed recipe, "Need it"): one emission per
-     * change, so the aisles and the "In stock" section never show two different
-     * lists for a frame.
-     */
-    private val listWithInStock = c.repository.list.map { Triple(it, c.repository.inStockOnList(it, stillShopping = true), sources(it)) }
+    /** The list with the recipe titles behind its rows, read together on every list change: one emission per change. */
+    private val listWithSources = c.repository.list.map { it to sources(it) }
 
     /** The watch link's state and the listRev it last got, for the shop header's word. */
     private val watchSent = combine(c.watchLink.state, c.watchSync.sent) { st, rev -> st to rev }
 
     val ui: StateFlow<ListUi> =
         combine(
-            listWithInStock,
+            listWithSources,
             c.settings.units,
             view,
             combine(c.importJobs.ready, watchSent, stores) { r, w, s -> Triple(r, w, s) },
             c.recipePhotos.paths(),
-        ) { (list, lines, src), units, v, (ready, watch, store), photos ->
+        ) { (list, src), units, v, (ready, watch, store), photos ->
             lastList = list
             lastUnits = units
             build(
@@ -318,7 +296,6 @@ class ListViewModel(
             ).let { ui ->
                 ui.copy(
                     readyJobs = ready.map { it.id },
-                    inStock = inStockRows(lines, units),
                     arranging = v.arranging && v.layout != ListView.RECIPE,
                     recipes = ui.recipes.map { r -> r.libraryKey?.let { r.copy(photo = photos[it]) } ?: r },
                     watch = watchWord(watch.first, watch.second, list.listRev),
@@ -342,14 +319,12 @@ class ListViewModel(
     private fun prepFlow(): Flow<PlanPrep> =
         combine(
             c.buyAgain.observe(),
-            c.homeCheck.observe(),
             c.repository.observeLibrary().map { it.isNotEmpty() },
-        ) { buy, home, saved ->
+        ) { buy, saved ->
             PlanPrep(
                 loaded = true,
                 buyAgain = buy.regulars.count { !it.onList },
                 lastShop = buy.lastShop.size,
-                toCheck = home.count { !it.have },
                 returning = saved || buy.hasHistory,
             )
         }
@@ -438,31 +413,6 @@ class ListViewModel(
             }
         }
     }
-
-    private fun inStockRows(
-        lines: List<InStockLine>,
-        units: UnitsSetting,
-    ): List<InStockRow> =
-        lines
-            .groupBy { it.target.mergeKey }
-            .map { (key, ls) ->
-                val t = ls.first().target
-                val entry = t.catalogId?.let { c.catalog.byId[it] }
-                val name = entry?.name ?: t.displayName
-                val qty = ls.fold(QtyBase.PRESENCE) { acc, l -> acc + l.qty }
-                val presence = entry?.displayPolicy == DisplayPolicy.PRESENCE && units != UnitsSetting.AS_WRITTEN
-                val hint = Display.hintOf(ls.map { it.unitHint })
-                // In the list's own words ("2 bananas"); a presence item at home needs no amount.
-                val (amount, shown) = Display.brief(qty, entry, name, units, t.aisle == AisleCode.PRODUCE, hint)
-                val from = ls.map { it.recipeTitle }.distinct().joinToString(", ")
-                InStockRow(key, name, listOfNotNull(amount.takeIf { !presence }, shown).joinToString(" "), from, t.aisle)
-            }.sortedBy { it.name.lowercase() }
-
-    /** "Need it": the in-stock lines go on the list after all, under their recipes. */
-    fun needIt(row: InStockRow) =
-        viewModelScope.launch {
-            if (c.repository.needAfterAll(row.key) > 0) messages.send(UiMessage("Added ${row.name} to the list"))
-        }
 
     private fun build(
         list: ShoppingList,
@@ -732,9 +682,10 @@ class ListViewModel(
                                 "Requirement unchanged; tick only what you buy."
                         } ?: packSize?.let { "Usual pack saved; no purchase suggestion is possible in a different measure." },
                     explanation =
-                        listOf(
+                        listOfNotNull(
                             "Required ${ItemEdit.text(list.total(id)).ifBlank { "as shown above" }}",
-                            "At home ${item.onHand?.let(ItemEdit::text) ?: "0"}",
+                            // Step Z: only an amount said to be at home before (the food-at-home check went).
+                            item.onHand?.let { "At home ${ItemEdit.text(it)}" },
                             "Bought ${ItemEdit.text(list.purchased(id)).ifBlank { "0" }}",
                             "Buy ${ItemEdit.text(list.toBuy(id)).ifBlank { "0 / see requirement" }}",
                         ).joinToString(" · "),

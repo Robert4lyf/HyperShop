@@ -126,14 +126,11 @@ class ScenariosTest {
         second.confirm()
         await(second.state) { it is ReviewState.Added }
         val vm = tracked(ListViewModel(c))
-        val ui = await(vm.ui) { it.loaded && it.inStock.isNotEmpty() }
+        val ui = await(vm.ui) { it.loaded && it.aisles.flatMap { r -> r.second }.size == 3 }
         assertEquals("3 onions", ui.row("onion").main)
-        assertEquals(listOf("olive oil"), ui.inStock.map { it.name })
+        // At home on the review: not on the list (Step Z: the review's toggle is the one place to say so).
         assertTrue(ui.aisles.flatMap { it.second }.none { it.name == "olive oil" })
-        // Change of mind in the shop: "Need it" brings the oil on under its recipe; the amount is the recipe's.
-        vm.needIt(ui.inStock.single())
-        val after = await(vm.ui) { it.inStock.isEmpty() && it.aisles.flatMap { r -> r.second }.any { it.name == "olive oil" } }
-        assertEquals(4, after.left)
+        assertEquals(3, ui.left)
     }
 
     private fun com.robert4lyf.hypershop.ui.review.ReviewUi.row(key: String) = aisles.flatMap { it.second }.first { it.key == key }

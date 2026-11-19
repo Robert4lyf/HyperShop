@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import androidx.navigation.NavHostController
@@ -266,20 +267,23 @@ class JourneyTest {
         tap("servings-more")
         tap("servings-done")
         compose.waitUntil(10_000) { runBlocking { c.repository.snapshot() }.uses[chilli!!]?.servings == 5 }
-        // Rice partly at home: the optional food-at-home check, a chip below the items.
-        swipeTo("list", "list-home-check")
-        tap("list-home-check")
-        scrollTo("home-check-list", "home-some-cat:basmati_rice")
-        tap("home-some-cat:basmati_rice")
-        type("home-some-amount", "300 g", done = false)
-        tap("home-some-set")
-        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("home-some-dialog")).fetchSemanticsNodes().isEmpty() }
-        tap("home-check-done")
+        // Rice partly at home (300 g of the 500 g): Step Z has no food-at-home check; the rice's amount is changed on
+        // the list, in its sheet, to what is still to buy.
+        val rice = c.itemId("cat:basmati_rice")
+        if (compose.onAllNodes(hasTestTag("item-$rice")).fetchSemanticsNodes().isEmpty()) scrollTo("list", "item-$rice")
+        tap("item-$rice")
+        tap("item-change")
+        node("edit-qty").performClick()
+        taps++
+        node("edit-qty").performTextReplacement("200 g")
+        typed++
+        tap("save-item")
+        compose.waitUntil(10_000) { compose.onAllNodes(isDialog()).fetchSemanticsNodes().isEmpty() }
+        settle()
         record("meal-based shopping", c)
         val list = runBlocking { c.repository.snapshot() }
-        val rice = list.itemByKey("cat:basmati_rice")!!
         assertEquals(setOf(Routes.LIST), setOf(route()))
         assertTrue(list.liveItems.size >= 6)
-        assertTrue(rice.id > 0)
+        assertEquals("200 g", com.robert4lyf.hypershop.ui.list.ItemEdit.text(list.total(rice)))
     }
 }

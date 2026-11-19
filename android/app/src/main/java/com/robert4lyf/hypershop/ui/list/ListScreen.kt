@@ -31,7 +31,6 @@ import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Layers
@@ -108,15 +107,12 @@ data class ListActions(
     val onClearAll: () -> Unit,
     val onOpenItem: (ListRow) -> Unit = {},
     val onShare: () -> Unit = {},
-    /** "Need it" on an in-stock ingredient. */
-    val onNeed: (InStockRow) -> Unit = {},
     /** The menu's choice of layout: store order or by recipe. */
     val onView: (ListView) -> Unit = {},
     /** Step Z: "Change store" in the menu, with two or more stores to choose from. */
     val onChangeStore: () -> Unit = {},
-    /** Step Q: Buy again and Check food at home, from the menu as well as below the items. */
+    /** Step Q: Buy again, from the menu as well as below the items. */
     val onBuyAgain: () -> Unit = {},
-    val onHomeCheck: () -> Unit = {},
     val onShareText: () -> Unit = {},
     /** X.9: "Arrange items" and its "Done"; a row or a group moved one place (-1 up, +1 down), or to an end (true = top). */
     val onArrange: (Boolean) -> Unit = {},
@@ -371,83 +367,7 @@ private fun ListBody(
                 }
             }
         }
-        if (ui.inStock.isNotEmpty() && !ui.arranging) inStockSection(ui.inStock, card, actions.onNeed)
         if (!ui.arranging) footer()
-    }
-}
-
-/**
- * "At home": what you said you already had when reviewing the recipes on the
- * list, to check before you go. Open until closed; "Need it" puts one on the list.
- */
-private fun LazyListScope.inStockSection(
-    rows: List<InStockRow>,
-    card: Color,
-    onNeed: (InStockRow) -> Unit,
-) {
-    item(key = "in-stock", contentType = "aisle") {
-        var open by rememberSaveable { mutableStateOf(true) }
-        Column {
-            val count = if (open) rows.size + 1 else 1
-            // The same card as an aisle: a tinted header with a badge and a count pill, then white rows.
-            Row(
-                Modifier
-                    .padding(top = 24.dp)
-                    .sectionItem(sectionPosition(0, count), MaterialTheme.colorScheme.secondaryContainer)
-                    .fillMaxWidth()
-                    .clickable(onClickLabel = if (open) "Collapse" else "Expand", role = Role.Button) { open = !open }
-                    .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
-                    .semantics(mergeDescendants = true) {
-                        heading()
-                        stateDescription = if (open) "Expanded" else "Collapsed"
-                    }
-                    .testTag("in-stock"),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Box(
-                    Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.secondary),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Rounded.Inventory2,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-                Text(
-                    "At home",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.weight(1f),
-                )
-                CountPill("${rows.size}", MaterialTheme.colorScheme.onSecondaryContainer)
-                Icon(
-                    if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
-            }
-            if (open) {
-                rows.forEachIndexed { i, r ->
-                    Row(
-                        Modifier
-                            .sectionItem(sectionPosition(i + 1, count), card)
-                            .fillMaxWidth()
-                            .heightIn(min = 64.dp)
-                            .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(r.main.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleMedium)
-                            Text(r.from, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        TextButton(onClick = { onNeed(r) }, modifier = Modifier.testTag("need-${r.key}")) { Text("Need it") }
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -710,10 +630,6 @@ private fun ListTop(
                         menu = false
                         actions.onBuyAgain()
                     }, modifier = Modifier.testTag("menu-buy-again"))
-                    DropdownMenuItem(text = { Text("Check food at home") }, onClick = {
-                        menu = false
-                        actions.onHomeCheck()
-                    }, modifier = Modifier.testTag("menu-home-check"))
                     DropdownMenuItem(text = { Text("Share list as text") }, enabled = !ui.isEmpty, onClick = {
                         menu = false
                         actions.onShare()

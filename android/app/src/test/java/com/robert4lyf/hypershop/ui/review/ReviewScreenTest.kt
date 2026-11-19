@@ -127,14 +127,15 @@ class ReviewScreenTest {
     }
 
     @Test
-    fun onlyARowAlreadyAtHomeShowsThePillAndItTakesItBack() {
-        // Y.20: the cupboard is checked on This week against every recipe together; a row here shows "At home"
-        // only when it already is (a staple), so it can be taken back.
+    fun everyRowHasTheAtHomeToggleAndItIsTheOnePlaceToSaySo() {
+        // Step Z: the row's pill is the one place a recipe's ingredient is said to be at home (the food-at-home check,
+        // the row sheet's switch and its "Always at home" went), so every row shows it, on or off.
         show()
-        compose.onAllNodesWithText("At home").assertCountEquals(1)
-        compose.onNodeWithText("At home").performClick()
-        assertEquals(listOf("stock cat:salt false"), events)
-        compose.onNodeWithTag("cupboard-hint").assertExists()
+        val rows = SAMPLE_REVIEW.aisles.sumOf { it.second.size }
+        compose.onAllNodesWithText("At home").assertCountEquals(rows)
+        compose.onNodeWithContentDescription("At home: Onion").performClick()
+        compose.onNodeWithTag("cupboard-hint").assertDoesNotExist()
+        assertEquals(listOf("stock cat:onion true"), events)
     }
 
     @Test
