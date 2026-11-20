@@ -146,6 +146,18 @@ class JourneyTest {
         settle()
     }
 
+    /**
+     * A message (its few seconds, with Undo) over the row about to be tapped: a person waits it out or swipes it away.
+     * Not counted. Step AA.4 keeps messages off the bottom bar; a list row can still be under one.
+     */
+    private fun waitOutAMessageOver(tag: String) {
+        val row = compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+        val message = compose.onAllNodes(hasTestTag("snackbar"), useUnmergedTree = true).fetchSemanticsNodes().firstOrNull()?.boundsInRoot
+        if (message == null || message.height == 0f || !message.overlaps(row)) return
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(6))
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Undo")).fetchSemanticsNodes().isEmpty() }
+    }
+
     /** Scrolls [list] to [tag] (a scroll, counted apart from taps). */
     private fun scrollTo(
         list: String,
@@ -210,11 +222,10 @@ class JourneyTest {
             for (item in runBlocking { c.repository.snapshot() }.liveItems) {
                 val tag = "tick-${item.id}"
                 if (compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isEmpty()) scrollTo("list", tag)
+                waitOutAMessageOver(tag)
                 tap(tag)
             }
-            // The review's "Added" message sits over the Finish bar for its few seconds; a person waits it out.
-            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(6))
-            compose.waitUntil(5_000) { compose.onAllNodes(hasText("Undo")).fetchSemanticsNodes().isEmpty() }
+            // Step AA.4: the review's "Added" message sits above the Finish bar now, so nothing waits for it to go.
             tap("finish")
             compose.waitUntil(10_000) { runBlocking { c.repository.snapshot() }.liveItems.isEmpty() }
             record("core share to finish", c)
@@ -262,13 +273,11 @@ class JourneyTest {
         val chilli = runBlocking { c.planner.week(c.planner.currentWeek()) }.first { it.title == "Weeknight chilli" }.useId
         compose.waitUntil(10_000) { runBlocking { c.repository.snapshot() }.uses[chilli!!]?.servings == 5 }
         tap("tab-${Routes.LIST}")
-        // The last "Added …" message sits over the bottom of the list for its few seconds; a person waits it out.
-        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(6))
-        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Undo")).fetchSemanticsNodes().isEmpty() }
         // Rice partly at home (300 g of the 500 g): Step Z has no food-at-home check; the rice's amount is changed on
         // the list, in its sheet, to what is still to buy.
         val rice = c.itemId("cat:basmati_rice")
         if (compose.onAllNodes(hasTestTag("item-$rice")).fetchSemanticsNodes().isEmpty()) scrollTo("list", "item-$rice")
+        waitOutAMessageOver("item-$rice")
         tap("item-$rice")
         tap("item-change")
         node("edit-qty").performClick()

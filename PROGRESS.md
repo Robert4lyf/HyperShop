@@ -393,7 +393,14 @@ A follow-up review of Step Z found the remaining friction in a few places, and t
   stays). Claims checked: "Check: has 'or'" was never on screen (only in a test's sample); the app said "Check: the
   recipe offers a choice; …", now gone. The sheet's amount field sets the recipe line's own amount (servings scale it),
   not an amount to buy, so it is labelled **Amount in the recipe**, not "Amount to buy".
-- [ ] AA.4 Snackbars never cover the bottom action
+- [x] AA.4 Snackbars never cover the bottom action. Done once rather than per screen: `BottomActionBar` (the list's
+  Finish shopping and Done arranging, the review's Add to list; the only pinned bottom actions) reports its measured
+  height to `SnackbarLift`, and the app's one `SnackbarHost` sits that far up. The review's guessed 80 dp lift (a bar
+  of 81 dp, more at a large font) is gone. The list's end padding (96 dp) already let the last rows scroll clear of
+  a message; the bar is below the list's box, so it needs none. `SnackbarPlacementTest` fails if a message overlaps
+  the bar: the list at 1× and 2× font, and the review. Not done as worded: the list does not keep a host of its own;
+  one measured lift covers it and the review alike. A message can still sit over list rows for its seconds:
+  JourneyTest waits it out only when the row it taps is under one (core: the last row; meal: the rice), not counted.
 - [ ] AA.5 Compact list header
 - [ ] AA.6 Recipes ordered by use
 - [ ] AA.7 One message for several adds
