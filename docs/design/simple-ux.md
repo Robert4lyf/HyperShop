@@ -29,6 +29,11 @@ fewer modes and one word per idea. The data model is unchanged; every action cal
 | Can't get it on this trip | **Can't find it** → *Set aside for this trip*; **Found it** takes it back | Unavailable, Not available today |
 | End the trip | **Finish shopping** | Done |
 | Keep a reviewed recipe without adding it | **Save recipe only** (review ⋮ menu) | Save recipe, Save for later |
+| Correct the words a recipe line was read from | **Fix the recipe's text** (review row sheet) | Edit the line |
+| Say the app read something wrong | **Report a wrong reading** (review row sheet, item sheet) | This is wrong |
+| A line offering "A or B" | its **two options** as buttons, the one it reads now selected | Check: has 'or', Use B instead, swap |
+| How much a review row adds | the amount alone ("200 ml"); with the item on the list already, "200 ml · 700 ml with what's on your list" | +200 ml, → 700 ml on the shopping list |
+| The row sheet's amount field | **Amount in the recipe** (it sets the line's own amount, which servings then scale) | Amount, Amount to buy |
 
 On the review, lines still to go on the list are counted as **N to add** ("4 to add · 1 at home") and the button reads
 **Add to list · N items**: they become "to buy" once they are on the list.

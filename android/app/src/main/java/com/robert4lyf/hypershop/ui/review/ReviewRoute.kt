@@ -135,7 +135,7 @@ fun ReviewRoute(
                 onRetryClaude = vm::retryWithClaude,
                 onAisleInStock = vm::aisleInStock,
                 onClearInStock = vm::clearInStock,
-                edits = ReviewEdits(onTitle = vm::setTitle, onAddLine = vm::addLine, onBook = vm::setBook),
+                edits = ReviewEdits(onTitle = vm::setTitle, onAddLine = vm::addLine, onBook = vm::setBook, onChoose = { vm.swap(it) }),
                 onStopRetry = vm::stopRetry,
                 // A shared import can wait on the card; an edit or a library re-add cannot (nothing to come back to).
                 onLater = if (vm.isThrowaway) null else onDone,

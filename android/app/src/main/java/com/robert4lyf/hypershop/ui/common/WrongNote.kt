@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import timber.log.Timber
 
 /**
- * W.4: "This is wrong" at the foot of a sheet. Asks what you expected, then saves the note on the phone; "Save and
+ * W.4: "Report a wrong reading" (Step AA; was "This is wrong") at the foot of a sheet. Asks what you expected, then saves the note on the phone; "Save and
  * share" also opens the share sheet. Nothing is sent otherwise.
  */
 @Composable
@@ -35,7 +35,7 @@ fun WrongNote(onSave: (expected: String, share: Boolean) -> Unit) {
     TextButton(onClick = { open = true }, modifier = Modifier.testTag("wrong")) {
         Icon(Icons.Rounded.Flag, contentDescription = null, Modifier.size(18.dp))
         Spacer(Modifier.size(8.dp))
-        Text("This is wrong")
+        Text("Report a wrong reading")
     }
     if (!open) return
 

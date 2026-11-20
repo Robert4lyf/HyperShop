@@ -7,8 +7,10 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasScrollAction
@@ -47,9 +49,29 @@ internal val SAMPLE_REVIEW =
                 AisleCode.PRODUCE to
                     listOf(
                         ReviewRow("cat:onion", "onion", "2", false, false, AisleCode.PRODUCE),
-                        ReviewRow("cat:garlic", "garlic", "3 cloves", false, false, AisleCode.PRODUCE),
+                        ReviewRow(
+                            "cat:garlic",
+                            "garlic",
+                            "3 cloves",
+                            false,
+                            true,
+                            AisleCode.PRODUCE,
+                            checkReason = "a range that goes down",
+                            raw = "3-2 cloves garlic",
+                        ),
                     ),
-                AisleCode.MEAT_FISH to listOf(ReviewRow("cat:beef_mince", "beef mince", "500 g", false, false, AisleCode.MEAT_FISH)),
+                AisleCode.MEAT_FISH to
+                    listOf(
+                        ReviewRow(
+                            "cat:beef_mince",
+                            "beef mince",
+                            "500 g",
+                            false,
+                            false,
+                            AisleCode.MEAT_FISH,
+                            withList = "500 g · 1 kg with what's on your list",
+                        ),
+                    ),
                 AisleCode.SPICES_CONDIMENTS to
                     listOf(
                         ReviewRow("cat:salt", "salt", null, true, false, AisleCode.SPICES_CONDIMENTS),
@@ -58,9 +80,9 @@ internal val SAMPLE_REVIEW =
                             "chipotle paste",
                             "1 tbsp",
                             false,
-                            true,
+                            false,
                             AisleCode.SPICES_CONDIMENTS,
-                            checkReason = "has 'or'",
+                            choice = Choice(9, "chipotle paste", "chipotle sauce"),
                         ),
                     ),
             ),
@@ -95,6 +117,7 @@ class ReviewScreenTest {
                 onClearInStock = { events += "clear" },
                 onSaveForLater = { events += "save only" },
                 onLater = { events += "later" },
+                edits = ReviewEdits(onChoose = { events += "choose $it" }),
             )
         }
     }
@@ -106,7 +129,7 @@ class ReviewScreenTest {
         show()
         val node = compose.onNodeWithTag("row-cat:onion").fetchSemanticsNode()
         val texts = node.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text }
-        assertTrue("texts $texts", texts.containsAll(listOf("Onion", "+2")))
+        assertTrue("texts $texts", texts.containsAll(listOf("Onion", "2")))
         assertEquals("Will be added", node.config.getOrNull(SemanticsProperties.StateDescription))
         val action = node.config[SemanticsActions.CustomActions].single()
         assertEquals("Mark at home", action.label)
@@ -166,8 +189,21 @@ class ReviewScreenTest {
         compose.onNodeWithContentDescription("More servings").performClick()
         assertEquals(listOf("servings 1"), events)
         compose.onNodeWithTag("summary").assertTextEquals("4 to add · 1 at home")
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Check: has 'or'"))
-        compose.onNodeWithText("Check: has 'or'").fetchSemanticsNode()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Check: the range reads backwards; check the amount"))
+        compose.onNodeWithText("Check: the range reads backwards; check the amount").fetchSemanticsNode()
+    }
+
+    @Test
+    fun amountsHaveNoPlusAndAChoiceIsTwoButtons() {
+        // Step AA: what goes on, then what the list will hold in words; "A or B" as its two options, no "Check".
+        show()
+        compose.onNodeWithText("500 g · 1 kg with what's on your list", useUnmergedTree = true).fetchSemanticsNode()
+        compose.onAllNodesWithText("+", substring = true, useUnmergedTree = true).assertCountEquals(0)
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Chipotle sauce"))
+        compose.onNodeWithTag("chosen-9").assertIsSelected().performClick()
+        compose.onNodeWithTag("other-9").assertIsNotSelected().performClick()
+        compose.onAllNodesWithText("Check:", substring = true, useUnmergedTree = true).assertCountEquals(1) // the garlic's
+        assertEquals(listOf("choose 9"), events)
     }
 
     @Test

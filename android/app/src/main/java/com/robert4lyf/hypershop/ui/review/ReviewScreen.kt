@@ -46,6 +46,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -111,7 +112,31 @@ data class ReviewEdits(
     /** A cookbook recipe's book and page. */
     val onBook: (String, String) -> Unit = { _, _ -> },
     val onAddLine: (String) -> Unit = {},
+    /** Step AA: the other side of an "A or B" line (the sheet's swap). */
+    val onChoose: (Long) -> Unit = {},
 )
+
+/**
+ * Step AA: an "A or B" line as its two options, the one the line reads now selected. Choosing the other is the swap; a
+ * second swap goes back. Each is its own button, apart from the row it sits in.
+ */
+@Composable
+internal fun ChoiceButtons(
+    choice: Choice,
+    onChoose: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier.testTag("choice-${choice.lineId}"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        for ((label, chosen) in listOf(choice.chosen to true, choice.other to false)) {
+            FilterChip(
+                selected = chosen,
+                onClick = { if (!chosen) onChoose(choice.lineId) },
+                label = { Text(label.replaceFirstChar { it.uppercase() }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                modifier = Modifier.testTag(if (chosen) "chosen-${choice.lineId}" else "other-${choice.lineId}"),
+            )
+        }
+    }
+}
 
 /** The review screen's default view (PLAN §3.1), stateless. */
 @Composable
@@ -176,7 +201,14 @@ fun ReviewScreen(
                         )
                     }
                     itemsIndexed(rows, key = { _, r -> r.key }) { i, r ->
-                        ReviewRowItem(r, onInStock.takeUnless { ui.savedOnly }, onRow, sectionPosition(i + 1, count), card)
+                        ReviewRowItem(
+                            r,
+                            onInStock.takeUnless { ui.savedOnly },
+                            onRow,
+                            edits.onChoose,
+                            sectionPosition(i + 1, count),
+                            card,
+                        )
                     }
                 }
                 item(key = "add-line") { AddLine(edits.onAddLine, enabled = !ui.busy, focus = addFocus) }
@@ -673,6 +705,7 @@ private fun ReviewRowItem(
     /** Null for a saved recipe being edited: nothing is added, so no box. */
     onInStock: ((String, Boolean) -> Unit)?,
     onRow: (String) -> Unit,
+    onChoose: (Long) -> Unit,
     position: SectionPosition,
     card: Color,
 ) {
@@ -735,16 +768,19 @@ private fun ReviewRowItem(
                         color = if (row.check && !row.inStock) MaterialTheme.colorScheme.tertiary else faded,
                     )
                 }
-                // What this row does: the amount that goes on, "At home", or the list has it already.
+                // What this row does: the amount that goes on (and what the list will hold with it), "At home", or the
+                // list has it already.
                 val sub =
                     when {
                         row.inStock -> listOfNotNull("At home", row.quantity?.let { "needs $it" }).joinToString(" · ")
                         !row.adds -> "Already on your shopping list"
-                        else -> row.quantity?.let { "+$it" }
+                        row.withList != null -> row.withList
+                        else -> row.quantity
                     }.let { s -> if (row.optional && !row.inStock) listOfNotNull(s, "optional").joinToString(" · ") else s }
                 sub?.let {
                     Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                row.choice?.takeIf { !row.inStock }?.let { ChoiceButtons(it, onChoose, Modifier.padding(top = 4.dp)) }
                 if (row.check && !row.inStock) {
                     Text(
                         row.checkReason?.let { "Check: ${ReviewViewModel.plainReason(it)}" } ?: "Check this line",

@@ -38,7 +38,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -160,17 +159,12 @@ fun ReviewRowSheet(
                 InfoBanner("Check: ${ReviewViewModel.plainReason(reason)}", Icons.Rounded.ReportProblem, tone = Tone.WARNING)
             }
             // UX review 6: in the order corrections are made. The amount first (the commonest), then a swap, the line's
-            // words behind "Edit the line" (one place for the text and the name: cut 6), the aisle, the rest.
+            // words behind "Fix the recipe's text" (one place for the text and the name: cut 6), the aisle, the rest.
             for (line in sheet.lines) key(line.origin ?: line.id) { AmountRow(line, sheet.lines.size > 1, actions) }
             if (sheet.swaps.isNotEmpty()) SwapFor(sheet.swaps, actions.onRename)
+            // Step AA: the line's two options, as on the row; choosing the other is the swap.
             for (line in sheet.lines) {
-                line.alternative?.let { alt ->
-                    OutlinedButton(onClick = { actions.onSwap(line.id) }) {
-                        Icon(Icons.Rounded.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.size(8.dp))
-                        Text("Use $alt instead")
-                    }
-                }
+                line.alternative?.let { alt -> ChoiceButtons(Choice(line.id, line.name, alt), actions.onSwap) }
             }
             var editing by rememberSaveable(sheet.key) { mutableStateOf(false) }
             Row(
@@ -181,7 +175,7 @@ fun ReviewRowSheet(
                     .testTag("edit-line"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Edit the line", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                Text("Fix the recipe's text", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
                 Icon(if (editing) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, contentDescription = null)
             }
             if (editing) {
@@ -317,7 +311,8 @@ private fun AmountRow(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         AmountField(
-            heading = if (several) line.raw else "Amount",
+            // It sets the recipe's amount (servings scale it), not an amount to buy, so it says so.
+            heading = if (several) line.raw else "Amount in the recipe",
             label = "e.g. 2, 200 g or 1 tbsp",
             button = "Set",
             tag = "amount-${line.id}",

@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.ui.review
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.robert4lyf.hypershop.core.catalog.CatalogEntry
 import com.robert4lyf.hypershop.core.merge.ApplyResult
 import com.robert4lyf.hypershop.core.merge.Display
 import com.robert4lyf.hypershop.core.merge.Incoming
@@ -67,6 +68,20 @@ data class ReviewRow(
     val raw: String? = null,
     /** Every line for it is optional or a garnish ("to serve"): said on the row, one tap to leave it out. */
     val optional: Boolean = false,
+    /** Step AA: an "A or B" line, shown as two buttons; choosing the other is [ReviewViewModel.swap]. */
+    val choice: Choice? = null,
+    /**
+     * Step AA: for an item on the list already, what this adds and what the list will then hold, in words ("200ml ·
+     * 700ml with what's on your list"); null otherwise, when the row shows [quantity].
+     */
+    val withList: String? = null,
+)
+
+/** The two sides of an "A or B" line: [chosen] is what the line reads now. */
+data class Choice(
+    val lineId: Long,
+    val chosen: String,
+    val other: String,
 )
 
 enum class Badge { CLAUDE, CLAUDE_PENDING, RULES }
@@ -80,20 +95,22 @@ data class SheetLine(
     val alternative: String?,
     /** Why the line is flagged to check, when it is. */
     val checkReason: String? = null,
-    /** The amount as read ("2 tbsp"), to start the Amount field from. */
+    /** The amount as read ("2 tbsp"), to start the Amount field from (the recipe's amount, before servings). */
     val amount: String? = null,
     /**
      * Which line of the recipe this is ([LineOrigin]): what the sheet's editors are keyed by, since every edit
      * stores the recipe again with new line [id]s and a draft in another line must not be lost to that (review B.15).
      */
     val origin: LineOrigin? = null,
+    /** The ingredient the line reads now: A in "A or B". */
+    val name: String = "",
 )
 
 /** The review row's detail sheet (PLAN §3.1). */
 data class RowSheet(
     val key: String,
     val name: String,
-    /** "Milk: +200 ml → 700 ml on list" */
+    /** "Milk: 200 ml · 700 ml with what's on your list" */
     val effect: String,
     val packNote: String?,
     val lines: List<SheetLine>,
@@ -575,12 +592,18 @@ class ReviewViewModel(
         val produce = r.target.aisle == AisleCode.PRODUCE
         val hint = Display.hintOf(lines.map { it.parsed.shopUnit })
         val entry = c.catalog.byId[r.target.catalogId ?: ""]
-        val check = lines.firstOrNull { it.parsed.check }
+        // Step AA: an "A or B" line is shown as its two options, not flagged to check.
+        val check = lines.firstOrNull { it.parsed.check && !isChoice(it.parsed) }
+        val choice =
+            lines.firstNotNullOfOrNull { l ->
+                alternativeOf(l.parsed)?.let { Choice(l.recipeLineId, l.parsed.name, it) }
+            }
+        val name = entry?.name ?: r.target.displayName
         return ReviewRow(
             key = r.target.mergeKey,
             name = entry?.name ?: r.target.displayName,
             // What the list row will say: "2" bananas rather than "200g", "1 jar" of jam.
-            quantity = Display.brief(needed, entry, entry?.name ?: r.target.displayName, units, produce, hint).first,
+            quantity = Display.brief(needed, entry, name, units, produce, hint).first,
             inStock = d.inStock,
             check = check != null,
             aisle = r.target.aisle,
@@ -588,7 +611,21 @@ class ReviewViewModel(
             checkReason = check?.parsed?.checkReason,
             raw = check?.parsed?.raw,
             optional = lines.isNotEmpty() && lines.all { it.parsed.optional || it.parsed.garnish },
+            choice = choice,
+            withList = r.existing?.let { withList(r.adding, r.onListAfter, entry, produce) },
         )
+    }
+
+    /** "200ml · 700ml with what's on your list": exact amounts, as the sheet says, since a pack count may not change. */
+    private fun withList(
+        adding: QtyBase,
+        after: QtyBase,
+        entry: CatalogEntry?,
+        produce: Boolean,
+    ): String? {
+        val a = Display.amount(adding, units, produce, null, entry?.gramsPerCup, entry?.displayPolicy) ?: return null
+        val b = Display.amount(after, units, produce, null, entry?.gramsPerCup, entry?.displayPolicy) ?: return null
+        return "$a · $b with what's on your list"
     }
 
     private fun lineQty(
@@ -856,8 +893,8 @@ class ReviewViewModel(
                 row.decision.inStock -> "$name: at home, nothing added"
                 adding == null && row.existing != null -> "$name: already on the shopping list"
                 adding == null -> "$name: added to the shopping list"
-                row.existing == null || before == null -> "$name: +$adding (new)"
-                else -> "$name: +$adding → $after on the shopping list"
+                row.existing == null || before == null -> "$name: $adding"
+                else -> "$name: $adding · $after with what's on your list"
             }
         val stored = stored?.lines.orEmpty()
         val origins = result?.let { LineIdentity.originsOf(it) }.orEmpty()
@@ -867,8 +904,8 @@ class ReviewViewModel(
                     l.recipeLineId,
                     l.parsed.raw,
                     summary(l.parsed),
-                    l.parsed.note?.takeIf { it.startsWith("or ") }?.removePrefix("or ")?.trim(),
-                    l.parsed.checkReason?.takeIf { l.parsed.check },
+                    alternativeOf(l.parsed),
+                    l.parsed.checkReason?.takeIf { l.parsed.check && !isChoice(l.parsed) },
                     amount =
                         l.parsed.quantity?.let { q ->
                             // A unit word with no unit of its own ("jar", "pot") reads as typed, not as "other".
@@ -879,6 +916,7 @@ class ReviewViewModel(
                                 ).joinToString(" ")
                         },
                     origin = origins.getOrNull(stored.indexOfFirst { it.first.id == l.recipeLineId }),
+                    name = l.parsed.name,
                 )
             }
         return RowSheet(
@@ -991,7 +1029,7 @@ class ReviewViewModel(
         onKey: (String) -> Unit = {},
     ) = act {
         replaceLine(lineId) { p ->
-            val alt = p.note?.takeIf { it.startsWith("or ") }?.removePrefix("or ")?.trim() ?: return@replaceLine p
+            val alt = alternativeOf(p) ?: return@replaceLine p
             // Decided: the line no longer needs checking.
             p.copy(name = alt.lowercase(), note = "or ${p.name}", unit = p.unit, check = false, checkReason = null)
         }?.let(onKey)
@@ -1205,13 +1243,19 @@ class ReviewViewModel(
     internal fun currentPreview(): Preview? = preview
 
     companion object {
+        /** B in "A or B": the line's note "or B", when it has one. */
+        fun alternativeOf(p: ParsedIngredient): String? =
+            p.note?.takeIf { it.startsWith("or ") }?.removePrefix("or ")?.trim()?.ifEmpty { null }
+
+        /** A line flagged only for its choice, which the row shows as two buttons rather than "Check". */
+        private fun isChoice(p: ParsedIngredient): Boolean = p.checkReason?.startsWith("\"A or B\"") == true && alternativeOf(p) != null
+
         /**
          * The parser's reason in plain words, with what to do about it. Reasons it
          * doesn't know (Claude's, or a new one) are shown as they are.
          */
         fun plainReason(reason: String): String =
             when {
-                reason.startsWith("\"A or B\"") -> "the recipe offers a choice; the swap button takes the other"
                 reason.startsWith("\"X and Y\"") -> "this may be two ingredients; edit the line to split them"
                 reason == "an unknown unit" -> "a measure the app doesn't know, so the amount may be off; the Amount field sets it"
                 reason == "an amount left in the name" -> "a number stayed in the name; check the amount"

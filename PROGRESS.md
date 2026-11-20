@@ -385,7 +385,14 @@ A follow-up review of Step Z found the remaining friction in a few places, and t
   `defaultDecisions` already marks them in stock (claim checked). The box is hidden from TalkBack; the row is one node
   with the name, the amount, a state ("Will be added" / "At home, not added") and a custom action that toggles it. The
   summary and the button count already followed `addCount`.
-- [ ] AA.3 Review wording
+- [x] AA.3 Review wording. An "A or B" line shows its two options as buttons on the row and in its sheet (the one it
+  reads now selected; the other is `swap`, a second swap goes back) and is no longer "to check". Amounts lose the "+";
+  an item on the list already reads "200ml · 700ml with what's on your list" (exact amounts, as a pack count may not
+  change), on the row and in the sheet. "Edit the line" → **Fix the recipe's text**; "This is wrong" → **Report a wrong
+  reading** (on the item sheet too, one word per idea; the saved note's own "--- This is wrong" header is data and
+  stays). Claims checked: "Check: has 'or'" was never on screen (only in a test's sample); the app said "Check: the
+  recipe offers a choice; …", now gone. The sheet's amount field sets the recipe line's own amount (servings scale it),
+  not an amount to buy, so it is labelled **Amount in the recipe**, not "Amount to buy".
 - [ ] AA.4 Snackbars never cover the bottom action
 - [ ] AA.5 Compact list header
 - [ ] AA.6 Recipes ordered by use
