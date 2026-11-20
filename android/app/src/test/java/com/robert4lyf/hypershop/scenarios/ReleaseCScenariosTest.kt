@@ -22,7 +22,7 @@ import com.robert4lyf.hypershop.ui.list.ListViewModel
 import com.robert4lyf.hypershop.ui.list.TickState
 import com.robert4lyf.hypershop.ui.list.add
 import com.robert4lyf.hypershop.ui.recipes.RecipesViewModel
-import com.robert4lyf.hypershop.ui.recipes.addRecipeToList
+import com.robert4lyf.hypershop.ui.recipes.putRecipeOnList
 import com.robert4lyf.hypershop.ui.review.Badge
 import com.robert4lyf.hypershop.ui.review.ReviewState
 import com.robert4lyf.hypershop.ui.review.ReviewUi
@@ -125,8 +125,8 @@ class ReleaseCScenariosTest {
         val soup = save(c, "Soup", "1 onion", "2 carrots")
         // Step Z: Add to list, each recipe on the list at once and planned for this week.
         runBlocking {
-            c.addRecipeToList(chilli, "Chilli")
-            c.addRecipeToList(soup, "Soup")
+            c.putRecipeOnList(chilli)
+            c.putRecipeOnList(soup)
         }
         assertTrue(runBlocking { c.planner.week(c.planner.currentWeek()) }.all { it.shopping == MealShopping.TO_BUY })
 

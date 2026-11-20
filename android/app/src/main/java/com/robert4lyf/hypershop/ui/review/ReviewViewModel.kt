@@ -116,7 +116,6 @@ data class RowSheet(
     val lines: List<SheetLine>,
     val aisle: AisleCode,
     val inStock: Boolean,
-    val isStaple: Boolean,
     /** False when the recipe has one line: it can't be removed. */
     val canRemove: Boolean = true,
     /** The catalogue's usual swaps ("Swap for" on the list's sheet), offered here before anything is bought. */
@@ -159,7 +158,6 @@ data class ReviewUi(
     private val rows: List<ReviewRow> get() = aisles.flatMap { it.second }
     val addCount: Int get() = rows.count { !it.inStock && it.adds }
     val inStockCount: Int get() = rows.count { it.inStock }
-    val checkCount: Int get() = rows.count { it.check && !it.inStock }
 
     /** Step Z: "4 to add · 2 at home", without the zero parts ("12 ingredients" for a saved recipe); a line to check is marked on its row. */
     val summary: String
@@ -927,7 +925,6 @@ class ReviewViewModel(
             lines,
             row.target.aisle,
             row.decision.inStock,
-            entry != null && row.decision.inStock,
             canRemove = p.incoming.lines.size > 1,
             swaps = entry?.swaps.orEmpty().mapNotNull { c.catalog.byId[it]?.name },
         )

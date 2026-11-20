@@ -479,9 +479,6 @@ interface ListDao {
     @Query("SELECT * FROM PlannedMeal WHERE weekStart = :week ORDER BY position, id")
     suspend fun plannedMeals(week: Long): List<PlannedMealEntity>
 
-    @Query("SELECT * FROM PlannedMeal WHERE weekStart = :week ORDER BY position, id")
-    fun observePlannedMeals(week: Long): Flow<List<PlannedMealEntity>>
-
     @Query("SELECT * FROM PlannedMeal")
     suspend fun allPlannedMeals(): List<PlannedMealEntity>
 
@@ -499,10 +496,6 @@ interface ListDao {
     @Query("SELECT * FROM PlannedMeal WHERE useId = :useId")
     suspend fun mealsOfUse(useId: Long): List<PlannedMealEntity>
 
-    /** The latest week before [week] with a meal planned, or null. */
-    @Query("SELECT MAX(weekStart) FROM PlannedMeal WHERE weekStart < :week")
-    suspend fun latestWeekBefore(week: Long): Long?
-
     @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM PlannedMeal WHERE weekStart = :week")
     suspend fun nextMealPosition(week: Long): Int
 
@@ -519,12 +512,6 @@ interface ListDao {
     suspend fun linkMeal(
         id: Long,
         useId: Long?,
-    )
-
-    @Query("UPDATE PlannedMeal SET cookedAt = :at WHERE id = :id")
-    suspend fun setMealCooked(
-        id: Long,
-        at: Long?,
     )
 
     @Query("UPDATE PlannedMeal SET servings = :servings WHERE id = :id")

@@ -40,6 +40,9 @@ private fun ReviewState.ui() = (this as ReviewState.Ready).ui
 
 private fun ReviewUi.row(key: String) = aisles.flatMap { it.second }.first { it.key == key }
 
+/** Rows flagged to check and not at home. */
+private fun ReviewUi.toCheck() = aisles.flatMap { it.second }.count { it.check && !it.inStock }
+
 /** The row, or [or] when the key is not on screen (yet). */
 private fun ReviewUi.row(
     key: String,
@@ -211,7 +214,7 @@ class ReviewCorrectionsTest {
     fun aSwapOrARenameSettlesAFlaggedLine() {
         // Step AA: an "A or B" line is never "to check" (its two options say it); a swap or a rename keeps it so.
         val (_, vm) = vm("4 tablespoons butter or margarine", "1 lemon or lime")
-        assertEquals(0, (vm.state.value as ReviewState.Ready).ui.checkCount)
+        assertEquals(0, (vm.state.value as ReviewState.Ready).ui.toCheck())
         vm.swap(vm.sheet("cat:butter")!!.lines.single().id)
         val ui = await(vm.state) { s -> s is ReviewState.Ready && s.ui().row("cat:vegan_butter", or = null) != null }.ui()
         assertFalse(ui.row("cat:vegan_butter").check)
@@ -219,7 +222,7 @@ class ReviewCorrectionsTest {
         vm.rename("cat:lemon", "lime")
         val renamed = await(vm.state) { s -> s is ReviewState.Ready && s.ui().row("cat:lime", or = null) != null }.ui()
         assertFalse(renamed.row("cat:lime").check)
-        assertEquals(0, renamed.checkCount)
+        assertEquals(0, renamed.toCheck())
     }
 
     @Test
@@ -276,7 +279,6 @@ class ReviewRowSheetScreenTest {
                 ),
             aisle = AisleCode.DAIRY_EGGS,
             inStock = false,
-            isStaple = false,
         )
     private val events = mutableListOf<String>()
     private val actions =

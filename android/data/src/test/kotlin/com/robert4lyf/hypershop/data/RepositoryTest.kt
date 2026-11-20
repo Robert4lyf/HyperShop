@@ -116,7 +116,7 @@ class RepositoryTest {
         }
 
     @Test
-    fun aSecondStoreKeepsItsOwnWalkingOrderAndCookedCounts() =
+    fun aSecondStoreKeepsItsOwnWalkingOrder() =
         runBlocking {
             // Missing 4 of the review: store 2 walks like store 1 until it has an order of its own.
             val mine = r.repo.aisleOrder(1)
@@ -127,11 +127,5 @@ class RepositoryTest {
             assertEquals(mine.reversed(), r.repo.aisleOrder(2))
             assertEquals(mine, r.repo.aisleOrder(1))
             assertEquals(mine.reversed().first(), r.repo.watchView(2).aisles.first().code)
-            // Missing 2: "Cooked it" counts, and comes back from an accidental tap.
-            r.repo.cooked("r:1")
-            r.repo.cooked("r:1")
-            assertEquals(2, r.repo.recipeNote("r:1")!!.timesCooked)
-            r.repo.uncooked("r:1")
-            assertEquals(1, r.repo.recipeNote("r:1")!!.timesCooked)
         }
 }

@@ -318,12 +318,6 @@ data class LineCount(
     val n: Int,
 )
 
-/** A count per library key (meals planned per saved recipe). */
-data class KeyCount(
-    val key: String,
-    val n: Int,
-)
-
 /** A query's row, not a table: how many meals a saved recipe has been planned as, and the latest one's time. */
 data class KeyUse(
     val key: String,

@@ -10,12 +10,10 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * The brand's colour beyond Material's roles (docs/design/ui-overhaul.md,
- * "Colour pass"): a basil-to-lagoon gradient for heroes, citrus for highlights
- * on it, and a low-poly header per recipe ([lowPoly]). White text clears 4.5:1 on every gradient here.
+ * "Colour pass"): a basil-to-lagoon gradient for heroes and a low-poly header
+ * per recipe ([lowPoly]). White text clears 4.5:1 on every gradient here.
  */
 object Brand {
-    val Citrus = Color(0xFFFFE08A)
-
     /** Text and icons on a hero: white, or a touch softer for secondary lines. */
     val OnHero = Color.White
     val OnHeroSoft = Color.White.copy(alpha = 0.9f)

@@ -16,7 +16,6 @@ import com.robert4lyf.hypershop.core.merge.ShelfOrder
 import com.robert4lyf.hypershop.core.merge.ShoppingList
 import com.robert4lyf.hypershop.core.merge.TickSource
 import com.robert4lyf.hypershop.core.merge.UseKind
-import com.robert4lyf.hypershop.core.merge.UseLineAdd
 import com.robert4lyf.hypershop.core.merge.UseProgress
 import com.robert4lyf.hypershop.core.merge.UseState
 import com.robert4lyf.hypershop.core.merge.WatchTickResult
@@ -42,18 +41,6 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.serialization.json.Json
-
-/** A recipe line marked in stock on review, for a recipe still on the list. */
-data class InStockLine(
-    val useId: Long,
-    val recipeTitle: String,
-    val recipeLineId: Long,
-    val target: NewItem,
-    /** Scaled to the use's servings. */
-    val qty: QtyBase,
-    val noScale: Boolean,
-    val unitHint: QtyUnit?,
-)
 
 /** One recipe in the library (the Recipes tab's "Your recipes"). */
 data class LibraryRecipe(
@@ -593,94 +580,6 @@ class ListRepository(
     private suspend fun recipesById(ids: Collection<Long>): Map<Long, RecipeEntity> =
         ids.distinct().chunked(MAX_ARGS).flatMap { dao.recipes(it) }.associateBy { it.id }
 
-    /**
-     * What you marked in stock for the recipes on the list ([usesOnList]'s
-     * recipes), line by line: one query for the decisions, one for the recipes
-     * and one for their lines (chunked), each line parsed once.
-     */
-    suspend fun inStockOnList(
-        l: ShoppingList,
-        /** For display: leave out recipes whose shopping is done. Undo and "Need it" read every line. */
-        stillShopping: Boolean = false,
-    ): List<InStockLine> {
-        val live = l.liveItems.map { it.id }.toSet()
-        // The recipes the Recipes tab shows ([usesOnList]'s rule): something on the list, or its shopping
-        // done (bought, finished, or every line at home) — its at-home lines are still there to put back.
-        // A recipe taken off the list unbought ("Clear all") takes them with it. [stillShopping] (what the
-        // screens show, X.13) drops a recipe whose shopping is done: its at-home lines are a question about a
-        // trip already made, and they kept asking about the cupboard under "Nothing on the list".
-        val uses =
-            l.uses.values.filter { u ->
-                if (u.archivedAt != null || u.recipeId == null) return@filter false
-                val state = l.progress(u.id).state
-                if (stillShopping && (state == UseState.ALL_BOUGHT || state == UseState.BOUGHT_THE_REST)) return@filter false
-                l.contributionsOfUse(u.id).any { it.itemId in live } || state in KEPT
-            }
-        if (uses.isEmpty()) return emptyList()
-        val inStock =
-            uses.map { it.id }.chunked(MAX_ARGS).flatMap { dao.decisionsFor(it) }
-                .filter { it.status == LineStatus.IN_STOCK.name }
-                .groupBy({ it.useId }, { it.recipeLineId })
-        if (inStock.isEmpty()) return emptyList()
-        val withInStock = uses.filter { it.id in inStock }
-        val recipes = recipesById(withInStock.mapNotNull { it.recipeId })
-        val ov = overrides()
-        // A line already on the list ("Need it") isn't in stock any more.
-        val onList =
-            l.contributions.filter { it.itemId in live && it.coveredBy == null }
-                .mapNotNull { c -> c.recipeLineId?.let { c.useId to it } }.toSet()
-        val wanted = inStock.flatMap { (use, ids) -> ids.filter { use to it !in onList } }.toSet()
-        val rows = recipes.keys.toList().chunked(MAX_ARGS).flatMap { dao.linesFor(it) }.filter { it.id in wanted }.groupBy { it.recipeId }
-        // Two uses of one recipe share its parsed lines.
-        val parsedByRecipe = HashMap<Long, List<Pair<Long, ParsedIngredient>>>()
-        return withInStock.sortedBy { it.addedAt }.flatMap { u ->
-            val ids = inStock.getValue(u.id).filter { u.id to it !in onList }.toSet()
-            val r = recipes[u.recipeId] ?: return@flatMap emptyList()
-            val parsed =
-                parsedByRecipe.getOrPut(r.id) {
-                    rows[r.id].orEmpty().map { it.id to json.decodeFromString(ParsedIngredient.serializer(), it.parsedJson) }
-                }.filter { it.first in ids }
-            if (parsed.isEmpty()) return@flatMap emptyList()
-            val locale = UnitLocale.valueOf(r.unitLocale)
-            val inc = merger.incoming(r.id, r.servingsOriginal, u.servings, locale, parsed, ov)
-            inc.lines.mapNotNull { line ->
-                val noScale = line.parsed.noScale
-                val full = line.parsed.shopBase(locale).let { if (noScale) it else it.times(inc.scale) }
-                val covered =
-                    l.contributions.filter { it.useId == u.id && it.recipeLineId == line.recipeLineId && it.coveredBy != null }
-                        .fold(QtyBase.PRESENCE) { q, c -> q + c.qty }
-                val q = full.minusClamped(covered)
-                if (!full.isPresence && q.isPresence) return@mapNotNull null
-                InStockLine(u.id, r.title ?: "Recipe", line.recipeLineId, line.target, q, noScale || q.isPresence, line.parsed.shopUnit)
-            }
-        }
-    }
-
-    /**
-     * "Need it": every in-stock line for [mergeKey] goes on the list, under its
-     * recipe, and stops counting as in stock. One transaction. The number of lines added.
-     */
-    suspend fun needAfterAll(mergeKey: String): Int = needLines { it.target.mergeKey == mergeKey }.size
-
-    /**
-     * [needAfterAll] for every in-stock line [which] picks, in one transaction: the
-     * At home check's "Need" for several ingredients at once. The lines put back on
-     * the list, as (use, line) pairs, for Undo.
-     */
-    suspend fun needLines(which: (InStockLine) -> Boolean): List<Pair<Long, Long>> =
-        db.withTransaction {
-            val old = load()
-            val lines = inStockOnList(old).filter(which)
-            if (lines.isEmpty()) return@withTransaction emptyList()
-            var l = old
-            for ((useId, ls) in lines.groupBy { it.useId }) {
-                l = l.addToUse(useId, ls.map { UseLineAdd(it.target, it.recipeLineId, it.qty, it.noScale, it.unitHint) }) ?: l
-            }
-            persist(old, l)
-            dao.putDecisions(lines.map { LineDecisionEntity(it.useId, it.recipeLineId, LineStatus.ADDED.name) })
-            lines.map { it.useId to it.recipeLineId }
-        }
-
     // ---- the recipe library -------------------------------------------------------------
 
     /**
@@ -704,11 +603,6 @@ class ListRepository(
         key: String,
         stars: Int?,
     ) = changeNote(key) { it.copy(rating = stars?.takeIf { s -> s in 1..MAX_STARS }) }
-
-    /** "Cooked it" on a meal: one more time, now. [uncooked] takes an accidental tap back. */
-    suspend fun cooked(key: String) = changeNote(key) { it.copy(timesCooked = it.timesCooked + 1, lastCookedAt = clock()) }
-
-    suspend fun uncooked(key: String) = changeNote(key) { it.copy(timesCooked = (it.timesCooked - 1).coerceAtLeast(0)) }
 
     /** The cook's own notes ("10 min longer", "half the chilli"); blank clears them. */
     suspend fun setCookingNotes(

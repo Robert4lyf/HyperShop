@@ -2,7 +2,6 @@ package com.robert4lyf.hypershop.ui.recipes
 
 import com.robert4lyf.hypershop.core.merge.ApplyResult
 import com.robert4lyf.hypershop.di.AppContainer
-import com.robert4lyf.hypershop.ui.common.UiMessage
 
 /** A saved recipe just put on the list: its use (what Undo takes back) and how many items are now to buy. */
 data class RecipeAdded(
@@ -20,13 +19,4 @@ suspend fun AppContainer.putRecipeOnList(libraryKey: String): RecipeAdded? {
     val added = planner.addToList(libraryKey) as? ApplyResult.Applied ?: return null
     val list = repository.snapshot()
     return RecipeAdded(added.useId, list.liveItems.count { !list.isDone(it.id) && !list.isUnavailable(it.id) })
-}
-
-/** [putRecipeOnList] and its message: what is now to buy, and an Undo that takes back only what is still unbought. */
-suspend fun AppContainer.addRecipeToList(
-    libraryKey: String,
-    title: String,
-): UiMessage {
-    val added = putRecipeOnList(libraryKey) ?: return UiMessage("Couldn't add $title to the list")
-    return UiMessage("Added $title · ${added.toBuy} to buy", undo = { planner.takeBack(added.useId) })
 }

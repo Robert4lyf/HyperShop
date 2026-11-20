@@ -424,6 +424,18 @@ A follow-up review of Step Z found the remaining friction in a few places, and t
   for each, latest first (only unbought shares leave; a bought item stays bought, tested). Another message in
   between, or the seconds over, starts a new one. `putRecipeOnList` split from `addRecipeToList` (kept for the
   scenarios).
-- [ ] AA.8 Remove what Step Z left unused
+- [x] AA.8 Remove what Step Z left unused. Deleted (each grepped for callers in every module's main source,
+  backup/restore, workers, widget and watch coordinator first; none had one): `Planner.addWeekToList`, `previewWeek`,
+  `undoAddWeek`, `repeatWeek`, `previousPlannedWeek`, `unplanNew`, `setCooked`, `observeWeek` (and `WeekAdded`,
+  `WeekPreview`), `HomeCheck` (file) and `AppContainer.homeCheck`, `ListRepository.needAfterAll`, `needLines`,
+  `inStockOnList`, `cooked`/`uncooked`, DAO `observePlannedMeals`, `latestWeekBefore`, `setMealCooked`, `KeyCount`;
+  in `:app` `HeroButton`, `Brand.Citrus`, `RowSheet.isStaple`, `ReviewUi.checkCount`, `addRecipeToList`. 132+ / 965−.
+  Backups unchanged: no entity, serializer or backup DAO call touched; `BackupPlanTest` now fills the plan with
+  `addToList`/`plan` and still round-trips `PlannedMeal` and its `useId` (no backup test ever filled `cookedAt`,
+  `timesCooked` or `onHand`). Tests that only tested deleted code went (`HomeCheckTest`, two PlannerTest cases, one
+  CompoundItemEditTest case, the cooked half of a RepositoryTest case, one plan invariant); tests that used it as
+  setup were rewritten to live calls with the same assertions. The performance probe's "6 meals onto the list"
+  budget now times six Add to list (same 1300 ms); the week-preview and at-home-check budgets went with their code.
+  KNOWN_ISSUES #46 updated.
 - [ ] AA.9 Verify and report
 
