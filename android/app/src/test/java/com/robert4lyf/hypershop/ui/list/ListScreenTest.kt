@@ -96,7 +96,7 @@ class ListScreenTest {
         // "Finish shopping" sits in the bar at the bottom, in reach, once something is ticked.
         compose.onNodeWithText("Finish shopping").performClick()
         compose.onNodeWithTag("finish").assertExists()
-        compose.onNodeWithText("5 to buy").fetchSemanticsNode()
+        compose.onNodeWithText("5 to buy · 1 bought").fetchSemanticsNode()
         assertEquals(listOf("open 1", "toggle 1", "finish"), events)
     }
 
@@ -178,7 +178,7 @@ class ListScreenTest {
     @Test
     fun theCountIsAHeading() {
         show()
-        compose.onNode(hasText("5 to buy") and isHeading()).assertExists()
+        compose.onNode(hasText("5 to buy · 1 bought") and isHeading()).assertExists()
     }
 
     @Test
@@ -381,7 +381,13 @@ class ListScreenTest {
             )
         compose.setContent {
             HyperShopTheme(dark = dark, dynamicColor = false) {
-                ListScreen(ui, actions, header = { listHeader(ui, header) }, empty = { EmptyState(header.onSample, header.onPasteLink) })
+                ListScreen(
+                    ui,
+                    actions,
+                    header = { listHeader(ui, header) },
+                    empty = { EmptyState(header.onSample, header.onPasteLink) },
+                    addField = { ListAddField(header) },
+                )
             }
         }
     }
@@ -412,7 +418,9 @@ class ListScreenTest {
                 onPick = { typed, s -> events += "pick $typed $s" },
             )
         compose.setContent {
-            HyperShopTheme(dynamicColor = false) { ListScreen(SAMPLE_LIST, actions, header = { listHeader(SAMPLE_LIST, header) }) }
+            HyperShopTheme(dynamicColor = false) {
+                ListScreen(SAMPLE_LIST, actions, header = { listHeader(SAMPLE_LIST, header) }, addField = { ListAddField(header) })
+            }
         }
         compose.onNodeWithTag("add-item").performTextInput("2 on")
         compose.onNodeWithTag("suggestion-onion").performClick()

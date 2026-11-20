@@ -58,5 +58,8 @@ On the review, lines still to go on the list are counted as **N to add** ("4 to 
 
 - Bought rows fold under one **"N bought"** row per aisle; a row just ticked stays in place for 2.5 s, so a second tap
   undoes it. The screen stays awake while anything is ticked.
-- The title is **N to buy**; the subtitle "2 of 8 bought", then "1 set aside" and the watch's state when there are any.
+- Once the list has items, its top is one row: **"N to buy · M bought"** ("N to buy" before anything is ticked, "All
+  bought" at the end), the progress bar under it, the gear and ⋮; "1 set aside" and the watch's state in small text when
+  there are any. The mosaic banner only on the empty list. The **Add item** field is pinned under that row. Recipes
+  does the same: one "Recipes" row once there are recipes, the banner while there are none.
 - No instructions on screens: a control that needed a paragraph was relabelled or removed.

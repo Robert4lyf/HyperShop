@@ -401,7 +401,13 @@ A follow-up review of Step Z found the remaining friction in a few places, and t
   the bar: the list at 1× and 2× font, and the review. Not done as worded: the list does not keep a host of its own;
   one measured lift covers it and the review alike. A message can still sit over list rows for its seconds:
   JourneyTest waits it out only when the row it taps is under one (core: the last row; meal: the rice), not counted.
-- [ ] AA.5 Compact list header
+- [x] AA.5 Compact list header. With items, the list's top is one row ("5 to buy · 2 bought", a 6 dp progress bar, the
+  gear, ⋮); the mosaic banner only on the empty list and while loading. The Add item field is pinned under it
+  (`ListAddField`, out of the lazy header). `CompactHeaderTest` at 360×640 dp through the app shell (tab bar
+  included): the first aisle heading and three items on screen without scrolling, the field above the list; its
+  screenshot is `docs/screenshots/list-360x640.png`. Recipes' banner (about 100 dp) became the same one row once
+  there are recipes. The emulator scenario and the performance probe read the new count; the probe keeps its metric's
+  name so `docs/reports/performance.md` still lines up.
 - [ ] AA.6 Recipes ordered by use
 - [ ] AA.7 One message for several adds
 - [ ] AA.8 Remove what Step Z left unused

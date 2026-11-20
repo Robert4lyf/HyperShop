@@ -59,7 +59,6 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.findRootCoordinates
@@ -141,6 +140,8 @@ fun ListScreen(
     focusAdd: Int = 0,
     /** After the items: the optional extras (Buy again, Check food at home), never above what is to buy. */
     footer: LazyListScope.() -> Unit = {},
+    /** Step AA: the Add item field, pinned under the top row (not while arranging). */
+    addField: @Composable () -> Unit = {},
 ) {
     // Missing 1 of the review: a list that locks every 30 s is the first thing a shopper notices. Kept awake once
     // something is ticked, which is when a shop is under way.
@@ -154,6 +155,7 @@ fun ListScreen(
         Column(Modifier.fillMaxSize()) {
             // Pinned: the count and the menu stay in reach on a long list.
             ListTop(ui, actions)
+            if (ui.loaded && !ui.arranging) addField()
             Box(Modifier.weight(1f)) {
                 if (ui.loaded) ListBody(ui, actions, header, empty, focusAdd, footer) else Loading()
             }
@@ -533,6 +535,10 @@ private class LeftMemo(
     var counts: Map<String, Int>,
 )
 
+/**
+ * The top of the list. Step AA: once the list has items, one compact row (the count, the progress bar, the gear and the
+ * menu) so the aisles start high on a small phone; the mosaic banner only on the empty list (and while loading).
+ */
 @Composable
 private fun ListTop(
     ui: ListUi,
@@ -540,109 +546,136 @@ private fun ListTop(
 ) {
     val shopping = ui.loaded && !ui.isEmpty
     val total = ui.left + ui.doneCount + ui.unavailable
-    ScreenHeader(
-        title =
-            when {
-                !ui.loaded -> ""
-                // Where am I, and what is left: the count is the title while there is a list.
-                shopping -> "${ui.left} to buy"
-                else -> "Shopping list"
+    if (!shopping) {
+        ScreenHeader(
+            title = if (!ui.loaded) "" else "Shopping list",
+            // One mosaic for the list, whatever the count says.
+            seed = "Shopping list",
+            // Loading: the screen's name, small, until the count or "Shopping list" can be said.
+            overline = if (ui.loaded) null else "Shopping list",
+            actions = {
+                com.robert4lyf.hypershop.ui.common.SettingsButton()
+                ListMenu(ui, actions)
             },
-        // One mosaic for the list, whatever the count says.
-        seed = "Shopping list",
-        overline = if (ui.loaded && !shopping) null else "Shopping list",
-        subtitle =
-            when {
-                !ui.loaded -> null
-                !shopping -> null
-                else ->
-                    listOfNotNull(
-                        if (ui.left == 0) "All bought" else "${ui.doneCount} of $total bought",
-                        ui.unavailable.takeIf { it > 0 }?.let { "$it set aside" },
-                        // UX review 23: whether the watch has this list.
-                        ui.watch,
-                    ).joinToString(" · ")
-            },
-        actions = {
-            com.robert4lyf.hypershop.ui.common.SettingsButton()
-            var menu by remember { mutableStateOf(false) }
-            Box {
-                IconButton(onClick = { menu = true }, modifier = Modifier.testTag("list-more")) {
-                    Icon(Icons.Rounded.MoreVert, contentDescription = "More")
-                }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text("Share shopping list") }, onClick = {
-                        menu = false
-                        actions.onShareText()
-                    })
-                    for ((view, label) in VIEWS) {
-                        val on = ui.view == view
-                        DropdownMenuItem(
-                            text = { Text(label) },
-                            trailingIcon = { if (on) Icon(Icons.Rounded.Check, contentDescription = null) },
-                            onClick = {
-                                menu = false
-                                actions.onView(view)
-                            },
-                            // Read as a radio button, so TalkBack says which one is chosen.
-                            modifier =
-                                Modifier
-                                    .semantics {
-                                        role = Role.RadioButton
-                                        selected = on
-                                    }
-                                    .testTag("view-${view.name}"),
-                        )
-                    }
-                    // Missing 4 of the review: which store's walking order; only offered when there is a choice.
-                    if (ui.secondStore) {
-                        DropdownMenuItem(text = { Text("Change store (${ui.storeName})") }, onClick = {
-                            menu = false
-                            actions.onChangeStore()
-                        }, modifier = Modifier.testTag("change-store"))
-                    }
-                    HorizontalDivider()
-                    DropdownMenuItem(
-                        text = { Text("Arrange items") },
-                        enabled = !ui.isEmpty && ui.view != ListView.RECIPE,
-                        onClick = {
-                            menu = false
-                            actions.onArrange(true)
-                        },
-                        modifier = Modifier.testTag("arrange"),
+        )
+        return
+    }
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).testTag("list-count")) {
+            val title = listCount(ui.left, ui.doneCount)
+            Text(
+                title,
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.semantics { heading() },
+            )
+            // Said only when there is something to say: set aside on this trip, and whether the watch has the list.
+            listOfNotNull(ui.unavailable.takeIf { it > 0 }?.let { "$it set aside" }, ui.watch)
+                .takeIf { it.isNotEmpty() }
+                ?.let {
+                    Text(
+                        it.joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    DropdownMenuItem(text = { Text("Buy again") }, onClick = {
-                        menu = false
-                        actions.onBuyAgain()
-                    }, modifier = Modifier.testTag("menu-buy-again"))
-                    DropdownMenuItem(text = { Text("Share list as text") }, enabled = !ui.isEmpty, onClick = {
-                        menu = false
-                        actions.onShare()
-                    })
-                    // No "are you sure?": the snackbar's Undo puts the list back.
-                    DropdownMenuItem(text = { Text("Clear all") }, enabled = !ui.isEmpty, onClick = {
-                        menu = false
-                        actions.onClearAll()
-                    })
                 }
-            }
-        },
-        below = {
-            if (shopping) {
-                Spacer(Modifier.height(12.dp))
-                LinearProgressIndicator(
-                    progress = { if (total == 0) 0f else ui.doneCount / total.toFloat() },
-                    // The subtitle already says "N of M bought"; the bar is not read out as well.
-                    modifier = Modifier.fillMaxWidth().height(8.dp).clearAndSetSemantics {},
-                    strokeCap = StrokeCap.Round,
-                    gapSize = 4.dp,
-                    drawStopIndicator = {},
-                    color = Brand.Citrus,
-                    trackColor = Color.White.copy(alpha = 0.22f),
+            Spacer(Modifier.height(6.dp))
+            LinearProgressIndicator(
+                progress = { if (total == 0) 0f else ui.doneCount / total.toFloat() },
+                // The count already says it; the bar is not read out as well.
+                modifier = Modifier.fillMaxWidth().height(6.dp).clearAndSetSemantics {},
+                strokeCap = StrokeCap.Round,
+                gapSize = 4.dp,
+                drawStopIndicator = {},
+            )
+        }
+        com.robert4lyf.hypershop.ui.common.SettingsButton()
+        ListMenu(ui, actions)
+    }
+}
+
+/** "5 to buy · 2 bought", "5 to buy" before anything is ticked, "All bought" at the end. */
+internal fun listCount(
+    left: Int,
+    bought: Int,
+): String =
+    when {
+        left == 0 -> "All bought"
+        bought == 0 -> "$left to buy"
+        else -> "$left to buy · $bought bought"
+    }
+
+/** The list's ⋮ menu. */
+@Composable
+private fun ListMenu(
+    ui: ListUi,
+    actions: ListActions,
+) {
+    var menu by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { menu = true }, modifier = Modifier.testTag("list-more")) {
+            Icon(Icons.Rounded.MoreVert, contentDescription = "More")
+        }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(text = { Text("Share shopping list") }, onClick = {
+                menu = false
+                actions.onShareText()
+            })
+            for ((view, label) in VIEWS) {
+                val on = ui.view == view
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    trailingIcon = { if (on) Icon(Icons.Rounded.Check, contentDescription = null) },
+                    onClick = {
+                        menu = false
+                        actions.onView(view)
+                    },
+                    // Read as a radio button, so TalkBack says which one is chosen.
+                    modifier =
+                        Modifier
+                            .semantics {
+                                role = Role.RadioButton
+                                selected = on
+                            }
+                            .testTag("view-${view.name}"),
                 )
             }
-        },
-    )
+            // Missing 4 of the review: which store's walking order; only offered when there is a choice.
+            if (ui.secondStore) {
+                DropdownMenuItem(text = { Text("Change store (${ui.storeName})") }, onClick = {
+                    menu = false
+                    actions.onChangeStore()
+                }, modifier = Modifier.testTag("change-store"))
+            }
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text("Arrange items") },
+                enabled = !ui.isEmpty && ui.view != ListView.RECIPE,
+                onClick = {
+                    menu = false
+                    actions.onArrange(true)
+                },
+                modifier = Modifier.testTag("arrange"),
+            )
+            DropdownMenuItem(text = { Text("Buy again") }, onClick = {
+                menu = false
+                actions.onBuyAgain()
+            }, modifier = Modifier.testTag("menu-buy-again"))
+            DropdownMenuItem(text = { Text("Share list as text") }, enabled = !ui.isEmpty, onClick = {
+                menu = false
+                actions.onShare()
+            })
+            // No "are you sure?": the snackbar's Undo puts the list back.
+            DropdownMenuItem(text = { Text("Clear all") }, enabled = !ui.isEmpty, onClick = {
+                menu = false
+                actions.onClearAll()
+            })
+        }
+    }
 }
 
 @Composable

@@ -204,16 +204,34 @@ fun RecipesScreen(
                 // and on This week, each with the recipe's own actions.
                 item(key = "top") {
                     val n = ui.library.size
-                    ScreenHeader(
-                        title = "Recipes",
-                        subtitle =
-                            when {
-                                !ui.loaded || n == 0 || ui.terms.isNotEmpty() || ui.highlyRated -> null
-                                n == 1 -> "1 saved recipe"
-                                else -> "$n saved recipes"
-                            },
-                        actions = { com.robert4lyf.hypershop.ui.common.SettingsButton() },
-                    )
+                    val subtitle =
+                        when {
+                            !ui.loaded || n == 0 || ui.terms.isNotEmpty() || ui.highlyRated -> null
+                            n == 1 -> "1 saved recipe"
+                            else -> "$n saved recipes"
+                        }
+                    if (ui.hasLibrary) {
+                        // Step AA: with recipes, one compact row (as the list's), so the cards start high; the mosaic
+                        // banner only while there are none.
+                        Row(
+                            Modifier.fillMaxWidth().padding(start = 20.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f).testTag("recipes-title")) {
+                                Text("Recipes", style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+                                subtitle?.let {
+                                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            com.robert4lyf.hypershop.ui.common.SettingsButton()
+                        }
+                    } else {
+                        ScreenHeader(
+                            title = "Recipes",
+                            subtitle = subtitle,
+                            actions = { com.robert4lyf.hypershop.ui.common.SettingsButton() },
+                        )
+                    }
                 }
                 if (ui.loaded && !ui.hasLibrary) {
                     item(key = "empty") {

@@ -280,7 +280,7 @@ class PerformanceProbeTest {
                     compose.onAllNodes(ticks)[0].performClick()
                     compose.waitUntil(
                         10_000,
-                    ) { compose.onAllNodesWithText("$i of 150 bought", substring = true).fetchSemanticsNodes().isNotEmpty() }
+                    ) { compose.onAllNodesWithText("· $i bought", substring = true).fetchSemanticsNodes().isNotEmpty() }
                 }.second
             }.sorted()
         budget("shop: tap to \"N of 150 bought\" (median of 10)", each[each.size / 2], 750.0)

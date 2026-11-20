@@ -254,14 +254,18 @@ fun EmptyState(
 fun androidx.compose.foundation.lazy.LazyListScope.listHeader(
     ui: ListUi,
     actions: HeaderActions,
-    prep: PlanPrep = PlanPrep(),
+) {
+    item(key = "ready") { ReadyCard(ui.readyJobs, actions.onReview) }
+}
+
+/** Step AA: the Add item field, pinned under the list's header (it no longer scrolls away with the items). */
+@Composable
+fun ListAddField(
+    actions: HeaderActions,
     /** Above zero to focus the Add field (the widget's or launcher's Add item). */
     focusAdd: Int = 0,
     onAddFocused: () -> Unit = {},
-) {
-    item(key = "add") { AddItemField(actions.onAdd, actions.suggestions, actions.onPick, focus = focusAdd, onFocused = onAddFocused) }
-    item(key = "ready") { ReadyCard(ui.readyJobs, actions.onReview) }
-}
+) = AddItemField(actions.onAdd, actions.suggestions, actions.onPick, focus = focusAdd, onFocused = onAddFocused)
 
 /**
  * Step Q: the optional extra after the items (on a small phone a row above them pushed the list off the screen):

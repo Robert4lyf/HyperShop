@@ -152,8 +152,8 @@ class DeviceScenariosTest {
             waitFor { openTicks().fetchSemanticsNodes().isNotEmpty() }
             openTicks()[0].performClick()
             waitFor { bought() == i + 1 }
-            // The list's subtitle counts "N of 4 bought" and says "All bought" for the last (the shop screen said "4 of 4").
-            val said = if (i == 3) "All bought" else "${i + 1} of 4 bought"
+            // Step AA: the list's top row counts "3 to buy · 1 bought" and says "All bought" for the last.
+            val said = if (i == 3) "All bought" else "${3 - i} to buy · ${i + 1} bought"
             waitFor("\"$said\"") { compose.onAllNodesWithText(said, substring = true).fetchSemanticsNodes().isNotEmpty() }
         }
         waitFor { compose.onAllNodesWithText("All bought", substring = true).fetchSemanticsNodes().isNotEmpty() }

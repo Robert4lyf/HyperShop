@@ -112,7 +112,8 @@ fun ListRoute(
                 context.startActivity(Intent.createChooser(send, "Share list"))
             },
         ),
-        header = { listHeader(ui, header, prep, focusAdd, onAddFocused) },
+        header = { listHeader(ui, header) },
+        addField = { ListAddField(header, focusAdd, onAddFocused) },
         footer = { listFooter(prep, header) },
         empty = { EmptyState(header.onSample, header.onPasteLink, prep, header.onLastShop) },
         focusAdd = focusAdd,
