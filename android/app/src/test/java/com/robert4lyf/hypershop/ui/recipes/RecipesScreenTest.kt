@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
@@ -58,6 +59,8 @@ private val USES =
                     1_760_000_000_000,
                     onList = true,
                     photo = TestPhotos.dish,
+                    servings = 4,
+                    listCount = 1,
                 ),
             ),
         photos = mapOf("r:1" to TestPhotos.dish),
@@ -112,21 +115,37 @@ class RecipesScreenTest {
     }
 
     @Test
-    fun aRecipeAlreadyOnTheListAsksBeforeAddingAgain() {
-        val added = mutableListOf<String>()
+    fun onTheListTheCardShowsServingsInPlaceOfAddToListAndItsMenuRemovesIt() {
+        // Step AA: "Add to list" no longer sits beside "On the shopping list".
+        val got = mutableListOf<String>()
         compose.setContent {
             HyperShopTheme(dynamicColor = false) {
-                RecipesScreen(USES, library = LibraryActions(onAdd = { added += it.key }))
+                RecipesScreen(
+                    USES,
+                    library =
+                        LibraryActions(
+                            onAdd = { got += "add ${it.key}" },
+                            onServings = { r, n -> got += "serves ${r.key} $n" },
+                            onRemoveFromList = { got += "remove ${it.key}" },
+                        ),
+                )
             }
         }
         val list = compose.onNodeWithTag("recipes")
-        // Not on the list: straight in.
+        // Not on the list: Add to list.
         list.performScrollToNode(hasTestTag("lib-add-r:9"))
         compose.onNodeWithTag("lib-add-r:9").performClick()
-        // On the list too: straight in; the review asks "Already on your shopping list" itself, once (review B.13).
-        list.performScrollToNode(hasTestTag("lib-add-r:1"))
-        compose.onNodeWithTag("lib-add-r:1").performClick()
-        assertEquals(listOf("r:9", "r:1"), added)
+        compose.onNodeWithTag("lib-serves-r:9").assertDoesNotExist()
+        // On the list: "− Serves 4 +", no Add to list; each press counts from the last.
+        list.performScrollToNode(hasTestTag("lib-serves-r:1"))
+        compose.onNodeWithTag("lib-add-r:1").assertDoesNotExist()
+        compose.onNodeWithTag("lib-serves-r:1").assertTextEquals("Serves 4")
+        compose.onNodeWithTag("lib-serves-r:1-more").performClick()
+        compose.onNodeWithTag("lib-serves-r:1-more").performClick()
+        compose.onNodeWithTag("lib-serves-r:1").assertTextEquals("Serves 6")
+        compose.onNodeWithContentDescription("More for Weeknight chilli").performClick()
+        compose.onNodeWithTag("lib-remove-from-list-r:1").performClick()
+        assertEquals(listOf("add r:9", "serves r:1 5", "serves r:1 6", "remove r:1"), got)
     }
 
     @Test
@@ -248,7 +267,8 @@ class RecipesScreenTest {
         // The recipe book (X.12, cut 1 of the review): this shop's recipes are on the Shopping tab's recipe view.
         compose.onNodeWithTag("lib-r:9").assertExists()
         compose.onNodeWithTag("use-1").assertDoesNotExist()
-        compose.onNodeWithText("On the shopping list").assertExists()
+        // On the list: its servings, changed in place (AA.1).
+        compose.onNodeWithTag("lib-serves-r:1").assertExists()
         TestPhotos.settle(compose)
         compose.onRoot().captureRoboImage(Shots.path("recipes-library-light.png"))
     }

@@ -97,6 +97,10 @@ data class LibraryRow(
     val timesPlanned: Int = 0,
     /** "Cooked it" taps on its meals. */
     val timesCooked: Int = 0,
+    /** Step AA: while it is on the list, the servings it is on the list for (null: the recipe does not say). */
+    val servings: Int? = null,
+    /** How many times it is on the list now (a share added again makes two). */
+    val listCount: Int = 0,
 ) {
     val facts get() = RecipeFacts(key, title, lastAddedAt, rating, timesPlanned, timesCooked)
 }
@@ -161,7 +165,8 @@ class RecipesViewModel(
             val (sort, highly) = view
             // "On the shopping list" only while something of it is still to buy: a recipe bought (or removed with
             // only bought shares left) stays a use for a week, and the badge said so long after the shop.
-            val onList = uses.filter { it.progress.state == UseState.STILL_NEEDED }.mapNotNull { it.libraryKey }.toSet()
+            val live = uses.filter { it.progress.state == UseState.STILL_NEEDED && it.libraryKey != null }.groupBy { it.libraryKey!! }
+            val onList = live.keys
             val rows =
                 lib.map {
                     LibraryRow(
@@ -178,6 +183,9 @@ class RecipesViewModel(
                         photo = photos[it.key],
                         timesPlanned = planned[it.key] ?: 0,
                         timesCooked = notes[it.key]?.timesCooked ?: 0,
+                        // On the list more than once: the stepper shows and changes the latest (AA.1).
+                        servings = live[it.key]?.maxByOrNull { u -> u.useId }?.servings,
+                        listCount = live[it.key]?.size ?: 0,
                     )
                 }
             val shown =
@@ -268,6 +276,44 @@ class RecipesViewModel(
 
     /** Step Z "Add to list" on a saved recipe: its ingredients on the list at once, as saved and corrected, with Undo. */
     fun addToList(row: LibraryRow) = viewModelScope.launch { messages.send(c.addRecipeToList(row.key, row.title)) }
+
+    /**
+     * Step AA "Serves N" on a recipe that is on the list: the latest time it went on is rescaled (the meal and its items
+     * together; bought stays bought). On the list twice, the earlier one keeps its servings: the card says "on the list
+     * twice", and the list's Group by recipe has a card for each.
+     */
+    fun setServings(
+        row: LibraryRow,
+        servings: Int,
+    ) = viewModelScope.launch {
+        c.awaitReady()
+        val use = latestOnList(row.key) ?: return@launch
+        if (!c.planner.setUseServings(use.useId, servings)) messages.send(UiMessage("${row.title} doesn't say how many it serves"))
+    }
+
+    /**
+     * Step AA "Remove from list" on a recipe's card: every time it is on the list comes off, each through
+     * `removeFromList` (only what is unbought goes). One message, one Undo for all of them.
+     */
+    fun removeFromList(row: LibraryRow) =
+        viewModelScope.launch {
+            c.awaitReady()
+            val uses = onListNow(row.key)
+            val removed = uses.mapNotNull { c.repository.removeFromList(it.useId) }
+            if (removed.isEmpty()) return@launch
+            messages.send(
+                UiMessage("Removed ${row.title} from the list", undo = {
+                    if (removed.reversed().map { c.repository.undoRemoveFromList(it) }.any { !it }) {
+                        messages.send(UiMessage("Can't undo: the shopping list has changed since"))
+                    }
+                }),
+            )
+        }
+
+    private suspend fun onListNow(key: String) =
+        c.repository.usesOnList().filter { it.libraryKey == key && it.progress.state == UseState.STILL_NEEDED }
+
+    private suspend fun latestOnList(key: String) = onListNow(key).maxByOrNull { it.useId }
 
     /** "Edit" on a saved recipe: the review screen, saving back to the library and leaving the list alone. */
     fun editSaved(row: LibraryRow) = openSaved(row, ImportResult.LIBRARY_EDIT)

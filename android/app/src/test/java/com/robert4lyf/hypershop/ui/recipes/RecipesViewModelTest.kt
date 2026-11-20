@@ -156,6 +156,34 @@ class RecipesViewModelTest {
     }
 
     @Test
+    fun onTheListTheCardsServingsRescaleItAndRemoveFromListKeepsWhatWasBought() {
+        // Step AA: the card's "− Serves N +" and its menu's "Remove from list", through Planner and removeFromList.
+        val c = TestContainer.create()
+        c.add(*CHILLI)
+        val vm = RecipesViewModel(c).shown()
+        val got = java.util.concurrent.CopyOnWriteArrayList<UiMessage>()
+        val watching = CoroutineScope(Dispatchers.Main).launch { vm.events.collect { got += it } }
+        val row = await(vm.ui) { it.library.singleOrNull()?.onList == true && it.library.single().servings != null }.library.single()
+        assertEquals(1, row.listCount)
+        val use = runBlocking { c.repository.usesOnList() }.single()
+        vm.setServings(row, row.servings!! * 2)
+        await(vm.ui) { it.library.single().servings == row.servings * 2 }
+        assertEquals(row.servings * 2, runBlocking { c.repository.snapshot() }.uses[use.useId]!!.servings)
+        // One item bought, then Remove from list: the purchase stays, the rest goes; Undo puts the rest back.
+        val bought = runBlocking { c.repository.snapshot() }.liveItems.first().id
+        runBlocking { c.repository.tick(bought) }
+        vm.removeFromList(await(vm.ui) { it.library.single().onList }.library.single())
+        com.robert4lyf.hypershop.testutil.awaitTrue { got.any { it.text == "Removed Weeknight chilli from the list" } }
+        val after = runBlocking { c.repository.snapshot() }
+        assertEquals(listOf(bought), after.liveItems.map { it.id })
+        assertTrue(after.isDone(bought))
+        await(vm.ui) { !it.library.single().onList }
+        runBlocking { got.first { it.text == "Removed Weeknight chilli from the list" }.undo!!.invoke() }
+        await(vm.ui) { it.library.single().onList }
+        watching.cancel()
+    }
+
+    @Test
     fun removingFromTheListOrTheLibraryCanBeUndone() {
         val c = TestContainer.create()
         c.add(*CHILLI)

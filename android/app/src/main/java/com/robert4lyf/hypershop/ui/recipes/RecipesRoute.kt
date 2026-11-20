@@ -116,6 +116,8 @@ fun RecipesRoute(
                 onEdit = vm::editSaved,
                 onSort = vm::sortBy,
                 onHighlyRated = vm::showHighlyRated,
+                onServings = { row, n -> vm.setServings(row, n) },
+                onRemoveFromList = vm::removeFromList,
             ),
         search =
             SearchBox(
@@ -157,6 +159,7 @@ fun RecipesRoute(
                 vm.closeDetail()
                 vm.removeFromLibrary(d.row)
             },
+            onServings = { vm.setServings(d.row, it) },
             onDismiss = vm::closeDetail,
             notes =
                 RecipeNoteActions(
@@ -245,6 +248,8 @@ fun RecipesScreen(
                             onOpen = { library.onOpen(row) },
                             onRename = { renamingSaved = row.key },
                             onEdit = { library.onEdit(row) },
+                            onServings = { library.onServings(row, it) },
+                            onRemoveFromList = { library.onRemoveFromList(row) },
                         )
                     }
                 }
@@ -373,6 +378,9 @@ data class LibraryActions(
     val onEdit: (LibraryRow) -> Unit = {},
     val onSort: (LibrarySort) -> Unit = {},
     val onHighlyRated: (Boolean) -> Unit = {},
+    /** Step AA: "Serves N" on a recipe that is on the list, and taking it off. */
+    val onServings: (LibraryRow, Int) -> Unit = { _, _ -> },
+    val onRemoveFromList: (LibraryRow) -> Unit = {},
 )
 
 /** What the open recipe's sheet can change about it: stars, cooking notes, its photo. */
@@ -394,6 +402,8 @@ private fun LibraryCard(
     onOpen: () -> Unit,
     onRename: () -> Unit,
     onEdit: () -> Unit,
+    onServings: (Int) -> Unit = {},
+    onRemoveFromList: () -> Unit = {},
 ) {
     val now = remember { System.currentTimeMillis() }
     Surface(
@@ -434,6 +444,8 @@ private fun LibraryCard(
                             if (row.lines == 1) "1 ingredient" else "${row.lines} ingredients",
                             row.timesCooked.takeIf { it > 0 }?.let { if (it == 1) "cooked once" else "cooked $it times" },
                             row.timesPlanned.takeIf { showPlanned && it > 0 }?.let { if (it == 1) "planned once" else "planned $it times" },
+                            // AA.1: on the list more than once (added again from a share), said rather than hidden.
+                            row.listCount.takeIf { it > 1 }?.let { if (it == 2) "on the list twice" else "on the list $it times" },
                             "added " + addedWhen(DateUtils.getRelativeTimeSpanString(row.lastAddedAt, now, DAY).toString()),
                         )
                     Text(
@@ -444,7 +456,7 @@ private fun LibraryCard(
                     row.uses?.let {
                         Text("Uses $it", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
                     }
-                    if (row.onList) {
+                    if (row.onList && row.servings == null) {
                         Text(
                             "On the shopping list",
                             style = MaterialTheme.typography.labelMedium,
@@ -452,13 +464,30 @@ private fun LibraryCard(
                         )
                     }
                 }
-                FilledTonalButton(onClick = onAdd, modifier = Modifier.testTag("lib-add-${row.key}")) {
-                    Text("Add to list")
+                // Step AA: on the list, the card shows how many it is for, changed in place; "Add to list" only when it
+                // is not on the list (it no longer sits beside "On the shopping list").
+                when {
+                    !row.onList ->
+                        FilledTonalButton(onClick = onAdd, modifier = Modifier.testTag("lib-add-${row.key}")) {
+                            Text("Add to list")
+                        }
+                    row.servings != null ->
+                        com.robert4lyf.hypershop.ui.common.ServingsStepper(row.servings, onServings, tag = "lib-serves-${row.key}")
                 }
                 var menu by remember { mutableStateOf(false) }
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More for ${row.title}") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        if (row.onList) {
+                            DropdownMenuItem(text = {
+                                Text(
+                                    "Remove from list",
+                                )
+                            }, modifier = Modifier.testTag("lib-remove-from-list-${row.key}"), onClick = {
+                                menu = false
+                                onRemoveFromList()
+                            })
+                        }
                         DropdownMenuItem(text = { Text("Rename") }, modifier = Modifier.testTag("lib-rename-${row.key}"), onClick = {
                             menu = false
                             onRename()
@@ -517,8 +546,9 @@ private fun RecipeDetailSheet(
     onRemove: () -> Unit,
     onDismiss: () -> Unit,
     notes: RecipeNoteActions,
+    onServings: (Int) -> Unit = {},
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) { RecipeDetailContent(detail, onAdd, onRemove, notes) }
+    ModalBottomSheet(onDismissRequest = onDismiss) { RecipeDetailContent(detail, onAdd, onRemove, notes, onServings) }
 }
 
 /** A saved recipe's ingredients, as written, with "Add to list", its page and "Delete recipe". */
@@ -528,6 +558,8 @@ fun RecipeDetailContent(
     onAdd: () -> Unit,
     onRemove: () -> Unit = {},
     notes: RecipeNoteActions = RecipeNoteActions(),
+    /** Step AA: "Serves N" while it is on the list, in place of Add to list. */
+    onServings: (Int) -> Unit = {},
 ) {
     var cooking by rememberSaveable(detail.row.key) { mutableStateOf(false) }
     if (cooking) CookingView(detail) { cooking = false }
@@ -571,7 +603,7 @@ fun RecipeDetailContent(
         }
         item(key = "buttons") {
             Column {
-                DetailButtons(onAdd, url?.let { { open(it) } }, onList = detail.row.onList)
+                DetailButtons(onAdd, url?.let { { open(it) } }, row = detail.row, onServings = onServings)
                 TextButton(onClick = { cooking = true }, modifier = Modifier.testTag("cook-recipe")) { Text("Cooking view") }
             }
         }
@@ -615,17 +647,23 @@ fun RecipeDetailContent(
 private fun DetailButtons(
     onAdd: () -> Unit,
     onOpen: (() -> Unit)?,
-    onList: Boolean,
+    row: LibraryRow,
+    onServings: (Int) -> Unit,
 ) {
     FlowRow(
         Modifier.padding(top = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Button(onClick = onAdd, modifier = Modifier.testTag("detail-add")) {
-            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.size(8.dp))
-            Text("Add to list")
+        when {
+            !row.onList ->
+                Button(onClick = onAdd, modifier = Modifier.testTag("detail-add")) {
+                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.size(8.dp))
+                    Text("Add to list")
+                }
+            row.servings != null -> com.robert4lyf.hypershop.ui.common.ServingsStepper(row.servings, onServings, tag = "detail-serves")
+            else -> Text("On the shopping list", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         }
         onOpen?.let {
             OutlinedButton(onClick = it) {

@@ -255,18 +255,16 @@ class JourneyTest {
         for (k in keys) {
             scrollTo("recipes", "lib-add-$k")
             tap("lib-add-$k")
+            // Step AA: on the list, the card shows "− Serves N +" in place of Add to list; the chilli is for 5.
+            if (k == keys.first()) tap("lib-serves-$k-more")
         }
         compose.waitUntil(10_000) { runBlocking { c.planner.week(c.planner.currentWeek()) }.count { it.useId != null } == 3 }
-        tap("tab-${Routes.LIST}")
-        // The chilli for 5: Servings on its card, in the list grouped by recipe.
         val chilli = runBlocking { c.planner.week(c.planner.currentWeek()) }.first { it.title == "Weeknight chilli" }.useId
-        tap("list-more")
-        tap("view-RECIPE")
-        tap("recipe-more-use-$chilli")
-        tap("recipe-servings-use-$chilli")
-        tap("servings-more")
-        tap("servings-done")
         compose.waitUntil(10_000) { runBlocking { c.repository.snapshot() }.uses[chilli!!]?.servings == 5 }
+        tap("tab-${Routes.LIST}")
+        // The last "Added …" message sits over the bottom of the list for its few seconds; a person waits it out.
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(6))
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Undo")).fetchSemanticsNodes().isEmpty() }
         // Rice partly at home (300 g of the 500 g): Step Z has no food-at-home check; the rice's amount is changed on
         // the list, in its sheet, to what is still to buy.
         val rice = c.itemId("cat:basmati_rice")

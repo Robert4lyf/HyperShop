@@ -41,8 +41,8 @@ On the review, lines still to go on the list are counted as **N to add** ("4 to 
 | **Add to list · N items** | Review | review `apply` (plans itself; an edit relinks) |
 | **Save recipe only** | Review ⋮ | review `saveForLater` |
 | **At home** | Review row | the row's decision (in stock); staples from Settings › Always at home start on |
-| **Servings (N)** | A recipe's card on the list (Group by recipe), ⋮ | `Planner.setUseServings` (the meal and the use rescaled together; what was bought stays bought) |
-| **Remove from list** | A recipe's card on the list, ⋮; its ingredients sheet | `ListRepository.removeFromList` (the use goes only when nothing of it is bought; otherwise unbought shares are withdrawn) |
+| **− Serves N +** | A recipe on the list: its Recipes card and sheet (in place of Add to list), and its card on the list (Group by recipe, ⋮) | `Planner.setUseServings` on each press (the meal and the use rescaled together; what was bought stays bought). On the list twice, the latest is changed and the card says "on the list twice" |
+| **Remove from list** | A recipe on the list: its Recipes card's ⋮, its card on the list (⋮), its ingredients sheet | `ListRepository.removeFromList` for each time it is on the list (the use goes only when nothing of it is bought; otherwise unbought shares are withdrawn); one Undo |
 | **Can't find it** / **Found it** | The item's sheet | `markUnavailable` / `markAvailable` |
 | **Change store** | List ⋮, only with two or more stores | `ShopStart.change` → active store |
 | **Store order / Group by recipe**, **Arrange items** | List ⋮ | `Settings.listView`; `arrangeWith` |
