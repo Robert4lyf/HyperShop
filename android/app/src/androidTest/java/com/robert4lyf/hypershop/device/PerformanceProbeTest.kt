@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.robert4lyf.hypershop.core.model.QtyBase
@@ -254,6 +255,10 @@ class PerformanceProbeTest {
             }
         val each =
             (1..10).map { i ->
+                // Step Z: the one list's rows are taller than the old shop screen's, and on a small screen only a few
+                // are on it; the next open tick is scrolled to first, outside the timed tap.
+                compose.waitUntil(10_000) { runCatching { compose.onNodeWithTag("list").performScrollToNode(ticks) }.isSuccess }
+                compose.waitForIdle()
                 timed {
                     compose.onAllNodes(ticks)[0].performClick()
                     compose.waitUntil(
