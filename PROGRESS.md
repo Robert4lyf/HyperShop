@@ -380,7 +380,11 @@ A follow-up review of Step Z found the remaining friction in a few places, and t
 
 - [x] AA.0 Baseline on e293db6 (`JourneyTest`, taps · typed · scrolls · screen changes): core job 6 · 0 · 0 · 2; quick shopping 7 · 2 · 0 · 0; meal-based 15 · 1 · 4 · 4 (as Z.9 recorded) — check: `JourneyTest`
 - [x] AA.1 Servings and state on the Recipes card. Verified: the card showed "On the shopping list" beside an "Add to list" that added the recipe a second time. Now a recipe on the list shows "− Serves N +" in place of Add to list, on its card and in its sheet (`ServingsStepper`, shared); each press calls `Planner.setUseServings` (bought stays bought) and says nothing, the number being on screen. Its ⋮ gains "Remove from list" (`removeFromList` for each time it is on the list, one Undo). The list's recipe card has the same stepper in its ⋮ menu; the Servings dialog and its Done are gone. On the list more than once (a share added again): the stepper shows and changes the latest, the card says "on the list twice", and Group by recipe has a card for each. A recipe that does not say how many it serves shows "On the shopping list" and no stepper. Meal journey: 15 → 10 taps, 4 → 3 screen changes (servings is one tap on the card just added); it now waits out the "Added" snackbar over the rice row, which AA.4 fixes — check: `RecipesScreenTest.onTheListTheCardShowsServings…`, `RecipesViewModelTest.onTheListTheCardsServings…` (a purchase survives Remove from list), `ListScreenTest.byRecipe…`, `JourneyTest`
-- [ ] AA.2 Review rows use a checkbox
+- [x] AA.2 Review rows use a checkbox. The "At home" pill became a leading checkbox (ticked = add); an unticked row is
+  greyed and reads "At home · needs N". The decision underneath is still `inStock`; staples start unticked because
+  `defaultDecisions` already marks them in stock (claim checked). The box is hidden from TalkBack; the row is one node
+  with the name, the amount, a state ("Will be added" / "At home, not added") and a custom action that toggles it. The
+  summary and the button count already followed `addCount`.
 - [ ] AA.3 Review wording
 - [ ] AA.4 Snackbars never cover the bottom action
 - [ ] AA.5 Compact list header

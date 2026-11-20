@@ -25,7 +25,7 @@ fewer modes and one word per idea. The data model is unchanged; every action cal
 | An item or a recipe's items all bought | **bought** ("2 bought", "Bought ✓", "All bought") | done, Done ✓ |
 | Take a recipe's items off the list | **Remove from list** (only what is unbought goes) | Remove meal, ✕ |
 | Delete a saved recipe | **Delete recipe** | Remove from your recipes |
-| Something is already at home | **At home** (the review row's toggle; staples in Settings start on) | Have it, Have some, I have some |
+| Something is already at home | **At home** (an unticked review row; staples in Settings start unticked) | Have it, Have some, I have some |
 | Can't get it on this trip | **Can't find it** → *Set aside for this trip*; **Found it** takes it back | Unavailable, Not available today |
 | End the trip | **Finish shopping** | Done |
 | Keep a reviewed recipe without adding it | **Save recipe only** (review ⋮ menu) | Save recipe, Save for later |
@@ -40,7 +40,7 @@ On the review, lines still to go on the list are counted as **N to add** ("4 to 
 | **Add to list** | Recipes card and sheet | `Planner.addToList` → `ListRepository.addSavedRecipe(plan = true)`: the review's own `apply`, planned for this week and linked in its transaction. Undo: `Planner.takeBack` (`unplan`: only unbought shares) |
 | **Add to list · N items** | Review | review `apply` (plans itself; an edit relinks) |
 | **Save recipe only** | Review ⋮ | review `saveForLater` |
-| **At home** | Review row | the row's decision (in stock); staples from Settings › Always at home start on |
+| **Checkbox** (ticked = add; unticked rows are greyed and say **At home**) | Review row | the row's decision (in stock); staples from Settings › Always at home start unticked; TalkBack reads the row as one node (name, amount, "Will be added" or "At home, not added") and toggles it with "Mark at home" / "Add to list" |
 | **− Serves N +** | A recipe on the list: its Recipes card and sheet (in place of Add to list), and its card on the list (Group by recipe, ⋮) | `Planner.setUseServings` on each press (the meal and the use rescaled together; what was bought stays bought). On the list twice, the latest is changed and the card says "on the list twice" |
 | **Remove from list** | A recipe on the list: its Recipes card's ⋮, its card on the list (⋮), its ingredients sheet | `ListRepository.removeFromList` for each time it is on the list (the use goes only when nothing of it is bought; otherwise unbought shares are withdrawn); one Undo |
 | **Can't find it** / **Found it** | The item's sheet | `markUnavailable` / `markAvailable` |
