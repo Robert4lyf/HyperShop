@@ -373,3 +373,19 @@ Feedback, again: "confusing and complicated". A review found the cause is the nu
 - [x] Z.11 The next emulator run (on Z.10) got past the ticks and then waited for "4 of 4 bought": the old shop screen's wording. The one list's subtitle says "N of 4 bought" until the last, then "All bought" (Z.2); the scenario now expects that, and says what was on screen if it times out. The whole loop (type four, scroll to and tick each, Finish, Undo offered) passes in a Robolectric copy at 360×640 dp — check: emulator-test compile, `tools/verify.sh`
 - [x] Z.12 With the scenarios green (Z.11), CI's performance probe failed: `theListAt150ItemsOnTheMainThread` found no open tick after two taps. Reproduced in Robolectric at 360×640 dp: the one list's rows are taller than the old shop screen's, so only two of the 150 were on screen, and once both lingered as bought there was none. The probe now scrolls the list to the next open tick before each timed tap (the scroll is outside the timing); the tap-to-"N of 150 bought" budget is unchanged — check: the Robolectric copy (10 ticks), emulator-test compile, `tools/verify.sh`
 - [x] Z.13 The emulator run on Z.12 crashed with "performMeasureAndLayout called during measure layout" (KNOWN_ISSUES #36; the report names no test). The scroll added in Z.10/Z.12, like two older ones (scenario B's "3 onions", the weekly scenarios' `scrollTo`, which Step Z's Add to list from Recipes now calls for every recipe), ran inside `waitUntil`'s condition, which the weekly scenarios' own comment warns can land in the middle of a frame's layout. Every such scroll in the emulator tests now goes through `scrollListTo`: wait for idle, then scroll, retrying for up to 15 s between frames. No assertion or timeout was loosened. The gate for this commit then failed once in `EntryNavigationTest` with "Illegal connection pointer" before a test started (KNOWN_ISSUES #35): the Z.3 test `aRememberedMealsTabFromBeforeOpensTheList` ended after 0.12 s, while its list was still loading. It now waits for the list and the remembered destination before it ends (3 runs of the class, then the gate, green) — check: emulator-test compile, `EntryNavigationTest` ×3, `tools/verify.sh`
+
+## Step AA — everyday polish (`claude/step-z-fewer-concepts-rvynea`, from e293db6)
+
+A follow-up review of Step Z found the remaining friction in a few places, and the meal-based journey longer than before (15 taps; 6 to change servings, 4 for a partial amount). This step fixes those places without adding tabs, modes, settings or help paragraphs. Words: `docs/design/simple-ux.md`. Report: `docs/reports/step-aa.md`. No Room schema, watch protocol, golden data, version or `:core` merge/tick change.
+
+- [x] AA.0 Baseline on e293db6 (`JourneyTest`, taps · typed · scrolls · screen changes): core job 6 · 0 · 0 · 2; quick shopping 7 · 2 · 0 · 0; meal-based 15 · 1 · 4 · 4 (as Z.9 recorded) — check: `JourneyTest`
+- [ ] AA.1 Servings and state on the Recipes card
+- [ ] AA.2 Review rows use a checkbox
+- [ ] AA.3 Review wording
+- [ ] AA.4 Snackbars never cover the bottom action
+- [ ] AA.5 Compact list header
+- [ ] AA.6 Recipes ordered by use
+- [ ] AA.7 One message for several adds
+- [ ] AA.8 Remove what Step Z left unused
+- [ ] AA.9 Verify and report
+
