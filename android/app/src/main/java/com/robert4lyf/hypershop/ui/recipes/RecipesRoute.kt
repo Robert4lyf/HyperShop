@@ -210,7 +210,8 @@ fun RecipesScreen(
                             n == 1 -> "1 saved recipe"
                             else -> "$n saved recipes"
                         }
-                    if (ui.hasLibrary) {
+                    // While loading, the compact row too, so a library does not jump from banner to row.
+                    if (!ui.loaded || ui.hasLibrary) {
                         // Step AA: with recipes, one compact row (as the list's), so the cards start high; the mosaic
                         // banner only while there are none.
                         Row(

@@ -546,13 +546,12 @@ private fun ListTop(
 ) {
     val shopping = ui.loaded && !ui.isEmpty
     val total = ui.left + ui.doneCount + ui.unavailable
-    if (!shopping) {
+    // While loading, the compact row too: most opens have a list, so the top does not jump from banner to row.
+    if (ui.loaded && !shopping) {
         ScreenHeader(
-            title = if (!ui.loaded) "" else "Shopping list",
+            title = "Shopping list",
             // One mosaic for the list, whatever the count says.
             seed = "Shopping list",
-            // Loading: the screen's name, small, until the count or "Shopping list" can be said.
-            overline = if (ui.loaded) null else "Shopping list",
             actions = {
                 com.robert4lyf.hypershop.ui.common.SettingsButton()
                 ListMenu(ui, actions)
@@ -565,7 +564,7 @@ private fun ListTop(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f).testTag("list-count")) {
-            val title = listCount(ui.left, ui.doneCount)
+            val title = if (shopping) listCount(ui.left, ui.doneCount) else "Shopping list"
             Text(
                 title,
                 style = MaterialTheme.typography.titleLarge,
@@ -583,15 +582,17 @@ private fun ListTop(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            Spacer(Modifier.height(6.dp))
-            LinearProgressIndicator(
-                progress = { if (total == 0) 0f else ui.doneCount / total.toFloat() },
-                // The count already says it; the bar is not read out as well.
-                modifier = Modifier.fillMaxWidth().height(6.dp).clearAndSetSemantics {},
-                strokeCap = StrokeCap.Round,
-                gapSize = 4.dp,
-                drawStopIndicator = {},
-            )
+            if (shopping) Spacer(Modifier.height(6.dp))
+            if (shopping) {
+                LinearProgressIndicator(
+                    progress = { if (total == 0) 0f else ui.doneCount / total.toFloat() },
+                    // The count already says it; the bar is not read out as well.
+                    modifier = Modifier.fillMaxWidth().height(6.dp).clearAndSetSemantics {},
+                    strokeCap = StrokeCap.Round,
+                    gapSize = 4.dp,
+                    drawStopIndicator = {},
+                )
+            }
         }
         com.robert4lyf.hypershop.ui.common.SettingsButton()
         ListMenu(ui, actions)

@@ -407,7 +407,9 @@ A follow-up review of Step Z found the remaining friction in a few places, and t
   included): the first aisle heading and three items on screen without scrolling, the field above the list; its
   screenshot is `docs/screenshots/list-360x640.png`. Recipes' banner (about 100 dp) became the same one row once
   there are recipes. The emulator scenario and the performance probe read the new count; the probe keeps its metric's
-  name so `docs/reports/performance.md` still lines up.
+  name so `docs/reports/performance.md` still lines up. Fixed in AA.7's commit: the top showed the banner while loading and
+  jumped to the row (EntryNavigationTest's gear tap landed mid-swap); both tabs now show the compact row while
+  loading, the banner only once loaded and empty.
 - [x] AA.6 Recipes ordered by use. "Most used" is the default and the first sort: added to the list most often, then
   most lately, then newest saved. Derived from `PlannedMeal` (a new read-only query, `observeMealUse`: count and
   latest `addedAt` per library key; no column, no migration): since Step Z every Add to list, and every import put
@@ -417,7 +419,11 @@ A follow-up review of Step Z found the remaining friction in a few places, and t
   no screen since Step Z, and Most used covers it; "Recently added" is now "Recently saved". The control still shows
   from 10 recipes. The card line is "Serves 4 · last added 3 days ago" with the source and stars; the ingredient
   count, "planned N times" and "cooked N times" went.
-- [ ] AA.7 One message for several adds
+- [x] AA.7 One message for several adds. An Add to list made while the previous add's message is still the latest the
+  screen took, and within its seconds, joins it: "3 recipes added · 12 to buy"; its one Undo runs `Planner.takeBack`
+  for each, latest first (only unbought shares leave; a bought item stays bought, tested). Another message in
+  between, or the seconds over, starts a new one. `putRecipeOnList` split from `addRecipeToList` (kept for the
+  scenarios).
 - [ ] AA.8 Remove what Step Z left unused
 - [ ] AA.9 Verify and report
 

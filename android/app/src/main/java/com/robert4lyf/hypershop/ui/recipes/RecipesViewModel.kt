@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -276,8 +277,37 @@ class RecipesViewModel(
      */
     fun addFromLibrary(row: LibraryRow) = openSaved(row, ImportResult.LIBRARY)
 
-    /** Step Z "Add to list" on a saved recipe: its ingredients on the list at once, as saved and corrected, with Undo. */
-    fun addToList(row: LibraryRow) = viewModelScope.launch { messages.send(c.addRecipeToList(row.key, row.title)) }
+    /**
+     * Step Z "Add to list" on a saved recipe: its ingredients on the list at once, as saved and corrected, with Undo.
+     * Step AA: an add made while the last add's message is still up joins it ("3 recipes added · 12 to buy"), and that
+     * one Undo takes them all back, latest first, through [com.robert4lyf.hypershop.data.Planner.takeBack] (only what
+     * is still unbought).
+     */
+    fun addToList(row: LibraryRow) =
+        viewModelScope.launch {
+            val added = c.putRecipeOnList(row.key) ?: return@launch messages.send(UiMessage("Couldn't add ${row.title} to the list"))
+            val now = android.os.SystemClock.uptimeMillis()
+            val joined = adds?.takeIf { it.message === lastShown && now - it.at < it.message.seconds * 1000L }
+            val uses = joined?.uses.orEmpty() + added.useId
+            val undo: suspend () -> Unit = { for (u in uses.asReversed()) c.planner.takeBack(u) }
+            val m =
+                if (uses.size == 1) {
+                    UiMessage("Added ${row.title} · ${added.toBuy} to buy", undo = undo)
+                } else {
+                    UiMessage("${uses.size} recipes added · ${added.toBuy} to buy", undo = undo)
+                }
+            adds = AddBatch(uses, now, m)
+            messages.send(m)
+        }
+
+    /** The adds the latest add's message speaks for, and when it was sent. */
+    private class AddBatch(
+        val uses: List<Long>,
+        val at: Long,
+        val message: UiMessage,
+    )
+
+    private var adds: AddBatch? = null
 
     /**
      * Step AA "Serves N" on a recipe that is on the list: the latest time it went on is rescaled (the meal and its items
@@ -419,7 +449,10 @@ class RecipesViewModel(
         }
 
     private val messages = Channel<UiMessage>(Channel.BUFFERED)
-    val events: Flow<UiMessage> = messages.receiveAsFlow()
+
+    /** The message the screen took last: an add joins the previous one's message only while that is still the latest. */
+    @Volatile private var lastShown: UiMessage? = null
+    val events: Flow<UiMessage> = messages.receiveAsFlow().onEach { lastShown = it }
 
     private val reviews = Channel<Long>(Channel.BUFFERED)
 

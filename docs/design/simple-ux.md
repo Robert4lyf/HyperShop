@@ -44,7 +44,7 @@ On the review, lines still to go on the list are counted as **N to add** ("4 to 
 
 | Words | Where | Changes |
 |---|---|---|
-| **Add to list** | Recipes card and sheet | `Planner.addToList` → `ListRepository.addSavedRecipe(plan = true)`: the review's own `apply`, planned for this week and linked in its transaction. Undo: `Planner.takeBack` (`unplan`: only unbought shares) |
+| **Add to list** | Recipes card and sheet | `Planner.addToList` → `ListRepository.addSavedRecipe(plan = true)`: the review's own `apply`, planned for this week and linked in its transaction. Undo: `Planner.takeBack` (`unplan`: only unbought shares). Adds made while the last add's message is up join it: "3 recipes added · 12 to buy", one Undo for all, latest first |
 | **Add to list · N items** | Review | review `apply` (plans itself; an edit relinks) |
 | **Save recipe only** | Review ⋮ | review `saveForLater` |
 | **Checkbox** (ticked = add; unticked rows are greyed and say **At home**) | Review row | the row's decision (in stock); staples from Settings › Always at home start unticked; TalkBack reads the row as one node (name, amount, "Will be added" or "At home, not added") and toggles it with "Mark at home" / "Add to list" |

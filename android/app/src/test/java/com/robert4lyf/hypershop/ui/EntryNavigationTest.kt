@@ -89,6 +89,9 @@ class EntryNavigationTest {
         // Recipes, then Settings from its gear: a screen of its own, with no tab bar, and Back returns to Recipes.
         compose.onNodeWithTag("tab-${Routes.RECIPES}").performClick()
         awaitRoute(Routes.RECIPES)
+        // Step AA: with recipes saved, the header becomes one compact row once the library has loaded; the gear moves.
+        waitFor("recipes-title")
+        compose.waitForIdle()
         compose.onNodeWithTag("open-settings").performClick()
         awaitRoute(Routes.SETTINGS)
         compose.onNodeWithTag("tab-${Routes.LIST}").assertDoesNotExist()
