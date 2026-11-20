@@ -437,5 +437,9 @@ A follow-up review of Step Z found the remaining friction in a few places, and t
   setup were rewritten to live calls with the same assertions. The performance probe's "6 meals onto the list"
   budget now times six Add to list (same 1300 ms); the week-preview and at-home-check budgets went with their code.
   KNOWN_ISSUES #46 updated.
-- [ ] AA.9 Verify and report
+- [x] AA.9 Verify and report. "Change amount" opens the editor on the amount, focused and selected (the meal
+  journey's last spare tap). Journeys: core 6·0·0·2 and quick 7·2·0·0 (as AA.0), meal 9·1·3·3 (AA.0: 15·1·4·4):
+  every target met. Screenshots re-recorded, `tools/contact-sheet` run, CLAUDE.md's plan rule notes that Most used
+  reads the meals. Report: `docs/reports/step-aa.md`. Seen once and not reproduced in two full runs: StartupTest
+  failing on an exception leaked by an earlier test (in the report).
 

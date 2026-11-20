@@ -1,6 +1,7 @@
 package com.robert4lyf.hypershop.ui
 
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
@@ -280,8 +281,8 @@ class JourneyTest {
         waitOutAMessageOver("item-$rice")
         tap("item-$rice")
         tap("item-change")
-        node("edit-qty").performClick()
-        taps++
+        // Step AA: "Change amount" opens with the amount focused and selected: no tap on the field.
+        node("edit-qty").assertIsFocused()
         node("edit-qty").performTextReplacement("200 g")
         typed++
         tap("save-item")

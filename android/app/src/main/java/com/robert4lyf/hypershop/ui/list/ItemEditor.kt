@@ -37,9 +37,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.robert4lyf.hypershop.core.model.AisleCode
@@ -62,11 +64,17 @@ internal fun ItemEditor(
     onDirty: (Boolean) -> Unit = {},
     /** A new value drops the draft: the editor starts again from [sheet] (edits discarded on the sheet). */
     draft: Int = 0,
+    /** Step AA: start in the amount field ("Change amount"), its text selected so typing replaces it. */
+    focusAmount: Boolean = false,
     details: @Composable () -> Unit = {},
 ) {
     // Keyed on the item: another row's sheet starts from that row. Survives a rotation.
     var name by rememberSaveable(sheet.id, draft) { mutableStateOf(sheet.name) }
     var amount by rememberSaveable(sheet.id, draft) { mutableStateOf(sheet.amount) }
+    // The amount starts selected, so a new one typed replaces it.
+    var amountSelection by remember(sheet.id, draft) { mutableStateOf(TextRange(0, sheet.amount.length)) }
+    val amountFocus = remember { FocusRequester() }
+    LaunchedEffect(sheet.id, draft, focusAmount) { if (focusAmount) runCatching { amountFocus.requestFocus() } }
     var aisle by rememberSaveable(sheet.id, draft) { mutableStateOf(sheet.aisle) }
     var always by rememberSaveable(sheet.id, draft) { mutableStateOf(true) }
     var group by rememberSaveable(sheet.id, draft) { mutableStateOf(sheet.group) }
@@ -113,10 +121,15 @@ internal fun ItemEditor(
                 modifier = Modifier.fillMaxWidth().testTag("edit-name"),
             )
             OutlinedTextField(
-                value = amount,
+                value =
+                    TextFieldValue(
+                        amount,
+                        TextRange(amountSelection.start.coerceAtMost(amount.length), amountSelection.end.coerceAtMost(amount.length)),
+                    ),
                 enabled = !sheet.saving,
                 onValueChange = {
-                    amount = it
+                    amount = it.text
+                    amountSelection = it.selection
                     bad = false
                 },
                 label = { Text("Total needed, e.g. 3 or 500 g") },
@@ -126,7 +139,7 @@ internal fun ItemEditor(
                 shape = MaterialTheme.shapes.medium,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { if (!changes.isEmpty && name.isNotBlank() && !sheet.saving) save() }),
-                modifier = Modifier.fillMaxWidth().testTag("edit-qty"),
+                modifier = Modifier.fillMaxWidth().focusRequester(amountFocus).testTag("edit-qty"),
             )
             val unit = ItemEdit.unitOf(amount)
             // The current unit and its exact alternatives first; the rest behind "More units".

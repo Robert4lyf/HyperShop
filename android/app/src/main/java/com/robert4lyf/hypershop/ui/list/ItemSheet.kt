@@ -267,6 +267,8 @@ fun ItemSheetContent(
     // Step Q: first what to buy and what it is for, with three plain actions; the form and the bookkeeping behind
     // Change amount and More details. A draft survives a rotation, and Change amount stays open with it.
     var editing by rememberSaveable(sheet.id, draft) { mutableStateOf(initiallyEditing) }
+    // Step AA: opened by "Change amount", the editor starts in the amount field (keyboard up), not a tap later.
+    var amountFirst by rememberSaveable(sheet.id, draft) { mutableStateOf(false) }
     var more by rememberSaveable(sheet.id) { mutableStateOf(false) }
     val full: @Composable () -> Unit = {
         SheetHeader(sheet.name, sheet.aisle)
@@ -310,7 +312,7 @@ fun ItemSheetContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (editing) {
-                ItemEditor(sheet, actions.onSave, Modifier.weight(1f), onDirty, draft) { full() }
+                ItemEditor(sheet, actions.onSave, Modifier.weight(1f), onDirty, draft, focusAmount = amountFirst) { full() }
             } else {
                 Column(
                     Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).testTag("item-summary"),
@@ -325,7 +327,10 @@ fun ItemSheetContent(
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         OutlinedButton(
-                            onClick = { editing = true },
+                            onClick = {
+                                amountFirst = true
+                                editing = true
+                            },
                             modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("item-change"),
                         ) { Text("Change amount") }
                         TextButton(
