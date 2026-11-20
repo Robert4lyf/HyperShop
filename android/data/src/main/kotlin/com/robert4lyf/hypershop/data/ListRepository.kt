@@ -65,6 +65,14 @@ data class LibraryRecipe(
     val lastAddedAt: Long,
     val book: String? = null,
     val page: String? = null,
+    /** What the recipe is written for, when it says. */
+    val servings: Int? = null,
+)
+
+/** How many times a saved recipe has gone on the list, and when it last did. */
+data class AddedToList(
+    val times: Int,
+    val lastAt: Long,
 )
 
 /** What "Edit" on the Recipes tab reopens: see [ListRepository.editSource]. */
@@ -766,8 +774,9 @@ class ListRepository(
         }
     }
 
-    /** How many meals each saved recipe has been planned as (its library key), all weeks kept. */
-    fun observeTimesPlanned(): Flow<Map<String, Int>> = dao.observeTimesPlanned().map { rows -> rows.associate { it.key to it.n } }
+    /** Step AA: per saved recipe, how many times it has gone on the list and when it last did (see [ListDao.observeMealUse]). */
+    fun observeAddedToList(): Flow<Map<String, AddedToList>> =
+        dao.observeMealUse().map { rows -> rows.associate { it.key to AddedToList(it.n, it.lastAt) } }
 
     /** Every recipe that has been on the list (its latest copy), the one added longest ago first. */
     fun observeLibrary(): Flow<List<LibraryRecipe>> =
@@ -783,6 +792,7 @@ class ListRepository(
                     r.lastAddedAt ?: 0,
                     r.book,
                     r.page,
+                    r.servingsOriginal,
                 )
             }
         }

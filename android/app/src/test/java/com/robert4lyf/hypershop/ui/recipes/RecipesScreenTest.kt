@@ -49,7 +49,7 @@ private val USES =
         loaded = true,
         library =
             listOf(
-                LibraryRow(9, "r:9", "Red lentil dal", null, 11, 1_700_000_000_000, onList = false),
+                LibraryRow(9, "r:9", "Red lentil dal", null, 11, 1_700_000_000_000, onList = false, writtenFor = 4),
                 LibraryRow(
                     1,
                     "r:1",
@@ -61,6 +61,8 @@ private val USES =
                     photo = TestPhotos.dish,
                     servings = 4,
                     listCount = 1,
+                    timesAdded = 3,
+                    lastAddedToList = 1_760_000_000_000,
                 ),
             ),
         photos = mapOf("r:1" to TestPhotos.dish),
@@ -92,6 +94,16 @@ class RecipesScreenTest {
                 RecipesScreen(USES)
             }
         }
+    }
+
+    @Test
+    fun aCardSaysWhatItServesAndWhenItLastWentOnTheList() {
+        // Step AA: "Serves N · last added <when>", the second part left out for a recipe never added.
+        show()
+        compose.onNodeWithTag("lib-r:9").assertTextContains("Serves 4")
+        compose.onAllNodesWithText("last added", substring = true).assertCountEquals(1)
+        compose.onNodeWithTag("lib-r:1").assertTextContains("last added", substring = true)
+        compose.onAllNodesWithText("ingredients", substring = true).assertCountEquals(0)
     }
 
     @Test

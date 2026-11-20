@@ -36,7 +36,7 @@ import kotlinx.coroutines.launch
 data class RecipesUi(
     val uses: List<UseSummary> = emptyList(),
     val loaded: Boolean = false,
-    /** Every recipe you've added, the one added longest ago first; when searching, the matches, best first. */
+    /** Every saved recipe, in the chosen order (Most used by default); when searching, the matches, best first. */
     val library: List<LibraryRow> = emptyList(),
     /** The library has recipes (the search box shows even when nothing matches). */
     val hasLibrary: Boolean = library.isNotEmpty(),
@@ -51,7 +51,7 @@ data class RecipesUi(
     /** Each saved recipe's cooking notes, by library key: shown with it wherever it is on the list. */
     val notes: Map<String, String> = emptyMap(),
     /** How "Saved" is ordered (while not searching: then it is best match first). */
-    val sort: LibrarySort = LibrarySort.RECENT,
+    val sort: LibrarySort = LibrarySort.MOST_USED,
     /** Only 4★ and 5★ recipes. */
     val highlyRated: Boolean = false,
 )
@@ -93,16 +93,17 @@ data class LibraryRow(
     val notes: String? = null,
     /** The recipe's photo on this phone, or null. */
     val photo: String? = null,
-    /** How many meals it has been planned as. */
-    val timesPlanned: Int = 0,
-    /** "Cooked it" taps on its meals. */
-    val timesCooked: Int = 0,
+    /** Step AA: how many times it has gone on the list, and when it last did (null: never). */
+    val timesAdded: Int = 0,
+    val lastAddedToList: Long? = null,
+    /** What the recipe is written for, when it says ("Serves 4" on its card). */
+    val writtenFor: Int? = null,
     /** Step AA: while it is on the list, the servings it is on the list for (null: the recipe does not say). */
     val servings: Int? = null,
     /** How many times it is on the list now (a share added again makes two). */
     val listCount: Int = 0,
 ) {
-    val facts get() = RecipeFacts(key, title, lastAddedAt, rating, timesPlanned, timesCooked)
+    val facts get() = RecipeFacts(key, title, lastAddedAt, rating, timesAdded, lastAddedToList)
 }
 
 /** The Recipes tab (PLAN §3.5): the uses on the list. */
@@ -131,7 +132,7 @@ class RecipesViewModel(
         val catalogVersion: String,
     )
 
-    private val order = MutableStateFlow(LibrarySort.RECENT to false)
+    private val order = MutableStateFlow(LibrarySort.MOST_USED to false)
 
     /** "Sort": the order of "Saved". Only the screen's: nothing stored or planned changes. */
     fun sortBy(sort: LibrarySort) = order.update { it.copy(first = sort) }
@@ -156,11 +157,11 @@ class RecipesViewModel(
     val ui: StateFlow<RecipesUi> =
         combine(
             c.repository.list.map { c.repository.usesOnList(it) },
-            combine(c.repository.observeLibrary(), c.repository.observeTimesPlanned()) { l, t -> l to t },
+            combine(c.repository.observeLibrary(), c.repository.observeAddedToList()) { l, t -> l to t },
             c.repository.observeRecipeNotes(),
             c.recipePhotos.paths(),
             combine(terms, order) { t, o -> t to o },
-        ) { uses, (lib, planned), notes, photos, (search, view) ->
+        ) { uses, (lib, added), notes, photos, (search, view) ->
             val (q, typing) = search
             val (sort, highly) = view
             // "On the shopping list" only while something of it is still to buy: a recipe bought (or removed with
@@ -181,8 +182,9 @@ class RecipesViewModel(
                         rating = notes[it.key]?.rating,
                         notes = notes[it.key]?.notes,
                         photo = photos[it.key],
-                        timesPlanned = planned[it.key] ?: 0,
-                        timesCooked = notes[it.key]?.timesCooked ?: 0,
+                        timesAdded = added[it.key]?.times ?: 0,
+                        lastAddedToList = added[it.key]?.lastAt,
+                        writtenFor = it.servings,
                         // On the list more than once: the stepper shows and changes the latest (AA.1).
                         servings = live[it.key]?.maxByOrNull { u -> u.useId }?.servings,
                         listCount = live[it.key]?.size ?: 0,

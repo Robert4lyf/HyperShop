@@ -408,7 +408,15 @@ A follow-up review of Step Z found the remaining friction in a few places, and t
   screenshot is `docs/screenshots/list-360x640.png`. Recipes' banner (about 100 dp) became the same one row once
   there are recipes. The emulator scenario and the performance probe read the new count; the probe keeps its metric's
   name so `docs/reports/performance.md` still lines up.
-- [ ] AA.6 Recipes ordered by use
+- [x] AA.6 Recipes ordered by use. "Most used" is the default and the first sort: added to the list most often, then
+  most lately, then newest saved. Derived from `PlannedMeal` (a new read-only query, `observeMealUse`: count and
+  latest `addedAt` per library key; no column, no migration): since Step Z every Add to list, and every import put
+  on the list, plans one meal, so meals are the history of adds (before Z a meal could be planned without being
+  added; counted as used). No meal sorts as never used. `Recipe.lastAddedAt` is not "last added to the list" (Save
+  recipe only sets it too), so it stays the "saved" date. "Your usual" (cooked, then planned) went: "Cooked it" has
+  no screen since Step Z, and Most used covers it; "Recently added" is now "Recently saved". The control still shows
+  from 10 recipes. The card line is "Serves 4 · last added 3 days ago" with the source and stars; the ingredient
+  count, "planned N times" and "cooked N times" went.
 - [ ] AA.7 One message for several adds
 - [ ] AA.8 Remove what Step Z left unused
 - [ ] AA.9 Verify and report

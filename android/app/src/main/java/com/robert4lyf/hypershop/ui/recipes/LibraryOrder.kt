@@ -1,14 +1,13 @@
 package com.robert4lyf.hypershop.ui.recipes
 
-/** How "Saved" is ordered. */
+/** How "Saved" is ordered. Step AA: "Most used" first, and the default. */
 enum class LibrarySort(
     val label: String,
 ) {
-    RECENT("Recently added"),
+    /** Added to the list most often, then most lately, then saved most recently. */
+    MOST_USED("Most used"),
+    RECENT("Recently saved"),
     RATING("Highest rated"),
-
-    /** Cooked most ("Cooked it" on a meal), then planned most: your usual. */
-    PLANNED("Your usual"),
     NAME("A–Z"),
 }
 
@@ -16,17 +15,19 @@ enum class LibrarySort(
 data class RecipeFacts(
     val key: String,
     val title: String,
+    /** When it was saved (or last put on the list before Step Z): the library's own date. */
     val addedAt: Long,
     val rating: Int?,
-    val timesPlanned: Int,
-    val timesCooked: Int = 0,
+    /** How many times it has gone on the list (its planned meals). */
+    val timesAdded: Int = 0,
+    /** When it last went on the list; null when it never has. */
+    val lastAddedToList: Long? = null,
 )
 
 /**
- * The one ordering of saved recipes, for "Saved" and for picking a week's meals. Every
- * order ends in the same tie-breaks — the most recently added, then the title, then the
- * key — so equal recipes never swap places from one frame to the next. Ordering is the
- * screen's only: nothing it decides is stored or changes what is planned or bought.
+ * The one ordering of saved recipes. Every order ends in the same tie-breaks — the most recently saved, then the title,
+ * then the key — so equal recipes never swap places from one frame to the next. Ordering is the screen's only: nothing
+ * it decides is stored or changes what is planned or bought.
  */
 object LibraryOrder {
     /** "4★ & up": the recipes you rated highly. */
@@ -41,11 +42,10 @@ object LibraryOrder {
 
     private val byName = compareBy<RecipeFacts> { it.title.lowercase() }.thenBy { it.title }.thenBy { it.key }
 
-    /** Cooked most, then planned most, then rated best, then newest: "your usual", what the planner offers first. */
-    private val usual =
-        compareByDescending<RecipeFacts> { it.timesCooked }
-            .thenByDescending { it.timesPlanned }
-            .thenByDescending { it.rating ?: 0 }
+    /** Step AA: added most often, then most lately (never added sorts last), then saved most recently. */
+    private val mostUsed =
+        compareByDescending<RecipeFacts> { it.timesAdded }
+            .thenByDescending { it.lastAddedToList ?: Long.MIN_VALUE }
             .then(newestFirst)
 
     fun <T> sort(
@@ -55,9 +55,9 @@ object LibraryOrder {
     ): List<T> {
         val c =
             when (sort) {
+                LibrarySort.MOST_USED -> mostUsed
                 LibrarySort.RECENT -> newestFirst
                 LibrarySort.RATING -> byRating
-                LibrarySort.PLANNED -> usual
                 LibrarySort.NAME -> byName
             }
         return rows.sortedWith(compareBy(c) { facts(it) })

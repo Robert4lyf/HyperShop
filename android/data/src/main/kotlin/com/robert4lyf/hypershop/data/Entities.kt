@@ -324,6 +324,13 @@ data class KeyCount(
     val n: Int,
 )
 
+/** A query's row, not a table: how many meals a saved recipe has been planned as, and the latest one's time. */
+data class KeyUse(
+    val key: String,
+    val n: Int,
+    val lastAt: Long,
+)
+
 /**
  * A meal planned for a week (docs/design/release-b.md): only the intent. Its
  * ingredients come from the saved recipe ([libraryKey], its latest copy) and its

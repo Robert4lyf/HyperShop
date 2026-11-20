@@ -260,7 +260,6 @@ fun RecipesScreen(
                     items(ui.library, key = { "lib-${it.key}" }) { row ->
                         LibraryCard(
                             row,
-                            showPlanned = ui.sort == LibrarySort.PLANNED,
                             onAdd = { library.onAdd(row) },
                             onRemove = { library.onRemove(row) },
                             onOpen = { library.onOpen(row) },
@@ -414,7 +413,6 @@ data class RecipeNoteActions(
 @Composable
 private fun LibraryCard(
     row: LibraryRow,
-    showPlanned: Boolean,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
     onOpen: () -> Unit,
@@ -459,12 +457,13 @@ private fun LibraryCard(
                         listOfNotNull(
                             webLink(row.url)?.let { siteName(it) } ?: row.bookRef,
                             row.rating?.let { "★ $it/5" },
-                            if (row.lines == 1) "1 ingredient" else "${row.lines} ingredients",
-                            row.timesCooked.takeIf { it > 0 }?.let { if (it == 1) "cooked once" else "cooked $it times" },
-                            row.timesPlanned.takeIf { showPlanned && it > 0 }?.let { if (it == 1) "planned once" else "planned $it times" },
+                            // Step AA: what it serves and when it last went on the list (left out when it never has).
+                            row.writtenFor?.let { "Serves $it" },
+                            row.lastAddedToList?.let {
+                                "last added " + addedWhen(DateUtils.getRelativeTimeSpanString(it, now, DAY).toString())
+                            },
                             // AA.1: on the list more than once (added again from a share), said rather than hidden.
                             row.listCount.takeIf { it > 1 }?.let { if (it == 2) "on the list twice" else "on the list $it times" },
-                            "added " + addedWhen(DateUtils.getRelativeTimeSpanString(row.lastAddedAt, now, DAY).toString()),
                         )
                     Text(
                         bits.joinToString(" · "),

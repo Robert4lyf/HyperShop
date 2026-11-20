@@ -5,15 +5,16 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** T.3: the orders of "Saved" and of the planner's picks, ties included. */
+/** T.3: the orders of "Saved", ties included. Step AA: "Most used" is the default. */
 class LibraryOrderTest {
     private fun r(
         key: String,
         title: String = key,
         addedAt: Long = 0,
         rating: Int? = null,
-        planned: Int = 0,
-    ) = RecipeFacts(key, title, addedAt, rating, planned)
+        added: Int = 0,
+        lastAdded: Long? = null,
+    ) = RecipeFacts(key, title, addedAt, rating, added, lastAdded)
 
     private fun keys(
         rows: List<RecipeFacts>,
@@ -22,23 +23,29 @@ class LibraryOrderTest {
 
     private val rows =
         listOf(
-            r("dal", "Red lentil dal", addedAt = 100, rating = 4, planned = 6),
-            r("chilli", "Weeknight chilli", addedAt = 300, rating = 5, planned = 2),
-            r("pie", "fish pie", addedAt = 200, rating = null, planned = 9),
-            r("soup", "Soup", addedAt = 400, rating = 3, planned = 0),
+            r("dal", "Red lentil dal", addedAt = 100, rating = 4, added = 2, lastAdded = 900),
+            r("chilli", "Weeknight chilli", addedAt = 300, rating = 5, added = 2, lastAdded = 950),
+            r("pie", "fish pie", addedAt = 200, rating = null, added = 9, lastAdded = 500),
+            r("soup", "Soup", addedAt = 400, rating = 3),
+            r("stew", "Stew", addedAt = 50, rating = 5),
         )
 
     @Test
-    fun recentlyAddedIsNewestFirst() = assertEquals(listOf("soup", "chilli", "pie", "dal"), keys(rows, LibrarySort.RECENT))
+    fun recentlySavedIsNewestFirst() = assertEquals(listOf("soup", "chilli", "pie", "dal", "stew"), keys(rows, LibrarySort.RECENT))
 
     @Test
-    fun highestRatedPutsUnratedLast() = assertEquals(listOf("chilli", "dal", "soup", "pie"), keys(rows, LibrarySort.RATING))
+    fun highestRatedPutsUnratedLast() = assertEquals(listOf("chilli", "stew", "dal", "soup", "pie"), keys(rows, LibrarySort.RATING))
 
     @Test
-    fun mostPlannedThenBestRated() = assertEquals(listOf("pie", "dal", "chilli", "soup"), keys(rows, LibrarySort.PLANNED))
+    fun mostUsedIsMostOftenThenMostLatelyThenSavedAndNeverAddedLast() =
+        // The pie most often; the chilli and the dal twice each, the chilli more lately; never added: newest saved first.
+        assertEquals(listOf("pie", "chilli", "dal", "soup", "stew"), keys(rows, LibrarySort.MOST_USED))
 
     @Test
-    fun alphabeticalIgnoresCase() = assertEquals(listOf("pie", "dal", "soup", "chilli"), keys(rows, LibrarySort.NAME))
+    fun mostUsedIsTheDefault() = assertEquals(LibrarySort.MOST_USED, RecipesUi().sort)
+
+    @Test
+    fun alphabeticalIgnoresCase() = assertEquals(listOf("pie", "dal", "soup", "stew", "chilli"), keys(rows, LibrarySort.NAME))
 
     @Test
     fun equalRecipesKeepOnePredictableOrder() {
@@ -46,7 +53,7 @@ class LibraryOrderTest {
         val tied = listOf(r("b", "Same", 5, 4), r("a", "Same", 5, 4), r("c", "Older", 1, 4))
         assertEquals(listOf("a", "b", "c"), keys(tied, LibrarySort.RATING))
         assertEquals(listOf("a", "b", "c"), keys(tied.reversed(), LibrarySort.RATING))
-        assertEquals(keys(tied, LibrarySort.PLANNED), keys(tied.shuffled(java.util.Random(7)), LibrarySort.PLANNED))
+        assertEquals(keys(tied, LibrarySort.MOST_USED), keys(tied.shuffled(java.util.Random(7)), LibrarySort.MOST_USED))
     }
 
     @Test
@@ -62,7 +69,14 @@ class LibraryOrderTest {
         val rnd = java.util.Random(42)
         val big =
             (0 until 2000).map {
-                r("k$it", "Recipe ${rnd.nextInt(300)}", rnd.nextInt(500).toLong(), rnd.nextInt(6).takeIf { it > 0 }, rnd.nextInt(4))
+                r(
+                    "k$it",
+                    "Recipe ${rnd.nextInt(300)}",
+                    rnd.nextInt(500).toLong(),
+                    rnd.nextInt(6).takeIf { it > 0 },
+                    rnd.nextInt(4),
+                    rnd.nextInt(3).takeIf { it > 0 }?.toLong(),
+                )
             }
         for (s in LibrarySort.entries) {
             val once = keys(big, s)

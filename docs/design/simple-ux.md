@@ -25,6 +25,8 @@ fewer modes and one word per idea. The data model is unchanged; every action cal
 | An item or a recipe's items all bought | **bought** ("2 bought", "Bought ✓", "All bought") | done, Done ✓ |
 | Take a recipe's items off the list | **Remove from list** (only what is unbought goes) | Remove meal, ✕ |
 | Delete a saved recipe | **Delete recipe** | Remove from your recipes |
+| The order of saved recipes | **Most used** (the default: added to the list most often, then most lately, then newest saved); **Recently saved**, **Highest rated**, **A–Z**. The sort control shows from 10 recipes | Your usual, Recently added |
+| A saved recipe's card line | "Serves 4 · last added 3 days ago" ("last added" left out when it never has been) | added today, 12 ingredients, planned 3 times, cooked once |
 | Something is already at home | **At home** (an unticked review row; staples in Settings start unticked) | Have it, Have some, I have some |
 | Can't get it on this trip | **Can't find it** → *Set aside for this trip*; **Found it** takes it back | Unavailable, Not available today |
 | End the trip | **Finish shopping** | Done |

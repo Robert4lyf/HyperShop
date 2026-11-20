@@ -100,6 +100,8 @@ class SnackbarPlacementTest {
         server.enqueue(MockResponse().setHeader("Content-Type", "text/html; charset=utf-8").setBody(PAGE))
         try {
             val c = TestContainer.create(pages = server)
+            // The review's own once-only "Read offline" message would replace the one this test posts.
+            runBlocking { c.settings.setKeyNudged() }
             show(c)
             runBlocking {
                 c.awaitReady()
