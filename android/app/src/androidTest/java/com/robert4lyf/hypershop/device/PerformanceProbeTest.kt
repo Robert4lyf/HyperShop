@@ -227,6 +227,24 @@ class PerformanceProbeTest {
         budget("at home check over the week's list", home, 150.0)
     }
 
+    /**
+     * Scrolls [list] until [target] is in it, the scroll made between frames: never from inside `waitUntil`'s condition,
+     * where an action can land in the middle of a frame's layout ("performMeasureAndLayout called during measure
+     * layout", KNOWN_ISSUES #36). Tries again while the row is still on its way from the database.
+     */
+    private fun scrollListTo(
+        list: String,
+        target: SemanticsMatcher,
+    ) {
+        val end = System.currentTimeMillis() + 15_000
+        while (true) {
+            compose.waitForIdle()
+            if (runCatching { compose.onNodeWithTag(list).performScrollToNode(target) }.isSuccess) return
+            check(System.currentTimeMillis() < end) { "$target never came into \"$list\"" }
+            Thread.sleep(50)
+        }
+    }
+
     @Test
     fun theListAt150ItemsOnTheMainThread() {
         assumeTrue("run on request only", enabled)
@@ -257,8 +275,7 @@ class PerformanceProbeTest {
             (1..10).map { i ->
                 // Step Z: the one list's rows are taller than the old shop screen's, and on a small screen only a few
                 // are on it; the next open tick is scrolled to first, outside the timed tap.
-                compose.waitUntil(10_000) { runCatching { compose.onNodeWithTag("list").performScrollToNode(ticks) }.isSuccess }
-                compose.waitForIdle()
+                scrollListTo("list", ticks)
                 timed {
                     compose.onAllNodes(ticks)[0].performClick()
                     compose.waitUntil(

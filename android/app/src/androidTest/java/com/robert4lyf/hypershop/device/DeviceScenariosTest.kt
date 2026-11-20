@@ -73,6 +73,24 @@ class DeviceScenariosTest {
                 it.config.getOrNull(SemanticsProperties.StateDescription) == "To buy"
         }
 
+    /**
+     * Scrolls [list] until [target] is in it, the scroll made between frames: never from inside `waitUntil`'s condition,
+     * where an action can land in the middle of a frame's layout ("performMeasureAndLayout called during measure
+     * layout", KNOWN_ISSUES #36). Tries again while the row is still on its way from the database.
+     */
+    private fun scrollListTo(
+        list: String,
+        target: SemanticsMatcher,
+    ) {
+        val end = System.currentTimeMillis() + 15_000
+        while (true) {
+            compose.waitForIdle()
+            if (runCatching { compose.onNodeWithTag(list).performScrollToNode(target) }.isSuccess) return
+            check(System.currentTimeMillis() < end) { "$target never came into \"$list\"" }
+            Thread.sleep(50)
+        }
+    }
+
     private fun waitFor(what: () -> Boolean) = compose.waitUntil(10_000) { runCatching(what).getOrDefault(false) }
 
     /** [waitFor], and on a timeout says what was awaited and the texts and tags on screen instead. */
@@ -130,7 +148,7 @@ class DeviceScenariosTest {
             // Step Z: no Shopping view to switch to, so the keyboard from the Add field is still up and on a small
             // screen the rows can be outside the list's composed window: the list is scrolled to the next one, as a
             // person scrolls (or closes the keyboard) before the first tick.
-            waitFor { runCatching { compose.onNodeWithTag("list").performScrollToNode(openTick) }.isSuccess }
+            scrollListTo("list", openTick)
             waitFor { openTicks().fetchSemanticsNodes().isNotEmpty() }
             openTicks()[0].performClick()
             waitFor { bought() == i + 1 }
@@ -160,8 +178,8 @@ class DeviceScenariosTest {
         assertEquals(Rational.of(3), onion)
         // Scrolled to, as a thumb would: on the CI emulator's small screen the list's header leaves room for little more
         // than the first aisle's heading.
+        scrollListTo("list", hasText("3 onions", substring = true, ignoreCase = true))
         waitFor("\"3 onions\" on the list") {
-            compose.onNodeWithTag("list").performScrollToNode(hasText("3 onions", substring = true, ignoreCase = true))
             compose.onAllNodesWithText("3 onions", substring = true, ignoreCase = true).fetchSemanticsNodes().isNotEmpty()
         }
         val uses = runBlocking { c.repository.usesOnList() }

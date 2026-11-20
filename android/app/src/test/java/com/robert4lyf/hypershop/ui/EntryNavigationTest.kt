@@ -125,6 +125,11 @@ class EntryNavigationTest {
         assertEquals(Routes.LIST, nav.graph.startDestinationRoute)
         compose.onNodeWithTag("tab-meals").assertDoesNotExist()
         compose.onNodeWithTag("tab-${Routes.RECIPES}").assertExists()
+        // The list loaded and the destination remembered before the test ends, so none of this test's database work is
+        // still running when the next test's container starts (KNOWN_ISSUES #35).
+        waitFor("add-item")
+        compose.waitUntil(5_000) { runBlocking { c.settings.lastTab.first() } == Routes.LIST }
+        compose.waitForIdle()
     }
 
     @Test

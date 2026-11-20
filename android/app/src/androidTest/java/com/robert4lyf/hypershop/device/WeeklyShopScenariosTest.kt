@@ -61,6 +61,24 @@ class WeeklyShopScenariosTest {
         compose.waitUntil(10_000) { has("list") }
     }
 
+    /**
+     * Scrolls [list] until [target] is in it, the scroll made between frames: never from inside `waitUntil`'s condition,
+     * where an action can land in the middle of a frame's layout ("performMeasureAndLayout called during measure
+     * layout", KNOWN_ISSUES #36). Tries again while the row is still on its way from the database.
+     */
+    private fun scrollListTo(
+        list: String,
+        target: SemanticsMatcher,
+    ) {
+        val end = System.currentTimeMillis() + 15_000
+        while (true) {
+            compose.waitForIdle()
+            if (runCatching { compose.onNodeWithTag(list).performScrollToNode(target) }.isSuccess) return
+            check(System.currentTimeMillis() < end) { "$target never came into \"$list\"" }
+            Thread.sleep(50)
+        }
+    }
+
     private fun waitFor(what: () -> Boolean) = compose.waitUntil(15_000) { runCatching(what).getOrDefault(false) }
 
     /** [waitFor], and on a timeout says what was awaited and what the screen and the data held instead. */
@@ -140,8 +158,7 @@ class WeeklyShopScenariosTest {
         // Not while the last tap's change is still being laid out (a scroll then measured mid-layout),
         // and not before the row is in the list at all (the saved recipes load after the screen opens).
         compose.waitForIdle()
-        val inList = hasTestTag(tag)
-        waitFor { runCatching { compose.onNodeWithTag(list).performScrollToNode(inList) }.isSuccess }
+        scrollListTo(list, hasTestTag(tag))
         scrolls++
     }
 
