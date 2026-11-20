@@ -1,6 +1,5 @@
 package com.robert4lyf.hypershop.ui.review
 
-import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -9,7 +8,6 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
-import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.robert4lyf.hypershop.core.model.AisleCode
@@ -64,14 +62,6 @@ class ReviewRowSheetViewModelTest {
         assertEquals("milk: +200ml → 700ml on the shopping list", vm.sheet("cat:milk")!!.effect)
         assertEquals("4 pint (2.27l) bottle", vm.sheet("cat:milk")!!.packNote)
         assertEquals("200 ml milk", vm.sheet("cat:milk")!!.lines.single().raw)
-    }
-
-    @Test
-    fun alwaysInStockMakesAStaple() {
-        val (c, vm) = vm("1 tsp ground cumin")
-        vm.alwaysInStock("cat:cumin")
-        await(vm.state) { it is ReviewState.Ready && it.ui().row("cat:cumin").inStock }
-        assertTrue("cat:cumin" in runBlocking { c.repository.staples() })
     }
 
     @Test
@@ -268,7 +258,6 @@ class ReviewRowSheetScreenTest {
     private val events = mutableListOf<String>()
     private val actions =
         SheetActions(
-            onAlwaysInStock = { events += "always" },
             onSwap = { events += "swap $it" },
             onMoveAisle = { a, always -> events += "move $a $always" },
             onEditLine = { id, t -> events += "edit $id $t" },
@@ -278,7 +267,6 @@ class ReviewRowSheetScreenTest {
                 events += "amount $id $t"
                 true
             },
-            onInStock = { events += "stock $it" },
             renamePreview = { "preview:$it" },
         )
 
@@ -291,7 +279,9 @@ class ReviewRowSheetScreenTest {
         compose.onNodeWithText("milk: +200ml → 700ml on the shopping list").fetchSemanticsNode()
         compose.onNodeWithText("Usually sold as 1 × 4 pint (2.27 l) bottle").fetchSemanticsNode()
         compose.onNodeWithText("Use oat milk instead").performClick()
-        compose.onNodeWithText("Always at home").performScrollTo().performClick()
+        // Step Z: at home is said on the review's row, not here.
+        compose.onNodeWithText("Always at home").assertDoesNotExist()
+        compose.onNodeWithTag("switch-At home").assertDoesNotExist()
         // The line's words and name sit behind "Edit the line" (UX review 6).
         compose.onNodeWithTag("edit-line").performScrollTo().performClick()
         compose.onNodeWithTag("line-7").performScrollTo().performTextReplacement("300ml milk")
@@ -302,24 +292,23 @@ class ReviewRowSheetScreenTest {
         // Said under the field: the change itself may be a word on a row further up the screen.
         compose.onNodeWithText("Set to 300 ml").fetchSemanticsNode()
         // A chip asks: just this time, or always.
+        // The aisles are behind "Change aisle".
+        compose.onNodeWithText("Frozen").assertDoesNotExist()
+        compose.onNodeWithTag("change-aisle").performScrollTo().performClick()
         compose.onNodeWithText("Frozen").performScrollTo().performClick()
         compose.onNodeWithText("Just this time").performClick()
         compose.onNodeWithText("Chilled").performScrollTo().performClick()
         compose.onNodeWithText("Always").performClick()
-        compose.onNodeWithTag("switch-At home").assertHeightIsAtLeast(48.dp)
-        compose.onNodeWithTag("switch-At home").performClick()
         compose.onNodeWithTag("rename").performTextReplacement("Oat milk")
         compose.onNodeWithTag("rename-preview").assertTextEquals("preview:Oat milk")
         compose.onNodeWithTag("rename-go").performClick()
         assertEquals(
             listOf(
                 "swap 7",
-                "always",
                 "edit 7 300ml milk",
                 "amount 7 300 ml",
                 "move FROZEN false",
                 "move CHILLED true",
-                "stock true",
                 "rename Oat milk",
             ),
             events,

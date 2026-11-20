@@ -5,14 +5,12 @@ import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.testutil.Photos.saved
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.testutil.await
-import com.robert4lyf.hypershop.ui.meals.MealsViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -113,21 +111,5 @@ class DiscoveryTest {
         await(vm.ui) { it.highlyRated && it.library.isEmpty() }
         runBlocking { c.backups.restore(file) }
         await(vm.ui) { order(vm).toSet() == setOf(dal, chilli) }
-    }
-
-    @Test
-    fun thePlannerOffersYourUsualFirstAndAMealShowsItsNotes() {
-        val vm = MealsViewModel(c).also { m -> CoroutineScope(Dispatchers.Main).launch { m.ui.collect {} } }
-        val ui = await(vm.ui) { it.loaded && it.picks.size == 3 }
-        assertEquals(listOf(pie, dal, chilli), ui.picks.map { it.key })
-        // Planning the chilli this week twice does not move it: only other weeks rank the picks.
-        runBlocking {
-            c.planner.plan(c.planner.currentWeek(), chilli)
-            c.planner.plan(c.planner.currentWeek(), pie)
-        }
-        val after = await(vm.ui) { it.meals.size == 2 }
-        assertEquals(listOf(pie, dal, chilli), after.picks.map { it.key })
-        assertEquals("Half the mustard", after.meals.single { it.title == "Fish pie" }.notes)
-        assertTrue(after.meals.single { it.title == "Weeknight chilli" }.notes == null)
     }
 }

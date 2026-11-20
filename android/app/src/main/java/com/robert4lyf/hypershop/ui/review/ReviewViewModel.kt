@@ -130,10 +130,6 @@ data class ReviewUi(
     val byHand: Boolean = false,
     /** A saved recipe being edited: nothing goes on the list, so no in-stock or servings. */
     val savedOnly: Boolean = false,
-    /** Adding plans the recipe as a meal of this week (a new import; not an edit, a save for later or a by-hand list). */
-    val plans: Boolean = false,
-    /** "Tap an ingredient to…": shown while the sheet is new to the user, or while a line needs checking (UX review 20). */
-    val hint: Boolean = true,
     /** A key is saved and Claude hasn't read this recipe: "Ask Claude" is offered. */
     val canAskClaude: Boolean = false,
     /** No web page: a cookbook recipe, which can carry its book and page. */
@@ -148,14 +144,11 @@ data class ReviewUi(
     val inStockCount: Int get() = rows.count { it.inStock }
     val checkCount: Int get() = rows.count { it.check && !it.inStock }
 
-    /** "4 to add · 2 at home · 1 to check", without the zero parts ("12 ingredients" for a saved recipe). */
+    /** Step Z: "4 to add · 2 at home", without the zero parts ("12 ingredients" for a saved recipe); a line to check is marked on its row. */
     val summary: String
         get() =
             if (savedOnly) {
-                listOfNotNull(
-                    if (rows.size == 1) "1 ingredient" else "${rows.size} ingredients",
-                    checkCount.takeIf { it > 0 }?.let { "$it to check" },
-                ).joinToString(" · ")
+                if (rows.size == 1) "1 ingredient" else "${rows.size} ingredients"
             } else {
                 summaryForList
             }
@@ -163,13 +156,10 @@ data class ReviewUi(
     private val summaryForList: String
         get() =
             listOfNotNull(
-                // The meal goes on This week with the add (CLAUDE.md: an import plans itself): said here, not found later.
-                "Planned for this week".takeIf { plans && rows.isNotEmpty() },
                 // Said here in full contrast, not only by the disabled button at the bottom.
                 "Nothing to add".takeIf { addCount == 0 && rows.isNotEmpty() && !editing },
                 addCount.takeIf { it > 0 }?.let { "$it to add" },
                 inStockCount.takeIf { it > 0 }?.let { "$it at home" },
-                checkCount.takeIf { it > 0 }?.let { "$it to check" },
             ).joinToString(" · ")
 }
 
@@ -250,15 +240,6 @@ class ReviewViewModel(
     private var busy = false
     private var retrying = false
     private var retryJob: Job? = null
-
-    /** How often a row's sheet has been opened, ever: the "tap an ingredient" hint goes once that is a few. */
-    private var sheetOpens = 0
-
-    /** A row's sheet opened (the route says): counted for the hint. */
-    fun noteSheetOpened() {
-        sheetOpens++
-        viewModelScope.launch { c.settings.bumpReviewSheetOpens() }
-    }
 
     /** The import as it failed, for the lines picked or pasted in its place. */
     private var failedFrom: ImportResult? = null
@@ -366,7 +347,6 @@ class ReviewViewModel(
             return fail(ImportError.NO_RECIPE, emptyList())
         }
         failedFrom = r
-        sheetOpens = c.settings.reviewSheetOpens.first()
         // Once per import: a failure or refusal in the worker isn't retried on open ("Retry with Claude" is).
         val pending = r.claudePending && !r.claudeTried && c.reviewGate.visible.value
         if (pending && r.lines.isEmpty()) {
@@ -567,8 +547,6 @@ class ReviewViewModel(
                     cookbook = webLink(r.url) == null && !r.byHand,
                     byHand = r.byHand,
                     savedOnly = r.savesToLibrary,
-                    plans = r.editsUse == null && !r.savesToLibrary && !r.byHand,
-                    hint = sheetOpens < HINT_OPENS || grouped.any { (_, rows) -> rows.any { it.check && !it.inStock } },
                     canAskClaude = r.parsedBy != ParsedBy.CLAUDE && !r.byHand && c.apiKeyStore.hasKey.value,
                     book = r.book,
                     page = r.page,
@@ -971,15 +949,6 @@ class ReviewViewModel(
             p.note?.let { "($it)" },
         ).joinToString(" ")
 
-    /** "Always at home": a staple from now on, and marked here. */
-    fun alwaysInStock(key: String) =
-        act {
-            c.repository.setStaple(key, true)
-            decisions[key] = (decisions[key] ?: RowDecision()).copy(inStock = true)
-            changed = true
-            recompute()
-        }
-
     /** "Move aisle": always (a CategoryOverride) or just this time. */
     fun moveAisle(
         key: String,
@@ -1261,8 +1230,6 @@ class ReviewViewModel(
 
         const val STAGE_OPENING = "Opening…"
 
-        /** Sheet openings after which the "tap an ingredient" hint is no longer needed. */
-        const val HINT_OPENS = 3
         const val STAGE_FETCHING = "Fetching the page…"
         const val STAGE_CLAUDE = "Reading with Claude…"
         const val STAGE_LINES = "Reading the lines…"

@@ -24,18 +24,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.ShoppingCart
+import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -49,11 +49,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -66,6 +68,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -80,12 +83,10 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
-import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.ui.common.AisleBadge
 import com.robert4lyf.hypershop.ui.common.BottomActionBar
 import com.robert4lyf.hypershop.ui.common.CountPill
-import com.robert4lyf.hypershop.ui.common.HeroButton
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
 import com.robert4lyf.hypershop.ui.common.TickMark
 import com.robert4lyf.hypershop.ui.common.sectionItem
@@ -96,6 +97,8 @@ import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.theme.style
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 data class ListActions(
@@ -104,23 +107,13 @@ data class ListActions(
     val onClearAll: () -> Unit,
     val onOpenItem: (ListRow) -> Unit = {},
     val onShare: () -> Unit = {},
-    /** "Need it" on an in-stock ingredient. */
-    val onNeed: (InStockRow) -> Unit = {},
     /** The menu's choice of layout: store order or by recipe. */
     val onView: (ListView) -> Unit = {},
-    /** "Shop" on the planning screen, "Plan" on the shop screen. */
-    val onMode: (ListMode) -> Unit = {},
-    /** "Shopping view": the remembered store's order (missing 4 of the review; step Q asks only when it must). */
-    val onShop: (Long) -> Unit = {},
-    /** Step Q: Shopping view's "Change store", with a second store to choose. */
+    /** Step Z: "Change store" in the menu, with two or more stores to choose from. */
     val onChangeStore: () -> Unit = {},
-    /** Step Q: Buy again and Check food at home, from the menu as well as below the items. */
+    /** Step Q: Buy again, from the menu as well as below the items. */
     val onBuyAgain: () -> Unit = {},
-    val onHomeCheck: () -> Unit = {},
     val onShareText: () -> Unit = {},
-    /** X.8: "Not available" on this trip, and "Found it" to take that back. */
-    val onUnavailable: (ListRow) -> Unit = {},
-    val onAvailable: (ListRow) -> Unit = {},
     /** X.9: "Arrange items" and its "Done"; a row or a group moved one place (-1 up, +1 down), or to an end (true = top). */
     val onArrange: (Boolean) -> Unit = {},
     val onMoveItem: (ListRow, Int) -> Unit = { _, _ -> },
@@ -131,13 +124,15 @@ data class ListActions(
     val onUseEdit: (RecipeSection) -> Unit = {},
     val onUseRename: (RecipeSection, String) -> Unit = { _, _ -> },
     val onUseRemove: (RecipeSection) -> Unit = {},
+    /** Step Z: "Servings" on a recipe's card. */
+    val onUseServings: (RecipeSection, Int) -> Unit = { _, _ -> },
 )
 
 /**
  * The list (PLAN §3.5), stateless: the count and progress, then [header] (the
  * "Add item" field and cards, Step 5.6b), then one card per aisle, and once
- * something is ticked a "Finish shopping" bar within thumb's reach. This is
- * the planning screen; in shopping mode the same state draws as [ShopScreen].
+ * something is ticked a "Finish shopping" bar within thumb's reach. Step Z: the
+ * one list screen, for planning and in the shop alike (there is no shopping mode).
  */
 @Composable
 fun ListScreen(
@@ -150,9 +145,13 @@ fun ListScreen(
     /** After the items: the optional extras (Buy again, Check food at home), never above what is to buy. */
     footer: LazyListScope.() -> Unit = {},
 ) {
-    if (ui.shopping) {
-        ShopScreen(ui, actions)
-        return
+    // Missing 1 of the review: a list that locks every 30 s is the first thing a shopper notices. Kept awake once
+    // something is ticked, which is when a shop is under way.
+    val view = LocalView.current
+    val shopping = ui.doneCount > 0
+    DisposableEffect(view, shopping) {
+        view.keepScreenOn = shopping
+        onDispose { view.keepScreenOn = false }
     }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
@@ -200,6 +199,27 @@ private fun ListBody(
     footer: LazyListScope.() -> Unit = {},
 ) {
     val card = MaterialTheme.colorScheme.card
+    // A row just ticked stays where it is for a moment, tick filled, so a mis-tap is undone by tapping it again; then
+    // it folds into its aisle's "N bought" row. Only the latest tick's timer lets the row fold.
+    var stamps by remember { mutableStateOf(emptyMap<Long, Int>()) }
+    val lingering = stamps.keys
+    val scope = rememberCoroutineScope()
+    val actions =
+        remember(actions) {
+            actions.copy(onToggle = { row ->
+                if (row.state != TickState.DONE) {
+                    val stamp = (stamps[row.id] ?: 0) + 1
+                    stamps = stamps + (row.id to stamp)
+                    scope.launch {
+                        delay(LINGER_MS)
+                        if (stamps[row.id] == stamp) stamps = stamps - row.id
+                    }
+                }
+                actions.onToggle(row)
+            })
+        }
+    // Aisles whose bought rows are shown: kept across tab switches and rotation.
+    var shownBought by rememberSaveable { mutableStateOf(emptyList<String>()) }
     // A request for the Add field brings it on screen, so it is focused now rather than whenever it next scrolls in.
     val listState = rememberLazyListState()
     LaunchedEffect(focusAdd) { if (focusAdd > 0) listState.scrollToItem(0) }
@@ -252,19 +272,7 @@ private fun ListBody(
         // Room at the end for a snackbar (List ready, Undo): the extras below the items scroll clear of it.
         contentPadding = PaddingValues(bottom = 96.dp + keyboard),
     ) {
-        if (ui.arranging) {
-            item(key = "arrange-hint") {
-                Text(
-                    "Move things into the order you find them in the shop: the arrows one place, ⋮ to the top or bottom. " +
-                        "Groups move together; the order is kept for every trip.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp).testTag("arrange-hint"),
-                )
-            }
-        } else {
-            header()
-        }
+        if (!ui.arranging) header()
         if (ui.isEmpty) item { empty() }
         if (byRecipe) {
             for (section in ui.recipes) {
@@ -295,11 +303,18 @@ private fun ListBody(
         }
         for ((aisle, rows) in if (byRecipe) emptyList() else ui.aisles) {
             val open = aisle.name !in collapsed
+            // Step Z: bought rows fold under one "N bought" row per aisle (all of them shown while arranging).
+            val toBuy = if (ui.arranging) rows else rows.filter { it.state != TickState.DONE || it.id in lingering }
+            val bought = rows - toBuy.toSet()
+            val showBought = aisle.name in shownBought
             // Categorised: a label above each group, when the aisle has more than one.
             val groups = rows.map { it.group }.distinct()
             // Group labels whenever an aisle has more than one group (cut 5 of the review: the "Group by type" view went).
             val labelled = groups.size > 1
-            val cells = if (labelled) withLabels(rows) else rows.map { Cell.Item(it) }
+            val cells =
+                (if (labelled) withLabels(toBuy) else toBuy.map { Cell.Item(it) }) +
+                    (if (showBought) bought.map { Cell.Item(it) } else emptyList()) +
+                    (if (bought.isEmpty()) emptyList() else listOf(Cell.Bought(bought.size, showBought)))
             val count = if (open) cells.size + 1 else 1
             item(key = "aisle-${aisle.name}", contentType = "aisle") {
                 AisleTitle(
@@ -332,87 +347,15 @@ private fun ListBody(
                             } else {
                                 GroupLabel(c.name, tile)
                             }
+                        is Cell.Bought ->
+                            BoughtRow(aisle, c, tile) {
+                                shownBought = if (c.shown) shownBought - aisle.name else shownBought + aisle.name
+                            }
                     }
                 }
             }
         }
-        if (ui.inStock.isNotEmpty() && !ui.arranging) inStockSection(ui.inStock, card, actions.onNeed)
         if (!ui.arranging) footer()
-    }
-}
-
-/**
- * "At home": what you said you already had when reviewing the recipes on the
- * list, to check before you go. Open until closed; "Need it" puts one on the list.
- */
-private fun LazyListScope.inStockSection(
-    rows: List<InStockRow>,
-    card: Color,
-    onNeed: (InStockRow) -> Unit,
-) {
-    item(key = "in-stock", contentType = "aisle") {
-        var open by rememberSaveable { mutableStateOf(true) }
-        Column {
-            val count = if (open) rows.size + 1 else 1
-            // The same card as an aisle: a tinted header with a badge and a count pill, then white rows.
-            Row(
-                Modifier
-                    .padding(top = 24.dp)
-                    .sectionItem(sectionPosition(0, count), MaterialTheme.colorScheme.secondaryContainer)
-                    .fillMaxWidth()
-                    .clickable(onClickLabel = if (open) "Collapse" else "Expand", role = Role.Button) { open = !open }
-                    .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
-                    .semantics(mergeDescendants = true) {
-                        heading()
-                        stateDescription = if (open) "Expanded" else "Collapsed"
-                    }
-                    .testTag("in-stock"),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Box(
-                    Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.secondary),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Rounded.Inventory2,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-                Text(
-                    "At home",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.weight(1f),
-                )
-                CountPill("${rows.size}", MaterialTheme.colorScheme.onSecondaryContainer)
-                Icon(
-                    if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
-            }
-            if (open) {
-                rows.forEachIndexed { i, r ->
-                    Row(
-                        Modifier
-                            .sectionItem(sectionPosition(i + 1, count), card)
-                            .fillMaxWidth()
-                            .heightIn(min = 64.dp)
-                            .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(r.main.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleMedium)
-                            Text(r.from, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        TextButton(onClick = { onNeed(r) }, modifier = Modifier.testTag("need-${r.key}")) { Text("Need it") }
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -431,6 +374,49 @@ private sealed interface Cell {
         val group: String?,
     ) : Cell {
         override fun key(aisle: AisleCode): Any = "group-${aisle.name}-$name"
+    }
+
+    /** "3 bought": the aisle's bought rows, out of the way until asked for (and the untick one tap away). */
+    data class Bought(
+        val count: Int,
+        val shown: Boolean,
+    ) : Cell {
+        override fun key(aisle: AisleCode): Any = "bought-${aisle.name}"
+    }
+}
+
+/** How long a ticked row stays in place before it folds into "N bought". */
+internal const val LINGER_MS = 2_500L
+
+@Composable
+private fun BoughtRow(
+    aisle: AisleCode,
+    cell: Cell.Bought,
+    tile: Modifier,
+    onToggle: () -> Unit,
+) {
+    Row(
+        tile
+            .background(MaterialTheme.colorScheme.card)
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(onClickLabel = if (cell.shown) "Hide bought" else "Show bought", role = Role.Button, onClick = onToggle)
+            .padding(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
+            .semantics(mergeDescendants = true) { stateDescription = if (cell.shown) "Expanded" else "Collapsed" }
+            .testTag("bought-${aisle.name}"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "${cell.count} bought",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            if (cell.shown) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -556,7 +542,7 @@ private fun ListTop(
     actions: ListActions,
 ) {
     val shopping = ui.loaded && !ui.isEmpty
-    val total = ui.left + ui.doneCount
+    val total = ui.left + ui.doneCount + ui.unavailable
     ScreenHeader(
         title =
             when {
@@ -572,26 +558,21 @@ private fun ListTop(
             when {
                 !ui.loaded -> null
                 !shopping -> null
-                ui.left == 0 -> "All bought"
-                else -> "${ui.doneCount} of $total bought"
+                else ->
+                    listOfNotNull(
+                        if (ui.left == 0) "All bought" else "${ui.doneCount} of $total bought",
+                        ui.unavailable.takeIf { it > 0 }?.let { "$it set aside" },
+                        // UX review 23: whether the watch has this list.
+                        ui.watch,
+                    ).joinToString(" · ")
             },
         actions = {
-            if (shopping) {
-                // The way into the shop screen: one tap, in reach of either thumb. With a second store's order on
-                // record, the tap asks which store (missing 4 of the review).
-                HeroButton(
-                    onClick = { actions.onShop(ui.activeStore) },
-                    modifier = Modifier.testTag("start-shopping"),
-                ) {
-                    Icon(Icons.Rounded.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(6.dp))
-                    Text("Shopping view")
-                }
-            }
             com.robert4lyf.hypershop.ui.common.SettingsButton()
             var menu by remember { mutableStateOf(false) }
             Box {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
+                IconButton(onClick = { menu = true }, modifier = Modifier.testTag("list-more")) {
+                    Icon(Icons.Rounded.MoreVert, contentDescription = "More")
+                }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(text = { Text("Share shopping list") }, onClick = {
                         menu = false
@@ -616,6 +597,13 @@ private fun ListTop(
                                     .testTag("view-${view.name}"),
                         )
                     }
+                    // Missing 4 of the review: which store's walking order; only offered when there is a choice.
+                    if (ui.secondStore) {
+                        DropdownMenuItem(text = { Text("Change store (${ui.storeName})") }, onClick = {
+                            menu = false
+                            actions.onChangeStore()
+                        }, modifier = Modifier.testTag("change-store"))
+                    }
                     HorizontalDivider()
                     DropdownMenuItem(
                         text = { Text("Arrange items") },
@@ -630,10 +618,6 @@ private fun ListTop(
                         menu = false
                         actions.onBuyAgain()
                     }, modifier = Modifier.testTag("menu-buy-again"))
-                    DropdownMenuItem(text = { Text("Check food at home") }, onClick = {
-                        menu = false
-                        actions.onHomeCheck()
-                    }, modifier = Modifier.testTag("menu-home-check"))
                     DropdownMenuItem(text = { Text("Share list as text") }, enabled = !ui.isEmpty, onClick = {
                         menu = false
                         actions.onShare()
@@ -690,10 +674,10 @@ private fun AisleTitle(
         AisleBadge(aisle, size = 36.dp)
         Text(aisle.displayName, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
         if (left == 0) {
-            Text("Done ✓", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Text("Bought ✓", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         } else {
             // A white pill on the tint, in the aisle's own colour: the count reads at a glance.
-            CountPill("$left left", tint.content)
+            CountPill("$left to buy", tint.content)
         }
         Icon(
             if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
@@ -746,7 +730,7 @@ private fun ListRowItem(
         when (row.state) {
             TickState.DONE -> "Bought"
             TickState.PARTIAL -> "Partly bought"
-            TickState.OPEN -> "Still needed"
+            TickState.OPEN -> if (row.unavailable) "Set aside for this trip" else "To buy"
         }
     val done = row.state == TickState.DONE
     Row(
@@ -798,6 +782,15 @@ private fun ListRowItem(
                     color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                     textDecoration = if (done) TextDecoration.LineThrough else null,
                 )
+                // Can't find it: still to buy, back on the next trip.
+                if (row.unavailable) {
+                    Text(
+                        "Set aside for this trip",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag("set-aside-${row.id}"),
+                    )
+                }
                 for (line in subLines(row)) {
                     Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -871,14 +864,15 @@ private fun RecipeTitle(
             modifier = Modifier.weight(1f),
         )
         if (left == 0) {
-            Text("Done ✓", style = MaterialTheme.typography.labelLarge, color = content)
+            Text("Bought ✓", style = MaterialTheme.typography.labelLarge, color = content)
         } else {
-            CountPill("$left left", content)
+            CountPill("$left to buy", content)
         }
         if (section.kind != RecipeSection.Kind.SHARED) {
             // The recipe's own actions, here on its card (cut 1 of the review): the Recipes tab is the recipe book.
             var menu by remember { mutableStateOf(false) }
             var renaming by rememberSaveable { mutableStateOf(false) }
+            var serving by rememberSaveable { mutableStateOf(false) }
             Box {
                 IconButton(onClick = { menu = true }, modifier = Modifier.testTag("recipe-more-${section.key}")) {
                     Icon(Icons.Rounded.MoreVert, contentDescription = "More for ${section.title}", tint = content)
@@ -896,11 +890,20 @@ private fun RecipeTitle(
                         menu = false
                         renaming = true
                     })
+                    section.servings?.let { n ->
+                        DropdownMenuItem(text = { Text("Servings ($n)") }, onClick = {
+                            menu = false
+                            serving = true
+                        }, modifier = Modifier.testTag("recipe-servings-${section.key}"))
+                    }
                     DropdownMenuItem(text = { Text("Remove from list") }, onClick = {
                         menu = false
                         actions.onUseRemove(section)
                     }, modifier = Modifier.testTag("recipe-remove-${section.key}"))
                 }
+            }
+            if (serving) {
+                ServingsDialog(section.servings ?: 1, onDismiss = { serving = false }) { actions.onUseServings(section, it) }
             }
             if (renaming) {
                 val byHand = section.kind == RecipeSection.Kind.BY_HAND
@@ -914,4 +917,35 @@ private fun RecipeTitle(
         }
         Icon(if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, contentDescription = null, tint = content)
     }
+}
+
+/** "Servings" on a recipe's card: one more or one fewer, then Done. */
+@Composable
+private fun ServingsDialog(
+    from: Int,
+    onDismiss: () -> Unit,
+    onSet: (Int) -> Unit,
+) {
+    var n by rememberSaveable { mutableIntStateOf(from) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Servings") },
+        text = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconButton(onClick = { n = (n - 1).coerceAtLeast(1) }, enabled = n > 1, modifier = Modifier.testTag("servings-fewer")) {
+                    Icon(Icons.Rounded.Remove, contentDescription = "Fewer")
+                }
+                Text("$n", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.testTag("servings-n"))
+                IconButton(onClick = { n = (n + 1).coerceAtMost(99) }, modifier = Modifier.testTag("servings-more")) {
+                    Icon(Icons.Rounded.Add, contentDescription = "More")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onDismiss()
+                onSet(n)
+            }, modifier = Modifier.testTag("servings-done")) { Text("Done") }
+        },
+    )
 }

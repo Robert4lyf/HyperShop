@@ -28,9 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
-import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ShoppingCart
-import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -74,7 +72,6 @@ import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.library.LibraryRoute
 import com.robert4lyf.hypershop.ui.list.ListRoute
 import com.robert4lyf.hypershop.ui.list.show
-import com.robert4lyf.hypershop.ui.meals.MealsRoute
 import com.robert4lyf.hypershop.ui.recipes.RecipesRoute
 import com.robert4lyf.hypershop.ui.review.ReviewRoute
 import com.robert4lyf.hypershop.ui.settings.AislesRoute
@@ -94,16 +91,15 @@ object Routes {
     const val LIBRARY = "library"
     const val AISLES = "aisles"
     const val VOICE_TEST = "voice-test"
-    const val MEALS = "meals"
-
-    /** Step Q: the focused food-at-home check. */
-    const val HOME = "home"
 
     fun review(job: Long) = "review/$job"
 }
 
-/** Step Q: the three main destinations. Settings is reached from the gear at the top of each. */
-private val TABS = setOf(Routes.MEALS, Routes.LIST, Routes.RECIPES)
+/**
+ * Step Z: the two main destinations (Step Q had three; Meals went). Settings is reached from the gear at the top of
+ * each. A remembered destination that is not one of these (a "meals" from before) opens the list.
+ */
+internal val TABS = setOf(Routes.LIST, Routes.RECIPES)
 
 internal data class Tab(
     val route: String,
@@ -113,8 +109,8 @@ internal data class Tab(
 )
 
 /**
- * The app's navigation: four tabs in the order of the week (plan it, shop it, the recipes behind it, settings),
- * plus the review screen opened by an import.
+ * The app's navigation: two tabs (the shopping list and the recipes behind it), Settings from a gear on each, and
+ * the review screen opened by an import.
  */
 @Composable
 fun HyperShopApp(
@@ -219,9 +215,6 @@ private fun AppShell(
     var addFocus by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         container.entryRequests.collect { request ->
-            if (request == com.robert4lyf.hypershop.EntryRequest.ADD) {
-                container.settings.setListMode(com.robert4lyf.hypershop.settings.ListMode.PLAN)
-            }
             // Navigation's state belongs to the main thread, wherever the setting was written. A request waiting
             // from a cold start arrives before NavHost has set its graph, and navigating then throws: wait for it.
             withContext(Dispatchers.Main) {
@@ -250,17 +243,15 @@ private fun AppShell(
                 snackbar,
                 when {
                     reviewing -> Modifier.navigationBarsPadding().padding(bottom = 80.dp)
-                    route == Routes.MEALS || route == Routes.HOME -> Modifier.padding(bottom = 80.dp)
                     else -> Modifier
                 },
             )
         },
         bottomBar = {
-            // The three main destinations only: Settings and its screens, and the review, have their own way back.
+            // The two main destinations only: Settings and its screens, and the review, have their own way back.
             if (route == null || route in TABS) {
                 val tabs =
                     listOf(
-                        Tab(Routes.MEALS, "Meals", Icons.Rounded.CalendarMonth, Icons.Outlined.CalendarMonth),
                         Tab(Routes.LIST, "Shopping list", Icons.Rounded.ShoppingCart, Icons.Outlined.ShoppingCart),
                         Tab(Routes.RECIPES, "Recipes", Icons.AutoMirrored.Rounded.MenuBook, Icons.AutoMirrored.Outlined.MenuBook),
                     )
@@ -285,10 +276,8 @@ private fun AppShell(
                         container,
                         snackbar,
                         onReview = openReview,
-                        onPlan = { selectTab(Routes.MEALS) },
                         focusAdd = addFocus,
                         onAddFocused = { addFocus = 0 },
-                        onHomeCheck = { nav.navigate(Routes.HOME) { launchSingleTop = true } },
                     )
                 }
                 composable(Routes.RECIPES) {
@@ -296,17 +285,6 @@ private fun AppShell(
                         container,
                         snackbar,
                         onReview = openReview,
-                        onMeals = { selectTab(Routes.MEALS) },
-                    )
-                }
-                composable(Routes.MEALS) {
-                    MealsRoute(
-                        container,
-                        snackbar,
-                        // View shopping list: the Shopping list tab.
-                        onList = { selectTab(Routes.LIST) },
-                        onReview = openReview,
-                        onHomeCheck = { nav.navigate(Routes.HOME) { launchSingleTop = true } },
                     )
                 }
                 composable(Routes.SETTINGS) {
@@ -320,9 +298,6 @@ private fun AppShell(
                         snackbar = snackbar,
                         onBack = { nav.popBackStack() },
                     )
-                }
-                composable(Routes.HOME) {
-                    com.robert4lyf.hypershop.ui.meals.HomeCheckRoute(container, snackbar, onBack = { nav.popBackStack() })
                 }
                 composable(Routes.VOICE_TEST) { VoiceTestRoute(onBack = { nav.popBackStack() }) }
                 composable(Routes.LIBRARY) { LibraryRoute(container, snackbar, onBack = { nav.popBackStack() }) }

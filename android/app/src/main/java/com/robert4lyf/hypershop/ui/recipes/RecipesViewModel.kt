@@ -40,6 +40,8 @@ data class RecipesUi(
     val library: List<LibraryRow> = emptyList(),
     /** The library has recipes (the search box shows even when nothing matches). */
     val hasLibrary: Boolean = library.isNotEmpty(),
+    /** How many recipes are saved, whatever the search or filter shows. */
+    val savedCount: Int = library.size,
     /** What is being searched for (chips, then the text being typed); empty when not searching. */
     val terms: List<String> = emptyList(),
     /** The book of the cookbook recipe added most recently: the photo form starts with it. */
@@ -194,6 +196,7 @@ class RecipesViewModel(
                 loaded = true,
                 library = shown,
                 hasLibrary = rows.isNotEmpty(),
+                savedCount = rows.size,
                 terms = q,
                 lastBook = lastBook,
                 photos = photos,
@@ -263,15 +266,8 @@ class RecipesViewModel(
      */
     fun addFromLibrary(row: LibraryRow) = openSaved(row, ImportResult.LIBRARY)
 
-    /**
-     * Step Q: "Add meal" on a saved recipe: a meal of this week, from the recipe as it was saved and corrected, with no
-     * second review. Its ingredients go on the list with Make shopping list on Meals; Edit changes the recipe itself.
-     */
-    fun addMeal(row: LibraryRow) =
-        viewModelScope.launch {
-            val id = c.planner.plan(c.planner.currentWeek(), row.key)
-            messages.send(UiMessage("${row.title} added to this week's meals", undo = { c.planner.unplanNew(listOf(id)) }))
-        }
+    /** Step Z "Add to list" on a saved recipe: its ingredients on the list at once, as saved and corrected, with Undo. */
+    fun addToList(row: LibraryRow) = viewModelScope.launch { messages.send(c.addRecipeToList(row.key, row.title)) }
 
     /** "Edit" on a saved recipe: the review screen, saving back to the library and leaving the list alone. */
     fun editSaved(row: LibraryRow) = openSaved(row, ImportResult.LIBRARY_EDIT)
@@ -367,11 +363,11 @@ class RecipesViewModel(
 
     fun closeUse() = useActions.closeDetail()
 
-    /** "Remove from your recipes" (what's on the list stays); Undo brings it back. */
+    /** "Delete recipe" (what's on the list stays); Undo brings it back. */
     fun removeFromLibrary(row: LibraryRow) =
         viewModelScope.launch {
             val copies = c.repository.removeFromLibrary(row.key)
-            messages.send(UiMessage("Removed ${row.title} from your recipes", undo = { c.repository.restoreToLibrary(copies) }))
+            messages.send(UiMessage("Deleted ${row.title}", undo = { c.repository.restoreToLibrary(copies) }))
         }
 
     private val messages = Channel<UiMessage>(Channel.BUFFERED)

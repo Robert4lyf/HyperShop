@@ -4,10 +4,8 @@ import android.net.Uri
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
-import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertHeightIsAtLeast
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -29,10 +27,8 @@ import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.di.AppContainer
-import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.ui.HyperShopApp
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -55,34 +51,45 @@ class DeviceScenariosTest {
     private fun show(c: AppContainer) {
         compose.setContent { HyperShopTheme { HyperShopApp(c) } }
         compose.waitForIdle()
-        // An empty list opens on This week (X.10); these scenarios start from the shopping list, as a person
-        // switching tabs would. Once the start screen has settled, so the switch is not undone by it.
-        compose.waitUntil(10_000) {
-            listOf("meals", "list", "shop").any { compose.onAllNodesWithTag(it).fetchSemanticsNodes().isNotEmpty() }
-        }
-        if (compose.onAllNodesWithTag("meals").fetchSemanticsNodes().isNotEmpty()) {
-            compose.onNodeWithTag("tab-list").performClick()
-            compose.waitForIdle()
-        }
+        // Step Z: the app opens on the list (two tabs: the list and Recipes).
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("list").fetchSemanticsNodes().isNotEmpty() }
     }
 
     private fun ticks() =
         compose.onAllNodes(
             SemanticsMatcher("a tick") {
-                it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("item-") == true &&
+                it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("tick-") == true &&
                     it.config.getOrNull(SemanticsProperties.Role) == Role.Checkbox
             },
         )
 
     /** The ticks of rows still to buy: a row just ticked stays in place for a moment (Release C), so "the first tick" may be it. */
-    private fun openTicks() =
-        compose.onAllNodes(
-            SemanticsMatcher("an open tick") {
-                it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("item-") == true &&
-                    it.config.getOrNull(SemanticsProperties.Role) == Role.Checkbox &&
-                    it.config.getOrNull(SemanticsProperties.StateDescription) == "Still needed"
-            },
-        )
+    private fun openTicks() = compose.onAllNodes(openTick)
+
+    private val openTick =
+        SemanticsMatcher("an open tick") {
+            it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("tick-") == true &&
+                it.config.getOrNull(SemanticsProperties.Role) == Role.Checkbox &&
+                it.config.getOrNull(SemanticsProperties.StateDescription) == "To buy"
+        }
+
+    /**
+     * Scrolls [list] until [target] is in it, the scroll made between frames: never from inside `waitUntil`'s condition,
+     * where an action can land in the middle of a frame's layout ("performMeasureAndLayout called during measure
+     * layout", KNOWN_ISSUES #36). Tries again while the row is still on its way from the database.
+     */
+    private fun scrollListTo(
+        list: String,
+        target: SemanticsMatcher,
+    ) {
+        val end = System.currentTimeMillis() + 15_000
+        while (true) {
+            compose.waitForIdle()
+            if (runCatching { compose.onNodeWithTag(list).performScrollToNode(target) }.isSuccess) return
+            check(System.currentTimeMillis() < end) { "$target never came into \"$list\"" }
+            Thread.sleep(50)
+        }
+    }
 
     private fun waitFor(what: () -> Boolean) = compose.waitUntil(10_000) { runCatching(what).getOrDefault(false) }
 
@@ -133,22 +140,25 @@ class DeviceScenariosTest {
         val four = runCatching { waitFor { runBlocking { c.repository.snapshot() }.liveItems.size == 4 } }
         note("after waiting")
         assertTrue("Four typed items did not all land:\n$transcript", four.isSuccess)
-        compose.onNodeWithTag("start-shopping").performClick()
-        waitFor { compose.onAllNodesWithTag("shop").fetchSemanticsNodes().isNotEmpty() }
         // A ticked row stays in place for a moment and then folds away under "N bought", so the next item
-        // to buy is the first tick still "Still needed", once the last tap has landed. waitForIdle does not
+        // to buy is the first tick still "To buy", once the last tap has landed. waitForIdle does not
         // wait for the database, so each tap waits for its own effect, as a shopper looks before the next tap.
         val bought = { runBlocking { c.repository.snapshot() }.let { l -> l.liveItems.count { l.isDone(it.id) } } }
         repeat(4) { i ->
+            // Step Z: no Shopping view to switch to, so the keyboard from the Add field is still up and on a small
+            // screen the rows can be outside the list's composed window: the list is scrolled to the next one, as a
+            // person scrolls (or closes the keyboard) before the first tick.
+            scrollListTo("list", openTick)
             waitFor { openTicks().fetchSemanticsNodes().isNotEmpty() }
             openTicks()[0].performClick()
             waitFor { bought() == i + 1 }
-            waitFor { compose.onAllNodesWithText("${i + 1} of 4 bought", substring = true).fetchSemanticsNodes().isNotEmpty() }
+            // The list's subtitle counts "N of 4 bought" and says "All bought" for the last (the shop screen said "4 of 4").
+            val said = if (i == 3) "All bought" else "${i + 1} of 4 bought"
+            waitFor("\"$said\"") { compose.onAllNodesWithText(said, substring = true).fetchSemanticsNodes().isNotEmpty() }
         }
-        waitFor { compose.onNodeWithTag("shop-left").fetchSemanticsNode().config.toString().contains("All bought") }
+        waitFor { compose.onAllNodesWithText("All bought", substring = true).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("finish").performClick()
         waitFor { runBlocking { c.repository.snapshot() }.liveItems.isEmpty() }
-        waitFor { runBlocking { c.settings.listMode.first() } == ListMode.PLAN }
         waitFor { compose.onAllNodesWithText("Undo").fetchSemanticsNodes().isNotEmpty() }
     }
 
@@ -168,8 +178,8 @@ class DeviceScenariosTest {
         assertEquals(Rational.of(3), onion)
         // Scrolled to, as a thumb would: on the CI emulator's small screen the list's header leaves room for little more
         // than the first aisle's heading.
+        scrollListTo("list", hasText("3 onions", substring = true, ignoreCase = true))
         waitFor("\"3 onions\" on the list") {
-            compose.onNodeWithTag("list").performScrollToNode(hasText("3 onions", substring = true, ignoreCase = true))
             compose.onAllNodesWithText("3 onions", substring = true, ignoreCase = true).fetchSemanticsNodes().isNotEmpty()
         }
         val uses = runBlocking { c.repository.usesOnList() }
@@ -213,13 +223,12 @@ class DeviceScenariosTest {
         assertEquals(listOf("cat:banana"), runBlocking { c.repository.snapshot() }.liveItems.map { it.mergeKey })
     }
 
-    /** E: the shop screen speaks: each tick is a named checkbox with its state, big enough to hit. */
+    /** E: the list speaks in the shop: each tick is a named checkbox with its state, big enough to hit. */
     @Test
-    fun e_shopScreenAccessibility() {
+    fun e_listTickAccessibility() {
         val c = DeviceContainer.create()
         runBlocking {
             for (n in listOf("milk", "bread")) c.repository.manualAdd(n, QtyBase.of(Rational.ONE, null, UnitLocale.METRIC), null)
-            c.settings.setListMode(ListMode.SHOP)
         }
         show(c)
         waitFor { ticks().fetchSemanticsNodes().size == 2 }
@@ -227,9 +236,7 @@ class DeviceScenariosTest {
         tick.assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
         val node = tick.fetchSemanticsNode()
         assertEquals(Role.Checkbox, node.config.getOrNull(SemanticsProperties.Role))
-        assertEquals("Still needed", node.config.getOrNull(SemanticsProperties.StateDescription))
-        assertEquals(ToggleableState.Off, node.config.getOrNull(SemanticsProperties.ToggleableState))
-        assertTrue(node.config.getOrNull(SemanticsProperties.Text).orEmpty().isNotEmpty())
-        compose.onNodeWithTag("shop-left").assertIsDisplayed()
+        assertEquals("To buy", node.config.getOrNull(SemanticsProperties.StateDescription))
+        assertTrue(node.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty().isNotEmpty())
     }
 }

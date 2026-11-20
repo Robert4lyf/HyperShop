@@ -61,9 +61,10 @@ internal val SAMPLE_REVIEW =
                         ),
                     ),
             ),
-        badge = Badge.CLAUDE_PENDING,
+        badge = Badge.RULES,
         originalServings = 4,
         canAskClaude = true,
+        claudeNote = "Claude couldn't be reached; the lines were read offline",
     )
 
 @RunWith(AndroidJUnit4::class)
@@ -89,6 +90,8 @@ class ReviewScreenTest {
                 onRetryClaude = { events += "retry" },
                 onAisleInStock = { events += "aisle $it" },
                 onClearInStock = { events += "clear" },
+                onSaveForLater = { events += "save only" },
+                onLater = { events += "later" },
             )
         }
     }
@@ -117,24 +120,34 @@ class ReviewScreenTest {
     @Test
     fun headerAndActions() {
         show()
-        compose.onNodeWithText("4 items to your list").assertExists()
-        compose.onNodeWithText("Save and add meal").assertIsEnabled().performClick()
-        compose.onNodeWithText("Cancel").performClick()
-        compose.onNodeWithText("Waiting for Claude").fetchSemanticsNode()
+        // Step Z: one primary button; Save recipe only is in the menu, with Discard.
+        compose.onNodeWithText("Add to list · 4 items").assertIsEnabled().performClick()
+        compose.onNodeWithTag("save-for-later").assertDoesNotExist()
+        compose.onNodeWithTag("review-more").performClick()
+        compose.onNodeWithText("Save recipe only").performClick()
+        compose.onNodeWithTag("review-more").performClick()
+        compose.onNodeWithTag("discard-import").performClick()
+        // Claude's status only because it failed, with Retry beside it; no badge or "Waiting for Claude".
+        compose.onNodeWithTag("claude-note").assertExists()
+        compose.onNodeWithText("Waiting for Claude").assertDoesNotExist()
+        compose.onNodeWithText("Read offline").assertDoesNotExist()
         compose.onNodeWithText("Retry with Claude").performClick()
         compose.onNodeWithText("Serves 4").fetchSemanticsNode()
-        assertEquals(listOf("add", "cancel", "retry"), events)
+        // No help paragraphs.
+        compose.onNodeWithTag("edit-hint").assertDoesNotExist()
+        assertEquals(listOf("add", "save only", "cancel", "retry"), events)
     }
 
     @Test
-    fun onlyARowAlreadyAtHomeShowsThePillAndItTakesItBack() {
-        // Y.20: the cupboard is checked on This week against every recipe together; a row here shows "At home"
-        // only when it already is (a staple), so it can be taken back.
+    fun everyRowHasTheAtHomeToggleAndItIsTheOnePlaceToSaySo() {
+        // Step Z: the row's pill is the one place a recipe's ingredient is said to be at home (the food-at-home check,
+        // the row sheet's switch and its "Always at home" went), so every row shows it, on or off.
         show()
-        compose.onAllNodesWithText("At home").assertCountEquals(1)
-        compose.onNodeWithText("At home").performClick()
-        assertEquals(listOf("stock cat:salt false"), events)
-        compose.onNodeWithTag("cupboard-hint").assertExists()
+        val rows = SAMPLE_REVIEW.aisles.sumOf { it.second.size }
+        compose.onAllNodesWithText("At home").assertCountEquals(rows)
+        compose.onNodeWithContentDescription("At home: Onion").performClick()
+        compose.onNodeWithTag("cupboard-hint").assertDoesNotExist()
+        assertEquals(listOf("stock cat:onion true"), events)
     }
 
     @Test
@@ -143,7 +156,7 @@ class ReviewScreenTest {
         compose.onNodeWithText("Serves ?").fetchSemanticsNode()
         compose.onNodeWithContentDescription("More servings").performClick()
         assertEquals(listOf("servings 1"), events)
-        compose.onNodeWithTag("summary").assertTextEquals("4 to add · 1 at home · 1 to check")
+        compose.onNodeWithTag("summary").assertTextEquals("4 to add · 1 at home")
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("Check: has 'or'"))
         compose.onNodeWithText("Check: has 'or'").fetchSemanticsNode()
     }
@@ -175,9 +188,11 @@ class ReviewScreenTest {
 
     @Test
     fun noticeShowsWhenTheListChanged() {
-        show(SAMPLE_REVIEW.copy(notice = "List changed — review updated", badge = Badge.CLAUDE))
+        show(SAMPLE_REVIEW.copy(notice = "List changed — review updated", badge = Badge.CLAUDE, claudeNote = null))
         compose.onNodeWithText("List changed — review updated").fetchSemanticsNode()
-        compose.onNodeWithText("Read by Claude").fetchSemanticsNode()
+        // Read by Claude, as it should be: nothing said about it, and nothing to retry.
+        compose.onNodeWithText("Read by Claude").assertDoesNotExist()
+        compose.onNodeWithTag("ask-claude").assertDoesNotExist()
     }
 
     @Test

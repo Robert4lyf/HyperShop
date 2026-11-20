@@ -98,7 +98,6 @@ fun RecipesRoute(
     container: AppContainer,
     snackbar: SnackbarHostState,
     onReview: (Long) -> Unit,
-    onMeals: () -> Unit = {},
 ) {
     val vm: RecipesViewModel = viewModel(factory = factoryFor { RecipesViewModel(container) })
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -110,7 +109,7 @@ fun RecipesRoute(
         ui,
         library =
             LibraryActions(
-                onAdd = vm::addMeal,
+                onAdd = vm::addToList,
                 onRemove = vm::removeFromLibrary,
                 onOpen = vm::openDetail,
                 onRename = { row, title -> vm.renameSaved(row, title) },
@@ -134,7 +133,6 @@ fun RecipesRoute(
                 onPhoto = { uri, book, page -> vm.addPhoto(uri, book, page) },
             ),
         hasKey = hasKey,
-        onMeals = onMeals,
     )
     val detail by vm.detail.collectAsStateWithLifecycle()
     // The photo picker: the system's, so no permission; the recipe it is for is kept across the trip there.
@@ -152,8 +150,8 @@ fun RecipesRoute(
             d,
             onAdd = {
                 vm.closeDetail()
-                // Step Q: a meal of this week, as saved; no second review (Edit is the way to change the recipe).
-                vm.addMeal(d.row)
+                // As saved, straight on to the list; Edit is the way to change the recipe.
+                vm.addToList(d.row)
             },
             onRemove = {
                 vm.closeDetail()
@@ -187,8 +185,6 @@ fun RecipesScreen(
     search: SearchBox = SearchBox(),
     /** A Claude key is saved: the photo option needs one. */
     hasKey: Boolean = true,
-    /** "Meals this week": pick saved recipes for the list. */
-    onMeals: () -> Unit = {},
 ) {
     // Which saved recipe a dialog is about, by key, so it survives a rotation.
     var renamingSaved by rememberSaveable { mutableStateOf<String?>(null) }
@@ -228,7 +224,9 @@ fun RecipesScreen(
                     item(key = "library-search") {
                         Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             RecipeSearchBox(search)
-                            LibraryView(ui, library)
+                            // Step Z: sorting and the "4★ & up" filter only once there are enough recipes to need them
+                            // (or while the filter is on, so it can be turned off).
+                            if (ui.savedCount >= SORT_FROM || ui.highlyRated) LibraryView(ui, library)
                             if (ui.library.isEmpty() && (ui.terms.isNotEmpty() || ui.highlyRated)) {
                                 Text(
                                     if (ui.terms.isEmpty()) "No recipes rated 4★ or 5★ yet" else "No matches",
@@ -455,7 +453,7 @@ private fun LibraryCard(
                     }
                 }
                 FilledTonalButton(onClick = onAdd, modifier = Modifier.testTag("lib-add-${row.key}")) {
-                    Text("Add meal")
+                    Text("Add to list")
                 }
                 var menu by remember { mutableStateOf(false) }
                 Box {
@@ -469,7 +467,7 @@ private fun LibraryCard(
                             menu = false
                             onEdit()
                         })
-                        DropdownMenuItem(text = { Text("Remove from your recipes") }, onClick = {
+                        DropdownMenuItem(text = { Text("Delete recipe") }, onClick = {
                             menu = false
                             onRemove()
                         })
@@ -523,7 +521,7 @@ private fun RecipeDetailSheet(
     ModalBottomSheet(onDismissRequest = onDismiss) { RecipeDetailContent(detail, onAdd, onRemove, notes) }
 }
 
-/** A saved recipe's ingredients, as written, with "Add to list", its page and "Remove from your recipes". */
+/** A saved recipe's ingredients, as written, with "Add to list", its page and "Delete recipe". */
 @Composable
 fun RecipeDetailContent(
     detail: RecipeDetail,
@@ -541,15 +539,7 @@ fun RecipeDetailContent(
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        row.photo?.let { path ->
-            item(key = "photo") {
-                RecipePhoto(
-                    path,
-                    contentDescription = "Photo of ${row.title}",
-                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(MaterialTheme.shapes.large).testTag("recipe-photo"),
-                )
-            }
-        }
+        // Step Z: the ingredients first, then Add to list, then what you keep about it (rating, notes, photo).
         item(key = "title") {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(detail.row.title, style = MaterialTheme.typography.headlineSmall)
@@ -563,28 +553,6 @@ fun RecipeDetailContent(
                     bits.joinToString(" · "),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                TextButton(onClick = { cooking = true }, modifier = Modifier.testTag("cook-recipe")) { Text("Cooking view") }
-                DetailButtons(onAdd, url?.let { { open(it) } }, onList = detail.row.onList)
-            }
-        }
-        item(key = "yours") {
-            // What you keep about it: stars, notes for next time, its photo.
-            Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Your rating", style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
-                StarRating(row.rating, onRate = { notes.onRate(row, it) })
-                CookingNotes(row.notes, onSave = { notes.onNotes(row, it) }, modifier = Modifier.padding(top = 4.dp))
-                PhotoButtons(
-                    hasPhoto = row.photo != null,
-                    fromPage = url != null,
-                    onChoose = { notes.onChoosePhoto(row) },
-                    onPage = { notes.onPagePhoto(row) },
-                    onRemove = { notes.onRemovePhoto(row) },
-                )
-                Text(
-                    "Ingredients",
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(top = 12.dp).semantics { heading() },
                 )
             }
         }
@@ -601,13 +569,43 @@ fun RecipeDetailContent(
                 }
             }
         }
-        // Last, away from Plan: a destructive button under the primary one invited the wrong tap (UX review 15).
+        item(key = "buttons") {
+            Column {
+                DetailButtons(onAdd, url?.let { { open(it) } }, onList = detail.row.onList)
+                TextButton(onClick = { cooking = true }, modifier = Modifier.testTag("cook-recipe")) { Text("Cooking view") }
+            }
+        }
+        item(key = "yours") {
+            // What you keep about it: stars, notes for next time, its photo.
+            Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Your rating", style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
+                StarRating(row.rating, onRate = { notes.onRate(row, it) })
+                CookingNotes(row.notes, onSave = { notes.onNotes(row, it) }, modifier = Modifier.padding(top = 4.dp))
+                row.photo?.let { path ->
+                    RecipePhoto(
+                        path,
+                        contentDescription = "Photo of ${row.title}",
+                        modifier =
+                            Modifier.padding(top = 8.dp).fillMaxWidth().aspectRatio(16f / 9f).clip(MaterialTheme.shapes.large)
+                                .testTag("recipe-photo"),
+                    )
+                }
+                PhotoButtons(
+                    hasPhoto = row.photo != null,
+                    fromPage = url != null,
+                    onChoose = { notes.onChoosePhoto(row) },
+                    onPage = { notes.onPagePhoto(row) },
+                    onRemove = { notes.onRemovePhoto(row) },
+                )
+            }
+        }
+        // Last, away from Add to list: a destructive button under the primary one invited the wrong tap (UX review 15).
         item(key = "remove") {
             TextButton(
                 onClick = onRemove,
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 modifier = Modifier.padding(top = 16.dp).testTag("detail-remove"),
-            ) { Text("Remove from your recipes") }
+            ) { Text("Delete recipe") }
         }
     }
 }
@@ -627,7 +625,7 @@ private fun DetailButtons(
         Button(onClick = onAdd, modifier = Modifier.testTag("detail-add")) {
             Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.size(8.dp))
-            Text("Add meal")
+            Text("Add to list")
         }
         onOpen?.let {
             OutlinedButton(onClick = it) {
@@ -742,3 +740,6 @@ fun UseDetailContent(
 
 /** How tall a saved recipe's band is (photo or mosaic): compact, so a library shows four or five to a screen (UX review 14). */
 private val LIBRARY_BAND = 96.dp
+
+/** Saved recipes from which the sort control and the "4★ & up" filter show. */
+internal const val SORT_FROM = 10

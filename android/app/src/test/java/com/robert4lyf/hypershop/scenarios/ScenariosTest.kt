@@ -9,7 +9,6 @@ import com.robert4lyf.hypershop.core.sync.WatchCodec
 import com.robert4lyf.hypershop.core.sync.WatchMessage
 import com.robert4lyf.hypershop.core.sync.WatchOp
 import com.robert4lyf.hypershop.di.AppContainer
-import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.testutil.await
 import com.robert4lyf.hypershop.testutil.readyJob
@@ -77,15 +76,12 @@ class ScenariosTest {
         await(vm.ui) { it.isEmpty }
         for (l in listOf("milk", "6 eggs", "bread", "2 onions")) vm.addTyped(l)
         var ui = await(vm.ui) { u -> u.aisles.flatMap { it.second }.size == 4 }
-        // Into the shop, tick everything as fast as taps come, finish: an empty, planned list.
-        vm.setMode(ListMode.SHOP)
-        ui = await(vm.ui) { it.shopping }
+        // In the shop, tick everything as fast as taps come, finish: an empty list.
         for (r in ui.aisles.flatMap { it.second }) vm.toggle(r)
         ui = await(vm.ui) { it.left == 0 && it.doneCount == 4 }
         vm.finishShopping()
-        // The trip took everything: an empty list, back in planning (the mode write follows the finish).
-        ui = await(vm.ui) { it.isEmpty && it.mode == ListMode.PLAN }
-        assertTrue(!ui.shopping)
+        // The trip took everything: an empty list.
+        ui = await(vm.ui) { it.isEmpty }
         // Undo is still there: the whole trip comes back, bought.
         val stamp = runBlocking { c.db.dao().meta()!! }
         assertTrue(stamp.listRev > 1)
@@ -130,14 +126,11 @@ class ScenariosTest {
         second.confirm()
         await(second.state) { it is ReviewState.Added }
         val vm = tracked(ListViewModel(c))
-        val ui = await(vm.ui) { it.loaded && it.inStock.isNotEmpty() }
+        val ui = await(vm.ui) { it.loaded && it.aisles.flatMap { r -> r.second }.size == 3 }
         assertEquals("3 onions", ui.row("onion").main)
-        assertEquals(listOf("olive oil"), ui.inStock.map { it.name })
+        // At home on the review: not on the list (Step Z: the review's toggle is the one place to say so).
         assertTrue(ui.aisles.flatMap { it.second }.none { it.name == "olive oil" })
-        // Change of mind in the shop: "Need it" brings the oil on under its recipe; the amount is the recipe's.
-        vm.needIt(ui.inStock.single())
-        val after = await(vm.ui) { it.inStock.isEmpty() && it.aisles.flatMap { r -> r.second }.any { it.name == "olive oil" } }
-        assertEquals(4, after.left)
+        assertEquals(3, ui.left)
     }
 
     private fun com.robert4lyf.hypershop.ui.review.ReviewUi.row(key: String) = aisles.flatMap { it.second }.first { it.key == key }
@@ -193,8 +186,7 @@ class ScenariosTest {
             assertTrue(names.toString(), names.any { it == "1 more onion" })
 
             // Back in the shop on the phone: the counts agree with what the watch did.
-            phone.setMode(ListMode.SHOP)
-            ui = await(phone.ui) { it.shopping }
+            ui = await(phone.ui) { it.doneCount == 1 }
             assertEquals(1, ui.doneCount)
             assertEquals(Rational.of(2), c.repository.snapshot().let { l -> l.covered(l.itemByKey("cat:onion")!!.id)[BaseKey.ITEMS] })
         }

@@ -64,7 +64,7 @@ class UseActions(
             val removed = c.repository.removeFromList(use.useId) ?: return@launch
             messages.send(
                 UiMessage(
-                    "Removed ${use.title} from the shopping list",
+                    "Removed ${use.title} from the list",
                     undo = {
                         // The recipe copy can go meanwhile (the start-up purge); the use can't come back without it.
                         if (!c.repository.undoRemoveFromList(removed)) {

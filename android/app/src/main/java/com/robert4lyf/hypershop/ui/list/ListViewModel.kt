@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.robert4lyf.hypershop.catalog.EntryEdit
 import com.robert4lyf.hypershop.core.catalog.CatalogEntry
-import com.robert4lyf.hypershop.core.catalog.DisplayPolicy
 import com.robert4lyf.hypershop.core.merge.Display
 import com.robert4lyf.hypershop.core.merge.ShelfOrder
 import com.robert4lyf.hypershop.core.merge.ShoppingList
@@ -17,12 +16,9 @@ import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.report.WrongReport
-import com.robert4lyf.hypershop.data.InStockLine
 import com.robert4lyf.hypershop.data.MANUAL_TITLE
-import com.robert4lyf.hypershop.data.MealShopping
 import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.di.AppContainer
-import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.common.webLink
@@ -42,7 +38,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -110,6 +105,8 @@ data class ItemSheet(
     val saveError: String? = null,
     /** Step Q: what is still to buy (requirement less what is bought and at home), shown first on the sheet. */
     val toBuy: List<String> = emptyList(),
+    /** Set aside with "Can't find it" on this trip: the sheet offers "Found it" instead. */
+    val unavailable: Boolean = false,
 )
 
 /** One "From" row: "Weeknight chilli · 400 g", linked to the recipe's page when it has one. */
@@ -119,29 +116,14 @@ data class ItemSource(
     val url: String? = null,
 )
 
-/** One ingredient you marked in stock on review, for the recipes on the list. */
-data class InStockRow(
-    val key: String,
-    val name: String,
-    /** "2tbsp olive oil", or just "Salt". */
-    val main: String,
-    /** The recipes that need it. */
-    val from: String,
-    val aisle: AisleCode,
-)
-
 data class ListUi(
     val aisles: List<Pair<AisleCode, List<ListRow>>> = emptyList(),
-    /** The "In stock" section, below the aisles. */
-    val inStock: List<InStockRow> = emptyList(),
     val loaded: Boolean = false,
     /** Imports waiting for review: the "1 recipe ready to review" card. */
     val readyJobs: List<Long> = emptyList(),
     val view: ListView = ListView.STORE,
     /** The recipe view's cards, in the order the recipes were added; empty in the other views. */
     val recipes: List<RecipeSection> = emptyList(),
-    /** Planning or shopping (Settings.listMode). */
-    val mode: ListMode = ListMode.PLAN,
     /** X.9: putting things in the order they are found, with arrows on every row and group. */
     val arranging: Boolean = false,
     /** "Watch synced" / "Watch updating…" / "Watch not connected", or null with no watch to speak of (UX review 23). */
@@ -153,9 +135,6 @@ data class ListUi(
 ) {
     val isEmpty: Boolean get() = loaded && aisles.isEmpty()
 
-    /** The shop screen is showing: shopping mode, with something to shop for (an empty list is planned, never shopped). */
-    val shopping: Boolean get() = mode == ListMode.SHOP && loaded && aisles.isNotEmpty()
-
     /** Still to find on this trip: what is set aside as not available is not "left". */
     val left: Int get() = aisles.sumOf { (_, r) -> r.count { it.state != TickState.DONE && !it.unavailable } }
 
@@ -164,41 +143,16 @@ data class ListUi(
     val doneCount: Int get() = aisles.sumOf { (_, r) -> r.count { it.state == TickState.DONE } }
 }
 
-/** The "This week" card: how far the week's shop is prepared (docs/design/release-b.md). */
+/** What the list offers around its items: Buy again and last shop. */
 data class PlanPrep(
     val loaded: Boolean = false,
-    val meals: Int = 0,
-    /** Meals planned and not on the list yet. */
-    val pending: Int = 0,
     /** Buy again suggestions not on the list. */
     val buyAgain: Int = 0,
     /** Last trip's hand-added items not on the list. */
     val lastShop: Int = 0,
-    /** Cupboard ingredients still to buy that may be at home. */
-    val toCheck: Int = 0,
     /** Has saved recipes or a finished trip: someone who has shopped here before. */
     val returning: Boolean = false,
-    /** This week's meals whose shopping is done (bought, or nothing to buy). */
-    val bought: Int = 0,
-) {
-    /** Every meal of the week planned and bought: the empty list is a finished shop, not one to start. */
-    val weekDone: Boolean get() = meals > 0 && pending == 0 && bought == meals
-
-    /** "2 meals · 1 not on the list · 5 to buy again · 3 to check at home". */
-    fun summary(): String =
-        listOfNotNull(
-            if (meals == 0) {
-                "No meals planned"
-            } else if (meals == 1) {
-                "1 meal"
-            } else {
-                "$meals meals"
-            },
-            pending.takeIf { it > 0 }?.let { "$it not on the list" },
-            buyAgain.takeIf { it > 0 }?.let { "$it to buy again" },
-            toCheck.takeIf { it > 0 }?.let { "$it to check at home" },
-        ).joinToString(" · ")
-}
+)
 
 /** One card of the recipe view: a recipe's items, or those several recipes share, or those added by hand. */
 data class RecipeSection(
@@ -210,6 +164,8 @@ data class RecipeSection(
     val libraryKey: String? = null,
     /** The recipe's photo on this phone, or null (its mosaic is drawn). */
     val photo: String? = null,
+    /** How many the recipe is on the list for (a recipe's card only). */
+    val servings: Int? = null,
 ) {
     enum class Kind { RECIPE, SHARED, BY_HAND }
 }
@@ -228,11 +184,7 @@ class ListViewModel(
         combine(c.settings.activeStore, c.repository.observeStores()) { s, profiles -> s to profiles }
             .distinctUntilChanged()
 
-    /** "Shop" with a store picked: the list and the watch walk it, and the shop screen opens. */
-    fun startShopping(storeId: Long) = viewModelScope.launch { c.shopStart.start(storeId) }
-
-    fun requestShopping() = viewModelScope.launch { c.shopStart.request() }
-
+    /** Step Z: "Change store" in the list's menu, with two or more stores. */
     fun changeStore() = viewModelScope.launch { c.shopStart.change() }
 
     private val arranging = MutableStateFlow(false)
@@ -275,6 +227,24 @@ class ListViewModel(
 
     fun removeUse(section: RecipeSection) = viewModelScope.launch { useOf(section)?.let { useActions.remove(it) } }
 
+    /**
+     * Step Z "Servings" on a recipe's card (it was the meal's stepper on Meals): the meal and its items on the list
+     * follow at once, what was bought stays bought; Undo sets it back.
+     */
+    fun setServings(
+        section: RecipeSection,
+        servings: Int,
+    ) = viewModelScope.launch {
+        val use = useOf(section) ?: return@launch
+        val was = section.servings ?: return@launch
+        if (servings == was) return@launch
+        if (!c.planner.setUseServings(use.useId, servings)) {
+            messages.send(UiMessage("${section.title} doesn't say how many it serves"))
+            return@launch
+        }
+        messages.send(UiMessage("${section.title} serves $servings", undo = { c.planner.setUseServings(use.useId, was) }))
+    }
+
     fun removeUse(use: UseSummary) = useActions.remove(use)
 
     private val committedSaves = mutableSetOf<Long>().apply { savedState.get<Long>("committedSave")?.let(::add) }
@@ -289,37 +259,31 @@ class ListViewModel(
     /** The item sheet being loaded: a newer open, or a close, cancels it. */
     private var openJob: Job? = null
 
-    /** The walking order, the layout and the mode, and whether the list is being arranged. */
+    /** The walking order and the layout, and whether the list is being arranged. */
     private val view =
-        combine(order, c.settings.listView, c.settings.listMode, arranging) { o, v, m, a -> View(o.first, o.second, v, m, a) }
+        combine(order, c.settings.listView, arranging) { o, v, a -> View(o.first, o.second, v, a) }
 
     private data class View(
         val aisles: List<AisleCode>,
         val shelf: ShelfOrder,
         val layout: ListView,
-        val mode: ListMode,
         val arranging: Boolean,
     )
 
-    /**
-     * The list with its in-stock lines and recipe titles, read together on every
-     * list change (an import, a removed recipe, "Need it"): one emission per
-     * change, so the aisles and the "In stock" section never show two different
-     * lists for a frame.
-     */
-    private val listWithInStock = c.repository.list.map { Triple(it, c.repository.inStockOnList(it, stillShopping = true), sources(it)) }
+    /** The list with the recipe titles behind its rows, read together on every list change: one emission per change. */
+    private val listWithSources = c.repository.list.map { it to sources(it) }
 
     /** The watch link's state and the listRev it last got, for the shop header's word. */
     private val watchSent = combine(c.watchLink.state, c.watchSync.sent) { st, rev -> st to rev }
 
     val ui: StateFlow<ListUi> =
         combine(
-            listWithInStock,
+            listWithSources,
             c.settings.units,
             view,
             combine(c.importJobs.ready, watchSent, stores) { r, w, s -> Triple(r, w, s) },
             c.recipePhotos.paths(),
-        ) { (list, lines, src), units, v, (ready, watch, store), photos ->
+        ) { (list, src), units, v, (ready, watch, store), photos ->
             lastList = list
             lastUnits = units
             build(
@@ -332,10 +296,7 @@ class ListViewModel(
             ).let { ui ->
                 ui.copy(
                     readyJobs = ready.map { it.id },
-                    inStock = inStockRows(lines, units),
-                    mode = v.mode,
-                    // Arranging is a planning job: the shop screen leaves it.
-                    arranging = v.arranging && v.mode == ListMode.PLAN && v.layout != ListView.RECIPE,
+                    arranging = v.arranging && v.layout != ListView.RECIPE,
                     recipes = ui.recipes.map { r -> r.libraryKey?.let { r.copy(photo = photos[it]) } ?: r },
                     watch = watchWord(watch.first, watch.second, list.listRev),
                     activeStore = store.first,
@@ -351,31 +312,20 @@ class ListViewModel(
      * Its own flow, so the list's main one (the one a tick waits on) carries none of it.
      */
     val prep: StateFlow<PlanPrep> =
-        c.settings.listMode
-            .flatMapLatest { mode ->
-                // The shop screen draws no card: a tick there reads nothing for it (QueryBudgetTest).
-                if (mode == ListMode.SHOP) flowOf(PlanPrep()) else prepFlow()
-            }.flowOn(Dispatchers.Default)
+        prepFlow()
+            .flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlanPrep())
 
     private fun prepFlow(): Flow<PlanPrep> =
         combine(
-            // The week is read again with every change to the list, so a card left open over Sunday
-            // midnight shows the new week (this view model lives as long as the app).
-            c.repository.list.map { c.planner.currentWeek() }.distinctUntilChanged().flatMapLatest { c.planner.observeWeek(it) },
             c.buyAgain.observe(),
-            c.homeCheck.observe(),
             c.repository.observeLibrary().map { it.isNotEmpty() },
-        ) { meals, buy, home, saved ->
+        ) { buy, saved ->
             PlanPrep(
                 loaded = true,
-                meals = meals.size,
-                pending = meals.count { it.shopping.pending },
                 buyAgain = buy.regulars.count { !it.onList },
                 lastShop = buy.lastShop.size,
-                toCheck = home.count { !it.have },
                 returning = saved || buy.hasHistory,
-                bought = meals.count { it.shopping == MealShopping.BOUGHT || it.shopping == MealShopping.NOTHING_TO_BUY },
             )
         }
 
@@ -458,35 +408,11 @@ class ListViewModel(
                             it.copy(from = null)
                         },
                         libraryKey = src.keys[key.removePrefix("use-").toLong()],
+                        servings = list.uses[key.removePrefix("use-").toLong()]?.servings,
                     )
             }
         }
     }
-
-    private fun inStockRows(
-        lines: List<InStockLine>,
-        units: UnitsSetting,
-    ): List<InStockRow> =
-        lines
-            .groupBy { it.target.mergeKey }
-            .map { (key, ls) ->
-                val t = ls.first().target
-                val entry = t.catalogId?.let { c.catalog.byId[it] }
-                val name = entry?.name ?: t.displayName
-                val qty = ls.fold(QtyBase.PRESENCE) { acc, l -> acc + l.qty }
-                val presence = entry?.displayPolicy == DisplayPolicy.PRESENCE && units != UnitsSetting.AS_WRITTEN
-                val hint = Display.hintOf(ls.map { it.unitHint })
-                // In the list's own words ("2 bananas"); a presence item at home needs no amount.
-                val (amount, shown) = Display.brief(qty, entry, name, units, t.aisle == AisleCode.PRODUCE, hint)
-                val from = ls.map { it.recipeTitle }.distinct().joinToString(", ")
-                InStockRow(key, name, listOfNotNull(amount.takeIf { !presence }, shown).joinToString(" "), from, t.aisle)
-            }.sortedBy { it.name.lowercase() }
-
-    /** "Need it": the in-stock lines go on the list after all, under their recipes. */
-    fun needIt(row: InStockRow) =
-        viewModelScope.launch {
-            if (c.repository.needAfterAll(row.key) > 0) messages.send(UiMessage("Added ${row.name} to the list"))
-        }
 
     private fun build(
         list: ShoppingList,
@@ -567,21 +493,12 @@ class ListViewModel(
         clearAll()
     }
 
-    /** "Shop" / "Plan": the mode is a setting, so it survives a restart mid-shop. Nothing on the list changes. */
-    fun setMode(m: ListMode) = viewModelScope.launch { if (m == ListMode.SHOP) c.shopStart.request() else c.settings.setListMode(m) }
-
     init {
         savedState.get<Long>("openItem")?.let { id ->
             viewModelScope.launch {
                 c.awaitReady()
                 openItem(id)
             }
-        }
-        // A shop that took everything ends in planning, however the list was emptied (Finish shopping,
-        // Clear all, a meal removed, Undo of an add): the next item typed must not land in the shop
-        // screen, where there is no field to type into.
-        viewModelScope.launch {
-            ui.collect { if (it.mode == ListMode.SHOP && it.isEmpty) c.settings.setListMode(ListMode.PLAN) }
         }
     }
 
@@ -591,16 +508,19 @@ class ListViewModel(
     /** Tick, or untick a DONE item (the item sheet's button too). No snackbar: tapping again is the undo. */
     fun toggle(id: Long) = viewModelScope.launch { c.repository.toggle(id) }
 
-    /** X.8: "Not available" in the shop: set aside for this trip, back on the next, with Undo. */
-    fun unavailable(row: ListRow) =
-        viewModelScope.launch {
-            if (!c.repository.markUnavailable(row.id)) return@launch
-            messages.send(
-                UiMessage("${row.name.replaceFirstChar { it.uppercase() }} set aside for next time", undo = {
-                    c.repository.markAvailable(row.id)
-                }),
-            )
-        }
+    /** "Can't find it" on the item's sheet: set aside for this trip, back on the next, with Undo. The sheet closes. */
+    fun cantFind(
+        id: Long,
+        name: String,
+    ) = viewModelScope.launch {
+        closeSheetOf(id)
+        if (!c.repository.markUnavailable(id)) return@launch
+        messages.send(
+            UiMessage("${name.replaceFirstChar { it.uppercase() }} set aside for next time", undo = {
+                c.repository.markAvailable(id)
+            }),
+        )
+    }
 
     /** X.9: "Arrange items" from the menu, and "Done". */
     fun arrange(on: Boolean) {
@@ -638,8 +558,12 @@ class ListViewModel(
         }
     }
 
-    /** "Found it after all": back among what is left. */
-    fun available(row: ListRow) = viewModelScope.launch { c.repository.markAvailable(row.id) }
+    /** "Found it" on the sheet of an item set aside: back among what is left. */
+    fun found(id: Long) =
+        viewModelScope.launch {
+            closeSheetOf(id)
+            c.repository.markAvailable(id)
+        }
 
     /** "Delete" on the item card: closes it, with Undo on the list. */
     fun delete(
@@ -656,12 +580,9 @@ class ListViewModel(
         viewModelScope.launch {
             // Counted inside the write: a tick still on its way to the screen is included.
             val (stamp, n) = c.repository.finish()
-            // A finished trip ends in planning whatever is still on the list (set aside as not available, or
-            // never found): the shop screen would count that as "left" (review B.14).
-            c.settings.setListMode(ListMode.PLAN)
             val left = c.repository.snapshot().liveItems.size
             // Step Q: what Finish did, in plain words: the bought things recorded, the rest still on the list.
-            val text = if (left > 0) "Shopping finished: $n bought · $left still on your list" else "Shopping finished: $n bought"
+            val text = if (left > 0) "Shopping finished: $n bought · $left to buy" else "Shopping finished: $n bought"
             messages.send(UiMessage(text, undo = { c.repository.undoDelete(stamp) }))
             // Missing 3: what was not bought is asked about once, rather than carried over unnoticed.
             if (left > 0 && n > 0) carryOver.value = left
@@ -674,7 +595,7 @@ class ListViewModel(
         val order = c.repository.aisleOrder(store)
         val units = c.settings.units.first()
         val rows = list.liveItems.filter { !list.isDone(it.id) }
-        if (rows.isEmpty()) return "HyperShop — nothing left to buy"
+        if (rows.isEmpty()) return "HyperShop — nothing to buy"
         return order.mapNotNull { aisle ->
             val items = rows.filter { it.aisle == aisle }.sortedBy { it.position }
             if (items.isEmpty()) {
@@ -761,13 +682,15 @@ class ListViewModel(
                                 "Requirement unchanged; tick only what you buy."
                         } ?: packSize?.let { "Usual pack saved; no purchase suggestion is possible in a different measure." },
                     explanation =
-                        listOf(
+                        listOfNotNull(
                             "Required ${ItemEdit.text(list.total(id)).ifBlank { "as shown above" }}",
-                            "At home ${item.onHand?.let(ItemEdit::text) ?: "0"}",
+                            // Step Z: only an amount said to be at home before (the food-at-home check went).
+                            item.onHand?.let { "At home ${ItemEdit.text(it)}" },
                             "Bought ${ItemEdit.text(list.purchased(id)).ifBlank { "0" }}",
                             "Buy ${ItemEdit.text(list.toBuy(id)).ifBlank { "0 / see requirement" }}",
                         ).joinToString(" · "),
                     toBuy = toBuy,
+                    unavailable = list.isUnavailable(id),
                 )
         }.also { openJob = it }
     }

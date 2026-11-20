@@ -457,10 +457,6 @@ private fun ListGroup(
             for (s in ui.staples) StapleChip(s, onRanOut = { actions.onRanOut(s) }) { actions.onRemoveStaple(s) }
         }
     }
-    Hint(
-        "Set one from an item's sheet on the shopping list, or from a row on a review. A review leaves these off the list; " +
-            "the cart puts one on once.",
-    )
 }
 
 /** A staple: its name, and an × that is the only way to remove it (a full 48 dp target). */
@@ -574,14 +570,7 @@ private fun DataGroup(
     ui: SettingsUi,
     actions: SettingsActions,
 ) {
-    Hint("Your recipes, list, ingredient edits and settings go in one file you choose. Your Claude key never does.")
     Hint(ui.backupHealth ?: "No successful manual backup recorded on this installation.")
-    Hint(
-        "Manual export includes available recipe photos and works on another " +
-            "installation. Android-managed backup depends on your device settings and " +
-            "system limits; HyperShop cannot confirm when it last ran. A restore does " +
-            "not count as a new backup.",
-    )
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         FilledTonalButton(
             onClick = actions.onBackup,
@@ -592,7 +581,6 @@ private fun DataGroup(
     }
     EdgeDivider()
     var confirmClear by rememberSaveable { mutableStateOf(false) }
-    Hint("Buy again learns from the trips you finish. They stay on this phone and go in your backups, nowhere else.")
     TextButton(onClick = { confirmClear = true }, modifier = Modifier.testTag("clear-history")) { Text("Clear shopping history") }
     if (ui.wrongNotes > 0) {
         EdgeDivider()
@@ -747,13 +735,7 @@ private fun ClaudeAlwaysSection(
 ) {
     Column {
         SwitchRow("Read every recipe with Claude", ui.claudeAlways, actions.onClaudeAlways)
-        Hint(
-            if (ui.claudeAlways) {
-                "Claude reads each new recipe; the offline reading checks it. About $0.001 a recipe."
-            } else {
-                "Claude reads a recipe only when the offline reading is unsure of a line."
-            },
-        )
+        if (ui.claudeAlways) Hint("About $0.001 a recipe.")
     }
 }
 
@@ -768,7 +750,6 @@ private fun ModelSection(
 ) {
     Column {
         SectionLabel("Model")
-        Hint("The reading was tuned on Haiku. A bigger model costs 20–40× as much against the same monthly cap.")
         for (m in ClaudeModel.entries) {
             Row(
                 Modifier

@@ -56,15 +56,16 @@ and retry; `verify.sh` already does.
   holds its inbox, and shares and import workers `awaitReady()`. New
   background entry points must wait the same way.
 - **A planned meal is not a recipe use.** `PlannedMeal` is the plan; its
-  shopping is the use it is linked to (`useId`). Only `Planner` puts a meal on
-  the list, through the review's own `apply`, linking it in the same
-  transaction. A finished trip leaves the plan alone. An import plans itself
-  for this week, and an edit relinks: keep `apply`'s `plan` and `replacing`
-  paths doing that.
-- **Nothing in Release B undoes a purchase.** Removing a meal, Undo of a week's
-  add, Buy again's Undo and "Have it" take back only unbought shares
-  (`ShoppingList.withdraw`). Never call `removeUse` on a use with a covered
-  contribution to "remove a meal".
+  shopping is the use it is linked to (`useId`). Since Step Z the plan has no
+  screen of its own, but it is still written: "Add to list" on a saved recipe
+  goes through `Planner.addToList`, the review's own `apply` with `plan`,
+  planning and linking it in the same transaction. A finished trip leaves the
+  plan alone. An import plans itself for this week, and an edit relinks: keep
+  `apply`'s `plan` and `replacing` paths doing that.
+- **Nothing undoes a purchase.** Remove from list, Undo of Add to list
+  (`Planner.takeBack`), a recipe's servings and Buy again's Undo take back only
+  unbought shares (`ShoppingList.withdraw`). Never call `removeUse` on a use
+  with a covered contribution to "remove a recipe".
 - **A review line is known by its occurrence, never its text.** A recipe can say
   "100 g sugar" twice. Corrections and removals are filed by `LineOrigin`
   (source text + occurrence) and laid over Claude by `LineIdentity.reconcile`,

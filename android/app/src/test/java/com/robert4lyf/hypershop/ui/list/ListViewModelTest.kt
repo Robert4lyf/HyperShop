@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.di.AppContainer
-import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.testutil.TestContainer
 import com.robert4lyf.hypershop.testutil.await
@@ -135,24 +134,6 @@ class ListViewModelTest {
     }
 
     @Test
-    fun inStockIsListedAndNeedItPutsItOnTheList() {
-        val c = TestContainer.create()
-        val review = ReviewViewModel(c, runBlocking { c.readyJob("2 onions", "2 tbsp olive oil") })
-        await(review.state) { it is ReviewState.Ready }
-        review.setInStock("cat:olive_oil", true)
-        await(review.state) { it is ReviewState.Ready && it.ui.addCount == 1 }
-        review.confirm()
-        await(review.state) { it is ReviewState.Added }
-        val vm = tracked(ListViewModel(c))
-        val ui = await(vm.ui) { it.loaded && it.inStock.isNotEmpty() }
-        assertEquals("olive oil", ui.inStock.single().main)
-        assertTrue(ui.aisles.flatMap { it.second }.none { it.name == "olive oil" })
-        vm.needIt(ui.inStock.single())
-        val after = await(vm.ui) { u -> u.inStock.isEmpty() && u.aisles.flatMap { it.second }.any { it.name == "olive oil" } }
-        assertEquals("olive oil", after.row("olive oil").main)
-    }
-
-    @Test
     fun groupedByAisleInStoreOrderAndDoneSinks() {
         val c = TestContainer.create()
         c.add("2 onions", "1 carrot", "500g beef mince", "1 tsp ground cumin")
@@ -203,7 +184,7 @@ class ListViewModelTest {
         await(vm.ui) { it.doneCount == 1 }
         vm.finishShopping()
         m = nextMessage(vm)
-        assertEquals("Shopping finished: 1 bought · 1 still on your list", m.text)
+        assertEquals("Shopping finished: 1 bought · 1 to buy", m.text)
         await(vm.ui) { it.left == 1 && it.doneCount == 0 }
         vm.clearAll()
         m = nextMessage(vm)
@@ -374,7 +355,7 @@ class ListViewModelTest {
         // Straight after the tick: the screen may not show it yet; the count comes from the write.
         runBlocking { c.repository.tick(ui.row("onion").id) }
         vm.finishShopping()
-        assertEquals("Shopping finished: 1 bought · 1 still on your list", nextMessage(vm).text)
+        assertEquals("Shopping finished: 1 bought · 1 to buy", nextMessage(vm).text)
     }
 
     @Test
@@ -406,65 +387,54 @@ class ListViewModelTest {
     }
 
     @Test
-    fun shopModeEndsHoweverTheListWasEmptied() {
-        // Not only "Finish shopping": the last row deleted by hand (or a meal removed, an add undone)
-        // must leave planning on, so the next item typed has a field to land in.
-        val c = TestContainer.create()
-        c.add("2 onions")
-        val vm = tracked(ListViewModel(c))
-        var ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
-        vm.setMode(ListMode.SHOP)
-        ui = await(vm.ui) { it.shopping }
-        vm.delete(ui.row("onion").id, "onion")
-        await(vm.ui) { it.isEmpty && it.mode == ListMode.PLAN }
-        vm.addTyped("milk")
-        assertTrue(!await(vm.ui) { it.aisles.isNotEmpty() }.shopping)
-    }
-
-    @Test
-    fun shopModeIsASettingAndKeepsEveryTick() {
+    fun ticksAndFinishWorkOnTheOneListAndANewViewModelSeesTheSameTicks() {
+        // Step Z: there is no shopping mode; the list ticks and finishes, and a restart keeps every tick.
         val c = TestContainer.create()
         c.add("2 onions", "1 carrot", "500g beef mince")
         val vm = tracked(ListViewModel(c))
         var ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
-        assertEquals(ListMode.PLAN, ui.mode)
-        assertTrue(!ui.shopping)
-        vm.setMode(ListMode.SHOP)
-        ui = await(vm.ui) { it.shopping }
         vm.toggle(ui.row("onion"))
         vm.toggle(ui.row("carrot"))
         ui = await(vm.ui) { it.doneCount == 2 }
-        // Back to planning: the same rows, the same ticks, the same count.
-        vm.setMode(ListMode.PLAN)
-        ui = await(vm.ui) { !it.shopping }
-        assertEquals(2, ui.doneCount)
         assertEquals(TickState.DONE, ui.row("onion").state)
-        // A new view model (the process came back) reads the mode from the setting.
-        vm.setMode(ListMode.SHOP)
-        await(vm.ui) { it.shopping }
         val again = tracked(ListViewModel(c))
-        assertTrue(await(again.ui) { it.loaded && it.aisles.isNotEmpty() }.shopping)
-        // Finishing takes the bought rows away and the shop screen with them, whatever is left (review B.14).
+        await(again.ui) { it.loaded && it.doneCount == 2 }
         again.finishShopping()
-        assertEquals("Shopping finished: 2 bought · 1 still on your list", nextMessage(again).text)
+        assertEquals("Shopping finished: 2 bought · 1 to buy", nextMessage(again).text)
         // Missing 3: the unbought row is asked about once; "Keep" leaves it for the next trip.
         assertEquals(1, await(again.carryOver) { it != null })
         again.keepLeftovers()
         assertEquals(null, again.carryOver.value)
-        assertEquals(ListMode.PLAN, await(again.ui) { !it.shopping }.mode)
         val after = await(again.ui) { it.doneCount == 0 && it.left == 1 }
-        assertTrue(!after.shopping)
-        // Back to the shop for what is left: the ticks and the finish work as before.
-        again.setMode(ListMode.SHOP)
-        await(again.ui) { it.shopping }
         again.toggle(after.row("beef mince"))
         again.finishShopping()
-        val empty = await(again.ui) { it.isEmpty }
-        assertTrue(!empty.shopping)
-        // A trip that took everything ends in planning, so the next item typed lands on the planning screen.
-        await(again.ui) { it.mode == ListMode.PLAN }
+        await(again.ui) { it.isEmpty }
         again.addTyped("milk")
-        assertTrue(!await(again.ui) { it.aisles.isNotEmpty() }.shopping)
+        await(again.ui) { it.aisles.isNotEmpty() }
+    }
+
+    @Test
+    fun cantFindItSetsTheItemAsideForThisTripWithUndoAndFoundItTakesItBack() {
+        val c = TestContainer.create()
+        c.add("2 onions", "1 carrot")
+        val vm = tracked(ListViewModel(c))
+        val ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
+        val onion = ui.row("onion")
+        vm.openItem(onion.id)
+        assertTrue(!await(vm.sheet) { it?.id == onion.id }!!.unavailable)
+        vm.cantFind(onion.id, onion.name)
+        await(vm.ui) { it.row("onion").unavailable && it.left == 1 && it.unavailable == 1 }
+        assertEquals(null, vm.sheet.value)
+        val m = nextMessage(vm)
+        assertEquals("Onion set aside for next time", m.text)
+        runBlocking { m.undo!!.invoke() }
+        await(vm.ui) { !it.row("onion").unavailable }
+        vm.cantFind(onion.id, onion.name)
+        await(vm.ui) { it.row("onion").unavailable }
+        vm.openItem(onion.id)
+        assertTrue(await(vm.sheet) { it?.id == onion.id }!!.unavailable)
+        vm.found(onion.id)
+        await(vm.ui) { !it.row("onion").unavailable && it.left == 2 }
     }
 
     /** Lets everything queued run: the main looper, and Room and background work. */
@@ -486,10 +456,10 @@ class ListViewModelTest {
         val ui = await(vm.ui) { it.loaded && it.aisles.size == 2 }
         assertTrue(ui.secondStore)
         assertEquals(listOf(AisleCode.PRODUCE, AisleCode.DAIRY_EGGS), ui.aisles.map { it.first })
-        vm.startShopping(2)
-        // The store and its order arrive on separate flows: wait for the order, not the first frame shopping there.
+        runBlocking { c.shopStart.start(2) }
+        // The store and its order arrive on separate flows: wait for the order, not the first frame there.
         val walked = listOf(AisleCode.DAIRY_EGGS, AisleCode.PRODUCE)
-        val second = await(vm.ui) { it.activeStore == 2L && it.shopping && it.aisles.map { a -> a.first } == walked }
+        val second = await(vm.ui) { it.activeStore == 2L && it.aisles.map { a -> a.first } == walked }
         assertEquals(walked, second.aisles.map { it.first })
     }
 }

@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.robert4lyf.hypershop.core.model.QtyBase
@@ -24,7 +25,6 @@ import com.robert4lyf.hypershop.core.search.RecipeSearch
 import com.robert4lyf.hypershop.core.sync.WatchCodec
 import com.robert4lyf.hypershop.core.sync.WatchMessage
 import com.robert4lyf.hypershop.di.AppContainer
-import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.ui.HyperShopApp
 import com.robert4lyf.hypershop.ui.list.ListViewModel
 import com.robert4lyf.hypershop.ui.recipes.RecipesViewModel
@@ -227,12 +227,29 @@ class PerformanceProbeTest {
         budget("at home check over the week's list", home, 150.0)
     }
 
+    /**
+     * Scrolls [list] until [target] is in it, the scroll made between frames: never from inside `waitUntil`'s condition,
+     * where an action can land in the middle of a frame's layout ("performMeasureAndLayout called during measure
+     * layout", KNOWN_ISSUES #36). Tries again while the row is still on its way from the database.
+     */
+    private fun scrollListTo(
+        list: String,
+        target: SemanticsMatcher,
+    ) {
+        val end = System.currentTimeMillis() + 15_000
+        while (true) {
+            compose.waitForIdle()
+            if (runCatching { compose.onNodeWithTag(list).performScrollToNode(target) }.isSuccess) return
+            check(System.currentTimeMillis() < end) { "$target never came into \"$list\"" }
+            Thread.sleep(50)
+        }
+    }
+
     @Test
-    fun theShopScreenAt150ItemsOnTheMainThread() {
+    fun theListAt150ItemsOnTheMainThread() {
         assumeTrue("run on request only", enabled)
         val c = DeviceContainer.create()
         c.fill(150)
-        runBlocking { c.settings.setListMode(ListMode.SHOP) }
         // Disk reads and writes on the main thread, while the screen is used.
         val violations = CopyOnWriteArrayList<String>()
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -245,17 +262,20 @@ class PerformanceProbeTest {
         val (_, first) =
             timed {
                 compose.setContent { HyperShopTheme { HyperShopApp(c) } }
-                compose.waitUntil(30_000) { compose.onAllNodesWithTag("shop").fetchSemanticsNodes().isNotEmpty() }
+                compose.waitUntil(30_000) { compose.onAllNodesWithTag("list").fetchSemanticsNodes().isNotEmpty() }
             }
         budget("shop screen: first frame with 150 items", first, 4000.0)
         // The ticks still to buy: a row just ticked stays in place for a moment (Release C).
         val ticks =
             SemanticsMatcher("an open tick") {
-                it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("item-") == true &&
-                    it.config.getOrNull(SemanticsProperties.StateDescription) == "Still needed"
+                it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("tick-") == true &&
+                    it.config.getOrNull(SemanticsProperties.StateDescription) == "To buy"
             }
         val each =
             (1..10).map { i ->
+                // Step Z: the one list's rows are taller than the old shop screen's, and on a small screen only a few
+                // are on it; the next open tick is scrolled to first, outside the timed tap.
+                scrollListTo("list", ticks)
                 timed {
                     compose.onAllNodes(ticks)[0].performClick()
                     compose.waitUntil(

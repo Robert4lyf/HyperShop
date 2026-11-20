@@ -26,13 +26,10 @@ import com.robert4lyf.hypershop.core.model.BaseKey
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
-import com.robert4lyf.hypershop.core.plan.Week
 import com.robert4lyf.hypershop.data.MealShopping
 import com.robert4lyf.hypershop.di.AppContainer
-import com.robert4lyf.hypershop.settings.ListMode
 import com.robert4lyf.hypershop.ui.HyperShopApp
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -42,10 +39,10 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * Release B's scenarios on a device (docs/design/release-b.md): the real
- * composables over Room on the device's SQLite. Scenario B also counts the
- * taps, typed entries and screens of a returning weekly shop, both the quick
- * way and item by item, and logs them under HyperShopEffort for
+ * Release B's scenarios on a device (docs/design/release-b.md), in Step Z's
+ * flow (two tabs, Add to list on a recipe): the real composables over Room on
+ * the device's SQLite. Scenario B also counts the taps, typed entries and
+ * screens of a returning weekly shop, both the quick way and item by item, and logs them under HyperShopEffort for
  * docs/reports/release-b-effort.md. Run in CI's device job, never on a phone
  * with a real list.
  */
@@ -60,14 +57,25 @@ class WeeklyShopScenariosTest {
     private fun show(c: AppContainer) {
         compose.setContent { HyperShopTheme { HyperShopApp(c) } }
         compose.waitForIdle()
-        // An empty list opens on This week (X.10); these scenarios start from the shopping list, as a person
-        // switching tabs would. Once the start screen has settled, so the switch is not undone by it.
-        compose.waitUntil(10_000) {
-            listOf("meals", "list", "shop").any { compose.onAllNodesWithTag(it).fetchSemanticsNodes().isNotEmpty() }
-        }
-        if (compose.onAllNodesWithTag("meals").fetchSemanticsNodes().isNotEmpty()) {
-            compose.onNodeWithTag("tab-list").performClick()
+        // Step Z: the app opens on the list (two tabs: the list and Recipes).
+        compose.waitUntil(10_000) { has("list") }
+    }
+
+    /**
+     * Scrolls [list] until [target] is in it, the scroll made between frames: never from inside `waitUntil`'s condition,
+     * where an action can land in the middle of a frame's layout ("performMeasureAndLayout called during measure
+     * layout", KNOWN_ISSUES #36). Tries again while the row is still on its way from the database.
+     */
+    private fun scrollListTo(
+        list: String,
+        target: SemanticsMatcher,
+    ) {
+        val end = System.currentTimeMillis() + 15_000
+        while (true) {
             compose.waitForIdle()
+            if (runCatching { compose.onNodeWithTag(list).performScrollToNode(target) }.isSuccess) return
+            check(System.currentTimeMillis() < end) { "$target never came into \"$list\"" }
+            Thread.sleep(50)
         }
     }
 
@@ -92,39 +100,22 @@ class WeeklyShopScenariosTest {
             .fetchSemanticsNodes()
             .mapNotNull { it.config.getOrNull(SemanticsProperties.TestTag) }
 
-    private fun weekSummary(): String =
-        compose.onAllNodesWithTag("week-summary").fetchSemanticsNodes()
-            .joinToString { n -> n.config.getOrNull(SemanticsProperties.Text).orEmpty().joinToString() }
-
     /**
-     * Plans the saved recipe [key] from the Plan screen, then waits for its meal card to be on screen.
-     *
-     * Planning puts a meal card *above* the picks, and it arrives from Room through the screen's flow after
-     * the tap's `waitForIdle` has returned (Compose's idling does not cover a flow on another dispatcher).
-     * Scrolling to the next pick before it lands races it: the late card pushes that pick down, out of the
-     * composition, and the next tap waits for a node that is no longer there. So the plan must be in the
-     * database and in the screen's own count ("19–25 Oct · N meals · …") before anything else moves.
+     * Step Z: Add to list on the saved recipe [key] in Recipes, then waits until it is on the list (planned for this
+     * week and linked to its use) before anything else moves.
      */
-    private fun planPick(
+    private fun addFromRecipes(
         c: AppContainer,
-        week: Week,
         key: String,
-        meals: Int,
     ) {
-        // Step Q: recipes are chosen in the Add meal sheet, opened once and kept open for several.
-        if (!has("add-meal-list")) tap(if (has("meals-add-meal")) "meals-add-meal" else "meals-add-meal-more")
-        scrollTo("pick-add-$key", "add-meal-list")
-        tap("pick-add-$key")
+        if (!has("recipes")) tap("tab-recipes")
+        scrollTo("lib-add-$key", "recipes")
+        val before = runBlocking { c.planner.week(c.planner.currentWeek()) }.count { it.libraryKey == key && it.useId != null }
+        tap("lib-add-$key")
         waitFor(
-            "\"$key\" planned as meal $meals of week $week",
-            {
-                val planned = runBlocking { c.planner.week(week) }.map { it.libraryKey }
-                "Planned: $planned; summary: \"${weekSummary()}\"; picks on screen: ${tagsOnScreen("pick-add-")}"
-            },
-        ) {
-            val count = if (meals == 1) "1 meal" else "$meals meals"
-            runBlocking { c.planner.week(week) }.size == meals && weekSummary().split(" · ").contains(count)
-        }
+            "\"$key\" on the list",
+            { "Planned: ${runBlocking { c.planner.week(c.planner.currentWeek()) }.map { it.libraryKey to it.useId }}" },
+        ) { runBlocking { c.planner.week(c.planner.currentWeek()) }.count { it.libraryKey == key && it.useId != null } > before }
     }
 
     private fun has(tag: String) = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
@@ -158,17 +149,16 @@ class WeeklyShopScenariosTest {
         compose.waitForIdle()
     }
 
-    /** Scrolls [list] (Meals, the Add meal sheet, Food at home) to [tag] (counted apart: a swipe, not a decision). */
+    /** Scrolls [list] (Recipes, the list) to [tag] (counted apart: a swipe, not a decision). */
     private fun scrollTo(
         tag: String,
-        list: String = "meals",
+        list: String = "list",
     ) {
         waitFor { has(list) }
         // Not while the last tap's change is still being laid out (a scroll then measured mid-layout),
         // and not before the row is in the list at all (the saved recipes load after the screen opens).
         compose.waitForIdle()
-        val inList = hasTestTag(tag)
-        waitFor { runCatching { compose.onNodeWithTag(list).performScrollToNode(inList) }.isSuccess }
+        scrollListTo(list, hasTestTag(tag))
         scrolls++
     }
 
@@ -256,90 +246,44 @@ class WeeklyShopScenariosTest {
         for (line in listOf("milk", "bread", "6 eggs")) type(line)
         waitFor { c.items().size == 3 }
         assertTrue(!has("empty-plan"))
-        tap("start-shopping")
-        waitFor { has("shop") }
     }
 
-    /** B: last week's meals again, the usual items, the cupboard checked, shopping: the quick way. */
+    /** B: last week's recipes again and the usual items: the quick way. */
     @Test
     fun b_returningWeeklyShopperTheQuickWay() {
         val c = returning()
         show(c)
         val t0 = System.currentTimeMillis()
-        tap("empty-plan")
-        tap("repeat-week-button")
-        // Make shopping list ends on the list (step Q).
-        tap("meals-add-to-list")
-        waitFor { runBlocking { c.planner.week(c.planner.currentWeek()) }.all { it.shopping == MealShopping.TO_BUY } }
-        waitFor { has("list") }
-        // Buy again is a sheet from the list now, and the food-at-home check a screen of its own.
+        val keys = runBlocking { c.planner.week(c.planner.currentWeek() - 1) }.map { it.libraryKey }
+        // Step Z: Add to list on each recipe puts it on the list at once; there is no week to prepare.
+        for (k in keys) addFromRecipes(c, k)
+        tap("tab-list")
+        // Buy again is a sheet from the list.
         swipeTo("list-buy-again")
         tap("list-buy-again")
         tap("buy-again-all")
         waitFor { runBlocking { c.buyAgain.view() }.regulars.all { it.onList } }
         tap("buy-again-done")
-        swipeTo("list-home-check")
-        tap("list-home-check")
-        tap("home-have-all")
-        waitFor(
-            "cumin off the list after Have all",
-            {
-                val home = runBlocking { c.homeCheck.view(c.repository.snapshot()) }
-                "List: ${c.items().map { it.mergeKey }}; home check: ${home.map { "${it.mergeKey}=${it.have}" }}; " +
-                    "on screen: ${tagsOnScreen("home")}"
-            },
-        ) { c.items().none { it.mergeKey.contains("cumin") } }
-        tap("home-check-done")
-        tap("start-shopping")
-        waitFor { has("shop") }
         effort("weekly shop, quick way", t0)
-        // One onion row for chilli and dal; the cumin both wanted is at home, once; every regular on once.
+        // One onion row for chilli and dal; every regular on once.
         assertEquals(Rational.of(3), c.total("cat:onion"))
-        assertTrue(c.items().none { it.mergeKey.contains("cumin") })
         assertEquals(1, c.items().count { it.displayName.contains("milk") })
-        assertEquals(ListMode.SHOP, runBlocking { c.settings.listMode.first() })
-        // Step Q moved Buy again and the food-at-home check off the Meals screen into a sheet and a screen of their
-        // own, as asked; each costs an open and a close. Was 6 taps on one long screen; now 10, measured, not hidden.
-        assertTrue("taps $taps", taps <= 10)
+        // Four recipes, the list, Buy again's chip, Add all and Done: nine taps (Step Q budgeted 10).
+        assertTrue("taps $taps", taps <= 9)
         assertEquals(0, typed)
     }
 
-    /** B, the long way round, for comparison: each meal planned by hand, each regular typed, each cupboard item checked. */
+    /** B, the long way round, for comparison: each recipe added, each regular typed. */
     @Test
     fun b_returningWeeklyShopperItemByItem() {
         val c = returning()
         show(c)
         val t0 = System.currentTimeMillis()
-        tap("empty-plan")
         val keys = runBlocking { c.planner.week(c.planner.currentWeek() - 1) }.map { it.libraryKey }
-        for ((i, k) in keys.withIndex()) planPick(c, c.planner.currentWeek(), k, i + 1)
-        tap("add-meal-done")
-        tap("meals-add-to-list")
-        waitFor {
-            runBlocking { c.planner.week(c.planner.currentWeek()) }.let {
-                    m ->
-                m.size == 4 && m.all { it.shopping == MealShopping.TO_BUY }
-            }
-        }
-        // Make shopping list ends on the list: type the usual items there.
+        for (k in keys) addFromRecipes(c, k)
+        tap("tab-list")
         waitFor { has("list") }
         for (line in regulars) type(line)
-        // The food-at-home check, from the list's chip; cupboard food by default, fresh food behind a switch.
-        swipeTo("list-home-check")
-        tap("list-home-check")
-        val home = runBlocking { c.homeCheck.view(c.repository.snapshot()) }
-        val cupboard = home.filter { it.likelyCupboard && !it.have }.map { it.mergeKey }
-        for (k in cupboard) {
-            scrollTo("home-have-$k", "home-check-list")
-            tap("home-have-$k")
-            // The row turns to "Need it" in place; the next scroll waits for that rather than racing it.
-            waitFor("\"$k\" had at home", { "Rows on screen: ${tagsOnScreen("home-have-")}" }) {
-                c.items().none { it.mergeKey == k } && !has("home-have-$k")
-            }
-        }
-        tap("home-check-done")
-        tap("start-shopping")
-        waitFor { has("shop") }
         effort("weekly shop, item by item", t0)
         assertEquals(Rational.of(3), c.total("cat:onion"))
     }
@@ -350,7 +294,6 @@ class WeeklyShopScenariosTest {
         val c = DeviceContainer.create()
         val chilli = c.saveRecipe("Weeknight chilli", "2 onions", "200 ml milk")
         runBlocking {
-            c.planner.plan(c.planner.currentWeek(), c.db.dao().recipe(chilli)!!.libraryKey!!)
             repeat(2) {
                 c.repository.manualAdd("onion", QtyBase.of(Rational.ONE, null, UnitLocale.METRIC), null)
                 for (i in c.repository.snapshot().liveItems) c.repository.tick(i.id)
@@ -359,10 +302,10 @@ class WeeklyShopScenariosTest {
         }
         show(c)
         type("1 onion")
-        tap("tab-meals")
-        tap("meals-add-to-list")
+        addFromRecipes(c, runBlocking { c.db.dao().recipe(chilli)!!.libraryKey!! })
         waitFor { c.total("cat:onion") == Rational.of(3) }
         // The onion regular is on the list already: shown there, and Add all has nothing to double.
+        tap("tab-list")
         waitFor { has("list") }
         swipeTo("list-buy-again")
         tap("list-buy-again")
@@ -374,24 +317,26 @@ class WeeklyShopScenariosTest {
         assertEquals(1, c.items().count { it.mergeKey == "cat:milk" })
     }
 
-    /** D: part bought, the app restarts, servings change: what was bought stays bought. */
+    /** D: part bought, the app restarts, servings change on the recipe's card: what was bought stays bought. */
     @Test
     fun d_interruptedShopKeepsWhatWasBought() {
         val first = DeviceContainer.create()
         val chilli = first.saveRecipe("Weeknight chilli", "2 onions", "1 lime")
         runBlocking {
-            val week = first.planner.currentWeek()
-            first.planner.plan(week, first.db.dao().recipe(chilli)!!.libraryKey!!)
-            first.planner.addWeekToList(week)
+            first.planner.addToList(first.db.dao().recipe(chilli)!!.libraryKey!!)
             first.repository.tick(first.repository.snapshot().itemByKey("cat:onion")!!.id)
         }
         // A new container over the same database: what a restart sees.
         val c = DeviceContainer.create(db = first.db)
         show(c)
-        tap("tab-meals")
-        val meal = runBlocking { c.planner.week(c.planner.currentWeek()) }.single()
-        tap("meal-more-${meal.id}")
-        tap("meal-more-${meal.id}")
+        val use = runBlocking { c.planner.week(c.planner.currentWeek()) }.single().useId
+        tap("list-more")
+        tap("view-RECIPE")
+        tap("recipe-more-use-$use")
+        tap("recipe-servings-use-$use")
+        tap("servings-more")
+        tap("servings-more")
+        tap("servings-done")
         waitFor { c.total("cat:onion") == Rational.of(3) }
         val l = runBlocking { c.repository.snapshot() }
         val onion = l.itemByKey("cat:onion")!!.id
@@ -399,31 +344,12 @@ class WeeklyShopScenariosTest {
         assertTrue(l.isPartial(onion))
     }
 
-    /** E: next week planned without touching this week's shop. */
-    @Test
-    fun e_planningNextWeekLeavesThisShopAlone() {
-        val c = DeviceContainer.create()
-        val chilli = c.saveRecipe("Weeknight chilli", "2 onions")
-        runBlocking { c.repository.manualAdd("milk", QtyBase.of(Rational.ONE, null, UnitLocale.METRIC), null) }
-        val before = c.items().map { it.mergeKey }
-        show(c)
-        tap("tab-meals")
-        tap("week-next")
-        waitFor { compose.onAllNodesWithTag("week-name").fetchSemanticsNodes().any { it.config.toString().contains("Next week") } }
-        val key = runBlocking { c.db.dao().recipe(chilli)!!.libraryKey!! }
-        planPick(c, c.planner.currentWeek() + 1, key, 1)
-        assertEquals(before, c.items().map { it.mergeKey })
-        assertTrue(runBlocking { c.planner.week(c.planner.currentWeek()) }.isEmpty())
-    }
-
     /** F: a backup with a plan and shopping history, restored on a fresh install: the plan still knows what is on the list. */
     @Test
     fun f_backupCarriesThePlanAndHistory() {
         val c = returning()
         runBlocking {
-            val week = c.planner.currentWeek()
-            c.planner.repeatWeek(week - 1, week)
-            c.planner.addWeekToList(week)
+            for (m in c.planner.week(c.planner.currentWeek() - 1)) c.planner.addToList(m.libraryKey)
         }
         val file = File(c.context.cacheDir, "backup-${System.nanoTime()}.json")
         assertTrue(runBlocking { BackupManager(c, "device").writeTo(c.context, Uri.fromFile(file)) }.isSuccess)
@@ -433,7 +359,6 @@ class WeeklyShopScenariosTest {
         assertTrue(runBlocking { m.restore(read.file) } is RestoreOutcome.Restored)
         val week = fresh.planner.currentWeek()
         assertEquals(4, runBlocking { fresh.planner.week(week) }.count { it.shopping == MealShopping.TO_BUY })
-        assertEquals(null, runBlocking { fresh.planner.addWeekToList(week) })
         assertEquals(7, runBlocking { fresh.buyAgain.view() }.regulars.size)
     }
 }

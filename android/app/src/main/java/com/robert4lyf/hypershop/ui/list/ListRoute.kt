@@ -45,14 +45,10 @@ fun ListRoute(
     container: AppContainer,
     snackbar: SnackbarHostState,
     onReview: (Long) -> Unit,
-    /** "Plan this week's shop": the Plan screen. */
-    onPlan: () -> Unit = {},
     /** Above zero while the widget or launcher shortcut asks for the Add field (missing 7 of the review). */
     focusAdd: Int = 0,
     /** The Add field took the request; it is not to be repeated. */
     onAddFocused: () -> Unit = {},
-    /** Step Q: the focused food-at-home check. */
-    onHomeCheck: () -> Unit = {},
 ) {
     var buyingAgain by rememberSaveable { mutableStateOf(false) }
     if (buyingAgain) BuyAgainSheet(container, snackbar, onDismiss = { buyingAgain = false })
@@ -65,7 +61,7 @@ fun ListRoute(
     val scope = rememberCoroutineScope()
     // Built once per view model: a new object on every recomposition would recompose the whole header.
     val header =
-        remember(vm, context, onReview, onPlan) {
+        remember(vm, context, onReview) {
             HeaderActions(
                 onAdd = vm::addTyped,
                 suggestions = vm::suggestions,
@@ -79,10 +75,8 @@ fun ListRoute(
                     val text = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
                     container.applicationScope.launch { container.importShared(text, null) }
                 },
-                onPlan = onPlan,
                 onLastShop = vm::addLastShop,
                 onBuyAgain = { buyingAgain = true },
-                onHomeCheck = onHomeCheck,
             )
         }
     ListScreen(
@@ -92,21 +86,15 @@ fun ListRoute(
             onFinish = vm::finishShopping,
             onClearAll = vm::clearAll,
             onOpenItem = { vm.openItem(it.id) },
-            onNeed = vm::needIt,
             onView = vm::setView,
-            onMode = vm::setMode,
-            onShop = { vm.requestShopping() },
             onChangeStore = { vm.changeStore() },
             onBuyAgain = { buyingAgain = true },
-            onHomeCheck = onHomeCheck,
             onShareText = {
                 scope.launch {
                     container.awaitReady()
                     shareNote(context, vm.shoppingText())
                 }
             },
-            onUnavailable = vm::unavailable,
-            onAvailable = vm::available,
             onArrange = vm::arrange,
             onMoveItem = { r, by -> vm.moveItem(r, by) },
             onMoveItemTo = { r, top -> vm.moveItemToEnd(r, top) },
@@ -115,6 +103,7 @@ fun ListRoute(
             onUseEdit = vm::editUse,
             onUseRename = { s, t -> vm.renameUse(s, t) },
             onUseRemove = vm::removeUse,
+            onUseServings = { s, n -> vm.setServings(s, n) },
             onShare = {
                 val send =
                     Intent(Intent.ACTION_SEND)
@@ -125,7 +114,7 @@ fun ListRoute(
         ),
         header = { listHeader(ui, header, prep, focusAdd, onAddFocused) },
         footer = { listFooter(prep, header) },
-        empty = { EmptyState(header.onSample, header.onPasteLink, prep, header.onPlan, header.onLastShop) },
+        empty = { EmptyState(header.onSample, header.onPasteLink, prep, header.onLastShop) },
         focusAdd = focusAdd,
     )
     val carry by vm.carryOver.collectAsStateWithLifecycle()
@@ -168,6 +157,8 @@ fun ListRoute(
                     vm.toggle(s.id)
                     vm.closeItem()
                 },
+                onCantFind = { vm.cantFind(s.id, s.name) },
+                onFound = { vm.found(s.id) },
                 onWrong = { expected, share ->
                     scope.launch {
                         val text = vm.wrongNote(s, expected)
@@ -250,9 +241,8 @@ private fun BuyAgainSheet(
     snackbar: SnackbarHostState,
     onDismiss: () -> Unit,
 ) {
-    // The light view model (Buy again, the home check and the list only), so the sheet fills at once.
-    val vm: com.robert4lyf.hypershop.ui.meals.PrepViewModel =
-        viewModel(key = "buy-again", factory = factoryFor { com.robert4lyf.hypershop.ui.meals.PrepViewModel(container) })
+    // A light view model (Buy again only), so the sheet fills at once.
+    val vm: BuyAgainViewModel = viewModel(key = "buy-again", factory = factoryFor { BuyAgainViewModel(container) })
     // Read here, not first inside the sheet: the sheet is a window of its own, and a value that lands while its
     // first composition is starting was missed there (the sheet stayed on "loading" with the data in hand).
     // Read in this composition, a change recomposes the host, which hands the sheet the new value.
@@ -275,18 +265,18 @@ private fun BuyAgainSheet(
             }
             if (ui.loaded && ui.buyAgain.regulars.isEmpty() && ui.buyAgain.lastShop.isEmpty()) {
                 Text(
-                    "Nothing to buy again yet. Things you buy often show here after a few shops.",
+                    "Nothing to buy again yet.",
                     modifier = androidx.compose.ui.Modifier.padding(20.dp),
                 )
             } else {
-                com.robert4lyf.hypershop.ui.meals.BuyAgainSection(
+                BuyAgainSection(
                     ui,
-                    com.robert4lyf.hypershop.ui.meals.MealsActions(
-                        onRegular = { vm.actions.addRegular(it) },
-                        onAllRegulars = { vm.actions.addAllRegulars() },
-                        onRepeatLastShop = { vm.actions.repeatLastShop() },
-                        onPin = { vm.actions.pin(it) },
-                        onHide = { vm.actions.hide(it) },
+                    BuyAgainActions(
+                        onRegular = { vm.addRegular(it) },
+                        onAllRegulars = { vm.addAllRegulars() },
+                        onRepeatLastShop = { vm.repeatLastShop() },
+                        onPin = { vm.pin(it) },
+                        onHide = { vm.hide(it) },
                     ),
                 )
             }

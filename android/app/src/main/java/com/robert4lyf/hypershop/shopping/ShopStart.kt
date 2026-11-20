@@ -2,33 +2,21 @@ package com.robert4lyf.hypershop.shopping
 
 import com.robert4lyf.hypershop.data.StoreProfileEntity
 import com.robert4lyf.hypershop.di.AppContainer
-import com.robert4lyf.hypershop.settings.ListMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/** Every entry point uses the same store choice and changes mode only after the order is ready. */
+/**
+ * Which store's walking order the list (and the watch) follow. Step Z: there is one list screen, so this is only the
+ * store: "Change store" in the list's menu offers the stores when there are two or more ([change]), and [start] makes
+ * the one chosen the active store.
+ */
 class ShopStart(private val c: AppContainer) {
     val choices = MutableStateFlow<List<StoreProfileEntity>>(emptyList())
     private val lock = Mutex()
 
-    /**
-     * Step Q: the store used last is remembered, so Shopping view opens at once; the question is asked only when that
-     * store is no longer configured. [change] asks on purpose (Shopping view's "Change store").
-     */
-    suspend fun request() {
-        c.awaitReady()
-        val stores = c.repository.storeProfiles()
-        val active = c.settings.activeStore.first()
-        when {
-            stores.any { it.id == active } -> start(active)
-            stores.size > 1 -> choices.value = stores
-            else -> start(stores.firstOrNull()?.id ?: 1L)
-        }
-    }
-
-    /** Shopping view's "Change store": the stores to choose from. */
+    /** The list's "Change store": the stores to choose from, when there is a choice. */
     suspend fun change() {
         c.awaitReady()
         val stores = c.repository.storeProfiles()
@@ -43,7 +31,6 @@ class ShopStart(private val c: AppContainer) {
                 c.settings.setActiveStore(id)
                 c.repository.touchListRev()
             }
-            c.settings.setListMode(ListMode.SHOP)
             choices.value = emptyList()
         }
 }
