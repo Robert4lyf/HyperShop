@@ -512,4 +512,7 @@ setting or help text.
   counted 8 taps against a limit of 7 (the Recipes tab forgotten; 8 is right), and `a_quickShop` ticked a row that
   the last add's new message covered (keyboard up, message above it); it now waits the message out, uncounted. CI's unit run also timed out in `JourneyTest.mealBasedShopping` scrolling Recipes:
   `scrollTo` polled inside `waitUntil`, which does not run Robolectric's main looper, so a list still loading never
-  arrived (only on CI's slower machine); it now idles the looper between tries, as `waitFor` does.
+  arrived (only on CI's slower machine); it now idles the looper between tries, as `waitFor` does. A third CI run failed `CompactHeaderTest` with CalledFromWrongThread:
+  recomposition ran on a worker because `RecipesViewModel` and `LibraryViewModel` read Compose state through
+  `snapshotFlow` on `Dispatchers.Default`, and a snapshot taken there can advance the global one; those reads now run
+  on the main thread (the rest of each flow stays on Default).
