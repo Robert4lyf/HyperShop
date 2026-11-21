@@ -150,6 +150,7 @@ class AddByHandTest {
         assertEquals(2, usual.regulars.size)
         vm.addLastShop()
         val m = nextMessage(vm)
+        assertEquals("Added 2 items", m.text)
         await(vm.prep) { it.usual.isEmpty }
         val l = runBlocking { c.repository.snapshot() }
         assertEquals(Rational.ONE, l.total(l.itemByKey("cat:bread")!!.id)[BaseKey.ITEMS])
@@ -161,6 +162,18 @@ class AddByHandTest {
         assertTrue("the milk was bought", after.isDone(milk))
         assertEquals(null, after.itemByKey("cat:egg"))
         assertTrue("bread was there before", after.itemByKey("cat:bread") != null)
+    }
+
+    @Test
+    fun aChipSaysWhichAisleItWentToAndLightsItsRow() {
+        val c = TestContainer.create()
+        c.regulars(listOf("kitchen roll"))
+        val vm = list(c)
+        val roll = await(vm.prep) { it.usual.regulars.size == 1 }.usual.regulars.single()
+        vm.addUsual(roll)
+        assertEquals("Added to Household", nextMessage(vm).text)
+        val id = runBlocking { c.repository.snapshot() }.itemByKey("cat:kitchen_roll")!!.id
+        assertEquals(setOf(id), vm.flash.value)
     }
 
     @Test

@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,10 +12,13 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -52,6 +56,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
@@ -108,7 +113,10 @@ fun AddItemField(
     onUsual: (Regular) -> Unit = {},
     onLastShop: () -> Unit = {},
     onDontSuggest: (Regular) -> Unit = {},
+    /** One scrolling row of chips rather than lines of them; null: while the keyboard is up (room for a message). */
+    oneLine: Boolean? = null,
 ) {
+    val keyboardUp = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     var text by rememberSaveable { mutableStateOf("") }
     var focused by remember { mutableStateOf(false) }
     // A chip's menu is a window of its own and takes focus while it is open: the chips stay until it closes.
@@ -165,6 +173,7 @@ fun AddItemField(
         if (text.isEmpty() && (focused || menuOpen) && !usual.isEmpty) {
             UsualChips(
                 usual,
+                oneLine = oneLine ?: keyboardUp,
                 onUsual = onUsual,
                 onLastShop = onLastShop,
                 onDontSuggest = onDontSuggest,
@@ -238,16 +247,13 @@ data class UsualItems(
 @Composable
 private fun UsualChips(
     usual: UsualItems,
+    oneLine: Boolean,
     onUsual: (Regular) -> Unit,
     onLastShop: () -> Unit,
     onDontSuggest: (Regular) -> Unit,
     onMenu: (Boolean) -> Unit,
 ) {
-    FlowRow(
-        Modifier.fillMaxWidth().padding(top = 8.dp).testTag("usual-chips"),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    val chips: @Composable () -> Unit = {
         for (r in usual.shown) key(r.mergeKey) { UsualChip(r, onUsual, onDontSuggest, onMenu) }
         if (usual.lastShop > 0) {
             ChipShape(
@@ -257,6 +263,19 @@ private fun UsualChips(
                 modifier = Modifier.testTag("usual-last-shop"),
             )
         }
+    }
+    if (oneLine) {
+        // With the keyboard up, one row that scrolls sideways: the list and a message keep room below it.
+        Row(
+            Modifier.fillMaxWidth().padding(top = 8.dp).horizontalScroll(rememberScrollState()).testTag("usual-chips"),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) { chips() }
+    } else {
+        FlowRow(
+            Modifier.fillMaxWidth().padding(top = 8.dp).testTag("usual-chips"),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) { chips() }
     }
 }
 

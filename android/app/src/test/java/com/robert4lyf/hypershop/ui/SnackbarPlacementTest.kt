@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.importing.ImportInput
 import com.robert4lyf.hypershop.testutil.TestContainer
@@ -92,6 +93,34 @@ class SnackbarPlacementTest {
         addAndTick(c)
         waitFor("finish")
         assertMessageClearsTheBar(c)
+    }
+
+    @Test
+    fun aHandAddsMessageCoversNeitherTheAddFieldNorItsChipsNorFinishShopping() {
+        // Step AB.3: the field focused with its usual items showing, something ticked (Finish shopping), and a message.
+        val c = TestContainer.create()
+        runBlocking {
+            c.awaitReady()
+            repeat(2) {
+                for (n in listOf(
+                    "toothpaste",
+                    "kitchen roll",
+                    "bin bags",
+                )) c.repository.tick(c.repository.manualAdd(n, QtyBase.PRESENCE, null))
+                c.repository.finish()
+            }
+        }
+        show(c)
+        addAndTick(c)
+        waitFor("finish")
+        compose.onNodeWithTag("add-item").performClick()
+        waitFor("usual-chips")
+        assertMessageClearsTheBar(c)
+        val message = compose.onNode(hasText("A message with an action"), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        for (tag in listOf("add-item", "usual-chips")) {
+            val b = bounds(tag)
+            assertTrue("the message $message overlaps $tag $b", !message.overlaps(b))
+        }
     }
 
     @Test

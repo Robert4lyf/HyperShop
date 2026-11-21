@@ -48,6 +48,7 @@ fun ListRoute(
     val vm: ListViewModel = viewModel(factory = factoryFor { ListViewModel(container, it.createSavedStateHandle()) })
     val ui by vm.ui.collectAsStateWithLifecycle()
     val prep by vm.prep.collectAsStateWithLifecycle()
+    val flash by vm.flash.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
     LaunchedEffect(vm) { vm.reviews.collect(onReview) }
     val context = LocalContext.current
@@ -109,6 +110,7 @@ fun ListRoute(
         addField = { ListAddField(header, focusAdd, onAddFocused, prep.usual) },
         empty = { EmptyState(header.onSample, header.onPasteLink, prep, header.onLastShop) },
         focusAdd = focusAdd,
+        flash = flash,
     )
     val carry by vm.carryOver.collectAsStateWithLifecycle()
     carry?.let { n ->

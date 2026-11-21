@@ -200,9 +200,15 @@ class ListViewModelTest {
         val vm = tracked(ListViewModel(c))
         await(vm.ui) { it.isEmpty }
         vm.addTyped("2 onions")
+        // Step AB: every hand add says where it went, with Undo; the row is lit for a moment.
+        val first = nextMessage(vm)
+        assertEquals("Added to Produce", first.text)
         await(vm.ui) { it.aisles.isNotEmpty() && it.row("onion").main == "2 onions" }
+        assertEquals(setOf(vm.ui.value.row("onion").id), vm.flash.value)
         vm.addTyped("milk\n\n6 eggs\n")
-        assertEquals("Added 2 items", nextMessage(vm).text)
+        // A paste: one message for all of it.
+        val paste = nextMessage(vm)
+        assertEquals("Added 2 items", paste.text)
         await(vm.ui) { u -> u.aisles.flatMap { it.second }.size == 3 }
         // Typed by hand: no recipe to name.
         assertNull(await(vm.ui) { it.aisles.isNotEmpty() }.row("onion").from)
@@ -210,18 +216,27 @@ class ListViewModelTest {
         // Enters are read against the list as it is, not as last shown (review B.17): the second is the duplicate.
         vm.addTyped("bread")
         vm.addTyped("bread")
-        assertEquals("Bread is already on the list", nextMessage(vm).text)
+        assertEquals("Added to Bakery", nextMessage(vm).text)
+        assertEquals("Bread is already on your list", nextMessage(vm).text)
         await(vm.ui) { u -> u.aisles.flatMap { it.second }.count { it.name == "bread" } == 1 }
         vm.addTyped("1 onion")
         val asked = nextMessage(vm)
-        assertEquals("Onion is already on the list", asked.text)
+        assertEquals("Onion is already on your list", asked.text)
         assertEquals("Add 1", asked.action)
         assertEquals("2 onions", vm.ui.value.row("onion").main)
         runBlocking { asked.undo!!.invoke() }
         await(vm.ui) { it.row("onion").main == "3 onions" }
+        // What happened, in words, with its own Undo.
+        val now = nextMessage(vm)
+        assertEquals("Onion: now 3 onions on your list", now.text)
         vm.addTyped("onion")
         assertEquals("Add 1 more", nextMessage(vm).action)
         assertEquals("3 onions", vm.ui.value.row("onion").main)
+        runBlocking { now.undo!!.invoke() }
+        await(vm.ui) { it.row("onion").main == "2 onions" }
+        // The paste's Undo takes back both its rows.
+        runBlocking { paste.undo!!.invoke() }
+        await(vm.ui) { u -> u.aisles.flatMap { it.second }.map { it.name }.toSet() == setOf("onion", "bread") }
     }
 
     @Test

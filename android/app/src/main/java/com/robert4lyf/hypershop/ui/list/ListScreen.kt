@@ -1,5 +1,7 @@
 package com.robert4lyf.hypershop.ui.list
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -140,6 +142,8 @@ fun ListScreen(
     footer: LazyListScope.() -> Unit = {},
     /** Step AA: the Add item field, pinned under the top row (not while arranging). */
     addField: @Composable () -> Unit = {},
+    /** Step AB: rows a hand add just put on or changed, lit for a moment where they are. */
+    flash: Set<Long> = emptySet(),
 ) {
     // Missing 1 of the review: a list that locks every 30 s is the first thing a shopper notices. Kept awake once
     // something is ticked, which is when a shop is under way.
@@ -155,7 +159,7 @@ fun ListScreen(
             ListTop(ui, actions)
             if (ui.loaded && !ui.arranging) addField()
             Box(Modifier.weight(1f)) {
-                if (ui.loaded) ListBody(ui, actions, header, empty, focusAdd, footer) else Loading()
+                if (ui.loaded) ListBody(ui, actions, header, empty, focusAdd, footer, flash) else Loading()
             }
             if (ui.arranging) {
                 BottomActionBar(navigationBarInset = false) {
@@ -194,6 +198,7 @@ private fun ListBody(
     empty: @Composable () -> Unit,
     focusAdd: Int = 0,
     footer: LazyListScope.() -> Unit = {},
+    flash: Set<Long> = emptySet(),
 ) {
     val card = MaterialTheme.colorScheme.card
     // A row just ticked stays where it is for a moment, tick filled, so a mis-tap is undone by tapping it again; then
@@ -293,7 +298,7 @@ private fun ListBody(
                             } else {
                                 Modifier.animateItem()
                             }.sectionItem(sectionPosition(i + 1, count), card)
-                        ListRowItem(r, actions, tile)
+                        ListRowItem(r, actions, tile, lit = r.id in flash)
                     }
                 }
             }
@@ -336,7 +341,7 @@ private fun ListBody(
                                 val inGroup = rows.filter { it.group == c.row.group }
                                 ArrangeRow(c.row, inGroup.first() != c.row, inGroup.last() != c.row, actions, tile)
                             } else {
-                                ListRowItem(c.row, actions, tile)
+                                ListRowItem(c.row, actions, tile, lit = c.row.id in flash)
                             }
                         is Cell.Label ->
                             if (ui.arranging) {
@@ -750,7 +755,14 @@ private fun ListRowItem(
     row: ListRow,
     actions: ListActions,
     tile: Modifier,
+    /** Step AB: just added by hand: lit, then back to the card (seen, not announced). */
+    lit: Boolean = false,
 ) {
+    val background by animateColorAsState(
+        if (lit) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.card,
+        animationSpec = tween(if (lit) 150 else 900),
+        label = "lit",
+    )
     val state =
         when (row.state) {
             TickState.DONE -> "Bought"
@@ -761,7 +773,7 @@ private fun ListRowItem(
     Row(
         tile
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.card)
+            .background(background)
             .heightIn(min = 64.dp)
             .padding(start = 4.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,

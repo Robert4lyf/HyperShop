@@ -476,7 +476,17 @@ setting or help text.
   a new pin ("Always offer") and un-hiding one item (Settings › Clear shopping history still clears every hidden one;
   its dialog no longer names Buy again). The empty list's "Last shop's N items" button stays. "Buy again" left the
   vocabulary table.
-- [ ] AB.3 Say where it went
+- [x] AB.3 Say where it went. Every hand add (typed, picked suggestion, chip) says "Added to <aisle>" with Undo; a
+  paste and last shop's items say "Added N items" with one Undo. `ListRepository.addByHand` returns the item, the new
+  contribution (Undo: `takeBackHandAdds`, i.e. `withdraw`, unbought only) and its aisle. The row is lit for 1.5 s
+  (`ListViewModel.flash`, an animated background, not announced); the list is not scrolled. Already on the list: the
+  B.17 guard stays, worded "Milk is already on your list" with Add 1 more, after which "Milk: now 2 on your list"
+  (with Undo) says what happened. One message per add, so TalkBack hears one announcement (the snackbar); a paste is
+  one. Placement: the AA.4 lift now counts from where the bar's top is (not its height) and also clears the keyboard
+  (edge-to-edge: the Scaffold put messages on the tab bar, under the keyboard, so they were hidden while typing);
+  with the keyboard up the chips are one row that scrolls sideways, so a message fits between them and the keyboard.
+  `SnackbarPlacementTest` checks a message clears the field, the chips and Finish shopping; the keyboard itself
+  cannot be raised in Robolectric (in the report).
 - [ ] AB.4 Non-food items land in Household
 - [ ] AB.5 Remember an aisle correction
 - [ ] AB.6 Verify and report

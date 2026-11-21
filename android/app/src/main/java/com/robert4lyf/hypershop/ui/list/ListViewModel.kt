@@ -16,6 +16,7 @@ import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.report.WrongReport
+import com.robert4lyf.hypershop.data.HandAdded
 import com.robert4lyf.hypershop.data.MANUAL_TITLE
 import com.robert4lyf.hypershop.data.Regular
 import com.robert4lyf.hypershop.data.UseSummary
@@ -30,6 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -329,11 +331,33 @@ class ListViewModel(
         viewModelScope.launch {
             val added = adding.withLock { c.buyAgain.add(listOf(r)) }
             if (added.isEmpty()) {
-                messages.send(UiMessage("${r.name.replaceFirstChar { it.uppercase() }} is already on the list"))
-            } else {
-                messages.send(UiMessage("Added ${r.name}", undo = { c.buyAgain.undo(added) }))
+                messages.send(UiMessage("${r.name.replaceFirstChar { it.uppercase() }} is already on your list"))
+                return@launch
             }
+            val item = c.repository.snapshot().itemByKey(c.repository.target(r.name).mergeKey)
+            item?.let { flash(setOf(it.id)) }
+            messages.send(UiMessage(addedTo(item?.aisle), undo = { c.buyAgain.undo(added) }))
         }
+
+    /**
+     * Step AB: the rows a hand add just put on or changed, lit for a moment where they are (the list is not scrolled
+     * to them, so the Add field stays in view).
+     */
+    private val _flash = MutableStateFlow<Set<Long>>(emptySet())
+    val flash: StateFlow<Set<Long>> = _flash
+
+    private fun flash(ids: Set<Long>) {
+        _flash.value = ids
+        viewModelScope.launch {
+            delay(FLASH_MS)
+            if (_flash.value == ids) _flash.value = emptySet()
+        }
+    }
+
+    /** "Added to Dairy & Eggs": where a hand add went. */
+    private fun addedTo(aisle: AisleCode?) = aisle?.let { "Added to ${it.displayName}" } ?: "Added"
+
+    private fun addedItems(n: Int) = if (n == 1) "Added 1 item" else "Added $n items"
 
     /** Step AB: "Don't suggest" on a chip: Buy again's hide; Undo gives back what there was (a pin, or the rules). */
     fun dontSuggest(r: Regular) =
@@ -346,9 +370,11 @@ class ListViewModel(
     fun addLastShop() =
         viewModelScope.launch {
             val items = c.buyAgain.view().lastShop
-            val added = c.buyAgain.add(items)
+            val added = adding.withLock { c.buyAgain.add(items) }
             if (added.isNotEmpty()) {
-                messages.send(UiMessage("Added ${added.size} from last shop", undo = { c.buyAgain.undo(added) }))
+                val l = c.repository.snapshot()
+                flash(l.contributions.filter { it.id in added }.map { it.itemId }.toSet())
+                messages.send(UiMessage(addedItems(added.size), undo = { c.buyAgain.undo(added) }))
             }
         }
 
@@ -899,16 +925,21 @@ class ListViewModel(
                     val line = lines.single()
                     messages.send(
                         UiMessage(
-                            "${existing.displayName.replaceFirstChar { it.uppercase() }} is already on the list",
+                            "${existing.displayName.replaceFirstChar { it.uppercase() }} is already on your list",
                             undo = { addMore(line) },
                             action = if (amount == null) "Add 1 more" else "Add $amount",
                         ),
                     )
+                    flash(setOf(existing.id))
                     return@run
                 }
             }
-            for (l in lines) addLine(l)
-            if (lines.size > 1) messages.send(UiMessage("Added ${lines.size} items"))
+            // Step AB: one message per add (one for a whole paste), naming where it went, with Undo.
+            val added = lines.mapNotNull { addLine(it) }
+            if (added.isEmpty()) return@run
+            flash(added.map { it.itemId }.toSet())
+            val undo: suspend () -> Unit = { c.repository.takeBackHandAdds(added.map { it.contributionId }.toSet()) }
+            messages.send(UiMessage(if (lines.size == 1) addedTo(added.single().aisle) else addedItems(added.size), undo = undo))
         }
     }
 
@@ -918,10 +949,10 @@ class ListViewModel(
      */
     private fun typed(line: String) = c.repository.merger.juiceAsFruit(c.ruleParser.parse(line), UnitLocale.METRIC)
 
-    private suspend fun addLine(line: String) {
+    private suspend fun addLine(line: String): HandAdded? {
         val p = typed(line)
-        if (p.name.isBlank()) return
-        c.repository.manualAdd(p.name, p.shopBase(UnitLocale.METRIC), p.shopUnit)
+        if (p.name.isBlank()) return null
+        return c.repository.addByHand(p.name, p.shopBase(UnitLocale.METRIC), p.shopUnit)
     }
 
     /** "Add 1 more" tapped: the typed amount (or one more) goes on as a manual contribution. */
@@ -930,7 +961,18 @@ class ListViewModel(
         // As a typed add would: grams over spoons, the top of a range; one more when no amount was typed.
         val amount = parsed.shopBase(UnitLocale.METRIC)
         val q = if (parsed.quantity == null || amount.isPresence) QtyBase.of(Rational.ONE, null, UnitLocale.METRIC) else amount
-        c.repository.manualAdd(parsed.name, q, parsed.shopUnit.takeIf { parsed.quantity != null })
+        val added = c.repository.addByHand(parsed.name, q, parsed.shopUnit.takeIf { parsed.quantity != null })
+        flash(setOf(added.itemId))
+        // Step AB: what happened, in words: "Milk: now 2 pints on your list".
+        val l = c.repository.snapshot()
+        val item = l.items.getValue(added.itemId)
+        val now = Display.row(l, item, item.catalogId?.let { c.catalog.byId[it] }, c.settings.units.first()).main
+        messages.send(
+            UiMessage(
+                "${item.displayName.replaceFirstChar { it.uppercase() }}: now $now on your list",
+                undo = { c.repository.takeBackHandAdds(setOf(added.contributionId)) },
+            ),
+        )
     }
 
     /** "Try a sample list". */
@@ -960,6 +1002,9 @@ class ListViewModel(
         }
 
     companion object {
+        /** How long a row a hand add put on stays lit. */
+        const val FLASH_MS = 1_500L
+
         val SAMPLE =
             listOf(
                 "2 onions",

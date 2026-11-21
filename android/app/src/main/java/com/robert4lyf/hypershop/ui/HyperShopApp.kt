@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -52,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -149,8 +151,11 @@ private fun AppShell(
 ) {
     val snackbar = remember { SnackbarHostState() }
     val lift = remember { com.robert4lyf.hypershop.ui.common.SnackbarLift() }
+    // The tab bar's height, for the snackbar's place over the keyboard.
+    var tabsPx by remember { mutableIntStateOf(0) }
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route
+    val tabsShown = route == null || route in TABS
     val share by container.shares.collectAsState()
     LaunchedEffect(share) {
         val s = share ?: return@LaunchedEffect
@@ -240,7 +245,13 @@ private fun AppShell(
                 // Above a screen's own bottom action (the review's Add, the list's Finish shopping), never over it: an Undo
                 // up for its few seconds must not stand between a shopper and the next step. Step AA: by the bar's own
                 // measured height (SnackbarLift), not a guess at it, so a large font cannot slide the bar under it.
-                SnackbarHost(snackbar, Modifier.padding(bottom = lift.height).testTag("snackbar"))
+                // Step AB: and above the keyboard while it is up (the Add field in use): the Scaffold places the host on
+                // the tab bar, which the keyboard covers, so only what reaches above the tab bar counts.
+                val density = androidx.compose.ui.platform.LocalDensity.current
+                val tabs = if (tabsShown) with(density) { tabsPx.toDp() } else 0.dp
+                val ime = with(density) { androidx.compose.foundation.layout.WindowInsets.ime.getBottom(this).toDp() }
+                val above = maxOf(lift.height - tabs, ime - tabs, 0.dp)
+                SnackbarHost(snackbar, Modifier.padding(bottom = above).testTag("snackbar"))
             },
             bottomBar = {
                 // The two main destinations only: Settings and its screens, and the review, have their own way back.
@@ -250,7 +261,9 @@ private fun AppShell(
                             Tab(Routes.LIST, "Shopping list", Icons.Rounded.ShoppingCart, Icons.Outlined.ShoppingCart),
                             Tab(Routes.RECIPES, "Recipes", Icons.AutoMirrored.Rounded.MenuBook, Icons.AutoMirrored.Outlined.MenuBook),
                         )
-                    CompactNavBar(tabs, route, selectTab)
+                    androidx.compose.foundation.layout.Box(Modifier.onSizeChanged { tabsPx = it.height }) {
+                        CompactNavBar(tabs, route, selectTab)
+                    }
                 }
             },
         ) { padding ->

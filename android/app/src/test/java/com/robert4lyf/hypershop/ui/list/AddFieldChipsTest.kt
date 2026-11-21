@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.robert4lyf.hypershop.core.model.QtyBase
@@ -43,6 +44,7 @@ class AddFieldChipsTest {
     private fun show(
         u: UsualItems = usual,
         dark: Boolean = false,
+        oneLine: Boolean? = null,
     ) = compose.setContent {
         HyperShopTheme(dark = dark, dynamicColor = false) {
             AddItemField(
@@ -52,6 +54,7 @@ class AddFieldChipsTest {
                 onUsual = { events += "usual ${it.name}" },
                 onLastShop = { events += "last shop" },
                 onDontSuggest = { events += "hide ${it.name}" },
+                oneLine = oneLine,
             )
         }
     }
@@ -88,6 +91,18 @@ class AddFieldChipsTest {
         assertEquals("Don't suggest", action.label)
         compose.runOnIdle { action.action() }
         assertEquals(listOf("hide shampoo", "hide foil"), events)
+    }
+
+    @Test
+    fun withTheKeyboardUpTheChipsAreOneRowThatScrolls() {
+        // Step AB.3: room for the list and a message below them; every chip still there, last shop's last.
+        show(usual.copy(), oneLine = true)
+        compose.onNodeWithTag("add-item").performClick()
+        val h = compose.onNodeWithTag("usual-chips").fetchSemanticsNode().size.height
+        val max = with(compose.density) { 64.dp.roundToPx() }
+        org.junit.Assert.assertTrue("one row: $h px, at most $max", h <= max)
+        compose.onNodeWithTag("usual-last-shop").assertExists()
+        compose.onNodeWithTag("usual-name:cat food").assertExists()
     }
 
     @Test
