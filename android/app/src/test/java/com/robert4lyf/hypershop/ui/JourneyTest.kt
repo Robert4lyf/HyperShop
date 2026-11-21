@@ -291,12 +291,10 @@ class JourneyTest {
 
     /** Toothpaste and kitchen roll, the owner's regulars, onto the list. */
     private fun addTwoRegulars(c: AppContainer) {
-        // AB.0: through Buy again, in the list's menu.
-        tap("list-more")
-        tap("menu-buy-again")
-        tap("regular-${c.repository.target("toothpaste").mergeKey}")
-        tap("regular-${c.repository.target("kitchen roll").mergeKey}")
-        tap("buy-again-done")
+        // AB.0 went through Buy again (list ⋮ › Buy again › each chip › Done: 5 taps, a sheet). AB.1: the field is still
+        // focused after Enter, and empty, so the usual items are chips under it: one tap each.
+        tap("usual-${c.repository.target("toothpaste").mergeKey}")
+        tap("usual-${c.repository.target("kitchen roll").mergeKey}")
     }
 
     /** Meal-based shopping: three saved recipes put on the list, one served to 5, rice partly at home. */

@@ -17,6 +17,7 @@ import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.report.WrongReport
 import com.robert4lyf.hypershop.data.MANUAL_TITLE
+import com.robert4lyf.hypershop.data.Regular
 import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.settings.ListView
@@ -152,6 +153,8 @@ data class PlanPrep(
     val lastShop: Int = 0,
     /** Has saved recipes or a finished trip: someone who has shopped here before. */
     val returning: Boolean = false,
+    /** Step AB: the Add field's chips: regulars not on the list, and the count of last shop's not on it. */
+    val usual: UsualItems = UsualItems(),
 )
 
 /** One card of the recipe view: a recipe's items, or those several recipes share, or those added by hand. */
@@ -320,7 +323,26 @@ class ListViewModel(
                 buyAgain = buy.regulars.count { !it.onList },
                 lastShop = buy.lastShop.size,
                 returning = saved || buy.hasHistory,
+                usual = UsualItems(buy.regulars.filter { !it.onList }, buy.lastShop.size),
             )
+        }
+
+    /** Step AB: a usual item's chip: on the list by hand at its usual amount (never doubled), with Undo. */
+    fun addUsual(r: Regular) =
+        viewModelScope.launch {
+            val added = adding.withLock { c.buyAgain.add(listOf(r)) }
+            if (added.isEmpty()) {
+                messages.send(UiMessage("${r.name.replaceFirstChar { it.uppercase() }} is already on the list"))
+            } else {
+                messages.send(UiMessage("Added ${r.name}", undo = { c.buyAgain.undo(added) }))
+            }
+        }
+
+    /** Step AB: "Don't suggest" on a chip: Buy again's hide; Undo gives back what there was (a pin, or the rules). */
+    fun dontSuggest(r: Regular) =
+        viewModelScope.launch {
+            c.buyAgain.hide(r)
+            messages.send(UiMessage("Won't suggest ${r.name}", undo = { if (r.pinned) c.buyAgain.pin(r) else c.buyAgain.reset(r) }))
         }
 
     /** "Add the rest of last shop" from the empty list: the last trip's hand-added items, never doubled. */

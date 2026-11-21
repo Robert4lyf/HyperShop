@@ -457,7 +457,15 @@ setting or help text.
   shampoo are OTHER. Claims checked: Enter adds and keeps the keyboard up, a multi-line paste adds one item per line
   (true); but a single typed item already on the list is not added again (review B.17): it says "Milk is already on
   the list" with "Add 1 more", so AB.3's "now 2 on your list" is said after Add 1 more, not instead of the guard.
-- [ ] AB.1 Usual items on focus
+- [x] AB.1 Usual items on focus. While the Add field is focused and empty, chips under it (`UsualItems`, from
+  `BuyAgain.observe`, the data Buy again already used): the regulars not on the list, pinned first then most trips,
+  eight at most with "Last shop's N items" last when last shop has hand-added items not on the list. A chip adds at
+  its usual amount through `BuyAgain.add` (never doubled; Undo `BuyAgain.undo`, unbought only), never takes focus
+  (`focusProperties`), and the next regular takes its place as the list changes. Typing hands over to the typed
+  suggestions. Long press or TalkBack's custom action: "Don't suggest" (`BuyAgain.hide`, Undo restores a pin or the
+  plain rules); the chips stay up while its menu has focus and the field is focused again after. No history: no
+  chips, no text. Tests: `AddFieldChipsTest` (screen; screenshots light, dark, 200 %), `AddByHandTest` (view model).
+  The adding-by-hand journey now uses the chips: 4 · 1 · 0 · 0.
 - [ ] AB.2 Remove the separate Buy again surfaces
 - [ ] AB.3 Say where it went
 - [ ] AB.4 Non-food items land in Household

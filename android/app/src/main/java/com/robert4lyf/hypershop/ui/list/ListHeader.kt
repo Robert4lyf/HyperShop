@@ -1,10 +1,14 @@
 package com.robert4lyf.hypershop.ui.list
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,6 +26,8 @@ import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -32,6 +38,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -40,12 +47,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.robert4lyf.hypershop.data.Regular
 import com.robert4lyf.hypershop.ui.common.EdgeDivider
 import com.robert4lyf.hypershop.ui.common.EmptyHero
 import com.robert4lyf.hypershop.ui.common.PillShape
@@ -66,8 +80,12 @@ data class HeaderActions(
     val onPick: (String, String) -> Unit = { _, s -> onAdd(s) },
     /** "Paste a link" on the empty state: imports the link on the clipboard. */
     val onPasteLink: () -> Unit = {},
-    /** The empty list's "Add last shop's items". */
+    /** The empty list's "Add last shop's items", and the Add field's "Last shop's N items" chip. */
     val onLastShop: () -> Unit = {},
+    /** Step AB: a usual item's chip under the focused, empty Add field: on the list at its usual amount. */
+    val onUsual: (Regular) -> Unit = {},
+    /** Step AB: "Don't suggest" on a usual item's chip (Buy again's rule: never suggested again). */
+    val onDontSuggest: (Regular) -> Unit = {},
     /** Step Q: Buy again, as a sheet over the list. */
     val onBuyAgain: () -> Unit = {},
 )
@@ -87,8 +105,16 @@ fun AddItemField(
     focus: Int = 0,
     /** The request is used up: told once the field has asked for focus, so it is not asked again later. */
     onFocused: () -> Unit = {},
+    /** Step AB: chips while the field is focused and empty. */
+    usual: UsualItems = UsualItems(),
+    onUsual: (Regular) -> Unit = {},
+    onLastShop: () -> Unit = {},
+    onDontSuggest: (Regular) -> Unit = {},
 ) {
     var text by rememberSaveable { mutableStateOf("") }
+    var focused by remember { mutableStateOf(false) }
+    // A chip's menu is a window of its own and takes focus while it is open: the chips stay until it closes.
+    var menuOpen by remember { mutableStateOf(false) }
     val requester = remember { FocusRequester() }
     // One request, one focus: a field composed again later (scrolled back, the tab revisited) does not refocus.
     LaunchedEffect(focus) {
@@ -130,8 +156,27 @@ fun AddItemField(
             colors = pillFieldColors(),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { submit() }),
-            modifier = Modifier.fillMaxWidth().focusRequester(requester).fieldLift().testTag("add-item"),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .focusRequester(requester)
+                    .onFocusChanged { focused = it.isFocused }
+                    .fieldLift()
+                    .testTag("add-item"),
         )
+        if (text.isEmpty() && (focused || menuOpen) && !usual.isEmpty) {
+            UsualChips(
+                usual,
+                onUsual = onUsual,
+                onLastShop = onLastShop,
+                onDontSuggest = onDontSuggest,
+                onMenu = { open ->
+                    menuOpen = open
+                    // Back to the field, so the next chip or a typed item follows on.
+                    if (!open) runCatching { requester.requestFocus() }
+                },
+            )
+        }
         if (shown.isNotEmpty()) {
             Surface(
                 Modifier.fillMaxWidth().padding(top = 8.dp).cardLift(),
@@ -164,6 +209,134 @@ fun AddItemField(
                 }
             }
         }
+    }
+}
+
+/**
+ * Step AB: what the focused, empty Add field offers: the items added by hand most often that are not on the list (Buy
+ * again's regulars), and last shop's hand-added items not on the list. Eight chips at most, the last shop's last.
+ */
+data class UsualItems(
+    val regulars: List<Regular> = emptyList(),
+    /** Last shop's hand-added items not on the list. */
+    val lastShop: Int = 0,
+) {
+    val isEmpty: Boolean get() = regulars.isEmpty() && lastShop == 0
+
+    /** The regulars shown: room is kept for the last shop's chip. */
+    val shown: List<Regular> get() = regulars.take(if (lastShop > 0) MAX_CHIPS - 1 else MAX_CHIPS)
+
+    companion object {
+        const val MAX_CHIPS = 8
+    }
+}
+
+/**
+ * Step AB: the usual items as chips under the Add field. A tap adds one at its usual amount and the field keeps focus
+ * (a chip never takes it); the next candidate takes its place as the list changes. A long press, or TalkBack's action,
+ * offers "Don't suggest".
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun UsualChips(
+    usual: UsualItems,
+    onUsual: (Regular) -> Unit,
+    onLastShop: () -> Unit,
+    onDontSuggest: (Regular) -> Unit,
+    onMenu: (Boolean) -> Unit,
+) {
+    FlowRow(
+        Modifier.fillMaxWidth().padding(top = 8.dp).testTag("usual-chips"),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        for (r in usual.shown) key(r.mergeKey) { UsualChip(r, onUsual, onDontSuggest, onMenu) }
+        if (usual.lastShop > 0) {
+            ChipShape(
+                label = "Last shop's ${usual.lastShop} items",
+                icon = Icons.Rounded.Replay,
+                onClick = onLastShop,
+                modifier = Modifier.testTag("usual-last-shop"),
+            )
+        }
+    }
+}
+
+@Composable
+private fun UsualChip(
+    r: Regular,
+    onUsual: (Regular) -> Unit,
+    onDontSuggest: (Regular) -> Unit,
+    onMenu: (Boolean) -> Unit,
+) {
+    var menu by remember { mutableStateOf(false) }
+    val name = r.name.replaceFirstChar { it.uppercase() }
+    Box {
+        ChipShape(
+            label = name,
+            icon = Icons.Rounded.Add,
+            onClick = { onUsual(r) },
+            onLongClick = {
+                menu = true
+                onMenu(true)
+            },
+            modifier =
+                Modifier
+                    .semantics {
+                        customActions =
+                            listOf(
+                                CustomAccessibilityAction("Don't suggest") {
+                                    onDontSuggest(r)
+                                    true
+                                },
+                            )
+                    }.testTag("usual-${r.mergeKey}"),
+        )
+        DropdownMenu(expanded = menu, onDismissRequest = {
+            menu = false
+            onMenu(false)
+        }) {
+            DropdownMenuItem(
+                text = { Text("Don't suggest") },
+                onClick = {
+                    menu = false
+                    onMenu(false)
+                    onDontSuggest(r)
+                },
+                modifier = Modifier.testTag("dont-suggest"),
+            )
+        }
+    }
+}
+
+/** A pill chip that never takes focus from the Add field. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ChipShape(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
+) {
+    Row(
+        modifier
+            .heightIn(min = 48.dp)
+            .clip(PillShape)
+            .background(MaterialTheme.colorScheme.card)
+            .focusProperties { canFocus = false }
+            .combinedClickable(
+                role = Role.Button,
+                onClickLabel = "Add to the shopping list",
+                onLongClickLabel = if (onLongClick != null) "More options" else null,
+                onLongClick = onLongClick,
+                onClick = onClick,
+            ).padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 
@@ -265,7 +438,18 @@ fun ListAddField(
     /** Above zero to focus the Add field (the widget's or launcher's Add item). */
     focusAdd: Int = 0,
     onAddFocused: () -> Unit = {},
-) = AddItemField(actions.onAdd, actions.suggestions, actions.onPick, focus = focusAdd, onFocused = onAddFocused)
+    usual: UsualItems = UsualItems(),
+) = AddItemField(
+    actions.onAdd,
+    actions.suggestions,
+    actions.onPick,
+    focus = focusAdd,
+    onFocused = onAddFocused,
+    usual = usual,
+    onUsual = actions.onUsual,
+    onLastShop = actions.onLastShop,
+    onDontSuggest = actions.onDontSuggest,
+)
 
 /**
  * Step Q: the optional extra after the items (on a small phone a row above them pushed the list off the screen):

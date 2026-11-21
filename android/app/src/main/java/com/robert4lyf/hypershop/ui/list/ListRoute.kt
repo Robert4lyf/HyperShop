@@ -77,6 +77,8 @@ fun ListRoute(
                 },
                 onLastShop = vm::addLastShop,
                 onBuyAgain = { buyingAgain = true },
+                onUsual = vm::addUsual,
+                onDontSuggest = vm::dontSuggest,
             )
         }
     ListScreen(
@@ -113,7 +115,7 @@ fun ListRoute(
             },
         ),
         header = { listHeader(ui, header) },
-        addField = { ListAddField(header, focusAdd, onAddFocused) },
+        addField = { ListAddField(header, focusAdd, onAddFocused, prep.usual) },
         footer = { listFooter(prep, header) },
         empty = { EmptyState(header.onSample, header.onPasteLink, prep, header.onLastShop) },
         focusAdd = focusAdd,
