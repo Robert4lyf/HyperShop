@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,8 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChipDefaults
@@ -41,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,6 +51,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -226,22 +226,6 @@ fun ScreenHeader(
     }
 }
 
-/** A white pill button for a hero, basil text on it. */
-@Composable
-fun HeroButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    content: @Composable RowScope.() -> Unit,
-) {
-    Button(
-        onClick = onClick,
-        modifier = modifier,
-        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF178040)),
-        contentPadding = PaddingValues(horizontal = 14.dp),
-        content = content,
-    )
-}
-
 /** The round tick: open (ring), partly ticked (half-filled with a dash), done (filled with a check). */
 @Composable
 fun TickMark(
@@ -336,7 +320,17 @@ fun BottomActionBar(
     navigationBarInset: Boolean = true,
     content: @Composable RowScope.() -> Unit,
 ) {
-    Surface(modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 0.dp, shadowElevation = 8.dp) {
+    // Step AA: the snackbar sits above this bar while it shows (SnackbarLift).
+    val lift = LocalSnackbarLift.current
+    val density = LocalDensity.current
+    val me = remember { Any() }
+    DisposableEffect(lift) { onDispose { lift.release(me) } }
+    Surface(
+        modifier.fillMaxWidth().onSizeChanged { lift.claim(me, with(density) { it.height.toDp() }) }.testTag("bottom-action-bar"),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 0.dp,
+        shadowElevation = 8.dp,
+    ) {
         Column {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             Row(

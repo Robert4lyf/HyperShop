@@ -435,10 +435,10 @@ class ReviewViewModelTest {
     @Test
     fun rowsCarryTheFlagReasonAndTheHeroSumsThemUp() {
         val c = TestContainer.create()
-        val vm = ReviewViewModel(c, runBlocking { c.readyJob("1 onion", "1 carrot", "salt", "1 lemon or lime") })
+        val vm = ReviewViewModel(c, runBlocking { c.readyJob("1 onion", "1 carrot", "salt", "3-2 eggs") })
         val ui = ready(vm)
         val flagged = ui.aisles.flatMap { it.second }.single { it.check }
-        assertEquals("\"A or B\": one of two", flagged.checkReason)
+        assertEquals("a range that goes down", flagged.checkReason)
         assertTrue(ui.row("cat:onion").adds)
         assertTrue("a staple, pre-ticked", ui.row("cat:salt").inStock)
         assertEquals("3 to add · 1 at home", ui.summary)

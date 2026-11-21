@@ -1,6 +1,5 @@
 package com.robert4lyf.hypershop.ui.review
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,7 +21,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.progressSemantics
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -43,10 +41,12 @@ import androidx.compose.material.icons.rounded.ReportProblem
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -55,7 +55,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -72,17 +71,23 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.invisibleToUser
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
@@ -107,7 +112,31 @@ data class ReviewEdits(
     /** A cookbook recipe's book and page. */
     val onBook: (String, String) -> Unit = { _, _ -> },
     val onAddLine: (String) -> Unit = {},
+    /** Step AA: the other side of an "A or B" line (the sheet's swap). */
+    val onChoose: (Long) -> Unit = {},
 )
+
+/**
+ * Step AA: an "A or B" line as its two options, the one the line reads now selected. Choosing the other is the swap; a
+ * second swap goes back. Each is its own button, apart from the row it sits in.
+ */
+@Composable
+internal fun ChoiceButtons(
+    choice: Choice,
+    onChoose: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier.testTag("choice-${choice.lineId}"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        for ((label, chosen) in listOf(choice.chosen to true, choice.other to false)) {
+            FilterChip(
+                selected = chosen,
+                onClick = { if (!chosen) onChoose(choice.lineId) },
+                label = { Text(label.replaceFirstChar { it.uppercase() }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                modifier = Modifier.testTag(if (chosen) "chosen-${choice.lineId}" else "other-${choice.lineId}"),
+            )
+        }
+    }
+}
 
 /** The review screen's default view (PLAN §3.1), stateless. */
 @Composable
@@ -172,7 +201,14 @@ fun ReviewScreen(
                         )
                     }
                     itemsIndexed(rows, key = { _, r -> r.key }) { i, r ->
-                        ReviewRowItem(r, onInStock.takeUnless { ui.savedOnly }, onRow, sectionPosition(i + 1, count), card)
+                        ReviewRowItem(
+                            r,
+                            onInStock.takeUnless { ui.savedOnly },
+                            onRow,
+                            edits.onChoose,
+                            sectionPosition(i + 1, count),
+                            card,
+                        )
                     }
                 }
                 item(key = "add-line") { AddLine(edits.onAddLine, enabled = !ui.busy, focus = addFocus) }
@@ -657,20 +693,22 @@ private fun AisleHeader(
 }
 
 /**
- * One row, one TalkBack node: name, quantity and the in-stock toggle (at most
- * 3 elements). Tapping the row opens its sheet; the pill toggles in stock. In
- * stock rows stay put, greyed and struck through (not colour alone).
+ * Step AA: one row, a leading checkbox and one TalkBack node. Ticked means "add this to the list"; an unticked row is
+ * at home (the decision underneath is unchanged: in stock), greyed and saying so. Tapping the row opens its sheet. The
+ * box is for the finger only: TalkBack reads the row (its name, its amount, and whether it will be added) and toggles
+ * it with the row's own action.
  */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 private fun ReviewRowItem(
     row: ReviewRow,
-    /** Null for a saved recipe being edited: no "At home" pill. */
+    /** Null for a saved recipe being edited: nothing is added, so no box. */
     onInStock: ((String, Boolean) -> Unit)?,
     onRow: (String) -> Unit,
+    onChoose: (Long) -> Unit,
     position: SectionPosition,
     card: Color,
 ) {
-    val struck = if (row.inStock) TextDecoration.LineThrough else TextDecoration.None
     val faded = if (row.inStock) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
     val name = row.name.replaceFirstChar { it.uppercase() }
     Row(
@@ -678,107 +716,96 @@ private fun ReviewRowItem(
             .sectionItem(position, card)
             .fillMaxWidth()
             .heightIn(min = 64.dp)
-            .clickable(role = Role.Button, onClickLabel = "Edit") { onRow(row.key) }
-            .semantics(mergeDescendants = true) {}
-            .testTag("row-${row.key}")
-            .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            .padding(start = 4.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (row.check) {
-                    // Decorative: the "Check: …" line below says it, so the row is not read twice.
-                    Icon(
-                        Icons.Rounded.ReportProblem,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-                Text(
-                    name,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (row.check && !row.inStock) MaterialTheme.colorScheme.tertiary else faded,
-                    textDecoration = struck,
-                )
-            }
-            // What this row does: "+200 ml" goes on, "needs 200 ml" is at home, or the list has it already.
-            val sub =
-                when {
-                    row.inStock -> row.quantity?.let { "needs $it" }
-                    !row.adds -> "Already on your shopping list"
-                    else -> row.quantity?.let { "+$it" }
-                }.let { s -> if (row.optional && !row.inStock) listOfNotNull(s, "optional").joinToString(" · ") else s }
-            sub?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textDecoration = struck,
-                )
-            }
-            if (row.check && !row.inStock) {
-                Text(
-                    row.checkReason?.let { "Check: ${ReviewViewModel.plainReason(it)}" } ?: "Check this line",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.tertiary,
-                )
-                // The line as the recipe wrote it, so the reading can be judged without opening the sheet.
-                row.raw?.let {
-                    Text(
-                        "“$it”",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontStyle = FontStyle.Italic,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
+        if (onInStock != null) {
+            Checkbox(
+                checked = !row.inStock,
+                onCheckedChange = { add -> onInStock(row.key, !add) },
+                modifier =
+                    Modifier.clearAndSetSemantics {
+                        testTag = "add-${row.key}"
+                        toggleableState = ToggleableState(!row.inStock)
+                        invisibleToUser()
+                    },
+            )
         }
-        // Step Z: the one place to say a recipe's ingredient is at home (the food-at-home check and the row sheet's
-        // switch went); staples from Settings › Always at home start on.
-        onInStock?.let { toggle -> InStockPill(row.inStock, name) { toggle(row.key, it) } }
-        Icon(
-            Icons.Rounded.ChevronRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.outline,
-            modifier = Modifier.size(22.dp),
-        )
-    }
-}
-
-/** "At home" (you already have it): a pill, outlined when off, filled with a tick when on. A 48 dp target either way. */
-@Composable
-private fun InStockPill(
-    on: Boolean,
-    name: String,
-    onChange: (Boolean) -> Unit,
-) {
-    val shape = RoundedCornerShape(50)
-    Surface(
-        shape = shape,
-        color = if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-        contentColor = if (on) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-        border = if (on) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        modifier =
-            Modifier
-                .minimumInteractiveComponentSize()
-                .clip(shape)
-                .toggleable(value = on, role = Role.Checkbox, onValueChange = onChange)
-                .semantics {
-                    contentDescription = "At home: $name"
-                    stateDescription = if (on) "Already at home" else "Need to buy"
-                },
-    ) {
         Row(
-            Modifier.heightIn(min = 48.dp).padding(horizontal = 14.dp),
+            Modifier
+                .weight(1f)
+                .heightIn(min = 64.dp)
+                .clickable(role = Role.Button, onClickLabel = "Edit") { onRow(row.key) }
+                .semantics(mergeDescendants = true) {
+                    if (onInStock != null) {
+                        stateDescription = if (row.inStock) "At home, not added" else "Will be added"
+                        customActions =
+                            listOf(
+                                CustomAccessibilityAction(if (row.inStock) "Add to list" else "Mark at home") {
+                                    onInStock(row.key, !row.inStock)
+                                    true
+                                },
+                            )
+                    }
+                }.testTag("row-${row.key}")
+                .padding(start = if (onInStock != null) 4.dp else 12.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            if (on) Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-            Text("At home", style = MaterialTheme.typography.labelLarge)
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (row.check) {
+                        // Decorative: the "Check: …" line below says it, so the row is not read twice.
+                        Icon(
+                            Icons.Rounded.ReportProblem,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    Text(
+                        name,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (row.check && !row.inStock) MaterialTheme.colorScheme.tertiary else faded,
+                    )
+                }
+                // What this row does: the amount that goes on (and what the list will hold with it), "At home", or the
+                // list has it already.
+                val sub =
+                    when {
+                        row.inStock -> listOfNotNull("At home", row.quantity?.let { "needs $it" }).joinToString(" · ")
+                        !row.adds -> "Already on your shopping list"
+                        row.withList != null -> row.withList
+                        else -> row.quantity
+                    }.let { s -> if (row.optional && !row.inStock) listOfNotNull(s, "optional").joinToString(" · ") else s }
+                sub?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                row.choice?.takeIf { !row.inStock }?.let { ChoiceButtons(it, onChoose, Modifier.padding(top = 4.dp)) }
+                if (row.check && !row.inStock) {
+                    Text(
+                        row.checkReason?.let { "Check: ${ReviewViewModel.plainReason(it)}" } ?: "Check this line",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                    // The line as the recipe wrote it, so the reading can be judged without opening the sheet.
+                    row.raw?.let {
+                        Text(
+                            "“$it”",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontStyle = FontStyle.Italic,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            Icon(
+                Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.size(22.dp),
+            )
         }
     }
 }

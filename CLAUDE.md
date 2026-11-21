@@ -60,7 +60,7 @@ and retry; `verify.sh` already does.
   screen of its own, but it is still written: "Add to list" on a saved recipe
   goes through `Planner.addToList`, the review's own `apply` with `plan`,
   planning and linking it in the same transaction. A finished trip leaves the
-  plan alone. An import plans itself for this week, and an edit relinks: keep
+  plan alone. Recipes' "Most used" order counts these meals (Step AA). An import plans itself for this week, and an edit relinks: keep
   `apply`'s `plan` and `replacing` paths doing that.
 - **Nothing undoes a purchase.** Remove from list, Undo of Add to list
   (`Planner.takeBack`), a recipe's servings and Buy again's Undo take back only

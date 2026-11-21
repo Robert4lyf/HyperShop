@@ -186,8 +186,8 @@ class PerformanceProbeTest {
 
     /**
      * Release B at scale: 300 saved recipes, twelve weeks of plans, the full 26
-     * trips of 60 items each. What a shopper waits for: the week's preview, the
-     * week onto the list, another week, Buy again and the At home check.
+     * trips of 60 items each. What a shopper waits for: six saved recipes onto the
+     * list with Add to list, another week's meals and Buy again.
      */
     @Test
     fun planningAndHistoryAtScale() {
@@ -213,18 +213,14 @@ class PerformanceProbeTest {
                 for (i in c.repository.snapshot().liveItems) c.repository.tick(i.id)
                 c.repository.finish()
             }
-            for (k in keys.take(6)) c.planner.plan(week, k)
         }
-        val (_, preview) = timed { runBlocking { c.planner.previewWeek(week) } }
-        budget("plan: preview of 6 meals to add", preview, 300.0)
-        val (_, add) = timed { runBlocking { c.planner.addWeekToList(week) } }
-        budget("plan: 6 meals onto the list (one transaction)", add, 1300.0)
+        // Step Z: Add to list on each saved recipe in turn, each planned for this week and linked as it goes on.
+        val (_, add) = timed { runBlocking { for (k in keys.take(6)) checkNotNull(c.planner.addToList(k)) } }
+        budget("add to list: 6 saved recipes, one at a time", add, 1300.0)
         val (_, other) = timed { runBlocking { c.planner.week(week - 3) } }
         budget("plan: another week's meals", other, 150.0)
         val (_, buy) = timed { runBlocking { c.buyAgain.view() } }
         budget("buy again: suggestions from 26 trips", buy, 150.0)
-        val (_, home) = timed { runBlocking { c.homeCheck.view(c.repository.snapshot()) } }
-        budget("at home check over the week's list", home, 150.0)
     }
 
     /**
@@ -280,7 +276,7 @@ class PerformanceProbeTest {
                     compose.onAllNodes(ticks)[0].performClick()
                     compose.waitUntil(
                         10_000,
-                    ) { compose.onAllNodesWithText("$i of 150 bought", substring = true).fetchSemanticsNodes().isNotEmpty() }
+                    ) { compose.onAllNodesWithText("· $i bought", substring = true).fetchSemanticsNodes().isNotEmpty() }
                 }.second
             }.sorted()
         budget("shop: tap to \"N of 150 bought\" (median of 10)", each[each.size / 2], 750.0)

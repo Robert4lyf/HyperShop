@@ -479,25 +479,22 @@ interface ListDao {
     @Query("SELECT * FROM PlannedMeal WHERE weekStart = :week ORDER BY position, id")
     suspend fun plannedMeals(week: Long): List<PlannedMealEntity>
 
-    @Query("SELECT * FROM PlannedMeal WHERE weekStart = :week ORDER BY position, id")
-    fun observePlannedMeals(week: Long): Flow<List<PlannedMealEntity>>
-
     @Query("SELECT * FROM PlannedMeal")
     suspend fun allPlannedMeals(): List<PlannedMealEntity>
 
-    /** How many meals each saved recipe has been planned as, every week kept. */
-    @Query("SELECT libraryKey AS `key`, COUNT(*) AS n FROM PlannedMeal GROUP BY libraryKey")
-    fun observeTimesPlanned(): Flow<List<KeyCount>>
+    /**
+     * How many meals each saved recipe has been planned as (every week kept), and when the latest was. Since Step Z
+     * every Add to list (and every import added to the list) plans one, so this is how often and how lately it went on
+     * the list.
+     */
+    @Query("SELECT libraryKey AS `key`, COUNT(*) AS n, MAX(addedAt) AS lastAt FROM PlannedMeal GROUP BY libraryKey")
+    fun observeMealUse(): Flow<List<KeyUse>>
 
     @Query("SELECT * FROM PlannedMeal WHERE id = :id")
     suspend fun plannedMeal(id: Long): PlannedMealEntity?
 
     @Query("SELECT * FROM PlannedMeal WHERE useId = :useId")
     suspend fun mealsOfUse(useId: Long): List<PlannedMealEntity>
-
-    /** The latest week before [week] with a meal planned, or null. */
-    @Query("SELECT MAX(weekStart) FROM PlannedMeal WHERE weekStart < :week")
-    suspend fun latestWeekBefore(week: Long): Long?
 
     @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM PlannedMeal WHERE weekStart = :week")
     suspend fun nextMealPosition(week: Long): Int
@@ -515,12 +512,6 @@ interface ListDao {
     suspend fun linkMeal(
         id: Long,
         useId: Long?,
-    )
-
-    @Query("UPDATE PlannedMeal SET cookedAt = :at WHERE id = :id")
-    suspend fun setMealCooked(
-        id: Long,
-        at: Long?,
     )
 
     @Query("UPDATE PlannedMeal SET servings = :servings WHERE id = :id")

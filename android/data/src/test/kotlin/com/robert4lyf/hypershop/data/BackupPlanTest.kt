@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.data
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.robert4lyf.hypershop.core.merge.ApplyResult
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
@@ -34,8 +35,8 @@ class BackupPlanTest {
         r.repo.manualAdd("milk", QtyBase.of(Rational.of(2), null, UnitLocale.METRIC), null)
         for (i in r.repo.snapshot().liveItems) r.repo.tick(i.id)
         r.repo.finish()
-        planner.plan(week, r.save("Chilli", "2 onions"))
-        planner.addWeekToList(week)
+        // This week's chilli on the list ("Add to list": planned and linked), next week's soup only planned.
+        checkNotNull(planner.addToList(r.save("Chilli", "2 onions")))
         planner.plan(week + 1, r.save("Soup", "1 carrot"))
         BuyAgain(r.repo).pin(Regular("cat:bread", "bread", QtyBase.PRESENCE, null, true, 0, false))
         return r.repo.exportBackup()
@@ -89,8 +90,10 @@ class BackupPlanTest {
                 val planner = Planner(fresh.repo)
                 val meal = planner.week(planner.currentWeek()).single()
                 assertEquals(MealShopping.TO_BUY, meal.shopping)
-                // Restored, the plan still knows it is on the list: no second chilli.
-                assertEquals(null, planner.addWeekToList(planner.currentWeek()))
+                // Restored, the plan still knows it is on the list: another Add to list is a second chilli, and the
+                // restored meal keeps its own shopping.
+                val again = planner.addToList(meal.libraryKey) as ApplyResult.Applied
+                assertEquals(listOf(meal.useId, again.useId), planner.week(planner.currentWeek()).map { it.useId })
                 assertEquals(1, planner.week(planner.currentWeek() + 1).size)
                 assertEquals(1, fresh.db.dao().trips().size)
             } finally {

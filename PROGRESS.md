@@ -373,3 +373,73 @@ Feedback, again: "confusing and complicated". A review found the cause is the nu
 - [x] Z.11 The next emulator run (on Z.10) got past the ticks and then waited for "4 of 4 bought": the old shop screen's wording. The one list's subtitle says "N of 4 bought" until the last, then "All bought" (Z.2); the scenario now expects that, and says what was on screen if it times out. The whole loop (type four, scroll to and tick each, Finish, Undo offered) passes in a Robolectric copy at 360×640 dp — check: emulator-test compile, `tools/verify.sh`
 - [x] Z.12 With the scenarios green (Z.11), CI's performance probe failed: `theListAt150ItemsOnTheMainThread` found no open tick after two taps. Reproduced in Robolectric at 360×640 dp: the one list's rows are taller than the old shop screen's, so only two of the 150 were on screen, and once both lingered as bought there was none. The probe now scrolls the list to the next open tick before each timed tap (the scroll is outside the timing); the tap-to-"N of 150 bought" budget is unchanged — check: the Robolectric copy (10 ticks), emulator-test compile, `tools/verify.sh`
 - [x] Z.13 The emulator run on Z.12 crashed with "performMeasureAndLayout called during measure layout" (KNOWN_ISSUES #36; the report names no test). The scroll added in Z.10/Z.12, like two older ones (scenario B's "3 onions", the weekly scenarios' `scrollTo`, which Step Z's Add to list from Recipes now calls for every recipe), ran inside `waitUntil`'s condition, which the weekly scenarios' own comment warns can land in the middle of a frame's layout. Every such scroll in the emulator tests now goes through `scrollListTo`: wait for idle, then scroll, retrying for up to 15 s between frames. No assertion or timeout was loosened. The gate for this commit then failed once in `EntryNavigationTest` with "Illegal connection pointer" before a test started (KNOWN_ISSUES #35): the Z.3 test `aRememberedMealsTabFromBeforeOpensTheList` ended after 0.12 s, while its list was still loading. It now waits for the list and the remembered destination before it ends (3 runs of the class, then the gate, green) — check: emulator-test compile, `EntryNavigationTest` ×3, `tools/verify.sh`
+
+## Step AA — everyday polish (`claude/step-z-fewer-concepts-rvynea`, from e293db6)
+
+A follow-up review of Step Z found the remaining friction in a few places, and the meal-based journey longer than before (15 taps; 6 to change servings, 4 for a partial amount). This step fixes those places without adding tabs, modes, settings or help paragraphs. Words: `docs/design/simple-ux.md`. Report: `docs/reports/step-aa.md`. No Room schema, watch protocol, golden data, version or `:core` merge/tick change.
+
+- [x] AA.0 Baseline on e293db6 (`JourneyTest`, taps · typed · scrolls · screen changes): core job 6 · 0 · 0 · 2; quick shopping 7 · 2 · 0 · 0; meal-based 15 · 1 · 4 · 4 (as Z.9 recorded) — check: `JourneyTest`
+- [x] AA.1 Servings and state on the Recipes card. Verified: the card showed "On the shopping list" beside an "Add to list" that added the recipe a second time. Now a recipe on the list shows "− Serves N +" in place of Add to list, on its card and in its sheet (`ServingsStepper`, shared); each press calls `Planner.setUseServings` (bought stays bought) and says nothing, the number being on screen. Its ⋮ gains "Remove from list" (`removeFromList` for each time it is on the list, one Undo). The list's recipe card has the same stepper in its ⋮ menu; the Servings dialog and its Done are gone. On the list more than once (a share added again): the stepper shows and changes the latest, the card says "on the list twice", and Group by recipe has a card for each. A recipe that does not say how many it serves shows "On the shopping list" and no stepper. Meal journey: 15 → 10 taps, 4 → 3 screen changes (servings is one tap on the card just added); it now waits out the "Added" snackbar over the rice row, which AA.4 fixes — check: `RecipesScreenTest.onTheListTheCardShowsServings…`, `RecipesViewModelTest.onTheListTheCardsServings…` (a purchase survives Remove from list), `ListScreenTest.byRecipe…`, `JourneyTest`
+- [x] AA.2 Review rows use a checkbox. The "At home" pill became a leading checkbox (ticked = add); an unticked row is
+  greyed and reads "At home · needs N". The decision underneath is still `inStock`; staples start unticked because
+  `defaultDecisions` already marks them in stock (claim checked). The box is hidden from TalkBack; the row is one node
+  with the name, the amount, a state ("Will be added" / "At home, not added") and a custom action that toggles it. The
+  summary and the button count already followed `addCount`.
+- [x] AA.3 Review wording. An "A or B" line shows its two options as buttons on the row and in its sheet (the one it
+  reads now selected; the other is `swap`, a second swap goes back) and is no longer "to check". Amounts lose the "+";
+  an item on the list already reads "200ml · 700ml with what's on your list" (exact amounts, as a pack count may not
+  change), on the row and in the sheet. "Edit the line" → **Fix the recipe's text**; "This is wrong" → **Report a wrong
+  reading** (on the item sheet too, one word per idea; the saved note's own "--- This is wrong" header is data and
+  stays). Claims checked: "Check: has 'or'" was never on screen (only in a test's sample); the app said "Check: the
+  recipe offers a choice; …", now gone. The sheet's amount field sets the recipe line's own amount (servings scale it),
+  not an amount to buy, so it is labelled **Amount in the recipe**, not "Amount to buy".
+- [x] AA.4 Snackbars never cover the bottom action. Done once rather than per screen: `BottomActionBar` (the list's
+  Finish shopping and Done arranging, the review's Add to list; the only pinned bottom actions) reports its measured
+  height to `SnackbarLift`, and the app's one `SnackbarHost` sits that far up. The review's guessed 80 dp lift (a bar
+  of 81 dp, more at a large font) is gone. The list's end padding (96 dp) already let the last rows scroll clear of
+  a message; the bar is below the list's box, so it needs none. `SnackbarPlacementTest` fails if a message overlaps
+  the bar: the list at 1× and 2× font, and the review. Not done as worded: the list does not keep a host of its own;
+  one measured lift covers it and the review alike. A message can still sit over list rows for its seconds:
+  JourneyTest waits it out only when the row it taps is under one (core: the last row; meal: the rice), not counted.
+- [x] AA.5 Compact list header. With items, the list's top is one row ("5 to buy · 2 bought", a 6 dp progress bar, the
+  gear, ⋮); the mosaic banner only on the empty list and while loading. The Add item field is pinned under it
+  (`ListAddField`, out of the lazy header). `CompactHeaderTest` at 360×640 dp through the app shell (tab bar
+  included): the first aisle heading and three items on screen without scrolling, the field above the list; its
+  screenshot is `docs/screenshots/list-360x640.png`. Recipes' banner (about 100 dp) became the same one row once
+  there are recipes. The emulator scenario and the performance probe read the new count; the probe keeps its metric's
+  name so `docs/reports/performance.md` still lines up. Fixed in AA.7's commit: the top showed the banner while loading and
+  jumped to the row (EntryNavigationTest's gear tap landed mid-swap); both tabs now show the compact row while
+  loading, the banner only once loaded and empty.
+- [x] AA.6 Recipes ordered by use. "Most used" is the default and the first sort: added to the list most often, then
+  most lately, then newest saved. Derived from `PlannedMeal` (a new read-only query, `observeMealUse`: count and
+  latest `addedAt` per library key; no column, no migration): since Step Z every Add to list, and every import put
+  on the list, plans one meal, so meals are the history of adds (before Z a meal could be planned without being
+  added; counted as used). No meal sorts as never used. `Recipe.lastAddedAt` is not "last added to the list" (Save
+  recipe only sets it too), so it stays the "saved" date. "Your usual" (cooked, then planned) went: "Cooked it" has
+  no screen since Step Z, and Most used covers it; "Recently added" is now "Recently saved". The control still shows
+  from 10 recipes. The card line is "Serves 4 · last added 3 days ago" with the source and stars; the ingredient
+  count, "planned N times" and "cooked N times" went.
+- [x] AA.7 One message for several adds. An Add to list made while the previous add's message is still the latest the
+  screen took, and within its seconds, joins it: "3 recipes added · 12 to buy"; its one Undo runs `Planner.takeBack`
+  for each, latest first (only unbought shares leave; a bought item stays bought, tested). Another message in
+  between, or the seconds over, starts a new one. `putRecipeOnList` split from `addRecipeToList` (kept for the
+  scenarios).
+- [x] AA.8 Remove what Step Z left unused. Deleted (each grepped for callers in every module's main source,
+  backup/restore, workers, widget and watch coordinator first; none had one): `Planner.addWeekToList`, `previewWeek`,
+  `undoAddWeek`, `repeatWeek`, `previousPlannedWeek`, `unplanNew`, `setCooked`, `observeWeek` (and `WeekAdded`,
+  `WeekPreview`), `HomeCheck` (file) and `AppContainer.homeCheck`, `ListRepository.needAfterAll`, `needLines`,
+  `inStockOnList`, `cooked`/`uncooked`, DAO `observePlannedMeals`, `latestWeekBefore`, `setMealCooked`, `KeyCount`;
+  in `:app` `HeroButton`, `Brand.Citrus`, `RowSheet.isStaple`, `ReviewUi.checkCount`, `addRecipeToList`. 132+ / 965−.
+  Backups unchanged: no entity, serializer or backup DAO call touched; `BackupPlanTest` now fills the plan with
+  `addToList`/`plan` and still round-trips `PlannedMeal` and its `useId` (no backup test ever filled `cookedAt`,
+  `timesCooked` or `onHand`). Tests that only tested deleted code went (`HomeCheckTest`, two PlannerTest cases, one
+  CompoundItemEditTest case, the cooked half of a RepositoryTest case, one plan invariant); tests that used it as
+  setup were rewritten to live calls with the same assertions. The performance probe's "6 meals onto the list"
+  budget now times six Add to list (same 1300 ms); the week-preview and at-home-check budgets went with their code.
+  KNOWN_ISSUES #46 updated.
+- [x] AA.9 Verify and report. "Change amount" opens the editor on the amount, focused and selected (the meal
+  journey's last spare tap). Journeys: core 6·0·0·2 and quick 7·2·0·0 (as AA.0), meal 9·1·3·3 (AA.0: 15·1·4·4):
+  every target met. Screenshots re-recorded, `tools/contact-sheet` run, CLAUDE.md's plan rule notes that Most used
+  reads the meals. Report: `docs/reports/step-aa.md`. Seen once and not reproduced in two full runs: StartupTest
+  failing on an exception leaked by an earlier test (in the report).
+

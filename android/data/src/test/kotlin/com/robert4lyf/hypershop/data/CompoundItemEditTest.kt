@@ -1,6 +1,8 @@
 package com.robert4lyf.hypershop.data
 
+import androidx.room.withTransaction
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.robert4lyf.hypershop.core.merge.ApplyResult
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.BaseKey
 import com.robert4lyf.hypershop.core.model.Rational
@@ -13,6 +15,18 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+
+/**
+ * [text] of [key] said to be at home (`ListItem.onHand`), as the At home check's "Have some" wrote it before Step Z;
+ * nothing in the app sets it now, but rows that carry it keep their meaning.
+ */
+private suspend fun DbRule.onHand(
+    key: String,
+    text: String,
+) = db.withTransaction {
+    val l = repo.load()
+    repo.persist(l, l.setOnHand(l.itemByKey(key)!!.id, QuantityInput.parse(text)!!)!!)
+}
 
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34])
@@ -71,7 +85,7 @@ class CompoundItemEditTest {
             val before = r.repo.snapshot()
             val rice = before.itemByKey("cat:basmati_rice") ?: before.liveItems.first { it.displayName.contains("rice") }
             val pasta = before.liveItems.first { it.id != rice.id }
-            HomeCheck(r.repo).haveSome(rice.mergeKey, "100 g")
+            r.onHand(rice.mergeKey, "100 g")
             r.repo.tick(pasta.id)
             val source = r.repo.snapshot().items.getValue(pasta.id)
             r.repo.editItem(source.id, source.rev, rice.displayName, null, null, false)
@@ -100,15 +114,13 @@ class CompoundItemEditTest {
     fun homeIsNotSpentTwiceAfterPurchasesAndServingChanges() =
         runBlocking {
             val planner = Planner(r.repo)
-            val key = r.save("Rice", "500 g basmati rice")
-            planner.plan(planner.currentWeek(), key)
-            planner.addWeekToList(planner.currentWeek())
+            val added = planner.addToList(r.save("Rice", "500 g basmati rice")) as ApplyResult.Applied
             val item = r.repo.snapshot().liveItems.single()
-            HomeCheck(r.repo).haveSome(item.mergeKey, "300 g")
+            r.onHand(item.mergeKey, "300 g")
             r.repo.tick(item.id)
             var list = r.repo.snapshot()
             assertEquals(Rational.of(200), list.purchased(item.id)[BaseKey.MASS])
-            planner.setServings(planner.week(planner.currentWeek()).single().id, 8)
+            assertTrue(planner.setUseServings(added.useId, 8))
             list = r.repo.snapshot()
             val live = list.itemByKey(item.mergeKey)!!
             assertEquals(Rational.of(500), list.toBuy(live.id)[BaseKey.MASS])
@@ -133,21 +145,5 @@ class CompoundItemEditTest {
             val marker = EpochMarker(java.io.File(context.cacheDir, "pack-restore"))
             assertTrue(r.repo.restoreBackup(backup, marker).isEmpty())
             assertEquals(QuantityInput.parse("400 g"), r.repo.packPreference(2, item.mergeKey))
-        }
-
-    @Test
-    fun homeUndoRestoresAnEarlierPartialAmountAndRefusesToUndoAPurchase() =
-        runBlocking {
-            r.import("500 g basmati rice")
-            val item = r.repo.snapshot().liveItems.single()
-            val home = HomeCheck(r.repo)
-            home.haveSome(item.mergeKey, "100 g")
-            val enough = home.changeSome(item.mergeKey, "600 g")
-            assertTrue(home.undoSome(enough.undo!!))
-            assertEquals(Rational.of(100), r.repo.snapshot().items.getValue(item.id).onHand?.get(BaseKey.MASS))
-            val changed = home.changeSome(item.mergeKey, "200 g")
-            r.repo.tick(item.id)
-            assertTrue(!home.undoSome(changed.undo!!))
-            assertEquals(Rational.of(300), r.repo.snapshot().purchased(item.id)[BaseKey.MASS])
         }
 }

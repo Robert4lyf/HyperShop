@@ -1,18 +1,23 @@
 package com.robert4lyf.hypershop.ui.review
 
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -44,9 +49,29 @@ internal val SAMPLE_REVIEW =
                 AisleCode.PRODUCE to
                     listOf(
                         ReviewRow("cat:onion", "onion", "2", false, false, AisleCode.PRODUCE),
-                        ReviewRow("cat:garlic", "garlic", "3 cloves", false, false, AisleCode.PRODUCE),
+                        ReviewRow(
+                            "cat:garlic",
+                            "garlic",
+                            "3 cloves",
+                            false,
+                            true,
+                            AisleCode.PRODUCE,
+                            checkReason = "a range that goes down",
+                            raw = "3-2 cloves garlic",
+                        ),
                     ),
-                AisleCode.MEAT_FISH to listOf(ReviewRow("cat:beef_mince", "beef mince", "500 g", false, false, AisleCode.MEAT_FISH)),
+                AisleCode.MEAT_FISH to
+                    listOf(
+                        ReviewRow(
+                            "cat:beef_mince",
+                            "beef mince",
+                            "500 g",
+                            false,
+                            false,
+                            AisleCode.MEAT_FISH,
+                            withList = "500 g · 1 kg with what's on your list",
+                        ),
+                    ),
                 AisleCode.SPICES_CONDIMENTS to
                     listOf(
                         ReviewRow("cat:salt", "salt", null, true, false, AisleCode.SPICES_CONDIMENTS),
@@ -55,9 +80,9 @@ internal val SAMPLE_REVIEW =
                             "chipotle paste",
                             "1 tbsp",
                             false,
-                            true,
+                            false,
                             AisleCode.SPICES_CONDIMENTS,
-                            checkReason = "has 'or'",
+                            choice = Choice(9, "chipotle paste", "chipotle sauce"),
                         ),
                     ),
             ),
@@ -92,27 +117,31 @@ class ReviewScreenTest {
                 onClearInStock = { events += "clear" },
                 onSaveForLater = { events += "save only" },
                 onLater = { events += "later" },
+                edits = ReviewEdits(onChoose = { events += "choose $it" }),
             )
         }
     }
 
     @Test
-    fun eachRowIsOneNodeWithAtMostThreeElements() {
+    fun eachRowIsOneNodeStatingNameAmountAndWhetherItIsAdded() {
+        // Step AA: TalkBack reads the row (name, amount, "Will be added") and toggles it with the row's own action; the
+        // checkbox is for the finger only.
         show()
-        val node = compose.onNodeWithTag("row-cat:onion", useUnmergedTree = false).fetchSemanticsNode()
+        val node = compose.onNodeWithTag("row-cat:onion").fetchSemanticsNode()
         val texts = node.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text }
-        val toggle = node.children.count { it.config.getOrNull(SemanticsProperties.ToggleableState) != null }
-        // name, quantity (what goes on) and the in-stock box.
-        assertTrue("texts $texts", texts.containsAll(listOf("Onion", "+2")))
-        assertTrue(texts.size + toggle <= 4) // "In stock" label + name + quantity + box, read as one node
+        assertTrue("texts $texts", texts.containsAll(listOf("Onion", "2")))
+        assertEquals("Will be added", node.config.getOrNull(SemanticsProperties.StateDescription))
+        val action = node.config[SemanticsActions.CustomActions].single()
+        assertEquals("Mark at home", action.label)
+        compose.runOnIdle { action.action() }
         compose.onNodeWithTag("row-cat:onion").performClick()
-        assertEquals("row cat:onion", events.last())
+        assertEquals(listOf("stock cat:onion true", "row cat:onion"), events)
     }
 
     @Test
     fun aSavedRecipeBeingEditedHasNoInStockOrServings() {
         show(SAMPLE_REVIEW.copy(editing = true, savedOnly = true))
-        compose.onAllNodesWithContentDescription("At home", substring = true).assertCountEquals(0)
+        compose.onAllNodesWithTag("add-cat:onion", useUnmergedTree = true).assertCountEquals(0)
         compose.onAllNodesWithText("Serves", substring = true).assertCountEquals(0)
         compose.onNodeWithText("Save changes").assertExists()
     }
@@ -139,13 +168,16 @@ class ReviewScreenTest {
     }
 
     @Test
-    fun everyRowHasTheAtHomeToggleAndItIsTheOnePlaceToSaySo() {
-        // Step Z: the row's pill is the one place a recipe's ingredient is said to be at home (the food-at-home check,
-        // the row sheet's switch and its "Always at home" went), so every row shows it, on or off.
+    fun everyRowHasACheckboxTickedMeansAddUntickedIsAtHome() {
+        // Step AA: the pill became a leading checkbox. Ticked adds; an unticked row is at home and says so.
         show()
-        val rows = SAMPLE_REVIEW.aisles.sumOf { it.second.size }
-        compose.onAllNodesWithText("At home").assertCountEquals(rows)
-        compose.onNodeWithContentDescription("At home: Onion").performClick()
+        val rows = SAMPLE_REVIEW.aisles.flatMap { it.second }
+        rows.forEach { r ->
+            val box = compose.onNodeWithTag("add-${r.key}", useUnmergedTree = true)
+            if (r.inStock) box.assertIsOff() else box.assertIsOn()
+        }
+        compose.onAllNodesWithText("At home", substring = true).assertCountEquals(rows.count { it.inStock })
+        compose.onNodeWithTag("add-cat:onion", useUnmergedTree = true).performClick()
         compose.onNodeWithTag("cupboard-hint").assertDoesNotExist()
         assertEquals(listOf("stock cat:onion true"), events)
     }
@@ -157,8 +189,21 @@ class ReviewScreenTest {
         compose.onNodeWithContentDescription("More servings").performClick()
         assertEquals(listOf("servings 1"), events)
         compose.onNodeWithTag("summary").assertTextEquals("4 to add · 1 at home")
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Check: has 'or'"))
-        compose.onNodeWithText("Check: has 'or'").fetchSemanticsNode()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Check: the range reads backwards; check the amount"))
+        compose.onNodeWithText("Check: the range reads backwards; check the amount").fetchSemanticsNode()
+    }
+
+    @Test
+    fun amountsHaveNoPlusAndAChoiceIsTwoButtons() {
+        // Step AA: what goes on, then what the list will hold in words; "A or B" as its two options, no "Check".
+        show()
+        compose.onNodeWithText("500 g · 1 kg with what's on your list", useUnmergedTree = true).fetchSemanticsNode()
+        compose.onAllNodesWithText("+", substring = true, useUnmergedTree = true).assertCountEquals(0)
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Chipotle sauce"))
+        compose.onNodeWithTag("chosen-9").assertIsSelected().performClick()
+        compose.onNodeWithTag("other-9").assertIsNotSelected().performClick()
+        compose.onAllNodesWithText("Check:", substring = true, useUnmergedTree = true).assertCountEquals(1) // the garlic's
+        assertEquals(listOf("choose 9"), events)
     }
 
     @Test

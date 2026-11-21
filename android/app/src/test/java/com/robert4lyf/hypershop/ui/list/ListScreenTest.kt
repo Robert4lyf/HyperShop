@@ -6,12 +6,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -95,7 +98,7 @@ class ListScreenTest {
         // "Finish shopping" sits in the bar at the bottom, in reach, once something is ticked.
         compose.onNodeWithText("Finish shopping").performClick()
         compose.onNodeWithTag("finish").assertExists()
-        compose.onNodeWithText("5 to buy").fetchSemanticsNode()
+        compose.onNodeWithText("5 to buy · 1 bought").fetchSemanticsNode()
         assertEquals(listOf("open 1", "toggle 1", "finish"), events)
     }
 
@@ -162,7 +165,9 @@ class ListScreenTest {
         compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ListUi(), actions) } }
         compose.onNodeWithTag("loading").assertExists()
         compose.onNodeWithText("HyperShop").assertDoesNotExist()
-        compose.onNodeWithText("SHOPPING LIST").assertExists()
+        // Step AA: the compact row while loading (no jump from banner to row), with no count yet.
+        compose.onNodeWithText("Shopping list").assertExists()
+        compose.onAllNodesWithText("to buy", substring = true).assertCountEquals(0)
     }
 
     @Test
@@ -177,7 +182,7 @@ class ListScreenTest {
     @Test
     fun theCountIsAHeading() {
         show()
-        compose.onNode(hasText("5 to buy") and isHeading()).assertExists()
+        compose.onNode(hasText("5 to buy · 1 bought") and isHeading()).assertExists()
     }
 
     @Test
@@ -316,7 +321,12 @@ class ListScreenTest {
 
     @Test
     fun byRecipeShowsACardPerRecipe() {
-        val actions = actions.copy(onUseRemove = { events += "remove ${it.key}" }, onUseOpen = { events += "open ${it.key}" })
+        val actions =
+            actions.copy(
+                onUseRemove = { events += "remove ${it.key}" },
+                onUseOpen = { events += "open ${it.key}" },
+                onUseServings = { s, n -> events += "serves ${s.key} $n" },
+            )
         val rows = SAMPLE_LIST.aisles.flatMap { it.second }
         val ui =
             SAMPLE_LIST.copy(
@@ -324,7 +334,7 @@ class ListScreenTest {
                 recipes =
                     listOf(
                         RecipeSection("use-1", "Weeknight chilli", RecipeSection.Kind.RECIPE, rows.take(3), photo = TestPhotos.dish),
-                        RecipeSection("use-2", "Red lentil dal", RecipeSection.Kind.RECIPE, listOf(rows[5])),
+                        RecipeSection("use-2", "Red lentil dal", RecipeSection.Kind.RECIPE, listOf(rows[5]), servings = 4),
                         RecipeSection(
                             "shared",
                             "In more than one recipe",
@@ -348,7 +358,15 @@ class ListScreenTest {
         compose.onNodeWithTag("recipe-more-use-2").performClick()
         compose.onNodeWithTag("recipe-open-use-2").performClick()
         compose.onNodeWithTag("recipe-more-shared").assertDoesNotExist()
+        // Step AA: servings in the menu, in place: no dialog, no Done; each press is written at once.
+        compose.onNodeWithTag("recipe-more-use-2").performClick()
+        compose.onNodeWithTag("recipe-servings-use-2").assertTextEquals("Serves 4")
+        compose.onNodeWithTag("recipe-servings-use-2-more").performClick()
+        compose.onNodeWithTag("servings-done").assertDoesNotExist()
+        compose.onNodeWithTag("recipe-servings-use-2").assertTextEquals("Serves 5")
+        androidx.test.espresso.Espresso.pressBack()
         assertEquals(listOf("remove use-2", "open use-2"), events.filter { it.endsWith("use-2") })
+        assertEquals(listOf("serves use-2 5"), events.filter { it.startsWith("serves") })
         TestPhotos.settle(compose)
         compose.onRoot().captureRoboImage(Shots.path("list-recipes-light.png"))
     }
@@ -367,7 +385,13 @@ class ListScreenTest {
             )
         compose.setContent {
             HyperShopTheme(dark = dark, dynamicColor = false) {
-                ListScreen(ui, actions, header = { listHeader(ui, header) }, empty = { EmptyState(header.onSample, header.onPasteLink) })
+                ListScreen(
+                    ui,
+                    actions,
+                    header = { listHeader(ui, header) },
+                    empty = { EmptyState(header.onSample, header.onPasteLink) },
+                    addField = { ListAddField(header) },
+                )
             }
         }
     }
@@ -398,7 +422,9 @@ class ListScreenTest {
                 onPick = { typed, s -> events += "pick $typed $s" },
             )
         compose.setContent {
-            HyperShopTheme(dynamicColor = false) { ListScreen(SAMPLE_LIST, actions, header = { listHeader(SAMPLE_LIST, header) }) }
+            HyperShopTheme(dynamicColor = false) {
+                ListScreen(SAMPLE_LIST, actions, header = { listHeader(SAMPLE_LIST, header) }, addField = { ListAddField(header) })
+            }
         }
         compose.onNodeWithTag("add-item").performTextInput("2 on")
         compose.onNodeWithTag("suggestion-onion").performClick()

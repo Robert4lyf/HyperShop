@@ -1,7 +1,11 @@
 package com.robert4lyf.hypershop.ui.review
 
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -24,6 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -34,6 +39,9 @@ import org.robolectric.annotation.GraphicsMode
 private fun ReviewState.ui() = (this as ReviewState.Ready).ui
 
 private fun ReviewUi.row(key: String) = aisles.flatMap { it.second }.first { it.key == key }
+
+/** Rows flagged to check and not at home. */
+private fun ReviewUi.toCheck() = aisles.flatMap { it.second }.count { it.check && !it.inStock }
 
 /** The row, or [or] when the key is not on screen (yet). */
 private fun ReviewUi.row(
@@ -59,9 +67,27 @@ class ReviewRowSheetViewModelTest {
         await(vm0.state) { it is ReviewState.Added }
         val vm = ReviewViewModel(c, runBlocking { c.readyJob("200 ml milk") })
         await(vm.state) { it is ReviewState.Ready }
-        assertEquals("milk: +200ml → 700ml on the shopping list", vm.sheet("cat:milk")!!.effect)
+        // Step AA: no "+"; what the list will hold, in words.
+        assertEquals("milk: 200ml · 700ml with what's on your list", vm.sheet("cat:milk")!!.effect)
+        val row = (vm.state.value as ReviewState.Ready).ui.row("cat:milk")
+        assertEquals("200ml · 700ml with what's on your list", row.withList)
         assertEquals("4 pint (2.27l) bottle", vm.sheet("cat:milk")!!.packNote)
         assertEquals("200 ml milk", vm.sheet("cat:milk")!!.lines.single().raw)
+    }
+
+    @Test
+    fun anAOrBLineIsTwoOptionsNotACheck() {
+        // Step AA: the row shows "Lemon" and "Lime" as buttons; no "Check: …" line, here or on the sheet.
+        val (_, vm) = vm("1 lemon or lime")
+        val row = (vm.state.value as ReviewState.Ready).ui.row("cat:lemon")
+        assertFalse(row.check)
+        val choice = row.choice!!
+        assertEquals("lemon" to "lime", choice.chosen to choice.other)
+        assertNull(vm.sheet("cat:lemon")!!.lines.single().checkReason)
+        vm.swap(choice.lineId)
+        val ui = await(vm.state) { s -> s is ReviewState.Ready && s.ui().aisles.flatMap { it.second }.none { it.key == "cat:lemon" } }.ui()
+        val swapped = ui.aisles.flatMap { it.second }.single()
+        assertEquals("lime" to "lemon", swapped.choice!!.chosen to swapped.choice!!.other)
     }
 
     @Test
@@ -186,16 +212,17 @@ class ReviewCorrectionsTest {
 
     @Test
     fun aSwapOrARenameSettlesAFlaggedLine() {
+        // Step AA: an "A or B" line is never "to check" (its two options say it); a swap or a rename keeps it so.
         val (_, vm) = vm("4 tablespoons butter or margarine", "1 lemon or lime")
-        assertTrue(vm.sheet("cat:butter")!!.lines.single().checkReason != null)
+        assertEquals(0, (vm.state.value as ReviewState.Ready).ui.toCheck())
         vm.swap(vm.sheet("cat:butter")!!.lines.single().id)
         val ui = await(vm.state) { s -> s is ReviewState.Ready && s.ui().row("cat:vegan_butter", or = null) != null }.ui()
         assertFalse(ui.row("cat:vegan_butter").check)
-        assertTrue(ui.row("cat:lemon").check)
+        assertFalse(ui.row("cat:lemon").check)
         vm.rename("cat:lemon", "lime")
         val renamed = await(vm.state) { s -> s is ReviewState.Ready && s.ui().row("cat:lime", or = null) != null }.ui()
         assertFalse(renamed.row("cat:lime").check)
-        assertEquals(0, renamed.checkCount)
+        assertEquals(0, renamed.toCheck())
     }
 
     @Test
@@ -217,13 +244,11 @@ class ReviewCorrectionsTest {
 
     @Test
     fun flaggedRowsCarryTheRecipesOwnLineAndAPlainReason() {
-        val (_, vm) = vm("1 lemon or lime")
-        val row = (vm.state.value as ReviewState.Ready).ui.row("cat:lemon")
-        assertEquals("1 lemon or lime", row.raw)
-        assertEquals(
-            "the recipe offers a choice; the swap button takes the other",
-            ReviewViewModel.plainReason(row.checkReason!!),
-        )
+        val (_, vm) = vm("3-2 eggs")
+        val row = (vm.state.value as ReviewState.Ready).ui.aisles.flatMap { it.second }.single()
+        assertTrue(row.check)
+        assertEquals("3-2 eggs", row.raw)
+        assertEquals("the range reads backwards; check the amount", ReviewViewModel.plainReason(row.checkReason!!))
         assertEquals("Claude's own words", ReviewViewModel.plainReason("Claude's own words"))
     }
 }
@@ -238,7 +263,7 @@ class ReviewRowSheetScreenTest {
         RowSheet(
             key = "cat:milk",
             name = "milk",
-            effect = "milk: +200ml → 700ml on the shopping list",
+            effect = "milk: 200ml · 700ml with what's on your list",
             packNote = "1 × 4 pint (2.27 l) bottle",
             lines =
                 listOf(
@@ -247,13 +272,13 @@ class ReviewRowSheetScreenTest {
                         "200ml whole milk or oat milk",
                         "200 ml whole milk (or oat milk)",
                         "oat milk",
-                        "\"A or B\": one of two",
+                        null,
                         amount = "200 ml",
+                        name = "whole milk",
                     ),
                 ),
             aisle = AisleCode.DAIRY_EGGS,
             inStock = false,
-            isStaple = false,
         )
     private val events = mutableListOf<String>()
     private val actions =
@@ -276,13 +301,18 @@ class ReviewRowSheetScreenTest {
     @Test
     fun actions() {
         show()
-        compose.onNodeWithText("milk: +200ml → 700ml on the shopping list").fetchSemanticsNode()
+        compose.onNodeWithText("milk: 200ml · 700ml with what's on your list").fetchSemanticsNode()
         compose.onNodeWithText("Usually sold as 1 × 4 pint (2.27 l) bottle").fetchSemanticsNode()
-        compose.onNodeWithText("Use oat milk instead").performClick()
+        // Step AA: the line's two options; the one it reads now does nothing, the other swaps.
+        compose.onNodeWithTag("chosen-7").assertIsSelected().performClick()
+        compose.onNodeWithText("Oat milk").assertIsNotSelected().performClick()
+        compose.onNodeWithText("Amount in the recipe").fetchSemanticsNode()
         // Step Z: at home is said on the review's row, not here.
         compose.onNodeWithText("Always at home").assertDoesNotExist()
         compose.onNodeWithTag("switch-At home").assertDoesNotExist()
-        // The line's words and name sit behind "Edit the line" (UX review 6).
+        // The line's words and name sit behind "Fix the recipe's text" (UX review 6; Step AA's words).
+        compose.onNodeWithText("Fix the recipe's text").fetchSemanticsNode()
+        compose.onNodeWithText("Report a wrong reading").performScrollTo().fetchSemanticsNode()
         compose.onNodeWithTag("edit-line").performScrollTo().performClick()
         compose.onNodeWithTag("line-7").performScrollTo().performTextReplacement("300ml milk")
         compose.onNodeWithText("Read as: parsed:300ml milk").fetchSemanticsNode()
@@ -319,7 +349,7 @@ class ReviewRowSheetScreenTest {
     fun theLastLineCannotBeRemoved() {
         compose.setContent { HyperShopTheme(dark = false, dynamicColor = false) { ReviewRowSheet(sheet.copy(canRemove = false), actions) } }
         compose.onNodeWithText("Remove from recipe").assertDoesNotExist()
-        compose.onNodeWithText("Check: the recipe offers a choice; the swap button takes the other").fetchSemanticsNode()
+        compose.onAllNodesWithText("Check:", substring = true).assertCountEquals(0)
     }
 
     @Test

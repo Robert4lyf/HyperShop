@@ -43,8 +43,15 @@ class EntryNavigationTest {
 
     private fun route() = nav.currentBackStackEntry?.destination?.route
 
-    private fun waitFor(tag: String) =
-        compose.waitUntil(10_000) { compose.onAllNodes(androidx.compose.ui.test.hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty() }
+    /** Idles the main looper while it waits (as [awaitRoute]): the list's first read lands there. */
+    private fun waitFor(tag: String) {
+        val end = System.currentTimeMillis() + 10_000
+        while (compose.onAllNodes(androidx.compose.ui.test.hasTestTag(tag)).fetchSemanticsNodes().isEmpty()) {
+            check(System.currentTimeMillis() < end) { "\"$tag\" never appeared; route ${route()}" }
+            compose.waitForIdle()
+            Thread.sleep(20)
+        }
+    }
 
     /** The request is handled on the main looper, which waitUntil alone does not run: idle it while waiting. */
     private fun awaitRoute(want: String) {
@@ -89,6 +96,9 @@ class EntryNavigationTest {
         // Recipes, then Settings from its gear: a screen of its own, with no tab bar, and Back returns to Recipes.
         compose.onNodeWithTag("tab-${Routes.RECIPES}").performClick()
         awaitRoute(Routes.RECIPES)
+        // Step AA: with recipes saved, the header becomes one compact row once the library has loaded; the gear moves.
+        waitFor("recipes-title")
+        compose.waitForIdle()
         compose.onNodeWithTag("open-settings").performClick()
         awaitRoute(Routes.SETTINGS)
         compose.onNodeWithTag("tab-${Routes.LIST}").assertDoesNotExist()

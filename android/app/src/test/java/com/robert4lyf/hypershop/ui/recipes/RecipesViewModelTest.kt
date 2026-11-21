@@ -156,6 +156,87 @@ class RecipesViewModelTest {
     }
 
     @Test
+    fun onTheListTheCardsServingsRescaleItAndRemoveFromListKeepsWhatWasBought() {
+        // Step AA: the card's "− Serves N +" and its menu's "Remove from list", through Planner and removeFromList.
+        val c = TestContainer.create()
+        c.add(*CHILLI)
+        val vm = RecipesViewModel(c).shown()
+        val got = java.util.concurrent.CopyOnWriteArrayList<UiMessage>()
+        val watching = CoroutineScope(Dispatchers.Main).launch { vm.events.collect { got += it } }
+        val row = await(vm.ui) { it.library.singleOrNull()?.onList == true && it.library.single().servings != null }.library.single()
+        assertEquals(1, row.listCount)
+        val use = runBlocking { c.repository.usesOnList() }.single()
+        vm.setServings(row, row.servings!! * 2)
+        await(vm.ui) { it.library.single().servings == row.servings * 2 }
+        assertEquals(row.servings * 2, runBlocking { c.repository.snapshot() }.uses[use.useId]!!.servings)
+        // One item bought, then Remove from list: the purchase stays, the rest goes; Undo puts the rest back.
+        val bought = runBlocking { c.repository.snapshot() }.liveItems.first().id
+        runBlocking { c.repository.tick(bought) }
+        vm.removeFromList(await(vm.ui) { it.library.single().onList }.library.single())
+        com.robert4lyf.hypershop.testutil.awaitTrue { got.any { it.text == "Removed Weeknight chilli from the list" } }
+        val after = runBlocking { c.repository.snapshot() }
+        assertEquals(listOf(bought), after.liveItems.map { it.id })
+        assertTrue(after.isDone(bought))
+        await(vm.ui) { !it.library.single().onList }
+        runBlocking { got.first { it.text == "Removed Weeknight chilli from the list" }.undo!!.invoke() }
+        await(vm.ui) { it.library.single().onList }
+        watching.cancel()
+    }
+
+    private fun com.robert4lyf.hypershop.di.AppContainer.saved(
+        title: String,
+        vararg lines: String,
+    ): String =
+        runBlocking {
+            val parser = RuleParser(catalog)
+            val stored =
+                repository.storeRecipe(
+                    "https://example.com/${title.lowercase().replace(' ', '-')}", title, 4, UnitLocale.METRIC, "WEB",
+                    com.robert4lyf.hypershop.core.model.ParsedBy.RULES, null, false, lines.map { parser.parse(it) },
+                )
+            repository.saveToLibrary(stored.recipe.id, null)
+            repository.libraryKeyOf(stored.recipe.id)!!
+        }
+
+    @Test
+    fun addsWhileTheMessageIsUpMakeOneMessageWhoseUndoTakesThemAllBack() {
+        // Step AA.7: three quick adds, one "3 recipes added" message; its Undo takes back all three (only the unbought).
+        val c = TestContainer.create()
+        val keys =
+            listOf(
+                c.saved("Chilli", "2 onions", "500g beef mince"),
+                c.saved("Dal", "200g red lentils"),
+                c.saved("Pesto pasta", "300g penne"),
+            )
+        val vm = RecipesViewModel(c).shown()
+        val got = java.util.concurrent.CopyOnWriteArrayList<UiMessage>()
+        val watching = CoroutineScope(Dispatchers.Main).launch { vm.events.collect { got += it } }
+        val rows = await(vm.ui) { it.library.size == 3 }.library.associateBy { it.key }
+        for ((i, k) in keys.withIndex()) {
+            vm.addToList(rows.getValue(k))
+            com.robert4lyf.hypershop.testutil.awaitTrue { got.size == i + 1 }
+        }
+        assertEquals("Added Chilli · 2 to buy", got[0].text)
+        assertEquals("2 recipes added · 3 to buy", got[1].text)
+        assertEquals("3 recipes added · 4 to buy", got[2].text)
+        assertEquals(3, runBlocking { c.repository.usesOnList() }.size)
+        // The mince is bought before Undo: it stays, bought; everything else comes off, and the week's meals go.
+        val mince = runBlocking { c.repository.snapshot() }.itemByKey("cat:beef_mince")!!.id
+        runBlocking { c.repository.tick(mince) }
+        runBlocking { got[2].undo!!.invoke() }
+        val after = runBlocking { c.repository.snapshot() }
+        assertEquals(listOf(mince), after.liveItems.map { it.id })
+        assertTrue(after.isDone(mince))
+        assertTrue(runBlocking { c.planner.week(c.planner.currentWeek()) }.none { it.libraryKey in keys.drop(1) })
+        // Once the message's seconds are over, the next add has a message of its own.
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(6))
+        vm.addToList(rows.getValue(keys[1]))
+        com.robert4lyf.hypershop.testutil.awaitTrue { got.size == 4 }
+        assertTrue(got[3].text, got[3].text.startsWith("Added Dal"))
+        watching.cancel()
+    }
+
+    @Test
     fun removingFromTheListOrTheLibraryCanBeUndone() {
         val c = TestContainer.create()
         c.add(*CHILLI)

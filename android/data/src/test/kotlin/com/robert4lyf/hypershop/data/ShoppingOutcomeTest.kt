@@ -20,7 +20,7 @@ import org.robolectric.annotation.Config
 /**
  * The whole way from a recipe's line to what the shopper reads (quality pass Q.3):
  * the line parsed, matched to the catalogue, merged with another recipe's line in
- * other units, scaled, bought, set aside as at home, and shown on the list and on
+ * other units, scaled, bought, deleted from the list, and shown on the list and on
  * the watch (both are [Display.row]) in metric and imperial. The lines are ones the
  * parser used to get wrong: tinned tomatoes filed as fresh, a Parmigiano in ml.
  */
@@ -90,8 +90,8 @@ class ShoppingOutcomeTest {
             l = r.repo.snapshot()
             assertEquals("460g more beef mince", l.row("cat:beef_mince"))
 
-            // The tins are in the cupboard: set aside, and the list and the watch agree.
-            HomeCheck(r.repo).have(listOf("cat:chopped_tomatoes"))
+            // The tins are in the cupboard: deleted from the list (the item card's Delete), and the list and the watch agree.
+            r.repo.softDelete(l.itemByKey("cat:chopped_tomatoes")!!.id)
             l = r.repo.snapshot()
             assertNull(l.row("cat:chopped_tomatoes"))
             val watch = r.repo.watchView().list

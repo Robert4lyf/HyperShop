@@ -64,14 +64,17 @@ class DiscoveryTest {
         val vm = recipes()
         await(vm.ui) { it.library.size == 3 }
         val before = everything()
-        assertEquals("newest first", listOf(pie, chilli, dal), order(vm))
+        // Step AA: Most used by default: the pie planned three times, the dal once, the chilli never.
+        assertEquals(LibrarySort.MOST_USED, vm.ui.value.sort)
+        assertEquals(listOf(pie, dal, chilli), order(vm))
+        assertEquals(3, vm.ui.value.library.first().timesAdded)
+        assertEquals(null, vm.ui.value.library.last().lastAddedToList)
+        vm.sortBy(LibrarySort.RECENT)
+        await(vm.ui) { it.sort == LibrarySort.RECENT }
+        assertEquals("newest saved first", listOf(pie, chilli, dal), order(vm))
         vm.sortBy(LibrarySort.RATING)
         await(vm.ui) { it.sort == LibrarySort.RATING }
         assertEquals(listOf(chilli, dal, pie), order(vm))
-        vm.sortBy(LibrarySort.PLANNED)
-        await(vm.ui) { it.sort == LibrarySort.PLANNED }
-        assertEquals(listOf(pie, dal, chilli), order(vm))
-        assertEquals(3, vm.ui.value.library.first().timesPlanned)
         vm.sortBy(LibrarySort.NAME)
         await(vm.ui) { it.sort == LibrarySort.NAME }
         assertEquals(listOf(pie, dal, chilli), order(vm))

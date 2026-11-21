@@ -333,10 +333,10 @@ class WeeklyShopScenariosTest {
         tap("list-more")
         tap("view-RECIPE")
         tap("recipe-more-use-$use")
-        tap("recipe-servings-use-$use")
-        tap("servings-more")
-        tap("servings-more")
-        tap("servings-done")
+        // Step AA: the card's menu has "− Serves N +" in place; each press is written at once.
+        tap("recipe-servings-use-$use-more")
+        waitFor { runBlocking { c.repository.snapshot() }.uses[use!!]?.servings == 5 }
+        tap("recipe-servings-use-$use-more")
         waitFor { c.total("cat:onion") == Rational.of(3) }
         val l = runBlocking { c.repository.snapshot() }
         val onion = l.itemByKey("cat:onion")!!.id

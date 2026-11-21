@@ -123,10 +123,9 @@ class AppContainer(
         }
     }
 
-    /** The weekly meal plan, Buy again and the At home check (Release B): all writes through [repository]. */
+    /** The weekly meal plan and Buy again (Release B): all writes through [repository]. */
     val planner = com.robert4lyf.hypershop.data.Planner(repository)
     val buyAgain = com.robert4lyf.hypershop.data.BuyAgain(repository)
-    val homeCheck = com.robert4lyf.hypershop.data.HomeCheck(repository)
     val settings = Settings(dataStore)
     val shopStart = com.robert4lyf.hypershop.shopping.ShopStart(this)
     val log = RingLog()

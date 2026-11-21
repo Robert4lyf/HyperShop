@@ -1,7 +1,9 @@
 package com.robert4lyf.hypershop.data
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.robert4lyf.hypershop.core.merge.ApplyResult
 import com.robert4lyf.hypershop.core.merge.ShoppingList
+import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.Rational
 import com.robert4lyf.hypershop.core.model.UnitLocale
@@ -15,20 +17,18 @@ import kotlin.random.Random
 
 /**
  * Release B: random runs of a few weeks of planning and shopping — meals planned,
- * repeated, removed and restored, weeks put on the list (sometimes twice), servings
- * changed, ticks, finished trips and their Undo, a cleared list, Buy again and the
- * At home check with their Undo — with the plan's and the list's rules checked
- * after every step. Seeded, so a failure replays.
+ * removed and restored, saved recipes put on the list with Add to list (sometimes
+ * twice) and taken back, recipes shared onto the list through the review, servings
+ * changed, ticks, finished trips and their Undo, a cleared list and Buy again with
+ * their Undo — with the plan's and the list's rules checked after every step.
+ * Seeded, so a failure replays.
  */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34])
 class PlanInvariantsTest {
     @get:Rule val r = DbRule()
 
-    private suspend fun check(
-        planner: Planner,
-        step: String,
-    ) {
+    private suspend fun check(step: String) {
         fun bad(what: String): Nothing = fail("after $step: $what") as Nothing
         val l: ShoppingList = r.repo.snapshot()
         val meals = r.db.dao().allPlannedMeals()
@@ -36,12 +36,6 @@ class PlanInvariantsTest {
         for (m in meals) if (m.useId != null && m.useId !in l.uses) bad("meal ${m.id} linked to a missing use ${m.useId}")
         val linked = meals.mapNotNull { it.useId }
         if (linked.size != linked.toSet().size) bad("two meals share one use")
-        // A week's add is idempotent: nothing waiting means a second add does nothing.
-        for (w in meals.map { it.weekStart }.distinct()) {
-            val week = com.robert4lyf.hypershop.core.plan.Week(w)
-            val waiting = planner.week(week).count { it.shopping.pending }
-            if (waiting == 0 && planner.previewWeek(week).meals != 0) bad("week $w previews meals to add with none waiting")
-        }
         // The list's own rules.
         for (i in l.liveItems) if (l.contributionsOf(i.id).isEmpty()) bad("live row ${i.displayName} with nothing on it")
         val keys = l.liveItems.map { it.mergeKey }
@@ -63,7 +57,6 @@ class PlanInvariantsTest {
             val rnd = Random(seed)
             val planner = Planner(r.repo)
             val buy = BuyAgain(r.repo)
-            val home = HomeCheck(r.repo)
             val keys =
                 listOf(
                     r.save("Chilli", "2 onions", "200 g basmati rice", "1 tsp ground cumin"),
@@ -81,12 +74,16 @@ class PlanInvariantsTest {
                         when (op) {
                             0, 1 -> {
                                 val id = planner.plan(week, keys.random(rnd))
-                                undo += { planner.unplanNew(listOf(id)) }
+                                // Undo of a plan: the meal goes again if it has not gone on the list since.
+                                undo += { if (r.db.dao().plannedMeal(id)?.useId == null) planner.unplan(id) }
                                 "plan"
                             }
                             2, 3 -> {
-                                planner.addWeekToList(week)?.let { a -> undo += { planner.undoAddWeek(a) } }
-                                "add week"
+                                // Step Z "Add to list" on a saved recipe, and its Undo (only what is still unbought).
+                                (planner.addToList(keys.random(rnd)) as? ApplyResult.Applied)?.let { a ->
+                                    undo += { planner.takeBack(a.useId) }
+                                }
+                                "add to list"
                             }
                             4 -> {
                                 planner.week(week).randomOrNull(rnd)?.let {
@@ -100,11 +97,11 @@ class PlanInvariantsTest {
                                 "servings"
                             }
                             6 -> {
-                                planner.previousPlannedWeek(week)?.let {
-                                        from ->
-                                    planner.repeatWeek(from, week).let { ids -> undo += { planner.unplanNew(ids) } }
+                                // The list's servings on a recipe's group: its meal's and the list's amounts together.
+                                r.repo.snapshot().uses.values.filter { it.recipeId != null }.randomOrNull(rnd)?.let {
+                                    planner.setUseServings(it.id, rnd.nextInt(1, 9))
                                 }
-                                "repeat"
+                                "use servings"
                             }
                             7, 8 -> {
                                 r.repo.snapshot().liveItems.randomOrNull(rnd)?.let { r.repo.toggle(it.id) }
@@ -131,11 +128,18 @@ class PlanInvariantsTest {
                                 "buy again"
                             }
                             12 -> {
-                                val rows = home.view(r.repo.snapshot())
-                                val pick = rows.filter { !it.have }.shuffled(rnd).take(2).map { it.mergeKey }
-                                home.have(pick).let { lines -> undo += { home.needLines(lines) } }
-                                rows.filter { it.have }.randomOrNull(rnd)?.let { row -> home.need(listOf(row.mergeKey)) }
-                                "at home"
+                                // A share of the same page through the review: a meal planned and pending is that meal.
+                                val key = keys.random(rnd)
+                                val (src, lines) = r.repo.librarySource(r.db.dao().recipesByKey(key).maxOf { it.id })!!
+                                val stored =
+                                    r.repo.storeRecipe(
+                                        key, src.title, src.servingsOriginal, UnitLocale.METRIC, "WEB", ParsedBy.RULES, null, false,
+                                        lines, key,
+                                    )
+                                (r.repo.apply(r.repo.preview(stored, null)) as? ApplyResult.Applied)?.let { a ->
+                                    undo += { r.repo.undoImport(a.useId) }
+                                }
+                                "share"
                             }
                             else -> {
                                 undo.removeLastOrNull()?.invoke()
@@ -145,7 +149,7 @@ class PlanInvariantsTest {
                     } catch (e: Exception) {
                         throw AssertionError("seed $seed step $step (op $op) threw", e)
                     }
-                check(planner, "seed $seed step $step ($what)")
+                check("seed $seed step $step ($what)")
             }
         }
 

@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -36,7 +37,7 @@ import kotlinx.coroutines.launch
 data class RecipesUi(
     val uses: List<UseSummary> = emptyList(),
     val loaded: Boolean = false,
-    /** Every recipe you've added, the one added longest ago first; when searching, the matches, best first. */
+    /** Every saved recipe, in the chosen order (Most used by default); when searching, the matches, best first. */
     val library: List<LibraryRow> = emptyList(),
     /** The library has recipes (the search box shows even when nothing matches). */
     val hasLibrary: Boolean = library.isNotEmpty(),
@@ -51,7 +52,7 @@ data class RecipesUi(
     /** Each saved recipe's cooking notes, by library key: shown with it wherever it is on the list. */
     val notes: Map<String, String> = emptyMap(),
     /** How "Saved" is ordered (while not searching: then it is best match first). */
-    val sort: LibrarySort = LibrarySort.RECENT,
+    val sort: LibrarySort = LibrarySort.MOST_USED,
     /** Only 4★ and 5★ recipes. */
     val highlyRated: Boolean = false,
 )
@@ -93,12 +94,17 @@ data class LibraryRow(
     val notes: String? = null,
     /** The recipe's photo on this phone, or null. */
     val photo: String? = null,
-    /** How many meals it has been planned as. */
-    val timesPlanned: Int = 0,
-    /** "Cooked it" taps on its meals. */
-    val timesCooked: Int = 0,
+    /** Step AA: how many times it has gone on the list, and when it last did (null: never). */
+    val timesAdded: Int = 0,
+    val lastAddedToList: Long? = null,
+    /** What the recipe is written for, when it says ("Serves 4" on its card). */
+    val writtenFor: Int? = null,
+    /** Step AA: while it is on the list, the servings it is on the list for (null: the recipe does not say). */
+    val servings: Int? = null,
+    /** How many times it is on the list now (a share added again makes two). */
+    val listCount: Int = 0,
 ) {
-    val facts get() = RecipeFacts(key, title, lastAddedAt, rating, timesPlanned, timesCooked)
+    val facts get() = RecipeFacts(key, title, lastAddedAt, rating, timesAdded, lastAddedToList)
 }
 
 /** The Recipes tab (PLAN §3.5): the uses on the list. */
@@ -127,7 +133,7 @@ class RecipesViewModel(
         val catalogVersion: String,
     )
 
-    private val order = MutableStateFlow(LibrarySort.RECENT to false)
+    private val order = MutableStateFlow(LibrarySort.MOST_USED to false)
 
     /** "Sort": the order of "Saved". Only the screen's: nothing stored or planned changes. */
     fun sortBy(sort: LibrarySort) = order.update { it.copy(first = sort) }
@@ -152,16 +158,17 @@ class RecipesViewModel(
     val ui: StateFlow<RecipesUi> =
         combine(
             c.repository.list.map { c.repository.usesOnList(it) },
-            combine(c.repository.observeLibrary(), c.repository.observeTimesPlanned()) { l, t -> l to t },
+            combine(c.repository.observeLibrary(), c.repository.observeAddedToList()) { l, t -> l to t },
             c.repository.observeRecipeNotes(),
             c.recipePhotos.paths(),
             combine(terms, order) { t, o -> t to o },
-        ) { uses, (lib, planned), notes, photos, (search, view) ->
+        ) { uses, (lib, added), notes, photos, (search, view) ->
             val (q, typing) = search
             val (sort, highly) = view
             // "On the shopping list" only while something of it is still to buy: a recipe bought (or removed with
             // only bought shares left) stays a use for a week, and the badge said so long after the shop.
-            val onList = uses.filter { it.progress.state == UseState.STILL_NEEDED }.mapNotNull { it.libraryKey }.toSet()
+            val live = uses.filter { it.progress.state == UseState.STILL_NEEDED && it.libraryKey != null }.groupBy { it.libraryKey!! }
+            val onList = live.keys
             val rows =
                 lib.map {
                     LibraryRow(
@@ -176,8 +183,12 @@ class RecipesViewModel(
                         rating = notes[it.key]?.rating,
                         notes = notes[it.key]?.notes,
                         photo = photos[it.key],
-                        timesPlanned = planned[it.key] ?: 0,
-                        timesCooked = notes[it.key]?.timesCooked ?: 0,
+                        timesAdded = added[it.key]?.times ?: 0,
+                        lastAddedToList = added[it.key]?.lastAt,
+                        writtenFor = it.servings,
+                        // On the list more than once: the stepper shows and changes the latest (AA.1).
+                        servings = live[it.key]?.maxByOrNull { u -> u.useId }?.servings,
+                        listCount = live[it.key]?.size ?: 0,
                     )
                 }
             val shown =
@@ -266,8 +277,75 @@ class RecipesViewModel(
      */
     fun addFromLibrary(row: LibraryRow) = openSaved(row, ImportResult.LIBRARY)
 
-    /** Step Z "Add to list" on a saved recipe: its ingredients on the list at once, as saved and corrected, with Undo. */
-    fun addToList(row: LibraryRow) = viewModelScope.launch { messages.send(c.addRecipeToList(row.key, row.title)) }
+    /**
+     * Step Z "Add to list" on a saved recipe: its ingredients on the list at once, as saved and corrected, with Undo.
+     * Step AA: an add made while the last add's message is still up joins it ("3 recipes added · 12 to buy"), and that
+     * one Undo takes them all back, latest first, through [com.robert4lyf.hypershop.data.Planner.takeBack] (only what
+     * is still unbought).
+     */
+    fun addToList(row: LibraryRow) =
+        viewModelScope.launch {
+            val added = c.putRecipeOnList(row.key) ?: return@launch messages.send(UiMessage("Couldn't add ${row.title} to the list"))
+            val now = android.os.SystemClock.uptimeMillis()
+            val joined = adds?.takeIf { it.message === lastShown && now - it.at < it.message.seconds * 1000L }
+            val uses = joined?.uses.orEmpty() + added.useId
+            val undo: suspend () -> Unit = { for (u in uses.asReversed()) c.planner.takeBack(u) }
+            val m =
+                if (uses.size == 1) {
+                    UiMessage("Added ${row.title} · ${added.toBuy} to buy", undo = undo)
+                } else {
+                    UiMessage("${uses.size} recipes added · ${added.toBuy} to buy", undo = undo)
+                }
+            adds = AddBatch(uses, now, m)
+            messages.send(m)
+        }
+
+    /** The adds the latest add's message speaks for, and when it was sent. */
+    private class AddBatch(
+        val uses: List<Long>,
+        val at: Long,
+        val message: UiMessage,
+    )
+
+    private var adds: AddBatch? = null
+
+    /**
+     * Step AA "Serves N" on a recipe that is on the list: the latest time it went on is rescaled (the meal and its items
+     * together; bought stays bought). On the list twice, the earlier one keeps its servings: the card says "on the list
+     * twice", and the list's Group by recipe has a card for each.
+     */
+    fun setServings(
+        row: LibraryRow,
+        servings: Int,
+    ) = viewModelScope.launch {
+        c.awaitReady()
+        val use = latestOnList(row.key) ?: return@launch
+        if (!c.planner.setUseServings(use.useId, servings)) messages.send(UiMessage("${row.title} doesn't say how many it serves"))
+    }
+
+    /**
+     * Step AA "Remove from list" on a recipe's card: every time it is on the list comes off, each through
+     * `removeFromList` (only what is unbought goes). One message, one Undo for all of them.
+     */
+    fun removeFromList(row: LibraryRow) =
+        viewModelScope.launch {
+            c.awaitReady()
+            val uses = onListNow(row.key)
+            val removed = uses.mapNotNull { c.repository.removeFromList(it.useId) }
+            if (removed.isEmpty()) return@launch
+            messages.send(
+                UiMessage("Removed ${row.title} from the list", undo = {
+                    if (removed.reversed().map { c.repository.undoRemoveFromList(it) }.any { !it }) {
+                        messages.send(UiMessage("Can't undo: the shopping list has changed since"))
+                    }
+                }),
+            )
+        }
+
+    private suspend fun onListNow(key: String) =
+        c.repository.usesOnList().filter { it.libraryKey == key && it.progress.state == UseState.STILL_NEEDED }
+
+    private suspend fun latestOnList(key: String) = onListNow(key).maxByOrNull { it.useId }
 
     /** "Edit" on a saved recipe: the review screen, saving back to the library and leaving the list alone. */
     fun editSaved(row: LibraryRow) = openSaved(row, ImportResult.LIBRARY_EDIT)
@@ -371,7 +449,10 @@ class RecipesViewModel(
         }
 
     private val messages = Channel<UiMessage>(Channel.BUFFERED)
-    val events: Flow<UiMessage> = messages.receiveAsFlow()
+
+    /** The message the screen took last: an add joins the previous one's message only while that is still the latest. */
+    @Volatile private var lastShown: UiMessage? = null
+    val events: Flow<UiMessage> = messages.receiveAsFlow().onEach { lastShown = it }
 
     private val reviews = Channel<Long>(Channel.BUFFERED)
 

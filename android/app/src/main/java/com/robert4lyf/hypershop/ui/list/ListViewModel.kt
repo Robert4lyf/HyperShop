@@ -228,21 +228,15 @@ class ListViewModel(
     fun removeUse(section: RecipeSection) = viewModelScope.launch { useOf(section)?.let { useActions.remove(it) } }
 
     /**
-     * Step Z "Servings" on a recipe's card (it was the meal's stepper on Meals): the meal and its items on the list
-     * follow at once, what was bought stays bought; Undo sets it back.
+     * Step AA "− Serves N +" on a recipe's card: the meal and its items on the list follow at once, what was bought
+     * stays bought. The number is on screen, so a press says nothing unless it could not be done.
      */
     fun setServings(
         section: RecipeSection,
         servings: Int,
     ) = viewModelScope.launch {
         val use = useOf(section) ?: return@launch
-        val was = section.servings ?: return@launch
-        if (servings == was) return@launch
-        if (!c.planner.setUseServings(use.useId, servings)) {
-            messages.send(UiMessage("${section.title} doesn't say how many it serves"))
-            return@launch
-        }
-        messages.send(UiMessage("${section.title} serves $servings", undo = { c.planner.setUseServings(use.useId, was) }))
+        if (!c.planner.setUseServings(use.useId, servings)) messages.send(UiMessage("${section.title} doesn't say how many it serves"))
     }
 
     fun removeUse(use: UseSummary) = useActions.remove(use)
