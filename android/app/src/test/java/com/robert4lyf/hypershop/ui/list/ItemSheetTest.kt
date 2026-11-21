@@ -187,6 +187,19 @@ class ItemSheetTest {
     }
 
     @Test
+    fun aHandAddedItemsMoveIsNotAskedAbout() {
+        // Step AB: no "Always put … in …" for an item only added by hand: the move is remembered, the message says so.
+        compose.setContent {
+            HyperShopTheme(dynamicColor = false) {
+                ItemSheetContent(SHEET.copy(byHand = true), ItemSheetActions(onSave = { true }), initiallyEditing = true)
+            }
+        }
+        compose.onNodeWithTag("item-preferences").performScrollTo().performClick()
+        compose.onNodeWithTag("aisle-${AisleCode.HOUSEHOLD.name}").performScrollTo().performClick()
+        compose.onNodeWithTag("always-aisle").assertDoesNotExist()
+    }
+
+    @Test
     fun tickAtTheTopFollowsTheRowsState() {
         var sheet by mutableStateOf(SHEET)
         compose.setContent {

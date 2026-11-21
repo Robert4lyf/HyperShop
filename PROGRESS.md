@@ -497,5 +497,12 @@ setting or help text.
   Household from the catalogue), and a guard that no golden name is moved to Household by a keyword; the golden
   coverage threshold passes, golden data untouched. AB.0's eight all land in Household now (`HandAisleTest` asserts
   it). Items already on a list keep the aisle they were given.
-- [ ] AB.5 Remember an aisle correction
+- [x] AB.5 Remember an aisle correction. Claim checked: on the list there was no "Always / Just this time" question
+  (that is the review's); the item sheet's editor had an "Always put X in Y" checkbox, ticked by default. Now an item
+  only added by hand (`ItemSheet.byHand`: every contribution from the MANUAL use) shows no checkbox; a move to
+  another aisle (name unchanged) sets the user override in `editItem`'s transaction and says "Moved to Household.
+  HyperShop will remember." Undo (`ListRepository.undoRememberedMove`) moves it back and puts the override row back
+  as it was (or deletes it) in one transaction (the move bumps `Item.rev`). A recipe's item keeps the checkbox.
+  Tests (`AddByHandTest`, `ItemSheetTest`): the message, Undo forgetting, the name typed again after finish shopping
+  lands in the remembered aisle, the override survives a backup restored on another container.
 - [ ] AB.6 Verify and report

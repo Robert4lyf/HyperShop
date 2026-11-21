@@ -176,6 +176,69 @@ class AddByHandTest {
         assertEquals(setOf(id), vm.flash.value)
     }
 
+    private fun moveTo(
+        vm: ListViewModel,
+        id: Long,
+        aisle: com.robert4lyf.hypershop.core.model.AisleCode,
+    ): UiMessage {
+        vm.openItem(id)
+        await(vm.sheet) { it?.id == id }
+        // Not asked (the editor shows no "Always" for a hand-added item): even false here, it is remembered.
+        vm.saveItem(id, ItemChanges(aisle = aisle, alwaysAisle = false))
+        return nextMessage(vm)
+    }
+
+    @Test
+    fun aHandAddedItemMovedIsRememberedThroughFinishAndBackupAndUndoForgetsIt() {
+        val household = com.robert4lyf.hypershop.core.model.AisleCode.HOUSEHOLD
+        val c = TestContainer.create()
+        val vm = list(c)
+        vm.addTyped("widgets")
+        assertEquals("Added to Other", nextMessage(vm).text)
+        val id = runBlocking { c.repository.snapshot() }.liveItems.single().id
+        vm.openItem(id)
+        assertTrue(await(vm.sheet) { it?.id == id }!!.byHand)
+        vm.closeItem()
+        val moved = moveTo(vm, id, household)
+        assertEquals(household, runBlocking { c.repository.overrides() }["name:widgets"])
+        assertEquals("Moved to Household. HyperShop will remember.", moved.text)
+        assertEquals(household, runBlocking { c.repository.snapshot() }.items.getValue(id).aisle)
+        // Undo: back where it was, and forgotten.
+        runBlocking { moved.undo!!.invoke() }
+        assertEquals(com.robert4lyf.hypershop.core.model.AisleCode.OTHER, runBlocking { c.repository.snapshot() }.items.getValue(id).aisle)
+        assertEquals(null, runBlocking { c.repository.overrideOf("name:widgets") })
+        // Again, kept this time: bought, the trip finished, and typed again: it goes to Household.
+        moveTo(vm, id, household)
+        runBlocking {
+            c.repository.tick(id)
+            c.repository.finish()
+        }
+        vm.addTyped("widgets")
+        assertEquals("Added to Household", nextMessage(vm).text)
+        // And on a phone restored from a backup.
+        val file = runBlocking { c.backups.snapshot() }
+        val other = TestContainer.create()
+        runBlocking {
+            other.awaitReady()
+            other.backups.restore(file)
+        }
+        assertEquals(household, runBlocking { other.repository.overrides() }["name:widgets"])
+        assertEquals(household, runBlocking { other.repository.addByHand("widgets", QtyBase.PRESENCE, null) }.aisle)
+    }
+
+    @Test
+    fun aRecipesItemStillAsksAndIsNotRememberedUnlessChosen() {
+        val c = TestContainer.create()
+        c.add("2 onions")
+        val vm = list(c)
+        val id = runBlocking { c.repository.snapshot() }.itemByKey("cat:onion")!!.id
+        vm.openItem(id)
+        assertFalse(await(vm.sheet) { it?.id == id }!!.byHand)
+        vm.saveItem(id, ItemChanges(aisle = com.robert4lyf.hypershop.core.model.AisleCode.DRINKS, alwaysAisle = false))
+        assertEquals("Saved", nextMessage(vm).text)
+        assertEquals(null, runBlocking { c.repository.overrideOf("cat:onion") })
+    }
+
     @Test
     fun withNoHistoryThereAreNoChips() {
         val c = TestContainer.create()

@@ -110,6 +110,8 @@ data class ItemSheet(
     val toBuy: List<String> = emptyList(),
     /** Set aside with "Can't find it" on this trip: the sheet offers "Found it" instead. */
     val unavailable: Boolean = false,
+    /** Step AB: only added by hand (no recipe): a move to another aisle is remembered without asking. */
+    val byHand: Boolean = false,
 )
 
 /** One "From" row: "Weeknight chilli · 400 g", linked to the recipe's page when it has one. */
@@ -720,6 +722,7 @@ class ListViewModel(
                             "Suggested purchase: ${it.packs} × ${ItemEdit.text(it.size)} packs. " +
                                 "Requirement unchanged; tick only what you buy."
                         } ?: packSize?.let { "Usual pack saved; no purchase suggestion is possible in a different measure." },
+                    byHand = byUse.keys.all { list.uses[it]?.kind == com.robert4lyf.hypershop.core.merge.UseKind.MANUAL },
                     explanation =
                         listOfNotNull(
                             "Required ${ItemEdit.text(list.total(id)).ifBlank { "as shown above" }}",
@@ -816,6 +819,9 @@ class ListViewModel(
                     return@launch
                 }
                 val before = c.repository.snapshot().items[id] ?: error("This item is no longer on the list")
+                // Step AB: a hand-added item moved to another aisle (its name unchanged) is remembered without asking.
+                val remember = opened?.byHand == true && ch.aisle != null && ch.aisle != before.aisle && ch.name == null
+                val previous = if (remember) c.repository.overrideOf(before.mergeKey) else null
                 val target = ch.name?.let { c.repository.target(it) }
                 val targetId = if (ch.name != null) target?.catalogId else before.catalogId
                 val entry = targetId?.let { c.catalog.byId[it] }
@@ -836,7 +842,7 @@ class ListViewModel(
                     }
                 c.repository.editItem(
                     id, opened?.revision?.takeIf { it > 0 } ?: before.rev,
-                    ch.name, total, ch.aisle, ch.alwaysAisle, pending, ch.packChanged, pack,
+                    ch.name, total, ch.aisle, ch.alwaysAisle || remember, pending, ch.packChanged, pack,
                     opened?.storeId ?: c.settings.activeStore.first(),
                 )
                 committedSaves.add(id)
@@ -845,7 +851,17 @@ class ListViewModel(
                 committedSaves.remove(id)
                 savedState["committedSave"] = null
                 closeSheetOf(id)
-                messages.send(UiMessage("Saved"))
+                if (remember) {
+                    val to = ch.aisle!!
+                    messages.send(
+                        UiMessage(
+                            "Moved to ${to.displayName}. HyperShop will remember.",
+                            undo = { c.repository.undoRememberedMove(id, before.aisle, before.mergeKey, previous) },
+                        ),
+                    )
+                } else {
+                    messages.send(UiMessage("Saved"))
+                }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {

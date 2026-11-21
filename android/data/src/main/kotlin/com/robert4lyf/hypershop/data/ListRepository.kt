@@ -1374,6 +1374,24 @@ class ListRepository(
         if (always) dao.putOverride(CategoryOverrideEntity(item.mergeKey, aisle.name, "USER"))
     }
 
+    /** Step AB: the aisle override kept for [mergeKey], as stored (its source too), or null. */
+    suspend fun overrideOf(mergeKey: String): CategoryOverrideEntity? = dao.overrides().firstOrNull { it.key == mergeKey }
+
+    /**
+     * Step AB: Undo of a remembered move: the item back in [aisle] and the override for [mergeKey] as it was before
+     * ([previous], or none), in one transaction ([ShoppingList.moveAisle] bumps the item's rev).
+     */
+    suspend fun undoRememberedMove(
+        itemId: Long,
+        aisle: AisleCode,
+        mergeKey: String,
+        previous: CategoryOverrideEntity?,
+    ) = db.withTransaction {
+        val old = load()
+        if (old.items[itemId] != null) persist(old, old.moveAisle(itemId, aisle))
+        if (previous != null) dao.putOverride(previous) else dao.deleteOverride(mergeKey)
+    }
+
     suspend fun setStaple(
         mergeKey: String,
         staple: Boolean,
