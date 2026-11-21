@@ -251,6 +251,54 @@ class JourneyTest {
         assertTrue(runBlocking { c.repository.snapshot() }.liveItems.isEmpty())
     }
 
+    /** Two finished trips on which toothpaste and kitchen roll were bought by hand: they are regulars now. */
+    private fun AppContainer.twoTripsOfRegulars() =
+        runBlocking {
+            awaitReady()
+            repeat(2) {
+                for (name in listOf("toothpaste", "kitchen roll")) {
+                    val id = repository.manualAdd(name, com.robert4lyf.hypershop.core.model.QtyBase.PRESENCE, null)
+                    repository.tick(id)
+                }
+                repository.finish()
+            }
+        }
+
+    /**
+     * Step AB: adding by hand to a list that already has items. Bin bags typed in full, then two things added often
+     * (toothpaste and kitchen roll, regulars from two finished trips), the fastest way the app offers.
+     */
+    @Test
+    fun addingByHand() {
+        val c = TestContainer.create()
+        c.twoTripsOfRegulars()
+        runBlocking {
+            for (name in listOf("milk", "bread", "eggs")) {
+                c.repository.manualAdd(name, com.robert4lyf.hypershop.core.model.QtyBase.PRESENCE, null)
+            }
+        }
+        show(c)
+        waitFor("tick-${c.itemId("cat:milk")}")
+        type("add-item", "bin bags")
+        compose.waitUntil(10_000) { runBlocking { c.repository.snapshot() }.itemByKey("cat:bin_bags") != null }
+        addTwoRegulars(c)
+        compose.waitUntil(10_000) {
+            val l = runBlocking { c.repository.snapshot() }
+            listOf("toothpaste", "kitchen roll").all { l.itemByKey(c.repository.target(it).mergeKey) != null }
+        }
+        record("adding by hand", c)
+    }
+
+    /** Toothpaste and kitchen roll, the owner's regulars, onto the list. */
+    private fun addTwoRegulars(c: AppContainer) {
+        // AB.0: through Buy again, in the list's menu.
+        tap("list-more")
+        tap("menu-buy-again")
+        tap("regular-${c.repository.target("toothpaste").mergeKey}")
+        tap("regular-${c.repository.target("kitchen roll").mergeKey}")
+        tap("buy-again-done")
+    }
+
     /** Meal-based shopping: three saved recipes put on the list, one served to 5, rice partly at home. */
     @Test
     fun mealBasedShopping() {

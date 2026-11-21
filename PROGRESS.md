@@ -443,3 +443,23 @@ A follow-up review of Step Z found the remaining friction in a few places, and t
   reads the meals. Report: `docs/reports/step-aa.md`. Seen once and not reproduced in two full runs: StartupTest
   failing on an exception leaked by an earlier test (in the report).
 
+
+## Step AB — adding by hand (`claude/step-z-fewer-concepts-rvynea`, from 31ba91e)
+
+The pinned Add item field becomes the one place to add anything that is not a recipe: no new button, screen, tab,
+setting or help text.
+
+- [x] AB.0 Baseline. `JourneyTest.addingByHand`: a list with milk, bread and eggs, two finished trips on which
+  toothpaste and kitchen roll were bought by hand; then bin bags typed in full and the two regulars added the fastest
+  way the app has (list ⋮ › Buy again › each chip › Done): **7 taps · 1 typed · 0 scrolls · 1 screen change**.
+  `HandAisleTest` writes where things typed into Add item land (`build/reports/hand-aisles.txt`): bin bags, kitchen
+  roll, washing-up liquid and foil are already HOUSEHOLD (catalogue entries); batteries, toothpaste, cat food and
+  shampoo are OTHER. Claims checked: Enter adds and keeps the keyboard up, a multi-line paste adds one item per line
+  (true); but a single typed item already on the list is not added again (review B.17): it says "Milk is already on
+  the list" with "Add 1 more", so AB.3's "now 2 on your list" is said after Add 1 more, not instead of the guard.
+- [ ] AB.1 Usual items on focus
+- [ ] AB.2 Remove the separate Buy again surfaces
+- [ ] AB.3 Say where it went
+- [ ] AB.4 Non-food items land in Household
+- [ ] AB.5 Remember an aisle correction
+- [ ] AB.6 Verify and report
