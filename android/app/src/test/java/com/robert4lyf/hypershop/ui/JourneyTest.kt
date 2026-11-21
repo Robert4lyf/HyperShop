@@ -165,8 +165,13 @@ class JourneyTest {
         tag: String,
     ) {
         scrolls++
-        compose.waitUntil(10_000) {
-            runCatching { compose.onNodeWithTag(list).performScrollToNode(hasTestTag(tag)) }.isSuccess
+        // Idling the main looper between tries, as [waitFor] does: waitUntil alone does not run it, so a list still
+        // loading (its rows arrive there) would never come in, and on a slow machine the scroll timed out.
+        val end = System.currentTimeMillis() + 10_000
+        while (runCatching { compose.onNodeWithTag(list).performScrollToNode(hasTestTag(tag)) }.isFailure) {
+            check(System.currentTimeMillis() < end) { "\"$tag\" never came into \"$list\"; route ${route()}" }
+            compose.waitForIdle()
+            Thread.sleep(20)
         }
         settle()
     }

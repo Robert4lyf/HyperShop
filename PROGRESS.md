@@ -510,4 +510,6 @@ setting or help text.
   taps, 1 typed, no screen change: met), core 6 · 0 · 0 · 2 and quick 7 · 2 · 0 · 0 (as in step-aa.md). Report:
   `docs/reports/step-ab.md`. CI's first emulator run (PR #95) caught two test errors of this step: the quick weekly shop
   counted 8 taps against a limit of 7 (the Recipes tab forgotten; 8 is right), and `a_quickShop` ticked a row that
-  the last add's new message covered (keyboard up, message above it); it now waits the message out, uncounted.
+  the last add's new message covered (keyboard up, message above it); it now waits the message out, uncounted. CI's unit run also timed out in `JourneyTest.mealBasedShopping` scrolling Recipes:
+  `scrollTo` polled inside `waitUntil`, which does not run Robolectric's main looper, so a list still loading never
+  arrived (only on CI's slower machine); it now idles the looper between tries, as `waitFor` does.
