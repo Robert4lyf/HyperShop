@@ -487,6 +487,15 @@ setting or help text.
   with the keyboard up the chips are one row that scrolls sideways, so a message fits between them and the keyboard.
   `SnackbarPlacementTest` checks a message clears the field, the chips and Finish shopping; the keyboard itself
   cannot be raised in Robolectric (in the report).
-- [ ] AB.4 Non-food items land in Household
+- [x] AB.4 Non-food items land in Household. In `Categoriser`, below overrides, catalogue matches, the identity
+  words and Claude's suggestion: (a) `HOUSEHOLD_PHRASES`, unmistakable non-food phrases ("washing powder",
+  "dishwasher", "tea towel", "sun cream", "dog biscuit", "cat food"…) checked before the head-noun stage, which read
+  "dishwasher salt" as salt and "sun cream" as cream; (b) `HOUSEHOLD_WORDS` (bleach, shampoo, toothpaste, battery,
+  nappy, wipe, deodorant…) checked after every food keyword, so a single word only turns an Other into Household.
+  Words that can name food are left out (bulb, sponge, polish, dog, spray, paper, liquid, bag). Tests: 38 household
+  items, 16 near-misses (soup, fennel bulb, sponge cake, hot dog, rice paper, tea bags…; baking paper stays
+  Household from the catalogue), and a guard that no golden name is moved to Household by a keyword; the golden
+  coverage threshold passes, golden data untouched. AB.0's eight all land in Household now (`HandAisleTest` asserts
+  it). Items already on a list keep the aisle they were given.
 - [ ] AB.5 Remember an aisle correction
 - [ ] AB.6 Verify and report

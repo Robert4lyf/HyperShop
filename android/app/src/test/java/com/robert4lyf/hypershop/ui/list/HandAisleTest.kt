@@ -25,6 +25,9 @@ class HandAisleTest {
         println(table)
         File("build/reports").mkdirs()
         File("build/reports/hand-aisles.txt").writeText(table + "\n")
+        // AB.4: every one of them in Household (AB.0: batteries, toothpaste, cat food and shampoo were Other).
+        val other = HAND_ADDED.filter { c.repository.target(it).aisle != com.robert4lyf.hypershop.core.model.AisleCode.HOUSEHOLD }
+        org.junit.Assert.assertTrue("not Household: $other", other.isEmpty())
     }
 
     companion object {
