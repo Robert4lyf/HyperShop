@@ -107,8 +107,6 @@ data class ListActions(
     val onView: (ListView) -> Unit = {},
     /** Step Z: "Change store" in the menu, with two or more stores to choose from. */
     val onChangeStore: () -> Unit = {},
-    /** Step Q: Buy again, from the menu as well as below the items. */
-    val onBuyAgain: () -> Unit = {},
     val onShareText: () -> Unit = {},
     /** X.9: "Arrange items" and its "Done"; a row or a group moved one place (-1 up, +1 down), or to an end (true = top). */
     val onArrange: (Boolean) -> Unit = {},
@@ -662,10 +660,6 @@ private fun ListMenu(
                 },
                 modifier = Modifier.testTag("arrange"),
             )
-            DropdownMenuItem(text = { Text("Buy again") }, onClick = {
-                menu = false
-                actions.onBuyAgain()
-            }, modifier = Modifier.testTag("menu-buy-again"))
             DropdownMenuItem(text = { Text("Share list as text") }, enabled = !ui.isEmpty, onClick = {
                 menu = false
                 actions.onShare()

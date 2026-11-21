@@ -86,8 +86,6 @@ data class HeaderActions(
     val onUsual: (Regular) -> Unit = {},
     /** Step AB: "Don't suggest" on a usual item's chip (Buy again's rule: never suggested again). */
     val onDontSuggest: (Regular) -> Unit = {},
-    /** Step Q: Buy again, as a sheet over the list. */
-    val onBuyAgain: () -> Unit = {},
 )
 
 /**
@@ -450,35 +448,3 @@ fun ListAddField(
     onLastShop = actions.onLastShop,
     onDontSuggest = actions.onDontSuggest,
 )
-
-/**
- * Step Q: the optional extra after the items (on a small phone a row above them pushed the list off the screen):
- * Buy again. It is in the list's menu too.
- */
-fun androidx.compose.foundation.lazy.LazyListScope.listFooter(
-    prep: PlanPrep,
-    actions: HeaderActions,
-) {
-    if (prep.returning) item(key = "shortcuts") { ListShortcuts(prep, actions) }
-}
-
-/** Step Q: Buy again (your usual things and last shop), a small chip: available, never in the way of the list. */
-@Composable
-private fun ListShortcuts(
-    prep: PlanPrep,
-    actions: HeaderActions,
-) {
-    val n = prep.buyAgain + prep.lastShop
-    androidx.compose.material3.AssistChip(
-        onClick = actions.onBuyAgain,
-        label = { Text(if (n > 0) "Buy again ($n)" else "Buy again") },
-        leadingIcon = {
-            Icon(
-                Icons.Rounded.Replay,
-                contentDescription = null,
-                modifier = Modifier.size(androidx.compose.material3.AssistChipDefaults.IconSize),
-            )
-        },
-        modifier = Modifier.padding(horizontal = 16.dp).padding(top = 16.dp).heightIn(min = 48.dp).testTag("list-buy-again"),
-    )
-}

@@ -140,6 +140,30 @@ class AddByHandTest {
     }
 
     @Test
+    fun lastShopsChipAddsTheRestInOneGoNeverDoublingAndOneUndoKeepsWhatWasBought() {
+        // Moved from Buy again's sheet (Add all, Repeat last shop): one write, one Undo; what is there is not doubled.
+        val c = TestContainer.create()
+        c.regulars(listOf("milk", "bread", "eggs"))
+        runBlocking { c.repository.manualAdd("bread", one, null) }
+        val vm = list(c)
+        val usual = await(vm.prep) { it.usual.lastShop == 2 }.usual
+        assertEquals(2, usual.regulars.size)
+        vm.addLastShop()
+        val m = nextMessage(vm)
+        await(vm.prep) { it.usual.isEmpty }
+        val l = runBlocking { c.repository.snapshot() }
+        assertEquals(Rational.ONE, l.total(l.itemByKey("cat:bread")!!.id)[BaseKey.ITEMS])
+        val milk = l.itemByKey("cat:milk")!!.id
+        assertTrue(l.itemByKey("cat:egg") != null)
+        runBlocking { c.repository.tick(milk) }
+        runBlocking { m.undo!!.invoke() }
+        val after = runBlocking { c.repository.snapshot() }
+        assertTrue("the milk was bought", after.isDone(milk))
+        assertEquals(null, after.itemByKey("cat:egg"))
+        assertTrue("bread was there before", after.itemByKey("cat:bread") != null)
+    }
+
+    @Test
     fun withNoHistoryThereAreNoChips() {
         val c = TestContainer.create()
         runBlocking { c.repository.manualAdd("milk", one, null) }

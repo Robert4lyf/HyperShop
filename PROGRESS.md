@@ -466,7 +466,16 @@ setting or help text.
   plain rules); the chips stay up while its menu has focus and the field is focused again after. No history: no
   chips, no text. Tests: `AddFieldChipsTest` (screen; screenshots light, dark, 200 %), `AddByHandTest` (view model).
   The adding-by-hand journey now uses the chips: 4 · 1 · 0 · 0.
-- [ ] AB.2 Remove the separate Buy again surfaces
+- [x] AB.2 Remove the separate Buy again surfaces. Deleted the chip below the items (`listFooter`,
+  `ListShortcuts`), the list ⋮ "Buy again" entry, the sheet (`BuyAgainSheet`), and `ui/list/BuyAgain.kt`
+  (`BuyAgainViewModel`, `BuyAgainSection`, its chips), with `BuyAgainSheetTest`, `BuyAgainSectionTest` and
+  `BuyAgainViewModelTest`. Behaviour that stays is tested on the Add field (`AddByHandTest`): what is suggested,
+  Don't suggest, last shop's items in one go with one Undo, nothing doubled, nothing bought undone. The emulator
+  scenarios use the chips (quick weekly shop: 7 taps, was 9). Data kept, nothing dropped: trips, `Regular` rows and
+  `BuyAgain` in `:data` are unchanged; a pin the owner set is still offered first. What went with the sheet: setting
+  a new pin ("Always offer") and un-hiding one item (Settings › Clear shopping history still clears every hidden one;
+  its dialog no longer names Buy again). The empty list's "Last shop's N items" button stays. "Buy again" left the
+  vocabulary table.
 - [ ] AB.3 Say where it went
 - [ ] AB.4 Non-food items land in Household
 - [ ] AB.5 Remember an aisle correction

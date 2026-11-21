@@ -597,7 +597,8 @@ private fun DataGroup(
         AlertDialog(
             onDismissRequest = { confirmClear = false },
             title = { Text("Clear shopping history?") },
-            text = { Text("Buy again forgets your past trips and the items you asked it not to suggest. Items you pinned stay pinned.") },
+            // Step AB: Buy again's sheet went; its suggestions are the Add field's usual items.
+            text = { Text("Your usual items start again: past trips and the items you asked not to be suggested are forgotten.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmClear = false

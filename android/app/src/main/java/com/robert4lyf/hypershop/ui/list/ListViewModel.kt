@@ -144,11 +144,9 @@ data class ListUi(
     val doneCount: Int get() = aisles.sumOf { (_, r) -> r.count { it.state == TickState.DONE } }
 }
 
-/** What the list offers around its items: Buy again and last shop. */
+/** What the list offers around its items: the Add field's usual items and last shop. */
 data class PlanPrep(
     val loaded: Boolean = false,
-    /** Buy again suggestions not on the list. */
-    val buyAgain: Int = 0,
     /** Last trip's hand-added items not on the list. */
     val lastShop: Int = 0,
     /** Has saved recipes or a finished trip: someone who has shopped here before. */
@@ -320,7 +318,6 @@ class ListViewModel(
         ) { buy, saved ->
             PlanPrep(
                 loaded = true,
-                buyAgain = buy.regulars.count { !it.onList },
                 lastShop = buy.lastShop.size,
                 returning = saved || buy.hasHistory,
                 usual = UsualItems(buy.regulars.filter { !it.onList }, buy.lastShop.size),
