@@ -122,7 +122,9 @@ class RecipesViewModel(
 
     /** The chips and the term being typed, and whether there is one being typed (it matches word starts). */
     private val terms =
-        combine(chips, snapshotFlow { searchText }) { cs, t ->
+        // Compose state is read on the main thread: each read takes a snapshot, which can advance the global one, and
+        // done on a worker that sent recomposition there under the Compose test clock (CalledFromWrongThread on CI).
+        combine(chips, snapshotFlow { searchText }.flowOn(Dispatchers.Main.immediate)) { cs, t ->
             val typed = t.trim().takeIf { it.isNotEmpty() }
             (cs + listOfNotNull(typed)) to (typed != null)
         }

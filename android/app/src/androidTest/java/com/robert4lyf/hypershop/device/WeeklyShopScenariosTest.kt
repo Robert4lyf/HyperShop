@@ -258,18 +258,16 @@ class WeeklyShopScenariosTest {
         // Step Z: Add to list on each recipe puts it on the list at once; there is no week to prepare.
         for (k in keys) addFromRecipes(c, k)
         tap("tab-list")
-        // Buy again is a sheet from the list.
-        swipeTo("list-buy-again")
-        tap("list-buy-again")
-        tap("buy-again-all")
+        // Step AB: the usual things are chips under the focused Add field; last shop's are one chip.
+        tap("add-item")
+        tap("usual-last-shop")
         waitFor { runBlocking { c.buyAgain.view() }.regulars.all { it.onList } }
-        tap("buy-again-done")
         effort("weekly shop, quick way", t0)
         // One onion row for chilli and dal; every regular on once.
         assertEquals(Rational.of(3), c.total("cat:onion"))
         assertEquals(1, c.items().count { it.displayName.contains("milk") })
-        // Four recipes, the list, Buy again's chip, Add all and Done: nine taps (Step Q budgeted 10).
-        assertTrue("taps $taps", taps <= 9)
+        // Recipes, four recipes, the list, the Add field and last shop's chip: eight taps (Step Q budgeted 10; AA had 9).
+        assertTrue("taps $taps", taps <= 8)
         assertEquals(0, typed)
     }
 
@@ -304,14 +302,12 @@ class WeeklyShopScenariosTest {
         type("1 onion")
         addFromRecipes(c, runBlocking { c.db.dao().recipe(chilli)!!.libraryKey!! })
         waitFor { c.total("cat:onion") == Rational.of(3) }
-        // The onion regular is on the list already: shown there, and Add all has nothing to double.
+        // The onion regular is on the list already: the Add field offers no chip for it, so nothing can double it.
         tap("tab-list")
         waitFor { has("list") }
-        swipeTo("list-buy-again")
-        tap("list-buy-again")
-        waitFor { has("regular-cat:onion") }
-        tap("regular-cat:onion")
+        tap("add-item")
         compose.waitForIdle()
+        assertTrue(!has("usual-cat:onion"))
         assertEquals(Rational.of(3), c.total("cat:onion"))
         assertEquals(1, c.items().count { it.mergeKey == "cat:onion" })
         assertEquals(1, c.items().count { it.mergeKey == "cat:milk" })

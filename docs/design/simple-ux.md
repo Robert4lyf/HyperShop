@@ -54,7 +54,9 @@ On the review, lines still to go on the list are counted as **N to add** ("4 to 
 | **Change store** | List ⋮, only with two or more stores | `ShopStart.change` → active store |
 | **Store order / Group by recipe**, **Arrange items** | List ⋮ | `Settings.listView`; `arrangeWith` |
 | **Finish shopping** | List, once something is ticked | `ListRepository.finish` (Undo) |
-| **Buy again** | List ⋮ and a chip below the items | `BuyAgain.add*` |
+| **Add item** (typed, a suggestion, a chip, a paste) | The list, pinned under its top row | `ListRepository.addByHand` (`manualAdd` that says the item, its contribution and aisle). One message per add: **"Added to Dairy & Eggs"**, or **"Added 3 items"** for a paste or last shop's items, with Undo (`takeBackHandAdds`: only what is unbought). The row is lit for a moment where it is; the list is not scrolled. Already on the list: **"Milk is already on your list"** with **Add 1 more** (or the typed amount), then **"Milk: now 2 on your list"** with Undo |
+| Move an item to another aisle (its sheet) | Item sheet | Added only by hand: remembered without asking (`editItem` with always), **"Moved to Household. HyperShop will remember."**, Undo `undoRememberedMove` (the move and the override, as it was). From a recipe: "Always put X in Y" as before |
+| **Usual items** (chips under the focused, empty **Add item** field: the regulars not on the list, eight at most, **Last shop's N items** last) | Add item field | a chip: `BuyAgain.add` (its usual amount, never doubled), Undo `BuyAgain.undo` (only unbought); long press or TalkBack action **Don't suggest**: `BuyAgain.hide` (Undo: the pin or the plain rules back). Typing hands over to the typed suggestions; no history, no chips |
 
 ## On the list
 

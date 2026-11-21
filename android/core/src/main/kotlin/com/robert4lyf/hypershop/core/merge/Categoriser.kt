@@ -17,7 +17,8 @@ enum class AisleSource { OVERRIDE, IDENTITY, CATALOGUE, CLAUDE, HEAD_NOUN, KEYWO
  * 3. identity words ("frozen …", "tinned …", "dried mango")
  * 4. Claude's `aisle_suggestion`
  * 5. head noun ("heirloom tomato" → tomato)
- * 6. keyword rules
+ * 5a. Step AB: a few unmistakable non-food phrases ("dishwasher salt", "sun cream") to Household
+ * 6. keyword rules (Step AB: non-food single words last, so they only ever turn an Other into Household)
  * 7. Other
  */
 class Categoriser(
@@ -34,6 +35,8 @@ class Categoriser(
         normaliser.entry(name)?.let { return it.aisle to AisleSource.CATALOGUE }
         identity(key)?.let { return it to AisleSource.IDENTITY }
         if (claude != null && claude != AisleCode.OTHER) return claude to AisleSource.CLAUDE
+        // Step AB: before the head noun, which would read "dishwasher salt" as salt and "sun cream" as cream.
+        if (householdPhrase(key)) return AisleCode.HOUSEHOLD to AisleSource.KEYWORD
         headNoun(key)?.let { return it to AisleSource.HEAD_NOUN }
         keyword(key)?.let { return it to AisleSource.KEYWORD }
         return AisleCode.OTHER to AisleSource.OTHER
@@ -64,6 +67,12 @@ class Categoriser(
         }
     }
 
+    /** "washing powder", "tea towel", "dog biscuits": a food word inside them would win later, and none is food. */
+    private fun householdPhrase(key: String): Boolean {
+        val joined = " " + key.split(' ', '-').filter { it.isNotEmpty() }.joinToString(" ") { Normaliser.singularKey(it) } + " "
+        return HOUSEHOLD_PHRASES.any { " $it " in joined }
+    }
+
     /** The longest catalogued suffix of the name: "heirloom cherry tomatoes" → cherry tomato. */
     private fun headNoun(key: String): AisleCode? {
         val words = key.split(' ')
@@ -77,10 +86,38 @@ class Categoriser(
     private fun keyword(key: String): AisleCode? {
         val words = key.split(' ', '-').map { Normaliser.singularKey(it) }.toSet()
         for ((aisle, keys) in KEYWORDS) if (keys.any { it in words }) return aisle
+        if (HOUSEHOLD_WORDS.any { it in words }) return AisleCode.HOUSEHOLD
         return null
     }
 
-    private companion object {
+    internal companion object {
+        /**
+         * Step AB: non-food phrases a food keyword would otherwise catch ("powder", "salt", "tea", "cream", "biscuit",
+         * "fish"), matched as whole words, singular. Nothing here can name a food.
+         */
+        val HOUSEHOLD_PHRASES: List<String> =
+            listOf(
+                "washing powder", "washing liquid", "washing tablet", "washing up", "laundry", "dishwasher",
+                "fabric softener", "fabric conditioner", "toilet", "bin bag", "bin liner", "freezer bag", "sandwich bag",
+                "food bag", "paper towel", "tea towel", "kitchen towel", "light bulb", "dog food", "dog biscuit",
+                "dog treat", "cat food", "cat litter", "cat treat", "pet food", "bird seed", "fish food", "sun cream",
+                "hand cream", "face cream", "body lotion", "hand wash", "body wash", "shower gel", "hand soap",
+                "oven cleaner", "rubber glove", "cotton bud", "cotton wool",
+            ).map { p -> p.split(' ').joinToString(" ") { Normaliser.singularKey(it) } }
+
+        /**
+         * Step AB: words that only name non-food things, checked after every food keyword. Left out on purpose: "bulb"
+         * (fennel bulb), "sponge" (sponge cake), "polish" (Polish sausage), "dog" (hot dog), "spray" (cooking spray),
+         * "paper" (rice paper), "liquid" (liquid smoke), "bag" (tea bags).
+         */
+        val HOUSEHOLD_WORDS: Set<String> =
+            setOf(
+                "detergent", "bleach", "soap", "shampoo", "conditioner", "toothpaste", "toothbrush", "floss", "mouthwash",
+                "deodorant", "antiperspirant", "razor", "battery", "tissue", "nappy", "wipe", "cleaner", "disinfectant",
+                "descaler", "limescale", "litter", "sunscreen", "moisturiser", "moisturizer", "tampon", "sanitary",
+                "plaster", "napkin", "candle", "glove", "bin", "hoover", "softener",
+            ).map { Normaliser.singularKey(it) }.toSet()
+
         val KEYWORDS: List<Pair<AisleCode, Set<String>>> =
             listOf(
                 AisleCode.FROZEN to setOf("ice"),

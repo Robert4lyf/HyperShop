@@ -443,3 +443,76 @@ A follow-up review of Step Z found the remaining friction in a few places, and t
   reads the meals. Report: `docs/reports/step-aa.md`. Seen once and not reproduced in two full runs: StartupTest
   failing on an exception leaked by an earlier test (in the report).
 
+
+## Step AB — adding by hand (`claude/step-z-fewer-concepts-rvynea`, from 31ba91e)
+
+The pinned Add item field becomes the one place to add anything that is not a recipe: no new button, screen, tab,
+setting or help text.
+
+- [x] AB.0 Baseline. `JourneyTest.addingByHand`: a list with milk, bread and eggs, two finished trips on which
+  toothpaste and kitchen roll were bought by hand; then bin bags typed in full and the two regulars added the fastest
+  way the app has (list ⋮ › Buy again › each chip › Done): **7 taps · 1 typed · 0 scrolls · 1 screen change**.
+  `HandAisleTest` writes where things typed into Add item land (`build/reports/hand-aisles.txt`): bin bags, kitchen
+  roll, washing-up liquid and foil are already HOUSEHOLD (catalogue entries); batteries, toothpaste, cat food and
+  shampoo are OTHER. Claims checked: Enter adds and keeps the keyboard up, a multi-line paste adds one item per line
+  (true); but a single typed item already on the list is not added again (review B.17): it says "Milk is already on
+  the list" with "Add 1 more", so AB.3's "now 2 on your list" is said after Add 1 more, not instead of the guard.
+- [x] AB.1 Usual items on focus. While the Add field is focused and empty, chips under it (`UsualItems`, from
+  `BuyAgain.observe`, the data Buy again already used): the regulars not on the list, pinned first then most trips,
+  eight at most with "Last shop's N items" last when last shop has hand-added items not on the list. A chip adds at
+  its usual amount through `BuyAgain.add` (never doubled; Undo `BuyAgain.undo`, unbought only), never takes focus
+  (`focusProperties`), and the next regular takes its place as the list changes. Typing hands over to the typed
+  suggestions. Long press or TalkBack's custom action: "Don't suggest" (`BuyAgain.hide`, Undo restores a pin or the
+  plain rules); the chips stay up while its menu has focus and the field is focused again after. No history: no
+  chips, no text. Tests: `AddFieldChipsTest` (screen; screenshots light, dark, 200 %), `AddByHandTest` (view model).
+  The adding-by-hand journey now uses the chips: 4 · 1 · 0 · 0.
+- [x] AB.2 Remove the separate Buy again surfaces. Deleted the chip below the items (`listFooter`,
+  `ListShortcuts`), the list ⋮ "Buy again" entry, the sheet (`BuyAgainSheet`), and `ui/list/BuyAgain.kt`
+  (`BuyAgainViewModel`, `BuyAgainSection`, its chips), with `BuyAgainSheetTest`, `BuyAgainSectionTest` and
+  `BuyAgainViewModelTest`. Behaviour that stays is tested on the Add field (`AddByHandTest`): what is suggested,
+  Don't suggest, last shop's items in one go with one Undo, nothing doubled, nothing bought undone. The emulator
+  scenarios use the chips (quick weekly shop: 8 taps, was 9). Data kept, nothing dropped: trips, `Regular` rows and
+  `BuyAgain` in `:data` are unchanged; a pin the owner set is still offered first. What went with the sheet: setting
+  a new pin ("Always offer") and un-hiding one item (Settings › Clear shopping history still clears every hidden one;
+  its dialog no longer names Buy again). The empty list's "Last shop's N items" button stays. "Buy again" left the
+  vocabulary table.
+- [x] AB.3 Say where it went. Every hand add (typed, picked suggestion, chip) says "Added to <aisle>" with Undo; a
+  paste and last shop's items say "Added N items" with one Undo. `ListRepository.addByHand` returns the item, the new
+  contribution (Undo: `takeBackHandAdds`, i.e. `withdraw`, unbought only) and its aisle. The row is lit for 1.5 s
+  (`ListViewModel.flash`, an animated background, not announced); the list is not scrolled. Already on the list: the
+  B.17 guard stays, worded "Milk is already on your list" with Add 1 more, after which "Milk: now 2 on your list"
+  (with Undo) says what happened. One message per add, so TalkBack hears one announcement (the snackbar); a paste is
+  one. Placement: the AA.4 lift now counts from where the bar's top is (not its height) and also clears the keyboard
+  (edge-to-edge: the Scaffold put messages on the tab bar, under the keyboard, so they were hidden while typing);
+  with the keyboard up the chips are one row that scrolls sideways, so a message fits between them and the keyboard.
+  `SnackbarPlacementTest` checks a message clears the field, the chips and Finish shopping; the keyboard itself
+  cannot be raised in Robolectric (in the report).
+- [x] AB.4 Non-food items land in Household. In `Categoriser`, below overrides, catalogue matches, the identity
+  words and Claude's suggestion: (a) `HOUSEHOLD_PHRASES`, unmistakable non-food phrases ("washing powder",
+  "dishwasher", "tea towel", "sun cream", "dog biscuit", "cat food"…) checked before the head-noun stage, which read
+  "dishwasher salt" as salt and "sun cream" as cream; (b) `HOUSEHOLD_WORDS` (bleach, shampoo, toothpaste, battery,
+  nappy, wipe, deodorant…) checked after every food keyword, so a single word only turns an Other into Household.
+  Words that can name food are left out (bulb, sponge, polish, dog, spray, paper, liquid, bag). Tests: 38 household
+  items, 16 near-misses (soup, fennel bulb, sponge cake, hot dog, rice paper, tea bags…; baking paper stays
+  Household from the catalogue), and a guard that no golden name is moved to Household by a keyword; the golden
+  coverage threshold passes, golden data untouched. AB.0's eight all land in Household now (`HandAisleTest` asserts
+  it). Items already on a list keep the aisle they were given.
+- [x] AB.5 Remember an aisle correction. Claim checked: on the list there was no "Always / Just this time" question
+  (that is the review's); the item sheet's editor had an "Always put X in Y" checkbox, ticked by default. Now an item
+  only added by hand (`ItemSheet.byHand`: every contribution from the MANUAL use) shows no checkbox; a move to
+  another aisle (name unchanged) sets the user override in `editItem`'s transaction and says "Moved to Household.
+  HyperShop will remember." Undo (`ListRepository.undoRememberedMove`) moves it back and puts the override row back
+  as it was (or deletes it) in one transaction (the move bumps `Item.rev`). A recipe's item keeps the checkbox.
+  Tests (`AddByHandTest`, `ItemSheetTest`): the message, Undo forgetting, the name typed again after finish shopping
+  lands in the remembered aisle, the override survives a backup restored on another container.
+- [x] AB.6 Verify and report. Screenshots re-recorded (new: `add-chips-light`, `add-chips-dark`, `add-chips-large`
+  at 200 %), `tools/contact-sheet` run (41). Journeys: adding by hand 4 · 1 · 0 · 0 (AB.0: 7 · 1 · 0 · 1; target ≤ 5
+  taps, 1 typed, no screen change: met), core 6 · 0 · 0 · 2 and quick 7 · 2 · 0 · 0 (as in step-aa.md). Report:
+  `docs/reports/step-ab.md`. CI's first emulator run (PR #95) caught two test errors of this step: the quick weekly shop
+  counted 8 taps against a limit of 7 (the Recipes tab forgotten; 8 is right), and `a_quickShop` ticked a row that
+  the last add's new message covered (keyboard up, message above it); it now waits the message out, uncounted. CI's unit run also timed out in `JourneyTest.mealBasedShopping` scrolling Recipes:
+  `scrollTo` polled inside `waitUntil`, which does not run Robolectric's main looper, so a list still loading never
+  arrived (only on CI's slower machine); it now idles the looper between tries, as `waitFor` does. A third CI run failed `CompactHeaderTest` with CalledFromWrongThread:
+  recomposition ran on a worker because `RecipesViewModel` and `LibraryViewModel` read Compose state through
+  `snapshotFlow` on `Dispatchers.Default`, and a snapshot taken there can advance the global one; those reads now run
+  on the main thread (the rest of each flow stays on Default).

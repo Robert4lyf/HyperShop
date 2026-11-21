@@ -62,6 +62,14 @@ data class AddedToList(
     val lastAt: Long,
 )
 
+/** A hand add ([ListRepository.addByHand]): its item, its contribution, the item's aisle, and whether it was there. */
+data class HandAdded(
+    val itemId: Long,
+    val contributionId: Long,
+    val aisle: AisleCode,
+    val existed: Boolean,
+)
+
 /** What "Edit" on the Recipes tab reopens: see [ListRepository.editSource]. */
 data class EditSource(
     val recipe: RecipeEntity,
@@ -1111,6 +1119,25 @@ class ListRepository(
             l.manualAdd(target, qty, unitHint, clock())
         }!!
 
+    /**
+     * Step AB: a hand add that says what it did: the item, the contribution it added (what Undo takes back,
+     * [takeBackHandAdds]), the aisle it is in and whether the item was on the list already.
+     */
+    suspend fun addByHand(
+        name: String,
+        qty: QtyBase,
+        unitHint: QtyUnit?,
+    ): HandAdded =
+        write { l ->
+            val target = merger.target(name, null, overrides())
+            val existed = l.itemByKey(target.mergeKey) != null
+            val (next, itemId) = l.manualAdd(target, qty, unitHint, clock())
+            next to HandAdded(itemId, next.contributions.last().id, next.items.getValue(itemId).aisle, existed)
+        }!!
+
+    /** Undo of hand adds: what they added and nobody has bought since ([ShoppingList.withdraw]). */
+    suspend fun takeBackHandAdds(contributions: Set<Long>) = write { l -> l.withdraw(contributions)?.let { it to Unit } }
+
     fun target(name: String): NewItem = merger.target(name)
 
     fun catalogEntry(name: String) = merger.catalogEntry(name)
@@ -1345,6 +1372,24 @@ class ListRepository(
         val item = old.items[itemId] ?: return@withTransaction
         persist(old, old.moveAisle(itemId, aisle))
         if (always) dao.putOverride(CategoryOverrideEntity(item.mergeKey, aisle.name, "USER"))
+    }
+
+    /** Step AB: the aisle override kept for [mergeKey], as stored (its source too), or null. */
+    suspend fun overrideOf(mergeKey: String): CategoryOverrideEntity? = dao.overrides().firstOrNull { it.key == mergeKey }
+
+    /**
+     * Step AB: Undo of a remembered move: the item back in [aisle] and the override for [mergeKey] as it was before
+     * ([previous], or none), in one transaction ([ShoppingList.moveAisle] bumps the item's rev).
+     */
+    suspend fun undoRememberedMove(
+        itemId: Long,
+        aisle: AisleCode,
+        mergeKey: String,
+        previous: CategoryOverrideEntity?,
+    ) = db.withTransaction {
+        val old = load()
+        if (old.items[itemId] != null) persist(old, old.moveAisle(itemId, aisle))
+        if (previous != null) dao.putOverride(previous) else dao.deleteOverride(mergeKey)
     }
 
     suspend fun setStaple(

@@ -51,7 +51,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -326,7 +328,14 @@ fun BottomActionBar(
     val me = remember { Any() }
     DisposableEffect(lift) { onDispose { lift.release(me) } }
     Surface(
-        modifier.fillMaxWidth().onSizeChanged { lift.claim(me, with(density) { it.height.toDp() }) }.testTag("bottom-action-bar"),
+        // Step AB: how far the bar's top is from the window's bottom, not only its height: a bar the keyboard lifts
+        // (the review's) or one above the tab bar (the list's) both say where a message must start.
+        modifier
+            .fillMaxWidth()
+            .onGloballyPositioned {
+                val fromBottom = it.findRootCoordinates().size.height - it.boundsInRoot().top
+                lift.claim(me, with(density) { fromBottom.toDp() })
+            }.testTag("bottom-action-bar"),
         color = MaterialTheme.colorScheme.surfaceContainer,
         tonalElevation = 0.dp,
         shadowElevation = 8.dp,

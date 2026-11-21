@@ -2,8 +2,6 @@ package com.robert4lyf.hypershop.ui.list
 
 import android.content.ClipboardManager
 import android.content.Intent
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
@@ -16,16 +14,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -50,11 +45,10 @@ fun ListRoute(
     /** The Add field took the request; it is not to be repeated. */
     onAddFocused: () -> Unit = {},
 ) {
-    var buyingAgain by rememberSaveable { mutableStateOf(false) }
-    if (buyingAgain) BuyAgainSheet(container, snackbar, onDismiss = { buyingAgain = false })
     val vm: ListViewModel = viewModel(factory = factoryFor { ListViewModel(container, it.createSavedStateHandle()) })
     val ui by vm.ui.collectAsStateWithLifecycle()
     val prep by vm.prep.collectAsStateWithLifecycle()
+    val flash by vm.flash.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
     LaunchedEffect(vm) { vm.reviews.collect(onReview) }
     val context = LocalContext.current
@@ -76,7 +70,8 @@ fun ListRoute(
                     container.applicationScope.launch { container.importShared(text, null) }
                 },
                 onLastShop = vm::addLastShop,
-                onBuyAgain = { buyingAgain = true },
+                onUsual = vm::addUsual,
+                onDontSuggest = vm::dontSuggest,
             )
         }
     ListScreen(
@@ -88,7 +83,6 @@ fun ListRoute(
             onOpenItem = { vm.openItem(it.id) },
             onView = vm::setView,
             onChangeStore = { vm.changeStore() },
-            onBuyAgain = { buyingAgain = true },
             onShareText = {
                 scope.launch {
                     container.awaitReady()
@@ -113,10 +107,10 @@ fun ListRoute(
             },
         ),
         header = { listHeader(ui, header) },
-        addField = { ListAddField(header, focusAdd, onAddFocused) },
-        footer = { listFooter(prep, header) },
+        addField = { ListAddField(header, focusAdd, onAddFocused, prep.usual) },
         empty = { EmptyState(header.onSample, header.onPasteLink, prep, header.onLastShop) },
         focusAdd = focusAdd,
+        flash = flash,
     )
     val carry by vm.carryOver.collectAsStateWithLifecycle()
     carry?.let { n ->
@@ -227,60 +221,6 @@ suspend fun SnackbarHostState.showTimed(
             showSnackbar(visuals)
         } finally {
             timer.cancel()
-        }
-    }
-}
-
-/**
- * Step Q: Buy again as a sheet over the list (it was a section of This week): your usual things and last shop, one tap
- * each, added as hand-added items are, never doubling what is on the list.
- */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-@Composable
-private fun BuyAgainSheet(
-    container: AppContainer,
-    snackbar: SnackbarHostState,
-    onDismiss: () -> Unit,
-) {
-    // A light view model (Buy again only), so the sheet fills at once.
-    val vm: BuyAgainViewModel = viewModel(key = "buy-again", factory = factoryFor { BuyAgainViewModel(container) })
-    // Read here, not first inside the sheet: the sheet is a window of its own, and a value that lands while its
-    // first composition is starting was missed there (the sheet stayed on "loading" with the data in hand).
-    // Read in this composition, a change recomposes the host, which hands the sheet the new value.
-    val ui = vm.ui.collectAsStateWithLifecycle().value
-    LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
-    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
-        androidx.compose.foundation.layout.Column(
-            androidx.compose.ui.Modifier.padding(bottom = 24.dp).testTag("buy-again-sheet"),
-        ) {
-            androidx.compose.foundation.layout.Row(
-                androidx.compose.ui.Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            ) {
-                // The section below names itself ("Buy again"); this row only closes the sheet.
-                androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.weight(1f))
-                androidx.compose.material3.TextButton(
-                    onClick = onDismiss,
-                    modifier = androidx.compose.ui.Modifier.testTag("buy-again-done"),
-                ) { Text("Done") }
-            }
-            if (ui.loaded && ui.buyAgain.regulars.isEmpty() && ui.buyAgain.lastShop.isEmpty()) {
-                Text(
-                    "Nothing to buy again yet.",
-                    modifier = androidx.compose.ui.Modifier.padding(20.dp),
-                )
-            } else {
-                BuyAgainSection(
-                    ui,
-                    BuyAgainActions(
-                        onRegular = { vm.addRegular(it) },
-                        onAllRegulars = { vm.addAllRegulars() },
-                        onRepeatLastShop = { vm.repeatLastShop() },
-                        onPin = { vm.pin(it) },
-                        onHide = { vm.hide(it) },
-                    ),
-                )
-            }
         }
     }
 }

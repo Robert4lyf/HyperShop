@@ -8,7 +8,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Step AA: how far above the foot of the screen the app's one snackbar sits. A [BottomActionBar] (the list's Finish
+ * Step AA: how far above the foot of the screen the app's one snackbar sits. Step AB: [height] is the distance from
+ * the window's bottom to the top of the bar (so a bar the keyboard lifts is cleared too). A [BottomActionBar] (the list's Finish
  * shopping and Done arranging, the review's Add to list) reports its height here while it is shown, so a message and
  * its Undo sit above the screen's main action, never over it, whatever the font size.
  */
