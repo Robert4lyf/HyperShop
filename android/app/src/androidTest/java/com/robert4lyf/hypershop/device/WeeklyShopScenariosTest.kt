@@ -266,8 +266,8 @@ class WeeklyShopScenariosTest {
         // One onion row for chilli and dal; every regular on once.
         assertEquals(Rational.of(3), c.total("cat:onion"))
         assertEquals(1, c.items().count { it.displayName.contains("milk") })
-        // Four recipes, the list, the Add field and last shop's chip: seven taps (Step Q budgeted 10; AA had 9).
-        assertTrue("taps $taps", taps <= 7)
+        // Recipes, four recipes, the list, the Add field and last shop's chip: eight taps (Step Q budgeted 10; AA had 9).
+        assertTrue("taps $taps", taps <= 8)
         assertEquals(0, typed)
     }
 

@@ -471,7 +471,7 @@ setting or help text.
   (`BuyAgainViewModel`, `BuyAgainSection`, its chips), with `BuyAgainSheetTest`, `BuyAgainSectionTest` and
   `BuyAgainViewModelTest`. Behaviour that stays is tested on the Add field (`AddByHandTest`): what is suggested,
   Don't suggest, last shop's items in one go with one Undo, nothing doubled, nothing bought undone. The emulator
-  scenarios use the chips (quick weekly shop: 7 taps, was 9). Data kept, nothing dropped: trips, `Regular` rows and
+  scenarios use the chips (quick weekly shop: 8 taps, was 9). Data kept, nothing dropped: trips, `Regular` rows and
   `BuyAgain` in `:data` are unchanged; a pin the owner set is still offered first. What went with the sheet: setting
   a new pin ("Always offer") and un-hiding one item (Settings › Clear shopping history still clears every hidden one;
   its dialog no longer names Buy again). The empty list's "Last shop's N items" button stays. "Buy again" left the
@@ -508,4 +508,6 @@ setting or help text.
 - [x] AB.6 Verify and report. Screenshots re-recorded (new: `add-chips-light`, `add-chips-dark`, `add-chips-large`
   at 200 %), `tools/contact-sheet` run (41). Journeys: adding by hand 4 · 1 · 0 · 0 (AB.0: 7 · 1 · 0 · 1; target ≤ 5
   taps, 1 typed, no screen change: met), core 6 · 0 · 0 · 2 and quick 7 · 2 · 0 · 0 (as in step-aa.md). Report:
-  `docs/reports/step-ab.md`.
+  `docs/reports/step-ab.md`. CI's first emulator run (PR #95) caught two test errors of this step: the quick weekly shop
+  counted 8 taps against a limit of 7 (the Recipes tab forgotten; 8 is right), and `a_quickShop` ticked a row that
+  the last add's new message covered (keyboard up, message above it); it now waits the message out, uncounted.

@@ -140,6 +140,9 @@ class DeviceScenariosTest {
         val four = runCatching { waitFor { runBlocking { c.repository.snapshot() }.liveItems.size == 4 } }
         note("after waiting")
         assertTrue("Four typed items did not all land:\n$transcript", four.isSuccess)
+        // Step AB: each add says where it went ("Added to Bakery", with Undo). With the keyboard still up the message
+        // sits just above it, over the list's rows, for its few seconds; a person waits it out before the first tick.
+        waitFor("the last add's message to go") { compose.onAllNodesWithText("Undo").fetchSemanticsNodes().isEmpty() }
         // A ticked row stays in place for a moment and then folds away under "N bought", so the next item
         // to buy is the first tick still "To buy", once the last tap has landed. waitForIdle does not
         // wait for the database, so each tap waits for its own effect, as a shopper looks before the next tap.

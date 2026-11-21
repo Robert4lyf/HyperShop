@@ -41,7 +41,7 @@ All targets are met:
   - Before: tap the field, type "bin bags", Enter, then ⋮ › Buy again › chip › chip › Done, which opened the sheet.
   - Now: tap the field, type "bin bags", Enter, then two chips.
 - The core and quick journeys are unchanged.
-- In the emulator scenario, the "quick" weekly shop drops from 9 taps to 7: the field, then last shop's chip, instead of Buy again's chip, Add all and Done.
+- In the emulator scenario, the "quick" weekly shop drops from 9 taps to 8: the field, then last shop's chip, instead of Buy again's chip, Add all and Done.
 
 ## Where things typed into Add item land
 
@@ -75,7 +75,9 @@ All targets are met:
 ## What could not be checked here
 
 - **Keyboard.** Robolectric raises no keyboard. These were not seen on a device: the one-row chips while the keyboard is up, the message sitting above the keyboard, Enter keeping the keyboard up after a chip tap, and the keyboard's own microphone (voice typing into the field). The code follows the keyboard's inset; the tests cover the layout with no keyboard and the one-row layout directly.
-- **Emulator and device.** The emulator scenarios were updated and compiled, but not run here.
+- **Emulator and device.** The emulator scenarios were updated and compiled here, and ran in CI on the PR. The first run caught two mistakes in this step's tests, both now fixed:
+  - the quick weekly shop takes 8 taps, not 7 (I forgot the Recipes tab);
+  - `a_quickShop` ticked a row that the last add's message covered, because with the keyboard up the message sits just above it. The test now waits the message out, uncounted.
 - **TalkBack.** The chips' "Don't suggest" action and the single message per add are tested through semantics only.
 - **Watch.** Not run. The watch protocol and its data are unchanged; hand adds reach the watch exactly as typed items did before.
 
