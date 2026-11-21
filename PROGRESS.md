@@ -505,4 +505,7 @@ setting or help text.
   as it was (or deletes it) in one transaction (the move bumps `Item.rev`). A recipe's item keeps the checkbox.
   Tests (`AddByHandTest`, `ItemSheetTest`): the message, Undo forgetting, the name typed again after finish shopping
   lands in the remembered aisle, the override survives a backup restored on another container.
-- [ ] AB.6 Verify and report
+- [x] AB.6 Verify and report. Screenshots re-recorded (new: `add-chips-light`, `add-chips-dark`, `add-chips-large`
+  at 200 %), `tools/contact-sheet` run (41). Journeys: adding by hand 4 · 1 · 0 · 0 (AB.0: 7 · 1 · 0 · 1; target ≤ 5
+  taps, 1 typed, no screen change: met), core 6 · 0 · 0 · 2 and quick 7 · 2 · 0 · 0 (as in step-aa.md). Report:
+  `docs/reports/step-ab.md`.
