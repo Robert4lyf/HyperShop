@@ -598,3 +598,23 @@ words.
   4 · 1 · 0 · 0, core 6 · 0 · 0 · 2, quick 7 · 2 · 0 · 0, meal-based 9 · 1 · 3 · 3 (none longer than step-ab.md);
   new `saladBeforeVegetables` (Settings › Walking order › Produce › Salad ↑, back to the list) 6 · 0 · 1 · 4. Report:
   `docs/reports/step-ac.md`.
+
+## Step AD — consistency and the weekly loop (`claude/step-z-fewer-concepts-rvynea`, from 8b125ab)
+
+The last structural pass before real use: one style across screens, leaner rows, and three small gaps in the weekly
+loop. No tabs, modes, settings or help text; no schema, protocol, golden-data or dependency change.
+
+- [x] AD.0 Baseline. JourneyTest on 8b125ab: adding by hand 4 · 1 · 0 · 0, core 6 · 0 · 0 · 2, meal-based
+  9 · 1 · 3 · 3, quick 7 · 2 · 0 · 0, salad before vegetables 6 · 0 · 1 · 4 (taps · typed · scrolls · screens).
+- [ ] AD.1 Walking order: drag to reorder.
+- [ ] AD.2 Store name: a pencil on each store tab.
+- [ ] AD.3 Review matches the list.
+- [ ] AD.4 A chosen reading looks chosen.
+- [ ] AD.5 One recipe card shape.
+- [ ] AD.6 Leaner list rows.
+- [ ] AD.7 Quiet watch status.
+- [ ] AD.8 The amount form opens filled.
+- [ ] AD.9 A link in Add item starts an import.
+- [ ] AD.10 Swipe to remove is obvious and safe.
+- [ ] AD.11 After a shop, the next step.
+- [ ] AD.12 Verify and report.
