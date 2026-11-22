@@ -67,8 +67,12 @@ class SettingsScreenTest {
     @Test
     fun groupsKeyFieldAndControls() {
         show()
-        compose.onNodeWithContentDescription("Remove salt").performClick()
+        // Step AC: a staple is one chip, no icons inside; a tap opens "Add to list once" and "Remove".
+        compose.onNodeWithTag("staple-salt").performScrollTo().performClick()
+        compose.onNodeWithTag("remove-staple-salt").performClick()
+        compose.onNodeWithTag("staple-salt").performClick()
         compose.onNodeWithTag("ran-out-salt").performClick()
+        compose.onNodeWithContentDescription("Remove salt").assertDoesNotExist()
         val list = compose.onNodeWithTag("settings")
         list.performScrollToNode(hasTestTag("watch-retry"))
         compose.onNodeWithTag("watch-retry").performClick()

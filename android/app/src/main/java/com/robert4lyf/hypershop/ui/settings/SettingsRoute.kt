@@ -32,10 +32,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AddShoppingCart
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Error
@@ -456,32 +454,51 @@ private fun ListGroup(
     }
 }
 
-/** A staple: its name, and an × that is the only way to remove it (a full 48 dp target). */
+/**
+ * Step AC: a staple is one chip, its name only (no icons in it). A tap opens its two actions: "Add to list once"
+ * (ran out this time, still a staple) and "Remove" (no longer always at home).
+ */
 @Composable
 private fun StapleChip(
     name: String,
     onRanOut: () -> Unit = {},
     onRemove: () -> Unit,
 ) {
-    // A soft green, not grey: these are live settings, not disabled chips.
-    Surface(
-        shape = PillShape,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 14.dp)) {
-            Text(name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelLarge)
-            // Missing 5 of the review: out of it this once, without un-stapling it.
-            IconButton(onClick = onRanOut, modifier = Modifier.testTag("ran-out-$name")) {
-                Icon(
-                    Icons.Rounded.AddShoppingCart,
-                    contentDescription = "Ran out of $name: add to the list",
-                    modifier = Modifier.size(18.dp),
-                )
+    var menu by remember { mutableStateOf(false) }
+    Box {
+        // A soft green, not grey: these are live settings, not disabled chips.
+        Surface(
+            shape = PillShape,
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier =
+                Modifier
+                    .heightIn(min = 48.dp)
+                    .clip(PillShape)
+                    .clickable(onClickLabel = "Show actions", role = Role.Button) { menu = true }
+                    .testTag("staple-$name"),
+        ) {
+            Box(Modifier.heightIn(min = 48.dp).padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+                Text(name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelLarge)
             }
-            IconButton(onClick = onRemove) {
-                Icon(Icons.Rounded.Close, contentDescription = "Remove $name", modifier = Modifier.size(18.dp))
-            }
+        }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(
+                text = { Text("Add to list once") },
+                onClick = {
+                    menu = false
+                    onRanOut()
+                },
+                modifier = Modifier.testTag("ran-out-$name"),
+            )
+            DropdownMenuItem(
+                text = { Text("Remove") },
+                onClick = {
+                    menu = false
+                    onRemove()
+                },
+                modifier = Modifier.testTag("remove-staple-$name"),
+            )
         }
     }
 }
