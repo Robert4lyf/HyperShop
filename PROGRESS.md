@@ -667,7 +667,10 @@ loop. No tabs, modes, settings or help text; no schema, protocol, golden-data or
   TalkBack reads it in store order too ("700 ml milk, for Weeknight chilli"). The watch's rows are unchanged
   (`Display.row` is shared; only the phone's list drops the line). Tests: `ListScreenTest` (store order hides the
   recipe but says it to TalkBack; `subLines` with and without it; `leanSub`'s cases).
-- [ ] AD.7 Quiet watch status.
+- [x] AD.7 Quiet watch status. Claim checked: the header's "N bought" is in its title ("3 to buy · 2 bought"), not
+  the subtitle; the subtitle held "1 set aside" and the watch's word. That word is now only "Watch not connected"
+  (the watch app installed but out of reach); "Watch updating…" and "Watch synced" are no longer shown there.
+  Settings › Watch keeps the full status. Test: `ListScreenTest.theWatchIsMentionedOnlyWhenItNeedsAttention`.
 - [ ] AD.8 The amount form opens filled.
 - [ ] AD.9 A link in Add item starts an import.
 - [ ] AD.10 Swipe to remove is obvious and safe.

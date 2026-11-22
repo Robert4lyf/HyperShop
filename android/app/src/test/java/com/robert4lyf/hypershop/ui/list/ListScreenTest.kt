@@ -181,6 +181,18 @@ class ListScreenTest {
     }
 
     @Test
+    fun theWatchIsMentionedOnlyWhenItNeedsAttention() {
+        // Step AD.7: synced or updating says nothing on the list; only "Watch not connected" shows, under the count.
+        assertEquals(null, watchWord(com.robert4lyf.hypershop.watch.WatchLinkState.APP_READY))
+        assertEquals(null, watchWord(com.robert4lyf.hypershop.watch.WatchLinkState.NO_SDK))
+        assertEquals(null, watchWord(com.robert4lyf.hypershop.watch.WatchLinkState.NOT_INSTALLED))
+        assertEquals("Watch not connected", watchWord(com.robert4lyf.hypershop.watch.WatchLinkState.DISCONNECTED))
+        assertEquals("Watch not connected", watchWord(com.robert4lyf.hypershop.watch.WatchLinkState.CONNECTED))
+        compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(SAMPLE_LIST.copy(watch = "Watch not connected"), actions) } }
+        compose.onNodeWithText("Watch not connected").assertExists()
+    }
+
+    @Test
     fun loadingShowsASpinnerAndNoCount() {
         compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ListUi(), actions) } }
         compose.onNodeWithTag("loading").assertExists()

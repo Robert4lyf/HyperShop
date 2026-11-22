@@ -69,8 +69,8 @@ On the review, lines still to go on the list are counted as **N to add** ("4 to 
 - Bought rows fold under one **"N bought"** row per aisle; a row just ticked stays in place for 2.5 s, so a second tap
   undoes it. The screen stays awake while anything is ticked.
 - Once the list has items, its top is one row: **"N to buy · M bought"** ("N to buy" before anything is ticked, "All
-  bought" at the end), the progress bar under it, the gear and ⋮; "1 set aside" and the watch's state in small text when
-  there are any. The **Add item** field is pinned under that row.
+  bought" at the end), the progress bar under it, the gear and ⋮; "1 set aside" and "Watch not connected" in small text when
+  there are any (Step AD: "Watch synced" and "Watch updating…" are only in Settings › Watch). The **Add item** field is pinned under that row.
 - Every screen's top is one plain bar (Step AC): back arrow where there is one, the title, an optional one-line
   subtitle, actions on the right. No mosaic, gradient or hero card anywhere. The review's top: **Review later** (the
   recipe waits on the "ready to review" card), the recipe's

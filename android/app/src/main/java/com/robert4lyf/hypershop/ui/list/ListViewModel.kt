@@ -299,7 +299,7 @@ class ListViewModel(
                     readyJobs = ready.map { it.id },
                     arranging = v.arranging && v.layout != ListView.RECIPE,
                     recipes = ui.recipes.map { r -> r.libraryKey?.let { r.copy(photo = photos[it]) } ?: r },
-                    watch = watchWord(watch.first, watch.second, list.listRev),
+                    watch = watchWord(watch.first),
                     activeStore = store.first,
                     secondStore = store.second.size > 1,
                     storeName = store.second.firstOrNull { it.id == store.first }?.name ?: "My store",
@@ -509,18 +509,6 @@ class ListViewModel(
 
     /** The menu's choice of layout. */
     fun setView(v: ListView) = viewModelScope.launch { c.settings.setListView(v) }
-
-    /** Whether the watch has this list, in a word for the shop header; null when there is no watch to speak of. */
-    private fun watchWord(
-        state: WatchLinkState,
-        sentRev: Int,
-        listRev: Long,
-    ): String? =
-        when (state) {
-            WatchLinkState.NO_SDK, WatchLinkState.NOT_INSTALLED -> null
-            WatchLinkState.DISCONNECTED, WatchLinkState.CONNECTED -> "Watch not connected"
-            WatchLinkState.APP_READY -> if (sentRev.toLong() == listRev) "Watch synced" else "Watch updating…"
-        }
 
     /** After Finish with rows unbought: how many, while the "keep or drop?" prompt is up; null otherwise. */
     val carryOver = MutableStateFlow<Int?>(null)
@@ -1083,3 +1071,14 @@ internal fun leanSub(
 }
 
 private val LEADING_AMOUNT = Regex("""^(\d+(?:[.,/]\d+)?|[½¼¾⅓⅔⅛])(kg|g|ml|l|cl|oz|lb)?(?=\s|$)""")
+
+/**
+ * The watch, in a word for the list's header, only when it needs attention (Step AD.7): "Watch not connected" when the
+ * watch app is there but out of reach. Updating and synced say nothing here; Settings › Watch keeps the full state.
+ * Null with no watch to speak of.
+ */
+internal fun watchWord(state: WatchLinkState): String? =
+    when (state) {
+        WatchLinkState.NO_SDK, WatchLinkState.NOT_INSTALLED, WatchLinkState.APP_READY -> null
+        WatchLinkState.DISCONNECTED, WatchLinkState.CONNECTED -> "Watch not connected"
+    }
