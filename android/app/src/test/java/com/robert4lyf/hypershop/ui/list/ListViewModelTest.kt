@@ -282,6 +282,24 @@ class ListViewModelTest {
     }
 
     @Test
+    fun aLinkInAddItemIsImportedNeverAddedAsAnItem() {
+        // Step AD.9: a single https link typed or pasted is queued as an import and its review opens, as "Paste a link"
+        // does (tracking stripped); text with a link among other lines adds the others and queues the link.
+        val c = TestContainer.create()
+        val vm = tracked(ListViewModel(c))
+        await(vm.ui) { it.loaded }
+        vm.addTyped("https://recipes.example/soup?utm_source=ig")
+        val first = await(c.pendingReviews) { it.size == 1 }.single()
+        assertEquals("https://recipes.example/soup", runBlocking { c.importJobs.get(first) }!!.input.url)
+        vm.addTyped("milk\nhttps://recipes.example/stew\nbread")
+        val both = await(c.pendingReviews) { it.size == 2 }
+        assertEquals("https://recipes.example/stew", runBlocking { c.importJobs.get(both.last()) }!!.input.url)
+        val names = await(vm.ui) { it.aisles.flatMap { a -> a.second }.size == 2 }.aisles.flatMap { it.second }.map { it.name }
+        assertEquals(setOf("milk", "bread"), names.toSet())
+        assertTrue(names.none { "http" in it || "example" in it })
+    }
+
+    @Test
     fun itemSheetTotalsSourcesEditAndMove() {
         val c = TestContainer.create()
         c.add("2 onions", "200g onions")

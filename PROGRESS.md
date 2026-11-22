@@ -677,7 +677,11 @@ loop. No tabs, modes, settings or help text; no schema, protocol, golden-data or
   left both out, so `item-sheet-light.png` showed an empty field. The fixture now carries them (re-recorded), and
   `ItemSheetTest.theAmountFieldOpensFilledForAnItemWithAnAmount` renders the form from the sheet the view model itself
   builds and fails if the field opens empty.
-- [ ] AD.9 A link in Add item starts an import.
+- [x] AD.9 A link in Add item starts an import. A line typed or pasted into Add item that `SharedText.parse` reads
+  as a link (the share's rule: https, http tried as https, tracking parameters stripped) is queued with
+  `importShared` and its review opens, as "Paste a link" does; no item is named after a URL. Pasted text with a link
+  among other lines adds the other lines as before and queues the link. Claude is called only once that review is on
+  screen (the import path is unchanged). Test: `ListViewModelTest.aLinkInAddItemIsImportedNeverAddedAsAnItem`.
 - [ ] AD.10 Swipe to remove is obvious and safe.
 - [ ] AD.11 After a shop, the next step.
 - [ ] AD.12 Verify and report.

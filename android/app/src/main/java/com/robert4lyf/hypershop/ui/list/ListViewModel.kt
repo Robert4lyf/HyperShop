@@ -21,6 +21,7 @@ import com.robert4lyf.hypershop.data.MANUAL_TITLE
 import com.robert4lyf.hypershop.data.Regular
 import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.di.AppContainer
+import com.robert4lyf.hypershop.importing.SharedText
 import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.common.webLink
@@ -937,7 +938,13 @@ class ListViewModel(
 
     private suspend fun addTypedNow(text: String) {
         run {
-            val lines = text.split('\n').map { it.trim() }.filter { it.isNotEmpty() }
+            // Step AD.9: a line that is a link (the share's own rule: https, tracking stripped) is a recipe to import,
+            // never an item named after a URL. It is queued and its review opens, as "Paste a link" does; Claude is
+            // called only once that review is on screen. The other lines are added as before.
+            val (links, lines) =
+                text.split('\n').map { it.trim() }.filter { it.isNotEmpty() }.partition { SharedText.parse(it) != null }
+            for (link in links) c.applicationScope.launch { c.importShared(link, null) }
+            if (lines.isEmpty()) return@run
             if (lines.size == 1) {
                 val p = typed(lines.single())
                 val existing = c.repository.snapshot().itemByKey(c.repository.target(p.name).mergeKey)
