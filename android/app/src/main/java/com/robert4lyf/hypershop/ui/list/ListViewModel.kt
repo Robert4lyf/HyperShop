@@ -637,8 +637,10 @@ class ListViewModel(
         val units = c.settings.units.first()
         val rows = list.liveItems.filter { !list.isDone(it.id) }
         if (rows.isEmpty()) return "HyperShop — nothing to buy"
+        // Step AC: within an aisle, its groups as arranged and then the arranged items, as on the list.
+        val walking = c.repository.inWalkingOrder(rows, store)
         return order.mapNotNull { aisle ->
-            val items = rows.filter { it.aisle == aisle }.sortedBy { it.position }
+            val items = walking.filter { it.aisle == aisle }
             if (items.isEmpty()) {
                 null
             } else {

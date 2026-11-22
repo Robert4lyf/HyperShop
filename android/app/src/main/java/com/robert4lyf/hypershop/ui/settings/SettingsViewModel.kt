@@ -41,6 +41,11 @@ data class SettingsUi(
     val theme: ThemeMode = ThemeMode.SYSTEM,
     val staples: List<String> = emptyList(),
     val aisles: List<AisleCode> = emptyList(),
+    /**
+     * Step AC: each aisle's groups in walking order (null: things in no group), for the aisles that have groups. The
+     * same stored order as the list's Arrange items ([com.robert4lyf.hypershop.data.ListRepository.arrangeWith]).
+     */
+    val groups: Map<AisleCode, List<String?>> = emptyMap(),
     /** Whose walking order [aisles] is: 1, or 2 for the second store (missing 4 of the review). */
     val backupHealth: String? = null,
     val editingStore: Long = 1,
@@ -157,7 +162,9 @@ class SettingsViewModel(
                 val saved = c.apiKeyStore.isSaved()
                 if (!hasKeyMoved) _ui.update { it.copy(hasKey = saved, keyMissingAfterRestore = keyWasSet && !saved) }
                 val aisles = c.repository.aisleOrder(_ui.value.editingStore)
+                val groups = groupOrder(_ui.value.editingStore)
                 if (!aislesMoved) _ui.update { it.copy(aisles = aisles) }
+                _ui.update { it.copy(groups = groups) }
             }
         viewModelScope.launch {
             startUp.join()
@@ -238,6 +245,48 @@ class SettingsViewModel(
         write(order)
     }
 
+    /** Step AC: every group each aisle can have (and "everything else"), in [store]'s order. */
+    private suspend fun groupOrder(store: Long): Map<AisleCode, List<String?>> {
+        val shelf = c.repository.shelfOrder(store)
+        return AisleCode.entries.mapNotNull { a ->
+            val known = c.catalog.groupsIn(a)
+            if (known.isEmpty()) return@mapNotNull null
+            a to (known + null).sortedBy { shelf.groupSort(a, it, c.catalog.groupRank(a, it)) }
+        }.toMap()
+    }
+
+    /**
+     * Step AC: a group moved in Walking order, [by] places (-1 up, +1 down, or to an end). Written with the list's own
+     * Arrange items move, in one transaction that bumps listRev, so the list, the widget and the watch follow.
+     */
+    fun moveGroup(
+        aisle: AisleCode,
+        group: String?,
+        by: Int,
+    ) = viewModelScope.launch {
+        aisleWrites.withLock {
+            val store = _ui.value.editingStore
+            val shown = _ui.value.groups[aisle] ?: return@withLock
+            val known = c.catalog.groupsIn(aisle) + null
+            c.repository.arrangeWith(store) { it.movedGroup(aisle, shown, known, group, by) { g -> c.catalog.groupRank(aisle, g) } }
+            val groups = groupOrder(store)
+            _ui.update { it.copy(groups = groups) }
+        }
+    }
+
+    /** "Move to top" / "Move to bottom" for a group. */
+    fun moveGroupTo(
+        aisle: AisleCode,
+        group: String?,
+        index: Int,
+    ) {
+        val shown = _ui.value.groups[aisle] ?: return
+        val at = shown.indexOf(group)
+        if (at < 0) return
+        val by = index.coerceIn(0, shown.lastIndex) - at
+        if (by != 0) moveGroup(aisle, group, by)
+    }
+
     /** "Reset order": the aisles as the app ships them. */
     fun resetAisleOrder() = write(AisleCode.entries.toList())
 
@@ -253,7 +302,8 @@ class SettingsViewModel(
     fun editStore(id: Long) =
         viewModelScope.launch {
             val order = aisleWrites.withLock { c.repository.aisleOrder(id) }
-            _ui.update { it.copy(editingStore = id, aisles = order) }
+            val groups = groupOrder(id)
+            _ui.update { it.copy(editingStore = id, aisles = order, groups = groups) }
         }
 
     fun renameStore(name: String) =

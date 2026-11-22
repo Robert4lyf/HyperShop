@@ -43,6 +43,8 @@ fun AislesRoute(
         SettingsActions(
             onMoveAisle = { a, d -> vm.moveAisle(a, d) },
             onMoveAisleTo = { a, i -> vm.moveAisleTo(a, i) },
+            onMoveGroup = { a, g, by -> vm.moveGroup(a, g, by) },
+            onMoveGroupTo = { a, g, i -> vm.moveGroupTo(a, g, i) },
             onResetAisles = { vm.resetAisleOrder() },
             onEditStore = { vm.editStore(it) },
             onRenameStore = vm::renameStore,

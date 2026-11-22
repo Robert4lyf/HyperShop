@@ -545,7 +545,18 @@ words.
   Found on the way: `EntryNavigationTest` depended on test order. Robolectric's window never enters touch mode, so
   Android re-focused it whenever a focused node went, and which control won depended on layout; the test now puts
   the window in touch mode, as a phone's is (on a phone, in touch mode, Android 9+ does not re-focus).
-- [ ] AC.2 Reorder sub-groups in Walking order
+- [x] AC.2 Reorder sub-groups in Walking order. Found: the group order is already stored, per store, as `ShelfRank`
+  rows keyed by aisle and group (`ShelfOrder.groupKey`), written by the list's Arrange items through
+  `ListRepository.arrangeWith`, which bumps listRev in the same transaction. Settings › Aisles now opens an aisle
+  (⌄) to show every group it can have (`Catalog.groupsIn`, whether or not on the list) plus "Everything else" (things
+  in no group: last until moved), each with the aisles' arrows and ⋮ Move to top / bottom; `SettingsViewModel.
+  moveGroup` writes with the same `movedGroup` through `arrangeWith` for the store being edited. No schema or
+  protocol change. Already following the order: the list and the watch snapshot (`WatchSyncCoordinator` sorts by
+  `groupSort`; a listRev bump re-sends, as an aisle reorder does). Not following it before, now fixed through
+  `ShelfOrder.walking` / `ListRepository.inWalkingOrder`: "Share shopping list" (`shoppingText`, sorted by add order
+  within an aisle) and the widget (its first four by storage order, not even by aisle). Tests:
+  `WalkingOrderGroupsTest` (Salad above Vegetables on the list, the shared text and the widget's order; through
+  finish shopping, a restart and a backup restore; the watch snapshot) and `WalkingOrderScreenTest`.
 - [ ] AC.3 Item editor is one small form
 - [ ] AC.4 A recipe on the list says so
 - [ ] AC.5 Review warnings in plain words

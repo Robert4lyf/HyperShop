@@ -13,6 +13,7 @@ import com.robert4lyf.hypershop.MainActivity
 import com.robert4lyf.hypershop.R
 import com.robert4lyf.hypershop.core.merge.Display
 import com.robert4lyf.hypershop.di.AppContainer
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -76,7 +77,8 @@ class ShoppingWidget : AppWidgetProvider() {
             val ids = manager.getAppWidgetIds(ComponentName(context, ShoppingWidget::class.java))
             if (ids.isEmpty()) return
             val list = c.repository.snapshot()
-            val rows = list.liveItems.filter { !list.isDone(it.id) }
+            // Step AC: the first things in walking order (aisles, then their groups as arranged), as on the list.
+            val rows = c.repository.inWalkingOrder(list.liveItems.filter { !list.isDone(it.id) }, c.settings.activeStore.first())
             val text =
                 if (rows.isEmpty()) {
                     "Your list is empty. Tap Add item to start."
