@@ -1,10 +1,12 @@
 package com.robert4lyf.hypershop.ui.list
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -13,14 +15,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowDropDown
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -66,7 +73,8 @@ internal fun ItemEditor(
     draft: Int = 0,
     /** Step AA: start in the amount field ("Change amount"), its text selected so typing replaces it. */
     focusAmount: Boolean = false,
-    details: @Composable () -> Unit = {},
+    /** Step AC: the second small form (More details › Category and usual pack) instead of name, amount and aisle. */
+    extras: Boolean = false,
 ) {
     // Keyed on the item: another row's sheet starts from that row. Survives a rotation.
     var name by rememberSaveable(sheet.id, draft) { mutableStateOf(sheet.name) }
@@ -82,7 +90,6 @@ internal fun ItemEditor(
     var bad by rememberSaveable(sheet.id, draft) { mutableStateOf(false) }
 
     var pack by rememberSaveable(sheet.id, draft) { mutableStateOf(sheet.preferredPack) }
-    var advanced by rememberSaveable(sheet.id, draft) { mutableStateOf(false) }
     var newUnit by rememberSaveable(sheet.id, draft) { mutableStateOf<String?>(null) }
     var unitAmount by rememberSaveable(sheet.id, draft) { mutableStateOf("") }
     var confirmRename by rememberSaveable(sheet.id, draft) { mutableStateOf(false) }
@@ -109,108 +116,108 @@ internal fun ItemEditor(
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionLabel("Edit item")
-            OutlinedTextField(
-                value = name,
-                enabled = !sheet.saving,
-                onValueChange = { name = it },
-                label = { Text("Name") },
-                singleLine = true,
-                shape = MaterialTheme.shapes.medium,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next),
-                modifier = Modifier.fillMaxWidth().testTag("edit-name"),
-            )
-            OutlinedTextField(
-                value =
-                    TextFieldValue(
-                        amount,
-                        TextRange(amountSelection.start.coerceAtMost(amount.length), amountSelection.end.coerceAtMost(amount.length)),
-                    ),
-                enabled = !sheet.saving,
-                onValueChange = {
-                    amount = it.text
-                    amountSelection = it.selection
-                    bad = false
-                },
-                label = { Text("Total needed, e.g. 3 or 500 g") },
-                isError = bad,
-                supportingText = if (bad) ({ Text("Enter an amount, like 2 or 200 ml") }) else null,
-                singleLine = true,
-                shape = MaterialTheme.shapes.medium,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { if (!changes.isEmpty && name.isNotBlank() && !sheet.saving) save() }),
-                modifier = Modifier.fillMaxWidth().focusRequester(amountFocus).testTag("edit-qty"),
-            )
-            val unit = ItemEdit.unitOf(amount)
-            // The current unit and its exact alternatives first; the rest behind "More units".
-            val common = ItemEdit.commonUnits(unit)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                for (u in if (allUnits) ItemEdit.UNITS else common) {
-                    FilterChip(
-                        enabled = !sheet.saving,
-                        selected = u == unit,
-                        onClick = {
-                            if (u != unit) {
-                                val converted = ItemEdit.withUnit(amount, u)
-                                if (converted != null) {
-                                    amount = converted
-                                } else {
-                                    // No conversion: the amount is asked for, never carried over as if it were one.
-                                    newUnit = u
-                                    unitAmount = ""
-                                }
-                                bad = false
-                            }
-                        },
-                        label = { Text(u) },
-                        shape = PillShape,
-                        colors = basilChipColors(),
-                        modifier = Modifier.testTag("unit-$u"),
-                    )
-                }
-                TextButton(
-                    onClick = { allUnits = !allUnits },
-                    enabled = !sheet.saving,
-                    modifier = Modifier.heightIn(min = 48.dp).testTag("more-units"),
-                ) { Text(if (allUnits) "Fewer units" else "More units") }
-            }
-
-            TextButton(onClick = { advanced = !advanced }, modifier = Modifier.testTag("item-preferences")) {
-                Text(if (advanced) "Hide aisle, category and pack" else "Aisle, category and usual pack")
-            }
-            if (advanced) {
+            // Step AC: one small form. Change amount: the name, the amount and the aisle. Category and usual pack: those two.
+            if (!extras) {
                 OutlinedTextField(
-                    value = pack,
+                    value = name,
                     enabled = !sheet.saving,
-                    onValueChange = { pack = it },
-                    label = { Text("Usual pack at ${sheet.storeName}, e.g. 400 g") },
-                    modifier = Modifier.fillMaxWidth().testTag("preferred-pack"),
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.medium,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next),
+                    modifier = Modifier.fillMaxWidth().testTag("edit-name"),
                 )
-                SectionLabel("Aisle")
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (a in AisleCode.entries) {
+                OutlinedTextField(
+                    value =
+                        TextFieldValue(
+                            amount,
+                            TextRange(amountSelection.start.coerceAtMost(amount.length), amountSelection.end.coerceAtMost(amount.length)),
+                        ),
+                    enabled = !sheet.saving,
+                    onValueChange = {
+                        amount = it.text
+                        amountSelection = it.selection
+                        bad = false
+                    },
+                    label = { Text("Total needed, e.g. 3 or 500 g") },
+                    isError = bad,
+                    supportingText =
+                        when {
+                            bad -> ({ Text("Enter an amount, like 2 or 200 ml") })
+                            // Step AC: the item's other kind of amount, said in words; the form leaves it as it is.
+                            sheet.amountRest != null -> ({ Text("Also ${sheet.amountRest} on the list, kept as it is") })
+                            else -> null
+                        },
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.medium,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (!changes.isEmpty && name.isNotBlank() && !sheet.saving) save() }),
+                    modifier = Modifier.fillMaxWidth().focusRequester(amountFocus).testTag("edit-qty"),
+                )
+                val unit = ItemEdit.unitOf(amount)
+                // The current unit and its exact alternatives first; the rest behind "More units".
+                val common = ItemEdit.commonUnits(unit)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    for (u in if (allUnits) ItemEdit.UNITS else common) {
                         FilterChip(
                             enabled = !sheet.saving,
-                            selected = a == aisle,
+                            selected = u == unit,
                             onClick = {
-                                if (a != aisle) {
-                                    aisle = a
-                                    // A category is the aisle's: one from the old aisle does not follow it.
-                                    if (group != null && group !in sheet.groups[a].orEmpty()) group = null
+                                if (u != unit) {
+                                    val converted = ItemEdit.withUnit(amount, u)
+                                    if (converted != null) {
+                                        amount = converted
+                                    } else {
+                                        // No conversion: the amount is asked for, never carried over as if it were one.
+                                        newUnit = u
+                                        unitAmount = ""
+                                    }
+                                    bad = false
                                 }
                             },
-                            label = { Text(a.displayName) },
-                            leadingIcon = {
-                                Icon(
-                                    a.icon,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(FilterChipDefaults.IconSize),
-                                )
-                            },
+                            label = { Text(u) },
                             shape = PillShape,
                             colors = basilChipColors(),
-                            modifier = Modifier.testTag("aisle-${a.name}"),
+                            modifier = Modifier.testTag("unit-$u"),
                         )
+                    }
+                    TextButton(
+                        onClick = { allUnits = !allUnits },
+                        enabled = !sheet.saving,
+                        modifier = Modifier.heightIn(min = 48.dp).testTag("more-units"),
+                    ) { Text(if (allUnits) "Fewer units" else "More units") }
+                }
+
+                var aisleMenu by remember { mutableStateOf(false) }
+                Box {
+                    OutlinedButton(
+                        onClick = { aisleMenu = true },
+                        enabled = !sheet.saving,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("edit-aisle"),
+                    ) {
+                        Icon(aisle.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text("Aisle: ${aisle.displayName}", Modifier.weight(1f))
+                        Icon(Icons.Rounded.ArrowDropDown, contentDescription = null)
+                    }
+                    DropdownMenu(expanded = aisleMenu, onDismissRequest = { aisleMenu = false }) {
+                        for (a in AisleCode.entries) {
+                            DropdownMenuItem(
+                                text = { Text(a.displayName) },
+                                leadingIcon = { Icon(a.icon, contentDescription = null) },
+                                trailingIcon = { if (a == aisle) Icon(Icons.Rounded.Check, contentDescription = null) },
+                                onClick = {
+                                    aisleMenu = false
+                                    if (a != aisle) {
+                                        aisle = a
+                                        // A category is the aisle's: one from the old aisle does not follow it.
+                                        if (group != null && group !in sheet.groups[a].orEmpty()) group = null
+                                    }
+                                },
+                                modifier = Modifier.testTag("aisle-${a.name}"),
+                            )
+                        }
                     }
                 }
                 // Step AB: a hand-added item's move is remembered without asking (the message says so, with Undo).
@@ -228,7 +235,15 @@ internal fun ItemEditor(
                         )
                     }
                 }
-
+            }
+            if (extras) {
+                OutlinedTextField(
+                    value = pack,
+                    enabled = !sheet.saving,
+                    onValueChange = { pack = it },
+                    label = { Text("Usual pack at ${sheet.storeName}, e.g. 400 g") },
+                    modifier = Modifier.fillMaxWidth().testTag("preferred-pack"),
+                )
                 SectionLabel("Category")
                 val groups = (sheet.groups[aisle].orEmpty() + listOfNotNull(group)).distinct()
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -287,7 +302,6 @@ internal fun ItemEditor(
                     )
                 }
             }
-            details()
         }
         sheet.saveError?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("item-save-error")) }
         Button(

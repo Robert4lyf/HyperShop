@@ -38,8 +38,19 @@ object ItemEdit {
     private val amount = Regex("""^\s*(\d[\d.,/\s½¼¾⅓⅔]*?)\s*([^\d\s.,/½¼¾⅓⅔].*)?$""")
 
     /**
-     * The total as text to edit ("400 g", "1.5 kg", "2 tin", "3"), or blank when it
-     * is not one amount ("2 + 200 g", or no amount at all): the field then starts empty.
+     * Step AC: an item holding amounts in two kinds of unit ("2 + 200 g") is edited by the one it is bought by: a count
+     * first, else a weight, else a volume. The first is that part; the second is the rest, which an edit leaves alone.
+     */
+    fun buyBy(total: QtyBase): Pair<QtyBase, QtyBase> {
+        if (total.parts.size <= 1) return total to QtyBase.PRESENCE
+        val order = listOf(Dimension.COUNT, Dimension.MASS, Dimension.VOLUME)
+        val key = total.parts.keys.minBy { order.indexOf(BaseKey.decode(it).dimension) }
+        return QtyBase(mapOf(key to total.parts.getValue(key))) to QtyBase(total.parts - key)
+    }
+
+    /**
+     * The total as text to edit ("400 g", "1.5 kg", "2 tin", "3"), or blank when it is not one amount: the form passes
+     * it [buyBy]'s first part, so an item with an amount never opens on an empty field.
      */
     fun text(total: QtyBase): String {
         val (k, v) = total.parts.entries.singleOrNull() ?: return ""

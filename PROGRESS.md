@@ -557,7 +557,15 @@ words.
   within an aisle) and the widget (its first four by storage order, not even by aisle). Tests:
   `WalkingOrderGroupsTest` (Salad above Vegetables on the list, the shared text and the widget's order; through
   finish shopping, a restart and a backup restore; the watch snapshot) and `WalkingOrderScreenTest`.
-- [ ] AC.3 Item editor is one small form
+- [x] AC.3 Item editor is one small form. Change amount draws only the name, the amount (its unit chips kept: they
+  are how the amount changes unit) and the aisle (one "Aisle: …" button with a menu, was 17 chips behind a toggle),
+  with Save; the second title, Mark bought, totals, sources, pack note, swaps, Remove and "This is wrong" it used to
+  repeat below the form are only on the summary and More details. Category and usual pack (the form's old hidden part)
+  are a second small form from More details. The amount opens filled: for "2 + 200 g", `ItemEdit.buyBy` picks the
+  part bought by (a count, else weight, else volume), the field says "Also 200g on the list, kept as it is", and
+  `saveItem` keeps that part (before, the field opened empty). Tests updated; seven `ItemSheetHostTest` cases went:
+  they asked "Discard edits and mark bought / remove / swap" with the form and the item's actions on screen together,
+  which cannot happen now (the confirmation code stays, harmless; Back on a dirty form still asks).
 - [ ] AC.4 A recipe on the list says so
 - [ ] AC.5 Review warnings in plain words
 - [ ] AC.6 Always at home chips

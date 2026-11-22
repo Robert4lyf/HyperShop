@@ -270,6 +270,8 @@ fun ItemSheetContent(
     // Step AA: opened by "Change amount", the editor starts in the amount field (keyboard up), not a tap later.
     var amountFirst by rememberSaveable(sheet.id, draft) { mutableStateOf(false) }
     var more by rememberSaveable(sheet.id) { mutableStateOf(false) }
+    // Step AC: More details › Category and usual pack opens the second small form.
+    var extras by rememberSaveable(sheet.id, draft) { mutableStateOf(false) }
     val full: @Composable () -> Unit = {
         SheetHeader(sheet.name, sheet.aisle)
         Button(onClick = actions.onToggle, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("toggle-item")) {
@@ -312,7 +314,7 @@ fun ItemSheetContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (editing) {
-                ItemEditor(sheet, actions.onSave, Modifier.weight(1f), onDirty, draft, focusAmount = amountFirst) { full() }
+                ItemEditor(sheet, actions.onSave, Modifier.weight(1f), onDirty, draft, focusAmount = amountFirst, extras = extras)
             } else {
                 Column(
                     Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).testTag("item-summary"),
@@ -329,6 +331,7 @@ fun ItemSheetContent(
                         OutlinedButton(
                             onClick = {
                                 amountFirst = true
+                                extras = false
                                 editing = true
                             },
                             modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("item-change"),
@@ -362,6 +365,14 @@ fun ItemSheetContent(
                         }
                         if (sheet.sources.isNotEmpty()) Sources(sheet.sources)
                         Swaps(sheet, actions.onSwap)
+                        TextButton(
+                            onClick = {
+                                amountFirst = false
+                                extras = true
+                                editing = true
+                            },
+                            modifier = Modifier.heightIn(min = 48.dp).testTag("item-extras"),
+                        ) { Text("Category and usual pack") }
                         EdgeDivider()
                         OutlinedButton(
                             onClick = actions.onDelete,

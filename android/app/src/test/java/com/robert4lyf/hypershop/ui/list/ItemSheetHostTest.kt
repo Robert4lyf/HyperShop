@@ -3,9 +3,6 @@ package com.robert4lyf.hypershop.ui.list
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertTextContains
-import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -72,14 +69,14 @@ class ItemSheetHostTest {
             },
         )
 
-    private fun show() =
+    private fun show(editing: Boolean = true) =
         compose.setContent {
             HyperShopTheme(dynamicColor = false) {
                 sheet?.let { s ->
                     ItemSheetHost(s, actions(), onDismiss = {
                         events += "dismiss"
                         sheet = null
-                    }, now = { clock }, initiallyEditing = true)
+                    }, now = { clock }, initiallyEditing = editing)
                 }
             }
         }
@@ -89,7 +86,8 @@ class ItemSheetHostTest {
     @Test
     fun aCleanSheetMarksBoughtStraightAwayAndOnlyOnceForRepeatedTaps() {
         closes = false
-        show()
+        // Step AC: Mark bought is on the item's summary; the form (Change amount) holds only name, amount and aisle.
+        show(editing = false)
         compose.onNodeWithTag("toggle-item").performScrollTo().performClick()
         compose.onNodeWithTag("toggle-item").performClick()
         compose.onNodeWithTag("toggle-item").performClick()
@@ -101,76 +99,8 @@ class ItemSheetHostTest {
         assertEquals(listOf("toggle", "toggle"), events)
     }
 
-    @Test
-    fun discardingEditsMarksBoughtExactlyOnce() {
-        show()
-        edit()
-        compose.onNodeWithTag("toggle-item").performScrollTo().performClick()
-        assertEquals(emptyList<String>(), events)
-        compose.onNodeWithText("Discard edits and mark bought").performClick()
-        assertEquals(listOf("toggle"), events)
-        compose.onNodeWithTag("discard-confirm").assertDoesNotExist()
-        compose.onNodeWithTag("edit-name").assertDoesNotExist()
-    }
-
-    @Test
-    fun aDoneItemOffersMarkNotBought() {
-        sheet = ONION.copy(done = true)
-        show()
-        edit()
-        compose.onNodeWithTag("toggle-item").performScrollTo().performClick()
-        compose.onNodeWithText("Discard edits and mark not bought").performClick()
-        assertEquals(listOf("toggle"), events)
-    }
-
-    @Test
-    fun removeAndSwapNameWhatTheyWillDo() {
-        show()
-        edit()
-        compose.onNodeWithTag("delete-item").performScrollTo().performClick()
-        compose.onNodeWithText("Discard edits and remove").assertExists()
-        compose.onNodeWithTag("discard-keep").performClick()
-        compose.onNodeWithTag("swap-shallot").performScrollTo().performClick()
-        compose.onNodeWithText("Just this time").performClick()
-        compose.onNodeWithText("Discard edits and swap for shallot").performClick()
-        assertEquals(listOf("swap shallot false"), events)
-    }
-
-    @Test
-    fun keepEditingRunsNothingKeepsTheDraftAndLeavesNothingQueued() {
-        closes = false
-        show()
-        edit()
-        compose.onNodeWithTag("toggle-item").performScrollTo().performClick()
-        compose.onNodeWithText("Keep editing").performClick()
-        compose.onNodeWithTag("edit-name").assertTextContains("red onion")
-        assertEquals(emptyList<String>(), events)
-        // The next thing asked is what runs, not the tick backed out of.
-        compose.onNodeWithTag("delete-item").performScrollTo().performClick()
-        compose.onNodeWithText("Discard edits and remove").performClick()
-        assertEquals(listOf("delete"), events)
-        // The draft went with the confirmation: the sheet (still open here) starts again from the item.
-        compose.onNodeWithTag("edit-name").assertTextContains("onion")
-        compose.onNodeWithTag("save-item").assertIsNotEnabled()
-    }
-
-    @Test
-    fun dismissingTheConfirmationRunsNothingAndTheEditorStaysUsable() {
-        show()
-        edit()
-        compose.onNodeWithTag("toggle-item").performScrollTo().performClick()
-        compose.onNodeWithTag("discard-confirm").assertExists()
-        Espresso.pressBack()
-        compose.waitForIdle()
-        compose.onNodeWithTag("discard-confirm").assertDoesNotExist()
-        assertEquals(emptyList<String>(), events)
-        compose.onNodeWithTag("edit-name").performScrollTo().performTextReplacement("spring onion")
-        // Save is pinned below the scrolling form.
-        compose.onNodeWithTag("save-item").performClick()
-        compose.onNodeWithText("Rename and save").performClick()
-        assertEquals(listOf("save spring onion"), events)
-    }
-
+    // Step AC: the form no longer shows Mark bought, Remove or the swaps, so "discard edits and …" can no longer be asked
+    // from it; what is left to ask is Back on a form with edits.
     @Test
     fun backOnADirtySheetAsksAndThenOnlyCloses() {
         show()
@@ -178,48 +108,6 @@ class ItemSheetHostTest {
         Espresso.pressBack()
         compose.onNodeWithText("Discard changes").performClick()
         assertEquals(listOf("dismiss"), events)
-    }
-
-    @Test
-    fun aTickMadeElsewhereMeanwhileIsNotUndone() {
-        show()
-        edit()
-        compose.onNodeWithTag("toggle-item").performScrollTo().performClick()
-        // The watch ticks it while the question is up.
-        sheet = sheet!!.copy(done = true)
-        compose.onNodeWithText("Discard edits and mark bought").performClick()
-        assertEquals(listOf("dismiss"), events)
-    }
-
-    @Test
-    fun nothingRunsWhileSaving() {
-        show()
-        edit()
-        compose.onNodeWithTag("toggle-item").performScrollTo().performClick()
-        sheet = sheet!!.copy(saving = true)
-        compose.onNodeWithTag("discard-confirm").assertIsNotEnabled()
-        assertEquals(emptyList<String>(), events)
-    }
-
-    @Test
-    fun aPendingQuestionSurvivesRecreationAsADescriptionAndRunsOnlyWhenConfirmed() {
-        val restore = StateRestorationTester(compose)
-        restore.setContent {
-            HyperShopTheme(dynamicColor = false) {
-                sheet?.let {
-                        s ->
-                    ItemSheetHost(s, actions(), onDismiss = { events += "dismiss" }, now = { clock }, initiallyEditing = true)
-                }
-            }
-        }
-        edit()
-        compose.onNodeWithTag("toggle-item").performScrollTo().performClick()
-        restore.emulateSavedInstanceStateRestore()
-        // Back as it was: the question, the draft, and nothing done.
-        compose.onNodeWithText("Discard edits and mark bought").assertExists()
-        assertEquals(emptyList<String>(), events)
-        compose.onNodeWithText("Discard edits and mark bought").performClick()
-        assertEquals(listOf("toggle"), events)
     }
 
     @Test

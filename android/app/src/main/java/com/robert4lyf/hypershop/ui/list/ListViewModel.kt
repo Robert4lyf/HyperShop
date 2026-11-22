@@ -112,6 +112,8 @@ data class ItemSheet(
     val unavailable: Boolean = false,
     /** Step AB: only added by hand (no recipe): a move to another aisle is remembered without asking. */
     val byHand: Boolean = false,
+    /** Step AC: the item's other kind of amount in words ("200 g" beside "2"), which the form keeps; null when none. */
+    val amountRest: String? = null,
 )
 
 /** One "From" row: "Weeknight chilli · 400 g", linked to the recipe's page when it has one. */
@@ -712,7 +714,8 @@ class ListViewModel(
                     entry != null,
                     list.isDone(id),
                     listOfNotNull(row.main, row.sub).joinToString(" · "),
-                    ItemEdit.text(list.total(id)),
+                    // Step AC: the amount bought by, never empty for an item that has one; the rest said in words.
+                    ItemEdit.text(ItemEdit.buyBy(list.total(id)).first),
                     entry?.group,
                     AisleCode.entries.associateWith { c.catalog.groupsIn(it) },
                     revision = item.rev,
@@ -725,6 +728,10 @@ class ListViewModel(
                                 "Requirement unchanged; tick only what you buy."
                         } ?: packSize?.let { "Usual pack saved; no purchase suggestion is possible in a different measure." },
                     byHand = byUse.keys.all { list.uses[it]?.kind == com.robert4lyf.hypershop.core.merge.UseKind.MANUAL },
+                    amountRest =
+                        ItemEdit.buyBy(list.total(id)).second.parts.mapNotNull { (k, v) ->
+                            Display.amount(QtyBase(mapOf(k to v)), units, produce, hint, entry?.gramsPerCup, entry?.displayPolicy)
+                        }.joinToString(" + ").ifEmpty { null },
                     explanation =
                         listOfNotNull(
                             "Required ${ItemEdit.text(list.total(id)).ifBlank { "as shown above" }}",
@@ -805,7 +812,7 @@ class ListViewModel(
         ch: ItemChanges,
     ): Boolean {
         if (_sheet.value?.saving == true) return false
-        val total = ch.amount?.let { com.robert4lyf.hypershop.core.parse.QuantityInput.parse(it) ?: return false }
+        val typed = ch.amount?.let { com.robert4lyf.hypershop.core.parse.QuantityInput.parse(it) ?: return false }
         val pack = ch.pack?.takeIf { it.isNotBlank() }?.let { com.robert4lyf.hypershop.core.parse.QuantityInput.parse(it) ?: return false }
         val opened = _sheet.value?.takeIf { it.id == id }
         _sheet.update { it?.copy(saving = true, saveError = null) }
@@ -820,7 +827,15 @@ class ListViewModel(
                     messages.send(UiMessage("Saved"))
                     return@launch
                 }
-                val before = c.repository.snapshot().items[id] ?: error("This item is no longer on the list")
+                val list = c.repository.snapshot()
+                val before = list.items[id] ?: error("This item is no longer on the list")
+                // Step AC: the form edits the amount bought by; the item's other kind of amount (a recipe's 200 g beside
+                // "2") is kept as it is unless the new amount is in that unit.
+                val total =
+                    typed?.let { t ->
+                        val rest = ItemEdit.buyBy(list.total(id)).second
+                        QtyBase(t.parts + rest.parts.filterKeys { it !in t.parts })
+                    }
                 // Step AB: a hand-added item moved to another aisle (its name unchanged) is remembered without asking.
                 val remember = opened?.byHand == true && ch.aisle != null && ch.aisle != before.aisle && ch.name == null
                 val previous = if (remember) c.repository.overrideOf(before.mergeKey) else null
