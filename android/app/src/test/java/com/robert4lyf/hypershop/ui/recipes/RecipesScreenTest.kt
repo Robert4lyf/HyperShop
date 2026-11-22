@@ -33,6 +33,7 @@ import com.robert4lyf.hypershop.testutil.Shots
 import com.robert4lyf.hypershop.testutil.TestPhotos
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -97,13 +98,21 @@ class RecipesScreenTest {
     }
 
     @Test
-    fun aCardSaysWhatItServesAndWhenItLastWentOnTheList() {
-        // Step AA: "Serves N · last added <when>", the second part left out for a recipe never added.
+    fun aCardHasOneStatusLineTheSiteElseWhatItServes() {
+        // Step AD.5: one status line that never wraps: the source site if there is one, else "Serves N"; "last added"
+        // is on the recipe's own page, not the card.
         show()
-        compose.onNodeWithTag("lib-r:9").assertTextContains("Serves 4")
-        compose.onAllNodesWithText("last added", substring = true).assertCountEquals(1)
-        compose.onNodeWithTag("lib-r:1").assertTextContains("last added", substring = true)
+        compose.onNodeWithTag("lib-status-r:9", useUnmergedTree = true).assertTextEquals("Serves 4")
+        compose.onNodeWithTag("lib-status-r:1", useUnmergedTree = true).assertTextEquals("example.com")
+        compose.onAllNodesWithText("last added", substring = true).assertCountEquals(0)
         compose.onAllNodesWithText("ingredients", substring = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun theRecipePageSaysWhenItLastWentOnTheList() {
+        val detail = DETAIL.copy(row = USES.library.first { it.key == "r:1" })
+        compose.setContent { HyperShopTheme(dynamicColor = false) { RecipeDetailContent(detail, onAdd = {}) } }
+        compose.onNodeWithText("last added", substring = true).assertExists()
     }
 
     @Test
@@ -327,18 +336,23 @@ class RecipesScreenTest {
     }
 
     @Test
-    fun aRecipeWithoutAPhotoHasASmallSquareOfArtNotABand() {
-        // Step AC: the chilli's real photo stays a band (compact, UX review 14); the dal, with no photo, has its art as a
-        // 56 dp square beside its title, and no band.
+    fun everyCardIsTheSameCompactRowWithASquareThumbnail() {
+        // Step AD.5: no full-width photo band on any card: the chilli's photo is cropped into the same 48 dp square as
+        // the dal's art, beside the title.
         show()
 
         fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertEquals(96f, bounds("lib-band-r:1").let { it.bottom - it.top }.value, 1f)
-        compose.onNodeWithTag("lib-band-r:9", useUnmergedTree = true).assertDoesNotExist()
-        val thumb = bounds("lib-thumb-r:9")
-        assertEquals(56f, (thumb.right - thumb.left).value, 1f)
-        assertEquals(56f, (thumb.bottom - thumb.top).value, 1f)
-        compose.onNodeWithTag("lib-title-r:9", useUnmergedTree = true).assertExists()
+        for (key in listOf("r:1", "r:9")) {
+            compose.onNodeWithTag("lib-band-$key", useUnmergedTree = true).assertDoesNotExist()
+            val thumb = bounds("lib-thumb-$key")
+            assertEquals(48f, (thumb.right - thumb.left).value, 1f)
+            assertEquals(48f, (thumb.bottom - thumb.top).value, 1f)
+            assertTrue(bounds("lib-title-$key").left > thumb.right)
+        }
+        val chilli = bounds("lib-r:1")
+        val dal = bounds("lib-r:9")
+        // Both cards the same shape: on the list or not, about one height.
+        assertEquals((dal.bottom - dal.top).value, (chilli.bottom - chilli.top).value, 8f)
     }
 
     @Test
@@ -392,10 +406,12 @@ class RecipesScreenTest {
     }
 
     @Test
-    fun aRatedRecipeSaysSoOnItsCard() {
+    fun aRatingIsOnTheRecipesPageNotItsCard() {
+        // Step AD.5: the card's one status line is the site or the servings; the stars are on the recipe's page.
         val rated = USES.copy(library = USES.library.map { if (it.key == "r:9") it.copy(rating = 5) else it })
         compose.setContent { HyperShopTheme(dynamicColor = false) { RecipesScreen(rated) } }
-        compose.onNodeWithText("★ 5/5", substring = true).assertExists()
+        compose.onAllNodesWithText("★ 5/5", substring = true).assertCountEquals(0)
+        compose.onNodeWithTag("lib-status-r:9", useUnmergedTree = true).assertTextEquals("Serves 4")
     }
 
     @Test

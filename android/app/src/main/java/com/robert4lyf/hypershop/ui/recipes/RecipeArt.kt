@@ -1,11 +1,8 @@
 package com.robert4lyf.hypershop.ui.recipes
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import com.robert4lyf.hypershop.ui.theme.lowPoly
 
 /**
@@ -25,22 +22,3 @@ fun RecipeArt(
         Box(modifier.lowPoly(title))
     }
 }
-
-/** A recipe's real photo behind white text (a Recipes card's band): darkened at the top and the bottom, where text sits. */
-@Composable
-fun RecipeBackdrop(
-    photo: String,
-    modifier: Modifier = Modifier,
-) {
-    Box(modifier) {
-        RecipePhoto(photo, contentDescription = null, modifier = Modifier.matchParentSize(), maxPx = 1280)
-        Box(Modifier.matchParentSize().background(PHOTO_SHADE))
-    }
-}
-
-private val PHOTO_SHADE =
-    Brush.verticalGradient(
-        0f to Color.Black.copy(alpha = 0.35f),
-        0.4f to Color.Black.copy(alpha = 0.1f),
-        1f to Color.Black.copy(alpha = 0.7f),
-    )

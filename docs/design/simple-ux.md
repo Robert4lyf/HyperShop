@@ -26,7 +26,7 @@ fewer modes and one word per idea. The data model is unchanged; every action cal
 | Take a recipe's items off the list | **Remove from list** (only what is unbought goes) | Remove meal, ✕ |
 | Delete a saved recipe | **Delete recipe** | Remove from your recipes |
 | The order of saved recipes | **Most used** (the default: added to the list most often, then most lately, then newest saved); **Recently saved**, **Highest rated**, **A–Z**. The sort control shows from 10 recipes | Your usual, Recently added |
-| A saved recipe's card line | "Serves 4 · last added 3 days ago" ("last added" left out when it never has been) | added today, 12 ingredients, planned 3 times, cooked once |
+| A saved recipe's card (Step AD) | one compact card: a square thumbnail (its photo cropped, or its art), the title, one status line that never wraps (the site, else "Serves 4"), then **Add to list**, or **✓ On your list** ("twice" when it is there twice) with "− Serves 4 +". "last added 3 days ago" and the stars are on the recipe's page | added today, 12 ingredients, planned 3 times, cooked once, a photo band |
 | Something is already at home | **At home** (an unticked review row; staples in Settings start unticked) | Have it, Have some, I have some |
 | Can't get it on this trip | **Can't find it** → *Set aside for this trip*; **Found it** takes it back | Unavailable, Not available today |
 | End the trip | **Finish shopping** | Done |
@@ -75,8 +75,8 @@ On the review, lines still to go on the list are counted as **N to add** ("4 to 
   subtitle, actions on the right. No mosaic, gradient or hero card anywhere. The review's top: **Review later** (the
   recipe waits on the "ready to review" card), the recipe's
   title with its pencil, then "4 to add · 1 at home" with the servings beside it (Step AD); when Claude failed or was skipped, one line with the
-  reason, **Retry** and ✕. "N recipes ready to review" is a plain card. A recipe without a photo shows its art as a
-  small square beside its title; a real photo stays a band.
+  reason, **Retry** and ✕. "N recipes ready to review" is a plain card. Every recipe card shows a small square beside its
+  title: its photo cropped, or its art (Step AD; no photo band on cards).
 - An aisle's heading is one slim row (Step AC): its small icon, its name, "N to buy" and the collapse arrow, in the
   card's own colour. The review uses the same row (Step AD), counting **N to add** ("All at home", "Nothing to add"). Group labels (Vegetables, Salad…) show only in an aisle with six or more items, and always while
   arranging; the group order from Walking order applies either way.

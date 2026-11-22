@@ -649,7 +649,16 @@ loop. No tabs, modes, settings or help text; no schema, protocol, golden-data or
   range, the one in use is the line's own amount (`RangeChoice.chosen`, matched against the recipe's two numbers; the
   parser takes the first). Tests: `ReviewScreenTest` (both kinds look and read alike; the second reading selected when
   the line uses it).
-- [ ] AD.5 One recipe card shape.
+- [x] AD.5 One recipe card shape. Every card on Recipes is the same compact card: a 48 dp square thumbnail (its
+  photo cropped, else its art), the title on one line, one status line that never wraps (the site, else the book,
+  else "Serves N"; "Uses …" while a search is on, as before), then "Add to list", or "✓ On your list" (and "twice"
+  when it is on the list twice, which the status line used to say) with the "− Serves N +" stepper; ⋮ beside the
+  title. No photo band on cards: the photo stays on the recipe's page. "last added …" moved to the page's top line;
+  the "★ 4/5" on the card went (the stars are on the page). Tests: `RecipesScreenTest` (status line, the page's "last
+  added", same shape and thumbnail for photo and no photo, no rating on the card), `RecipesCompactTest` (through the
+  app shell at 360×640: at least four recipes' titles on screen above the tab bar, the fourth card's button just
+  above it; cards 8 dp apart, were 12; screenshot `recipes-360x640.png`). Deleted with the band: `RecipeBackdrop`, its shade,
+  `LIBRARY_BAND` and `Brand.OnHero`.
 - [ ] AD.6 Leaner list rows.
 - [ ] AD.7 Quiet watch status.
 - [ ] AD.8 The amount form opens filled.
