@@ -579,7 +579,10 @@ words.
   first). The recipe's text is quoted only where it helps choose (`quoteHelps`). The sheet's banner drops "Check:".
 - [x] AC.6 Always at home chips. Each staple is one chip with its name only (the cart and × icons inside it went);
   a tap opens a menu: "Add to list once" (the existing `ranOut`) and "Remove" (`removeStaple`). 48 dp targets kept.
-- [ ] AC.7 "Don't suggest" can be undone
+- [x] AC.7 "Don't suggest" can be undone. Claim checked and wrong: Step AB.1 already shows "Won't suggest shampoo"
+  with Undo after Don't suggest (`ListViewModel.dontSuggest`; Undo puts back a pin or the plain rules), placed by the
+  AB.3 rule, and `AddByHandTest.dontSuggestHidesItAndUndoBringsItBack` tests it. Nothing to change; Settings › Clear
+  shopping history was already not the only way back.
 - [ ] AC.8 Denser list
 - [ ] AC.9 Small words
 - [ ] AC.10 Verify and report
