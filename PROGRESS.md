@@ -682,6 +682,16 @@ loop. No tabs, modes, settings or help text; no schema, protocol, golden-data or
   `importShared` and its review opens, as "Paste a link" does; no item is named after a URL. Pasted text with a link
   among other lines adds the other lines as before and queues the link. Claude is called only once that review is on
   screen (the import path is unchanged). Test: `ListViewModelTest.aLinkInAddItemIsImportedNeverAddedAsAnItem`.
-- [ ] AD.10 Swipe to remove is obvious and safe.
+- [x] AD.10 Swipe to remove is obvious and safe. Claims checked: list rows could not be swiped at all, and had no
+  "Delete"/"Remove" accessibility action (Delete is on the item's sheet, which soft-deletes the whole row). Now a row
+  still to buy can be swiped either way (Material 3 `SwipeToDismissBox`, already in the build); while it moves (and only
+  then, so TalkBack finds no hidden label at rest), a "Remove" label with a bin shows under it in the error-container
+  colour. A swipe, or TalkBack's new "Remove" action on
+  the row, calls `ListRepository.removeUnbought`: only the row's unbought shares come off (`withdrawKeeping`, in one
+  write that bumps the row and the list's revision); a row with nothing bought goes, "Removed Carrot"; a partly bought
+  row stays as what was bought, "Onion: the rest taken off, what's bought stays". Undo puts the shares back
+  (`reinstate`). A bought row isn't swiped. The sheet's Delete is unchanged. Tests: `ListViewModelTest` (partly
+  bought keeps the bought, listRev bumped, Undo; unbought goes), `ListScreenTest` (swipe left and right, "Remove"
+  while moving, none on a bought row, TalkBack's action).
 - [ ] AD.11 After a shop, the next step.
 - [ ] AD.12 Verify and report.

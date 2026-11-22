@@ -81,6 +81,7 @@ fun ListRoute(
             onFinish = vm::finishShopping,
             onClearAll = vm::clearAll,
             onOpenItem = { vm.openItem(it.id) },
+            onRemove = { vm.removeRow(it.id, it.name) },
             onView = vm::setView,
             onChangeStore = { vm.changeStore() },
             onShareText = {

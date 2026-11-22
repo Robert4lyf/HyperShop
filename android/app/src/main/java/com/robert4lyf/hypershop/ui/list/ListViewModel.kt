@@ -597,6 +597,25 @@ class ListViewModel(
             c.repository.markAvailable(id)
         }
 
+    /**
+     * Step AD.10: a row swiped away (or TalkBack's "Remove"): what is still to buy comes off, with Undo; what was
+     * bought stays bought.
+     */
+    fun removeRow(
+        id: Long,
+        name: String,
+    ) = viewModelScope.launch {
+        val w = c.repository.removeUnbought(id) ?: return@launch
+        val stays = w.items.none { it.id == id }
+        val label = name.replaceFirstChar { it.uppercase() }
+        messages.send(
+            UiMessage(
+                if (stays) "$label: the rest taken off, what's bought stays" else "Removed $label",
+                undo = { c.repository.undoRemoveUnbought(w) },
+            ),
+        )
+    }
+
     /** "Delete" on the item card: closes it, with Undo on the list. */
     fun delete(
         id: Long,

@@ -1225,6 +1225,20 @@ class ListRepository(
         total: QtyBase,
     ) = write { it.editQuantity(itemId, total, clock()) to Unit }
 
+    /**
+     * Step AD.10: a row swiped away. Only its unbought shares come off ([ShoppingList.withdrawKeeping]): a row with
+     * nothing bought goes; one partly bought stays as what was bought, since nothing undoes a purchase. Null when
+     * nothing on it is unbought. Undo: [undoRemoveUnbought].
+     */
+    suspend fun removeUnbought(itemId: Long): Withdrawn? =
+        write { l ->
+            val ids = l.contributionsOf(itemId).filter { it.coveredBy == null }.map { it.id }.toSet()
+            l.withdrawKeeping(ids)
+        }
+
+    /** Undo of [removeUnbought]: the shares back, unbought. False when nothing could come back. */
+    suspend fun undoRemoveUnbought(w: Withdrawn): Boolean = write { l -> l.reinstate(w)?.let { it to true } } ?: false
+
     /** Soft-deletes; returns the stamp for Undo. */
     suspend fun softDelete(itemId: Long): Long {
         val stamp = clock()

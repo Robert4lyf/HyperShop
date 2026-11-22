@@ -3,7 +3,9 @@ package com.robert4lyf.hypershop.ui.list
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertCountEquals
@@ -22,6 +24,9 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.robert4lyf.hypershop.core.model.AisleCode
@@ -30,6 +35,7 @@ import com.robert4lyf.hypershop.testutil.Shots
 import com.robert4lyf.hypershop.testutil.TestPhotos
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -70,6 +76,7 @@ class ListScreenTest {
         ListActions(
             onToggle = { events += "toggle ${it.id}" },
             onOpenItem = { events += "open ${it.id}" },
+            onRemove = { events += "remove ${it.id}" },
             onFinish = { events += "finish" },
             onClearAll = { events += "clear" },
             onArrange = { events += "arrange $it" },
@@ -190,6 +197,31 @@ class ListScreenTest {
         assertEquals("Watch not connected", watchWord(com.robert4lyf.hypershop.watch.WatchLinkState.CONNECTED))
         compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(SAMPLE_LIST.copy(watch = "Watch not connected"), actions) } }
         compose.onNodeWithText("Watch not connected").assertExists()
+    }
+
+    @Test
+    fun aRowSwipedAwayIsRemovedAndShowsRemoveWhileMoving() {
+        // Step AD.10: swiping a row still to buy, either way, takes it off; a labelled "Remove" shows under it as it moves.
+        show()
+        compose.onNodeWithTag("swipe-4").performTouchInput {
+            down(center)
+            repeat(10) {
+                advanceEventTime(16)
+                moveBy(Offset(-12f, 0f))
+            }
+        }
+        compose.onNodeWithText("Remove", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("swipe-4").performTouchInput { up() }
+        compose.onNodeWithTag("swipe-2").performTouchInput { swipeLeft() }
+        compose.onNodeWithTag("swipe-1").performTouchInput { swipeRight() }
+        compose.waitForIdle()
+        assertTrue(events.toString(), "remove 2" in events && "remove 1" in events)
+        // A bought row isn't swiped; TalkBack has the same as an action on a row still to buy.
+        compose.onNodeWithTag("swipe-3").assertDoesNotExist()
+        val action =
+            compose.onNodeWithTag("item-4").fetchSemanticsNode().config[SemanticsActions.CustomActions].single { it.label == "Remove" }
+        compose.runOnIdle { action.action() }
+        assertTrue(events.toString(), "remove 4" in events)
     }
 
     @Test

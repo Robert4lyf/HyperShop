@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.ExpandLess
@@ -40,17 +42,22 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,9 +75,11 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -104,6 +113,8 @@ data class ListActions(
     val onFinish: () -> Unit,
     val onClearAll: () -> Unit,
     val onOpenItem: (ListRow) -> Unit = {},
+    /** Step AD.10: swiped away, or TalkBack's "Remove": its unbought share comes off. */
+    val onRemove: (ListRow) -> Unit = {},
     val onShare: () -> Unit = {},
     /** The menu's choice of layout: store order or by recipe. */
     val onView: (ListView) -> Unit = {},
@@ -743,13 +754,62 @@ internal fun subLines(
 }
 
 /**
+ * Step AD.10: a row still to buy can be swiped away, either way: while it moves, a labelled "Remove" shows under it.
+ * Only its unbought share comes off ([ListActions.onRemove]); a bought row isn't swiped.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ListRowItem(
+    row: ListRow,
+    actions: ListActions,
+    tile: Modifier,
+    lit: Boolean = false,
+    showFrom: Boolean = false,
+) {
+    if (row.state == TickState.DONE) {
+        ListRowBody(row, actions, tile, lit, showFrom)
+        return
+    }
+    // A new state when the row changes, so a row that stays (partly bought) comes back settled.
+    key(row.main, row.state) {
+        val swipe =
+            rememberSwipeToDismissBoxState(confirmValueChange = { v ->
+                if (v != SwipeToDismissBoxValue.Settled) actions.onRemove(row)
+                true
+            })
+        SwipeToDismissBox(
+            swipe,
+            modifier = tile.testTag("swipe-${row.id}"),
+            backgroundContent = { RemoveBackground(swipe.dismissDirection) },
+        ) { ListRowBody(row, actions, Modifier, lit, showFrom) }
+    }
+}
+
+/** What shows under a row being swiped: "Remove", on the side it is uncovered from. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RemoveBackground(direction: SwipeToDismissBoxValue) {
+    // Only while the row moves: at rest nothing is under it (and TalkBack doesn't find a "Remove" on every row).
+    if (direction == SwipeToDismissBoxValue.Settled) return
+    Row(
+        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.errorContainer).padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = if (direction == SwipeToDismissBoxValue.StartToEnd) Arrangement.Start else Arrangement.End,
+    ) {
+        Icon(Icons.Rounded.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
+        Spacer(Modifier.width(8.dp))
+        Text("Remove", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onErrorContainer)
+    }
+}
+
+/**
  * One row, two targets: only the round tick ticks or unticks (so a stray tap on
  * the row can't); the rest of the row opens the item card, where Delete lives.
  * TalkBack reads the tick as a checkbox named after the item, then the row.
  * DONE rows are greyed, struck through and carry a tick (not colour alone).
  */
 @Composable
-private fun ListRowItem(
+private fun ListRowBody(
     row: ListRow,
     actions: ListActions,
     tile: Modifier,
@@ -809,6 +869,8 @@ private fun ListRowItem(
                 .semantics(mergeDescendants = true) {
                     testTag = "item-${row.id}"
                     stateDescription = state
+                    // Step AD.10: the swipe, for TalkBack: what is still to buy comes off.
+                    if (!done) customActions = listOf(CustomAccessibilityAction("Remove") { actions.onRemove(row).let { true } })
                     // Step AD.6: in store order the recipe is not drawn, but TalkBack still says what it is for.
                     if (!showFrom && row.from != null) {
                         contentDescription =

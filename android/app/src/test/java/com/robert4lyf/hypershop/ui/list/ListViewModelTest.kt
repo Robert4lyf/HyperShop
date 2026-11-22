@@ -151,6 +151,33 @@ class ListViewModelTest {
     }
 
     @Test
+    fun swipingARowTakesOffOnlyWhatIsUnboughtWithUndo() {
+        // Step AD.10: a recipe's onions, 2 bought and 1 more since: removing the row takes off the 1, the 2 stay bought.
+        val c = TestContainer.create()
+        c.add("2 onions", "3 carrots")
+        val vm = tracked(ListViewModel(c))
+        var ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
+        vm.toggle(ui.row("onion"))
+        await(vm.ui) { it.row("onion").state == TickState.DONE }
+        c.add("1 onion")
+        ui = await(vm.ui) { it.row("onion").state == TickState.PARTIAL }
+        val rev = runBlocking { c.repository.snapshot() }.listRev
+        vm.removeRow(ui.row("onion").id, "onion")
+        ui = await(vm.ui) { it.row("onion").state == TickState.DONE }
+        assertEquals("2 onions", ui.row("onion").main)
+        val l = runBlocking { c.repository.snapshot() }
+        assertEquals(com.robert4lyf.hypershop.core.model.Rational.of(2), l.purchased(l.itemByKey("cat:onion")!!.id).parts.values.single())
+        assertTrue("the watch hears of it", l.listRev > rev)
+        val msg = nextMessage(vm)
+        assertEquals("Onion: the rest taken off, what's bought stays", msg.text)
+        runBlocking { msg.undo!!() }
+        await(vm.ui) { it.row("onion").state == TickState.PARTIAL }
+        // Nothing of the carrots bought: the row goes, and Undo brings it back.
+        vm.removeRow(ui.row("carrot").id, "carrot")
+        await(vm.ui) { u -> u.aisles.flatMap { it.second }.none { it.name == "carrot" } }
+    }
+
+    @Test
     fun tickUndoAndPartial() {
         val c = TestContainer.create()
         c.add("2 onions")
