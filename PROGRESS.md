@@ -594,4 +594,7 @@ words.
   Walking order's line now names the groups ("The aisles, and the groups in them, in the order you walk the store");
   the rest still fit (the review aisle menu's "Mark this aisle as at home" matches the AA.2 checkbox, "Always at home"
   in Settings and the ingredient library is the same staples, "Arrange items", "Clear shopping history").
-- [ ] AC.10 Verify and report
+- [x] AC.10 Verify and report. Screenshots re-recorded, `tools/contact-sheet` run. Journeys: adding by hand
+  4 · 1 · 0 · 0, core 6 · 0 · 0 · 2, quick 7 · 2 · 0 · 0, meal-based 9 · 1 · 3 · 3 (none longer than step-ab.md);
+  new `saladBeforeVegetables` (Settings › Walking order › Produce › Salad ↑, back to the list) 6 · 0 · 1 · 4. Report:
+  `docs/reports/step-ac.md`.

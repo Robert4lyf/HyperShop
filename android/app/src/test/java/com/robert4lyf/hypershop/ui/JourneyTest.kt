@@ -17,6 +17,7 @@ import androidx.compose.ui.test.swipeUp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.UnitLocale
 import com.robert4lyf.hypershop.core.parse.RuleParser
@@ -300,6 +301,39 @@ class JourneyTest {
         // focused after Enter, and empty, so the usual items are chips under it: one tap each.
         tap("usual-${c.repository.target("toothpaste").mergeKey}")
         tap("usual-${c.repository.target("kitchen roll").mergeKey}")
+    }
+
+    /** Step AC: Salad before Vegetables, set in Settings › Aisles › Walking order and seen on the list. */
+    @Test
+    fun saladBeforeVegetables() {
+        val c = TestContainer.create()
+        runBlocking {
+            c.awaitReady()
+            for (name in listOf(
+                "onion",
+                "lettuce",
+            )) c.repository.manualAdd(name, com.robert4lyf.hypershop.core.model.QtyBase.PRESENCE, null)
+        }
+        show(c)
+        val onion = c.itemId("cat:onion")
+        val lettuce = c.itemId("cat:lettuce")
+        waitFor("tick-$onion")
+        tap("open-settings")
+        scrollTo("settings", "open-aisles")
+        tap("open-aisles")
+        waitFor("groups-PRODUCE")
+        tap("groups-PRODUCE")
+        tap("group-up-PRODUCE-Salad")
+        compose.waitUntil(10_000) {
+            runBlocking { c.repository.shelfOrder(1) }.groupSort(AisleCode.PRODUCE, "Salad", 0) <
+                runBlocking { c.repository.shelfOrder(1) }.groupSort(AisleCode.PRODUCE, "Vegetables", 0)
+        }
+        tap("aisles-back")
+        tap("settings-back")
+        waitFor("tick-$lettuce")
+        val top = { id: Long -> compose.onNodeWithTag("tick-$id", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.top }
+        compose.waitUntil(10_000) { top(lettuce) < top(onion) }
+        record("salad before vegetables", c)
     }
 
     /** Meal-based shopping: three saved recipes put on the list, one served to 5, rice partly at home. */
