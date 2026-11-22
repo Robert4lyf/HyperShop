@@ -24,7 +24,6 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ExpandLess
@@ -66,7 +65,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -148,26 +146,11 @@ fun LibraryScreen(
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
-                Row(
-                    Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp, top = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") }
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            "Ingredient library",
-                            style = MaterialTheme.typography.headlineSmall,
-                            modifier = Modifier.semantics { heading() },
-                        )
-                        if (ui.loaded) {
-                            Text(
-                                "${ui.total} ingredients",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
+                com.robert4lyf.hypershop.ui.common.ScreenHeader(
+                    title = "Ingredient library",
+                    subtitle = if (ui.loaded) "${ui.total} ingredients" else null,
+                    onBack = onBack,
+                )
                 OutlinedTextField(
                     value = query,
                     onValueChange = onSearch,

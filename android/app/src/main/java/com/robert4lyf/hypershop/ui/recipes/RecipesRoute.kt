@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -65,8 +66,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -435,19 +434,36 @@ private fun LibraryCard(
         color = MaterialTheme.colorScheme.card,
     ) {
         Column {
-            // The recipe's band, as on its card on the list: its photo, else its own mosaic, the same height either way.
-            Box(Modifier.fillMaxWidth().heightIn(min = LIBRARY_BAND).clipToBounds().testTag("lib-band-${row.key}")) {
-                RecipeBackdrop(row.title, row.photo, Modifier.matchParentSize())
-                Text(
-                    row.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Brand.OnHero,
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(start = 20.dp, end = 16.dp, top = 14.dp, bottom = 12.dp)
-                            .testTag("hero-text"),
-                )
+            // A real photo heads the card as a band, the title on it. Step AC: without one, the recipe's own art is a
+            // small square beside the title, not a full-width banner.
+            val photo = row.photo
+            if (photo != null) {
+                Box(Modifier.fillMaxWidth().heightIn(min = LIBRARY_BAND).clipToBounds().testTag("lib-band-${row.key}")) {
+                    RecipeBackdrop(photo, Modifier.matchParentSize())
+                    Text(
+                        row.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Brand.OnHero,
+                        modifier =
+                            Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(start = 20.dp, end = 16.dp, top = 14.dp, bottom = 12.dp)
+                                .testTag("hero-text"),
+                    )
+                }
+            } else {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RecipeArt(row.title, null, Modifier.size(56.dp).clip(RoundedCornerShape(14.dp)).testTag("lib-thumb-${row.key}"))
+                    Spacer(Modifier.size(12.dp))
+                    Text(
+                        row.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.weight(1f).testTag("lib-title-${row.key}"),
+                    )
+                }
             }
             Row(
                 Modifier.padding(start = 20.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
@@ -521,37 +537,6 @@ private fun LibraryCard(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun Meta(
-    icon: ImageVector,
-    text: String,
-    modifier: Modifier = Modifier,
-) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Icon(icon, contentDescription = null, tint = Brand.OnHeroSoft, modifier = Modifier.size(16.dp))
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = Brand.OnHeroSoft)
-    }
-}
-
-@Composable
-private fun Fact(
-    icon: ImageVector,
-    text: String,
-    bg: Color,
-    fg: Color,
-) {
-    Surface(shape = PillShape, color = bg, contentColor = fg) {
-        Row(
-            Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
-            Text(text, style = MaterialTheme.typography.labelLarge)
         }
     }
 }

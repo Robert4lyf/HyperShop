@@ -35,12 +35,10 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.ReportProblem
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -49,14 +47,12 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -101,8 +97,6 @@ import com.robert4lyf.hypershop.ui.common.rememberOpenLink
 import com.robert4lyf.hypershop.ui.common.sectionItem
 import com.robert4lyf.hypershop.ui.common.sectionPosition
 import com.robert4lyf.hypershop.ui.common.siteName
-import com.robert4lyf.hypershop.ui.recipes.RecipeBackdrop
-import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.theme.style
 
@@ -304,7 +298,11 @@ private fun TopBar(
     }
 }
 
-/** The recipe: who read it, its title and site, what will happen, and how many it serves. */
+/**
+ * The recipe, plainly (Step AC: no picture behind it): its title with the pencil, what will happen ("4 to add · 1 at
+ * home"), the servings and its site. When Claude failed or was skipped, one line says why, with Retry, and can be put
+ * away. Compact, so the ingredients start on the first screen of a small phone.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Hero(
@@ -320,125 +318,101 @@ private fun Hero(
     var sourcing by rememberSaveable { mutableStateOf(false) }
     if (sourcing) BookDialog(ui.book, ui.page, onDismiss = { sourcing = false }, onSave = onBook)
     val open = rememberOpenLink()
-    val onHero = ButtonDefaults.textButtonColors(contentColor = Brand.OnHero)
-    CompositionLocalProvider(LocalContentColor provides Brand.OnHero) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 4.dp)
-                .clip(RoundedCornerShape(24.dp)),
-        ) {
-            // The recipe's own picture behind it, the same as its card on the Recipes tab: its photo, else its mosaic.
-            RecipeBackdrop(ui.title, ui.photo, Modifier.matchParentSize())
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                // Wraps rather than squeezing: the spinner must stay visible on narrow phones.
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    val centred = Modifier.align(Alignment.CenterVertically)
-                    // Step Z: Claude's status shows only when it failed or was skipped (the note below says which),
-                    // with Retry there; a reading that worked, or one still running, has no badge of its own.
-                    if (ui.claudeNote != null && ui.canAskClaude && !ui.retrying) {
-                        TextButton(
-                            onClick = onRetryClaude,
-                            enabled = !ui.busy,
-                            colors = onHero,
-                            modifier = centred.testTag("ask-claude"),
-                        ) {
-                            Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.size(6.dp))
-                            Text("Retry with Claude")
-                        }
-                    }
-                    if (ui.retrying) {
-                        CircularProgressIndicator(centred.size(20.dp).progressSemantics(), color = Brand.OnHero, strokeWidth = 2.dp)
-                        TextButton(onClick = onStopRetry, colors = onHero, modifier = centred.testTag("stop-retry")) {
-                            Text("Stop")
-                        }
-                    } else if (ui.busy) {
-                        CircularProgressIndicator(centred.size(20.dp), color = Brand.OnHero, strokeWidth = 2.dp)
-                    }
-                }
-                ui.claudeNote?.let {
+    var noteAway by rememberSaveable(ui.claudeNote) { mutableStateOf(false) }
+    Column(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 0.dp, bottom = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f, fill = false).testTag("hero-text")) {
+                Text(
+                    ui.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier =
+                        Modifier.semantics {
+                            heading()
+                            contentDescription = ui.title
+                        },
+                )
+                if (ui.summary.isNotEmpty()) {
                     Text(
-                        it,
-                        Modifier.testTag("claude-note"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Brand.OnHero,
+                        ui.summary,
+                        Modifier.testTag("summary"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f, fill = false).testTag("hero-text")) {
-                        Text(
-                            ui.title,
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = Brand.OnHero,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier =
-                                Modifier.semantics {
-                                    heading()
-                                    contentDescription = ui.title
-                                },
-                        )
-                        if (ui.summary.isNotEmpty()) {
-                            Text(ui.summary, Modifier.testTag("summary"), style = MaterialTheme.typography.bodyMedium, color = Brand.OnHero)
-                        }
-                    }
-                    if (!ui.byHand) {
-                        IconButton(onClick = { renaming = true }, modifier = Modifier.testTag("edit-title")) {
-                            Icon(Icons.Rounded.Edit, contentDescription = "Rename recipe", tint = Brand.OnHero)
-                        }
-                    }
-                }
-                if (ui.cookbook) {
-                    TextButton(
-                        onClick = { sourcing = true },
-                        colors = onHero,
-                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp),
-                        modifier = Modifier.testTag("edit-book"),
-                    ) {
-                        Icon(Icons.AutoMirrored.Rounded.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.size(8.dp))
-                        Text(bookRef(ui.book, ui.page) ?: "Add book and page", maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    if (!ui.byHand && !ui.savedOnly) {
-                        Servings(
-                            ui.servings,
-                            ui.originalServings,
-                            onServings,
-                            Modifier.align(Alignment.CenterVertically),
-                        )
-                    }
-                    ui.url?.let { url ->
-                        TextButton(
-                            onClick = { open(url) },
-                            modifier = Modifier.align(Alignment.CenterVertically).testTag("open-recipe"),
-                            colors = onHero,
-                        ) {
-                            Text(
-                                siteName(url) ?: "Open recipe",
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false),
-                            )
-                            Spacer(Modifier.size(6.dp))
-                            Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = "Open recipe", modifier = Modifier.size(18.dp))
-                        }
-                    }
+            }
+            if (!ui.byHand) {
+                IconButton(onClick = { renaming = true }, modifier = Modifier.testTag("edit-title")) {
+                    Icon(Icons.Rounded.Edit, contentDescription = "Rename recipe")
                 }
             }
+        }
+        if (ui.cookbook) {
+            TextButton(
+                onClick = { sourcing = true },
+                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp),
+                modifier = Modifier.testTag("edit-book"),
+            ) {
+                Icon(Icons.AutoMirrored.Rounded.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(8.dp))
+                Text(bookRef(ui.book, ui.page) ?: "Add book and page", maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            if (!ui.byHand && !ui.savedOnly) {
+                Servings(ui.servings, ui.originalServings, onServings, Modifier.align(Alignment.CenterVertically))
+            }
+            ui.url?.let { url ->
+                TextButton(onClick = { open(url) }, modifier = Modifier.align(Alignment.CenterVertically).testTag("open-recipe")) {
+                    Text(
+                        siteName(url) ?: "Open recipe",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Spacer(Modifier.size(6.dp))
+                    Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = "Open recipe", modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+        // Claude's status only when it failed or was skipped: the reason, Retry, and a way to put the line away.
+        if (ui.retrying) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(20.dp).progressSemantics(), strokeWidth = 2.dp)
+                Spacer(Modifier.size(8.dp))
+                Text("Reading with Claude…", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = onStopRetry, modifier = Modifier.testTag("stop-retry")) { Text("Stop") }
+            }
+        } else if (ui.claudeNote != null && !noteAway) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    ui.claudeNote,
+                    Modifier.weight(1f).testTag("claude-note"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (ui.canAskClaude) {
+                    TextButton(
+                        onClick = onRetryClaude,
+                        enabled = !ui.busy,
+                        modifier = Modifier.semantics { contentDescription = "Retry with Claude" }.testTag("ask-claude"),
+                    ) { Text("Retry") }
+                }
+                IconButton(onClick = { noteAway = true }, modifier = Modifier.testTag("claude-note-close")) {
+                    Icon(Icons.Rounded.Close, contentDescription = "Hide this note")
+                }
+            }
+        } else if (ui.busy) {
+            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
         }
     }
 }
@@ -572,7 +546,11 @@ private fun Servings(
     var typing by rememberSaveable { mutableStateOf(false) }
     if (typing) ServingsDialog(s, onDismiss = { typing = false }, onSet = onServings)
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Surface(shape = RoundedCornerShape(50), color = Color.White, contentColor = HERO_INK) {
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
                     onClick = { onServings((s ?: 1) - 1) },
@@ -811,4 +789,3 @@ private fun ReviewRowItem(
 }
 
 /** Text on the hero's white chips: near-black green, readable on white whatever the recipe's hue. */
-private val HERO_INK = Color(0xFF12301F)

@@ -531,7 +531,20 @@ words.
   card (`Brand.WarmCall` gradient + `heroGlow`). `heroBrush` has no user. Claims checked: `EmptyHero` draws no
   mosaic (plain text, it is the empty states' headline); the cooking view and the recipe sheet draw none (the sheet
   and the list's recipe sheet show a real photo when there is one).
-- [ ] AC.1 No large geometric header anywhere
+- [x] AC.1 No large geometric header anywhere. `ScreenHeader` is one plain bar (back arrow at the start where there
+  is one, title, one-line subtitle, actions at the end, an optional line below): the empty list, empty Recipes,
+  Settings, Aisles and the ingredient library use it (Settings' and Aisles' back arrows moved from the right to the
+  start). The review's `Hero` is plain: title + pencil, "N to add · N at home", the servings stepper (secondary
+  container colours, was white on the mosaic), the site; Claude's note is one line with Retry and ✕. A
+  `w360dp-h640dp` test shows the first ingredient row above the Add bar without scrolling. "N recipes ready to
+  review" is a card in `secondaryContainer`. Recipes cards: a real photo keeps its band; without one, the art is a
+  56 dp square beside the title. Deleted: the mosaic `ScreenHeader`, `Brand.WarmCall`, `heroGlow`, `heroBrush`,
+  `RecipeBackdrop`'s mosaic branch and shade, `HERO_INK`, `ScreenHeader`'s `seed`/`overline`, `HeroTextTest` and its
+  `hero-large-font-light.png` (replaced by `ScreenHeaderTest`), `HeroContrastTest` (white text on every mosaic
+  palette: no text sits on a mosaic now), `Brand.OnHeroSoft` and two unused composables (`Meta`, `Fact`). `lowPoly` stays: it draws `RecipeArt`'s squares.
+  Found on the way: `EntryNavigationTest` depended on test order. Robolectric's window never enters touch mode, so
+  Android re-focused it whenever a focused node went, and which control won depended on layout; the test now puts
+  the window in touch mode, as a phone's is (on a phone, in touch mode, Android 9+ does not re-focus).
 - [ ] AC.2 Reorder sub-groups in Walking order
 - [ ] AC.3 Item editor is one small form
 - [ ] AC.4 A recipe on the list says so

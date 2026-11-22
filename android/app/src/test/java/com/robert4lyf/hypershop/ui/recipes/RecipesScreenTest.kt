@@ -325,13 +325,18 @@ class RecipesScreenTest {
     }
 
     @Test
-    fun aRecipeWithoutAPhotoHasABandAsTallAsOneWith() {
+    fun aRecipeWithoutAPhotoHasASmallSquareOfArtNotABand() {
+        // Step AC: the chilli's real photo stays a band (compact, UX review 14); the dal, with no photo, has its art as a
+        // 56 dp square beside its title, and no band.
         show()
 
-        // The chilli's photo and the dal's mosaic make bands of one (compact, UX review 14) height.
-        fun height(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot().let { it.bottom - it.top }
-        assertEquals(height("lib-band-r:1").value, height("lib-band-r:9").value, 1f)
-        assertEquals(96f, height("lib-band-r:9").value, 1f)
+        fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertEquals(96f, bounds("lib-band-r:1").let { it.bottom - it.top }.value, 1f)
+        compose.onNodeWithTag("lib-band-r:9", useUnmergedTree = true).assertDoesNotExist()
+        val thumb = bounds("lib-thumb-r:9")
+        assertEquals(56f, (thumb.right - thumb.left).value, 1f)
+        assertEquals(56f, (thumb.bottom - thumb.top).value, 1f)
+        compose.onNodeWithTag("lib-title-r:9", useUnmergedTree = true).assertExists()
     }
 
     @Test

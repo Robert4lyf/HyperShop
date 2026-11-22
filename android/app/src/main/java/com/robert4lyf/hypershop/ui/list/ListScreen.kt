@@ -553,8 +553,6 @@ private fun ListTop(
     if (ui.loaded && !shopping) {
         ScreenHeader(
             title = "Shopping list",
-            // One mosaic for the list, whatever the count says.
-            seed = "Shopping list",
             actions = {
                 com.robert4lyf.hypershop.ui.common.SettingsButton()
                 ListMenu(ui, actions)

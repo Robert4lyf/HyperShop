@@ -26,33 +26,17 @@ fun RecipeArt(
     }
 }
 
-/**
- * [RecipeArt] behind white text (a card's band, the review's header). A photo is darkened
- * at the top and the bottom, where the text and buttons sit; the mosaic needs nothing.
- */
+/** A recipe's real photo behind white text (a Recipes card's band): darkened at the top and the bottom, where text sits. */
 @Composable
 fun RecipeBackdrop(
-    title: String,
-    photo: String?,
+    photo: String,
     modifier: Modifier = Modifier,
 ) {
-    if (photo == null) {
-        // UX review 25: the mosaic's brightest facets get the same soft shade behind the title as a photo does.
-        Box(modifier.lowPoly(title)) { Box(Modifier.matchParentSize().background(MOSAIC_SHADE)) }
-        return
-    }
     Box(modifier) {
         RecipePhoto(photo, contentDescription = null, modifier = Modifier.matchParentSize(), maxPx = 1280)
         Box(Modifier.matchParentSize().background(PHOTO_SHADE))
     }
 }
-
-private val MOSAIC_SHADE =
-    Brush.verticalGradient(
-        0f to Color.Transparent,
-        0.5f to Color.Black.copy(alpha = 0.08f),
-        1f to Color.Black.copy(alpha = 0.38f),
-    )
 
 private val PHOTO_SHADE =
     Brush.verticalGradient(

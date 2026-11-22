@@ -64,6 +64,10 @@ On the review, lines still to go on the list are counted as **N to add** ("4 to 
   undoes it. The screen stays awake while anything is ticked.
 - Once the list has items, its top is one row: **"N to buy · M bought"** ("N to buy" before anything is ticked, "All
   bought" at the end), the progress bar under it, the gear and ⋮; "1 set aside" and the watch's state in small text when
-  there are any. The mosaic banner only on the empty list. The **Add item** field is pinned under that row. Recipes
-  does the same: one "Recipes" row once there are recipes, the banner while there are none.
+  there are any. The **Add item** field is pinned under that row.
+- Every screen's top is one plain bar (Step AC): back arrow where there is one, the title, an optional one-line
+  subtitle, actions on the right. No mosaic, gradient or hero card anywhere. The review's top: **Later**, the recipe's
+  title with its pencil, "4 to add · 1 at home", the servings; when Claude failed or was skipped, one line with the
+  reason, **Retry** and ✕. "N recipes ready to review" is a plain card. A recipe without a photo shows its art as a
+  small square beside its title; a real photo stays a band.
 - No instructions on screens: a control that needed a paragraph was relabelled or removed.

@@ -32,7 +32,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AddShoppingCart
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -256,16 +255,7 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 item(key = "top") {
-                    ScreenHeader(
-                        title = "Settings",
-                        actions = {
-                            onBack?.let { back ->
-                                IconButton(onClick = back, modifier = Modifier.testTag("settings-back")) {
-                                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
-                                }
-                            }
-                        },
-                    )
+                    ScreenHeader(title = "Settings", onBack = onBack, backTag = "settings-back")
                 }
                 // Nothing below the header until the saved settings are in, so no control jumps.
                 if (!ui.loaded) {

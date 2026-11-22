@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Settings
@@ -26,7 +28,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -37,7 +39,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,7 +48,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -65,11 +65,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
-import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.theme.cardEdge
-import com.robert4lyf.hypershop.ui.theme.lowPoly
 import com.robert4lyf.hypershop.ui.theme.style
 
 /** The aisle's icon on its colour: the same mark on every screen. */
@@ -171,60 +169,54 @@ fun SectionLabel(
 }
 
 /**
- * A screen's hero: the large title on a low-poly mosaic picked by the title, with an overline and
- * subtitle and room for actions and more below. Content inside is white
- * ([LocalContentColor]), so icon buttons in [actions] need no colours.
+ * Step AC: every screen's top, one plain compact bar: the back arrow where there is one, the title (a heading) with an
+ * optional one-line subtitle, actions on the right, and room for one more line below (the list's progress bar). No
+ * mosaic, gradient or card behind it.
  */
 @Composable
 fun ScreenHeader(
     title: String,
     modifier: Modifier = Modifier,
-    /** What picks the mosaic; the title unless it changes as you go ("5 left"). */
-    seed: String = title,
-    overline: String? = null,
     subtitle: String? = null,
+    /** The back arrow, at the start; null where the screen is a tab. */
+    onBack: (() -> Unit)? = null,
+    backTag: String = "back",
     actions: @Composable RowScope.() -> Unit = {},
     below: @Composable ColumnScope.() -> Unit = {},
 ) {
-    Box(
-        modifier
-            .fillMaxWidth()
-            .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .lowPoly(seed)
-            // UX review 25: a soft shade under the title, so the mosaic's brightest facets never meet white text bare.
-            .background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.22f), 1f to Color.Black.copy(alpha = 0.06f))),
-    ) {
-        CompositionLocalProvider(LocalContentColor provides Brand.OnHero) {
-            Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 14.dp, bottom = 14.dp)) {
-                Row(verticalAlignment = Alignment.Top) {
-                    Column(Modifier.weight(1f).padding(top = 2.dp).testTag("hero-text")) {
-                        overline?.let {
-                            // Soft white, not citrus: citrus only clears 3:1 on the brighter hero.
-                            Text(it.uppercase(), style = MaterialTheme.typography.labelMedium, color = Brand.OnHeroSoft)
-                        }
-                        // Three lines at most (a long title at 200 % pushed the screen below the fold); TalkBack gets it whole.
-                        Text(
-                            title,
-                            style = MaterialTheme.typography.headlineLarge,
-                            color = Brand.OnHero,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier =
-                                Modifier.semantics {
-                                    heading()
-                                    contentDescription = title
-                                },
-                        )
-                        subtitle?.let {
-                            Text(it, style = MaterialTheme.typography.bodyMedium, color = Brand.OnHeroSoft)
-                        }
-                    }
-                    Row(Modifier, verticalAlignment = Alignment.CenterVertically, content = actions)
+    Column(modifier.fillMaxWidth().padding(start = if (onBack != null) 4.dp else 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            onBack?.let { back ->
+                IconButton(onClick = back, modifier = Modifier.testTag(backTag)) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
                 }
-                Column(Modifier.padding(end = 12.dp), content = below)
             }
+            Column(Modifier.weight(1f).heightIn(min = 48.dp), verticalArrangement = Arrangement.Center) {
+                // Two lines at most (a long title at 200 % must not push the screen down); TalkBack gets it whole.
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier =
+                        Modifier.semantics {
+                            heading()
+                            contentDescription = title
+                        },
+                )
+                subtitle?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, content = actions)
         }
+        Column(Modifier.padding(start = if (onBack != null) 12.dp else 0.dp, end = 12.dp), content = below)
     }
 }
 
