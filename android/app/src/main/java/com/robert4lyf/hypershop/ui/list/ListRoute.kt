@@ -44,6 +44,8 @@ fun ListRoute(
     focusAdd: Int = 0,
     /** The Add field took the request; it is not to be repeated. */
     onAddFocused: () -> Unit = {},
+    /** Step AD.11: "Add recipes" on the empty list opens the Recipes tab. */
+    onRecipes: () -> Unit = {},
 ) {
     val vm: ListViewModel = viewModel(factory = factoryFor { ListViewModel(container, it.createSavedStateHandle()) })
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -109,7 +111,7 @@ fun ListRoute(
         ),
         header = { listHeader(ui, header) },
         addField = { ListAddField(header, focusAdd, onAddFocused, prep.usual) },
-        empty = { EmptyState(header.onSample, header.onPasteLink, prep, header.onLastShop) },
+        empty = { EmptyState(header.onSample, header.onPasteLink, prep, header.onLastShop, onRecipes) },
         focusAdd = focusAdd,
         flash = flash,
     )

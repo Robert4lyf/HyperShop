@@ -693,5 +693,9 @@ loop. No tabs, modes, settings or help text; no schema, protocol, golden-data or
   (`reinstate`). A bought row isn't swiped. The sheet's Delete is unchanged. Tests: `ListViewModelTest` (partly
   bought keeps the bought, listRev bumped, Undo; unbought goes), `ListScreenTest` (swipe left and right, "Remove"
   while moving, none on a bought row, TalkBack's action).
-- [ ] AD.11 After a shop, the next step.
+- [x] AD.11 After a shop, the next step. The empty list for someone who has shopped before shows "Last shop's N
+  items" (when there are any) and "Add recipes", which opens the Recipes tab. The first-run empty list (Try a sample
+  list, Paste a link) is unchanged. Tests: `ListScreenTest` (both buttons; Add recipes alone with no last shop; the
+  first run unchanged), `AfterAShopTest` (after a finished trip, through the app shell, Add recipes opens the Recipes
+  tab).
 - [ ] AD.12 Verify and report.

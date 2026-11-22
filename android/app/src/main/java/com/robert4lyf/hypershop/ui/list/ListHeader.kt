@@ -407,17 +407,23 @@ fun EmptyState(
     onPasteLink: () -> Unit = {},
     prep: PlanPrep = PlanPrep(),
     onLastShop: () -> Unit = {},
+    /** Step AD.11: the Recipes tab, to add this week's recipes. */
+    onRecipes: () -> Unit = {},
 ) {
     if (prep.returning) {
+        // Step AD.11: after a shop, the next step: last shop's regulars back on, or recipes for the week.
         EmptyHero(
             title = "Nothing on the list",
             body = "Type an item above or share a recipe link.",
             modifier = Modifier.padding(top = 8.dp).testTag("empty"),
         ) {
-            if (prep.lastShop > 0) {
-                OutlinedButton(onClick = onLastShop, modifier = Modifier.testTag("empty-last-shop")) {
-                    Text("Last shop's ${prep.lastShop} items")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (prep.lastShop > 0) {
+                    OutlinedButton(onClick = onLastShop, modifier = Modifier.testTag("empty-last-shop")) {
+                        Text("Last shop's ${prep.lastShop} items")
+                    }
                 }
+                OutlinedButton(onClick = onRecipes, modifier = Modifier.testTag("empty-recipes")) { Text("Add recipes") }
             }
         }
         return

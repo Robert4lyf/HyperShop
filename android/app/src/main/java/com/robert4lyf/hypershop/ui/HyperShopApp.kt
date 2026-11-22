@@ -286,6 +286,7 @@ private fun AppShell(
                             onReview = openReview,
                             focusAdd = addFocus,
                             onAddFocused = { addFocus = 0 },
+                            onRecipes = { selectTab(Routes.RECIPES) },
                         )
                     }
                     composable(Routes.RECIPES) {

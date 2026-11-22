@@ -464,18 +464,50 @@ class ListScreenTest {
     }
 
     @Test
-    fun aReturningShopperIsOfferedLastShopAndNoPlanning() {
-        // Step Z: no "Plan this week" (Meals went); someone who has shopped before can put last shop back on.
+    fun aReturningShopperIsOfferedLastShopAndRecipes() {
+        // Step Z: no "Plan this week" (Meals went). Step AD.11: after a shop, the next step: last shop's items back on,
+        // or "Add recipes" (the Recipes tab).
         val prep = PlanPrep(loaded = true, lastShop = 4, returning = true)
         compose.setContent {
             HyperShopTheme(dynamicColor = false) {
-                ListScreen(ListUi(loaded = true), actions, empty = { EmptyState({}, {}, prep, onLastShop = { events += "last" }) })
+                ListScreen(
+                    ListUi(loaded = true),
+                    actions,
+                    empty = { EmptyState({}, {}, prep, onLastShop = { events += "last" }, onRecipes = { events += "recipes" }) },
+                )
             }
         }
         compose.onNodeWithText("Nothing on the list").assertExists()
         compose.onNodeWithTag("empty-plan").assertDoesNotExist()
-        compose.onNodeWithTag("empty-last-shop").performClick()
-        assertEquals(listOf("last"), events)
+        compose.onNodeWithText("Last shop's 4 items").performClick()
+        compose.onNodeWithText("Add recipes").performClick()
+        assertEquals(listOf("last", "recipes"), events)
+        compose.onNodeWithTag("paste-link").assertDoesNotExist()
+    }
+
+    @Test
+    fun aReturningShopperWithNoLastShopStillGetsAddRecipes() {
+        val prep = PlanPrep(loaded = true, lastShop = 0, returning = true)
+        compose.setContent {
+            HyperShopTheme(dynamicColor = false) {
+                ListScreen(ListUi(loaded = true), actions, empty = { EmptyState({}, {}, prep, onRecipes = { events += "recipes" }) })
+            }
+        }
+        compose.onNodeWithTag("empty-last-shop").assertDoesNotExist()
+        compose.onNodeWithTag("empty-recipes").performClick()
+        assertEquals(listOf("recipes"), events)
+    }
+
+    @Test
+    fun theFirstRunEmptyListIsUnchanged() {
+        compose.setContent {
+            HyperShopTheme(
+                dynamicColor = false,
+            ) { ListScreen(ListUi(loaded = true), actions, empty = { EmptyState({}, {}, PlanPrep(loaded = true)) }) }
+        }
+        compose.onNodeWithText("Try a sample list").assertExists()
+        compose.onNodeWithTag("paste-link").assertExists()
+        compose.onNodeWithTag("empty-recipes").assertDoesNotExist()
     }
 
     @Test
