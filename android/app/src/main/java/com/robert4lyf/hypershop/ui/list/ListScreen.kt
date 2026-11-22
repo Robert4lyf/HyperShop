@@ -82,7 +82,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.settings.ListView
-import com.robert4lyf.hypershop.ui.common.AisleBadge
+import com.robert4lyf.hypershop.ui.common.AisleHeading
 import com.robert4lyf.hypershop.ui.common.BottomActionBar
 import com.robert4lyf.hypershop.ui.common.CountPill
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
@@ -692,27 +692,17 @@ private fun AisleTitle(
 ) {
     val left = rows.count { it.state != TickState.DONE }
     val tint = aisle.style
-    Row(
+    AisleHeading(
+        aisle,
+        if (left == 0) "Bought ✓" else "$left to buy",
         modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
             .clickable(onClickLabel = if (open) "Collapse" else "Expand", role = Role.Button, onClick = onToggle)
-            .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp)
             .semantics(mergeDescendants = true) {
                 heading()
                 stateDescription = if (open) "Expanded" else "Collapsed"
-            }
-            .testTag("aisle-${aisle.name}"),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            }.testTag("aisle-${aisle.name}"),
+        countColor = if (left == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
     ) {
-        AisleBadge(aisle, size = 24.dp)
-        Text(aisle.displayName, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-        if (left == 0) {
-            Text("Bought ✓", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-        } else {
-            Text("$left to buy", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
         Icon(
             if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
             contentDescription = null,

@@ -214,12 +214,25 @@ class ReviewScreenTest {
     @Config(qualifiers = "w360dp-h640dp-xhdpi")
     fun onASmallPhoneTheIngredientsStartOnTheFirstScreen() {
         // Step AC: a plain, compact header (no picture behind it), so the first rows show without scrolling.
-        show()
+        // Step AD.3: Claude read it (no note under the title), as most reviews; the range row and three aisles stay.
+        show(SAMPLE_REVIEW.copy(claudeNote = null))
         val root = compose.onRoot().getUnclippedBoundsInRoot()
         val bar = compose.onNodeWithTag("add").getUnclippedBoundsInRoot()
         val first = compose.onNodeWithTag("row-cat:onion").getUnclippedBoundsInRoot()
         assertTrue("first row $first above the bar $bar in $root", first.bottom <= bar.top)
+        // Step AD.3: the list's slim aisle rows, so at least four ingredients show under the header.
+        val shown =
+            listOf("cat:onion", "cat:garlic", "cat:beef_mince", "cat:salt", "name:chipotle paste or sauce").count { key ->
+                compose.onAllNodesWithTag("row-$key").fetchSemanticsNodes().firstOrNull()?.let {
+                    compose.onNodeWithTag("row-$key").getUnclippedBoundsInRoot().bottom <= bar.top
+                } == true
+            }
         compose.onRoot().captureRoboImage(Shots.path("review-360x640.png"))
+        assertTrue("$shown ingredients above the bar", shown >= 4)
+        // Each aisle heading is one 48 dp row, as on the list.
+        val heading = compose.onNodeWithTag("review-aisle-PRODUCE").getUnclippedBoundsInRoot()
+        assertTrue("a slim aisle row: $heading", heading.bottom - heading.top <= 56.dp)
+        compose.onNodeWithText("2 to add", useUnmergedTree = true).assertExists()
     }
 
     @Test

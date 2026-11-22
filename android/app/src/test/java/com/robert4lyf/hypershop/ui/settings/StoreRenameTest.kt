@@ -23,7 +23,18 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34])
 class StoreRenameTest {
-    @get:Rule val compose = createComposeRule()
+    /**
+     * No container here, so the last test's is wound down first, before the compose rule starts: its leftover work
+     * (Room's refresh) must not land in this test as an uncaught exception.
+     */
+    @get:Rule(order = 0)
+    val quiet =
+        object : org.junit.rules.ExternalResource() {
+            override fun before() = com.robert4lyf.hypershop.testutil.TestContainer.windDown()
+        }
+
+    @get:Rule(order = 1)
+    val compose = createComposeRule()
 
     @Test
     fun thePencilRenamesItsOwnStore() {

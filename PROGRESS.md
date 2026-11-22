@@ -628,7 +628,20 @@ loop. No tabs, modes, settings or help text; no schema, protocol, golden-data or
   stores (two fixed profiles); nothing to keep. Test: `StoreRenameTest` (at Robolectric's default size: with the
   `w411dp-h891dp-xxhdpi` qualifiers any dialog holding a text field never lets Compose go idle, a bare `AlertDialog`
   too; noted in the report), `WalkingOrderScreenTest` (no field, a pencil per tab).
-- [ ] AD.3 Review matches the list.
+- [x] AD.3 Review matches the list. The review's aisle headings are the list's slim row, one shared composable
+  (`ui/common/AisleHeading.kt`: 24 dp icon, name, count in words; the list adds its collapse arrow), in the card's own
+  colour, not the tall coloured block (36 dp badge, a count pill); 40 dp on the review, where it is not tapped. The
+  count is what the aisle adds ("2 to add", "All at home", "Nothing to add"; a saved recipe being edited: "3 items"),
+  was a bare number. Found: the heading's "Mark this aisle as at home" menu could not be reached (its callback was
+  always null since Y.20) and went with the block. To fit four ingredients at 360×640 dp the header also lost a line
+  (the servings stepper sits beside "4 to add · 1 at home") and review rows are 56 dp like the list's (were 64). The
+  test's sample (three aisles, a range row with its two readings) shows four rows wholly above the Add bar when
+  Claude read the recipe; with Claude's failure note under the title it shows three and the top of the fourth.
+  `ReviewScreenTest.onASmallPhoneTheIngredientsStartOnTheFirstScreen` checks four, and a heading ≤ 56 dp. Found on
+  the way: the gate failed once in `StoreRenameTest` with "uncaught exceptions before the test started" (Room's
+  refresh of the previous test's database, "Illegal connection pointer"). `TestContainer` only wound the last
+  container down when the next test built one. A test that builds none (`StoreRenameTest`) now calls
+  `TestContainer.windDown()` (the scope stopped and the database closed) from a rule ordered before its compose rule.
 - [ ] AD.4 A chosen reading looks chosen.
 - [ ] AD.5 One recipe card shape.
 - [ ] AD.6 Leaner list rows.

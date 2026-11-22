@@ -71,6 +71,20 @@ object TestContainer {
         return container
     }
 
+    /**
+     * Winds the container [create] made last right down, its database closed too: for a test that builds no container
+     * of its own (from a rule ordered before its compose rule), so the last one's work can't fail it. [create] only
+     * stops the last one's scope: a test may still use two containers at once (a backup and its restore).
+     */
+    fun windDown() {
+        last?.let { previous ->
+            runBlocking { withTimeoutOrNull(5_000) { previous.applicationScope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin() } }
+            // Room's own refresh of the last database runs on its own; let it finish before the next test starts.
+            runCatching { previous.db.close() }
+        }
+        last = null
+    }
+
     /** The container [create] made last: wound down before the next one is built. */
     @Volatile private var last: AppContainer? = null
 }

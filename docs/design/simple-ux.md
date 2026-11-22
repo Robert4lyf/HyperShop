@@ -74,11 +74,11 @@ On the review, lines still to go on the list are counted as **N to add** ("4 to 
 - Every screen's top is one plain bar (Step AC): back arrow where there is one, the title, an optional one-line
   subtitle, actions on the right. No mosaic, gradient or hero card anywhere. The review's top: **Review later** (the
   recipe waits on the "ready to review" card), the recipe's
-  title with its pencil, "4 to add · 1 at home", the servings; when Claude failed or was skipped, one line with the
+  title with its pencil, then "4 to add · 1 at home" with the servings beside it (Step AD); when Claude failed or was skipped, one line with the
   reason, **Retry** and ✕. "N recipes ready to review" is a plain card. A recipe without a photo shows its art as a
   small square beside its title; a real photo stays a band.
 - An aisle's heading is one slim row (Step AC): its small icon, its name, "N to buy" and the collapse arrow, in the
-  card's own colour. Group labels (Vegetables, Salad…) show only in an aisle with six or more items, and always while
+  card's own colour. The review uses the same row (Step AD), counting **N to add** ("All at home", "Nothing to add"). Group labels (Vegetables, Salad…) show only in an aisle with six or more items, and always while
   arranging; the group order from Walking order applies either way.
 - No instructions on screens: a control that needed a paragraph was relabelled or removed.
 
