@@ -298,7 +298,7 @@ private fun ListBody(
                             } else {
                                 Modifier.animateItem()
                             }.sectionItem(sectionPosition(i + 1, count), card)
-                        ListRowItem(r, actions, tile, lit = r.id in flash)
+                        ListRowItem(r, actions, tile, lit = r.id in flash, showFrom = true)
                     }
                 }
             }
@@ -723,13 +723,17 @@ internal fun displayMain(
 ): String = main.replaceFirstChar { it.uppercaseChar() }
 
 /**
- * The row's sub-lines: "2 already ticked" or the pack note, and the recipe the
- * item came from. The recipe joins the ticked count on one line ("2 already
- * ticked · Weeknight chilli"), but a pack note gets a line of its own.
+ * The row's sub-lines: "2 already bought" or the pack note. Step AD.6: the recipe an item came from is shown only when
+ * the list is grouped by recipe ([showFrom]; the shared card names its recipes); in store order it is in the row's
+ * TalkBack description and on the item's sheet. With both, it joins the bought count on one line ("2 already bought ·
+ * Weeknight chilli"), but a pack note gets a line of its own.
  */
-internal fun subLines(row: ListRow): List<String> {
+internal fun subLines(
+    row: ListRow,
+    showFrom: Boolean = false,
+): List<String> {
     val sub = row.sub
-    val from = row.from
+    val from = row.from?.takeIf { showFrom }
     return when {
         sub == null -> listOfNotNull(from)
         from == null -> listOf(sub)
@@ -751,6 +755,8 @@ private fun ListRowItem(
     tile: Modifier,
     /** Step AB: just added by hand: lit, then back to the card (seen, not announced). */
     lit: Boolean = false,
+    /** Step AD.6: the recipe under the name, in Group by recipe only. */
+    showFrom: Boolean = false,
 ) {
     val background by animateColorAsState(
         if (lit) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.card,
@@ -803,6 +809,11 @@ private fun ListRowItem(
                 .semantics(mergeDescendants = true) {
                     testTag = "item-${row.id}"
                     stateDescription = state
+                    // Step AD.6: in store order the recipe is not drawn, but TalkBack still says what it is for.
+                    if (!showFrom && row.from != null) {
+                        contentDescription =
+                            listOfNotNull(displayMain(row.main, row.name), row.sub, "for ${row.from}").joinToString(", ")
+                    }
                 }.padding(start = 6.dp, top = 10.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -822,7 +833,7 @@ private fun ListRowItem(
                         modifier = Modifier.testTag("set-aside-${row.id}"),
                     )
                 }
-                for (line in subLines(row)) {
+                for (line in subLines(row, showFrom)) {
                     Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }

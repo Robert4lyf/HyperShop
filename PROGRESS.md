@@ -659,7 +659,14 @@ loop. No tabs, modes, settings or help text; no schema, protocol, golden-data or
   app shell at 360×640: at least four recipes' titles on screen above the tab bar, the fourth card's button just
   above it; cards 8 dp apart, were 12; screenshot `recipes-360x640.png`). Deleted with the band: `RecipeBackdrop`, its shade,
   `LIBRARY_BAND` and `Brand.OnHero`.
-- [ ] AD.6 Leaner list rows.
+- [x] AD.6 Leaner list rows. In store order a row is its amount and name, with a second line only when it adds
+  something: the usual pack when it differs from the amount (`leanSub`: "500g beef mince" over "500g pack" loses
+  the pack line; "700ml milk" over "4 pint bottle" keeps it), the partly-bought state, what a pack count stands for
+  ("150ml needed") and an amount at home. The recipe's name is not drawn in store order (it was a line of its own, or
+  joined the bought count); it stays in Group by recipe (and the shared card's titles) and on the item's sheet, and
+  TalkBack reads it in store order too ("700 ml milk, for Weeknight chilli"). The watch's rows are unchanged
+  (`Display.row` is shared; only the phone's list drops the line). Tests: `ListScreenTest` (store order hides the
+  recipe but says it to TalkBack; `subLines` with and without it; `leanSub`'s cases).
 - [ ] AD.7 Quiet watch status.
 - [ ] AD.8 The amount form opens filled.
 - [ ] AD.9 A link in Add item starts an import.

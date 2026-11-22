@@ -77,6 +77,10 @@ On the review, lines still to go on the list are counted as **N to add** ("4 to 
   title with its pencil, then "4 to add · 1 at home" with the servings beside it (Step AD); when Claude failed or was skipped, one line with the
   reason, **Retry** and ✕. "N recipes ready to review" is a plain card. Every recipe card shows a small square beside its
   title: its photo cropped, or its art (Step AD; no photo band on cards).
+- In store order a row is its amount and name (Step AD); a second line only when it adds something: the usual pack
+  when it differs from the amount ("700 ml milk" over "4 pint bottle"; "500 g beef mince" has none), "2 already
+  bought", "150 ml needed", "200 g at home". The recipe it is for shows in Group by recipe and on its sheet; TalkBack
+  reads it in store order too ("700 ml milk, for Weeknight chilli").
 - An aisle's heading is one slim row (Step AC): its small icon, its name, "N to buy" and the collapse arrow, in the
   card's own colour. The review uses the same row (Step AD), counting **N to add** ("All at home", "Nothing to add"). Group labels (Vegetables, Salad…) show only in an aisle with six or more items, and always while
   arranging; the group order from Walking order applies either way.

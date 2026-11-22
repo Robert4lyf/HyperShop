@@ -139,7 +139,7 @@ class ListScreenTest {
     }
 
     @Test
-    fun rowsReadAlikeAndShowTheirRecipe() {
+    fun rowsReadAlikeAndSayTheirRecipeOnlyToTalkBackInStoreOrder() {
         val rows =
             listOf(
                 ListRow(1, "milk", "700 ml milk", null, TickState.OPEN, AisleCode.DAIRY_EGGS, from = "Weeknight chilli"),
@@ -150,14 +150,34 @@ class ListScreenTest {
         compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions) } }
         compose.onNodeWithText("700 ml milk").assertExists()
         compose.onNodeWithText("1 more onion").assertExists()
-        compose.onNodeWithText("2 already bought · Weeknight chilli").assertExists()
-        compose.onNodeWithText("1 × 250 g block").assertExists()
-        // The pack note keeps its line; the recipe goes under it.
-        assertEquals(listOf("1 × 250 g block", "Weeknight chilli"), subLines(rows[2]))
+        // Step AD.6: in store order the recipe is not drawn; the bought count keeps its line.
+        compose.onNodeWithText("2 already bought", useUnmergedTree = true).assertExists()
+        compose.onAllNodesWithText("Weeknight chilli", substring = true, useUnmergedTree = true).assertCountEquals(0)
+        // TalkBack still says what it is for.
+        val said = compose.onNodeWithTag("item-1").fetchSemanticsNode().config[SemanticsProperties.ContentDescription]
+        assertEquals(listOf("700 ml milk, for Weeknight chilli"), said)
+        assertEquals(listOf("1 × 250 g block"), subLines(rows[2]))
+        // Grouped by recipe (the shared card): the recipe under the name, the pack note on a line of its own.
+        assertEquals(listOf("1 × 250 g block", "Weeknight chilli"), subLines(rows[2], showFrom = true))
+        assertEquals(listOf("2 already bought · Weeknight chilli"), subLines(rows[1], showFrom = true))
         // A capital at the start of the row only (UX review 9): mid-line capitals read as typos.
         assertEquals("Coriander", displayMain("coriander", "coriander"))
         assertEquals("2 leaves", displayMain("2 leaves", "leaf"))
         assertEquals("2 tins chopped tomatoes", displayMain("2 tins chopped tomatoes", "chopped tomatoes"))
+    }
+
+    @Test
+    fun aPackLineOnlyWhenItDiffersFromTheAmount() {
+        // Step AD.6: the usual pack under the amount only when it says something new.
+        assertEquals(null, leanSub("500g beef mince", "500g pack", "1 × 500 g pack", TickState.OPEN))
+        assertEquals(null, leanSub("250g unsalted butter", "250g block", "1 × 250 g block", TickState.OPEN))
+        assertEquals("4 pint bottle", leanSub("700ml milk", "4 pint bottle", "1 × 4 pint bottle", TickState.OPEN))
+        assertEquals("400g tin", leanSub("2 tins chopped tomatoes", "400g tin", "1 × 400 g tin", TickState.OPEN))
+        assertEquals("454g jar", leanSub("honey", "454g jar", "454 g jar", TickState.OPEN))
+        // Not the pack note: kept whatever the numbers.
+        assertEquals("2 already bought", leanSub("2 more onions", "2 already bought", "1 × 1 kg bag", TickState.PARTIAL))
+        assertEquals("150ml needed", leanSub("1 pot double cream", "150ml needed", "1 × 150 ml pot", TickState.OPEN))
+        assertEquals("200g at home", leanSub("200g rice", "200g at home", "1 × 1 kg bag", TickState.OPEN))
     }
 
     @Test

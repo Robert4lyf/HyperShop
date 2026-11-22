@@ -480,7 +480,7 @@ class ListViewModel(
                     item.id,
                     item.displayName,
                     text.main,
-                    text.sub,
+                    leanSub(text.main, text.sub, entry?.packNote, state),
                     state,
                     item.aisle,
                     entry?.group,
@@ -1062,3 +1062,24 @@ private class Sources(
 
 private const val SHARED = "shared"
 private const val BY_HAND = "by-hand"
+
+/**
+ * Step AD.6: the row's second line, only when it adds something. The usual pack is left out when it is the amount
+ * already shown ("500g beef mince" over "500g pack"); it stays when it differs ("700ml milk" over "4 pint bottle"). What
+ * is partly bought, what a pack count stands for ("150ml needed") and what is at home always stay.
+ */
+internal fun leanSub(
+    main: String,
+    sub: String?,
+    packNote: String?,
+    state: TickState,
+): String? {
+    if (sub == null || packNote == null || state == TickState.PARTIAL) return sub
+    val pack = Display.compactUnits(packNote.removePrefix("1 × "))
+    if (sub != pack) return sub
+    val shown = LEADING_AMOUNT.find(Display.compactUnits(main))?.value ?: return sub
+    val packAmount = LEADING_AMOUNT.find(pack)?.value ?: return sub
+    return if (shown == packAmount) null else sub
+}
+
+private val LEADING_AMOUNT = Regex("""^(\d+(?:[.,/]\d+)?|[½¼¾⅓⅔⅛])(kg|g|ml|l|cl|oz|lb)?(?=\s|$)""")
