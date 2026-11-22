@@ -213,7 +213,8 @@ internal fun ItemEditor(
                         )
                     }
                 }
-                if (aisle != sheet.aisle) {
+                // Step AB: a hand-added item's move is remembered without asking (the message says so, with Undo).
+                if (aisle != sheet.aisle && !sheet.byHand) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
                             enabled = !sheet.saving,

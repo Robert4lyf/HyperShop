@@ -93,7 +93,13 @@ class LibraryViewModel(
     val events: Flow<UiMessage> = messages.receiveAsFlow()
 
     val ui: StateFlow<LibraryUi> =
-        combine(c.library.edits, snapshotFlow { query }, snapshotFlow { aisle }) { edits, q, a ->
+        // Compose state is read on the main thread: each read takes a snapshot, which can advance the global one, and
+        // done on a worker that sent recomposition there under the Compose test clock (CalledFromWrongThread on CI).
+        combine(
+            c.library.edits,
+            snapshotFlow { query }.flowOn(Dispatchers.Main.immediate),
+            snapshotFlow { aisle }.flowOn(Dispatchers.Main.immediate),
+        ) { edits, q, a ->
             val all = c.catalog.entries
             val key = CatalogKey.of(q)
             val rows =

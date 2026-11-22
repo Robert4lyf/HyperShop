@@ -78,4 +78,57 @@ class CategoriserTest {
         val r2 = 1.0 - viaParser.count { c.aisle(it).first == AisleCode.OTHER }.toDouble() / viaParser.size
         assertTrue(r2 >= 0.85, "via parser only ${"%.1f".format(r2 * 100)}%")
     }
+
+    /** Step AB: everyday non-food things typed into Add item land in Household, not Other. */
+    @Test
+    fun everydayNonFoodGoesToHousehold() {
+        val household =
+            listOf(
+                "batteries", "AA batteries", "toothpaste", "toothbrush", "shampoo", "conditioner", "cat food", "dog food",
+                "dog biscuits", "cat litter", "washing powder", "laundry detergent", "fabric conditioner", "bleach",
+                "toilet cleaner", "dishwasher tablets", "dishwasher salt", "light bulbs", "tissues", "nappies",
+                "baby wipes", "deodorant", "razors", "shower gel", "hand wash", "sun cream", "tea towels", "paper towels",
+                "freezer bags", "bin liners", "rubber gloves", "cotton buds", "plasters", "candles", "mouthwash",
+                "oven cleaner", "hand soap", "pet food",
+            )
+        val wrong = household.associateWith { c.aisle(it).first }.filterValues { it != AisleCode.HOUSEHOLD }
+        assertTrue(wrong.isEmpty(), "not Household: $wrong")
+        // The catalogue's own household entries are where they were.
+        for (n in listOf("bin bags", "kitchen roll", "washing-up liquid", "foil", "baking paper", "cling film")) {
+            assertEquals(AisleCode.HOUSEHOLD to AisleSource.CATALOGUE, c.aisle(n), n)
+        }
+    }
+
+    /** Step AB: words close to the household ones still name food, and keep their aisle. */
+    @Test
+    fun nearMissesStayFood() {
+        val food =
+            mapOf(
+                "soup" to null, "tomato soup" to null, "fennel bulb" to null, "sponge cake" to null, "polish sausage" to null,
+                "hot dog" to null, "cooking spray" to null, "rice paper" to null, "liquid smoke" to null, "tea bags" to null,
+                "fish fillets" to AisleCode.MEAT_FISH, "salt" to AisleCode.SPICES_CONDIMENTS, "single cream" to AisleCode.DAIRY_EGGS,
+                "digestive biscuits" to AisleCode.BAKING, "cloves" to null, "bin" to AisleCode.HOUSEHOLD,
+            )
+        for ((name, want) in food) {
+            val (aisle, source) = c.aisle(name)
+            if (want != null) {
+                assertEquals(want, aisle, name)
+            } else {
+                assertTrue(aisle != AisleCode.HOUSEHOLD, "$name went to Household ($source)")
+            }
+        }
+    }
+
+    /** Step AB: no golden ingredient is moved to Household by a keyword (golden data untouched). */
+    @Test
+    fun noGoldenIngredientBecomesHouseholdByKeyword() {
+        val names =
+            listOf("frozen.json", "synthetic-uk.json").flatMap { f ->
+                Json.parseToJsonElement(File("../../testdata/ingredients/$f").readText()).jsonArray.map {
+                    it.jsonObject.getValue("expected").jsonObject.getValue("name").jsonPrimitive.content
+                }
+            }
+        val moved = names.filter { c.aisle(it) == (AisleCode.HOUSEHOLD to AisleSource.KEYWORD) }
+        assertTrue(moved.isEmpty(), "golden names now Household by keyword: $moved")
+    }
 }

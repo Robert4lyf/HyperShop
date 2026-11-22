@@ -165,8 +165,13 @@ class JourneyTest {
         tag: String,
     ) {
         scrolls++
-        compose.waitUntil(10_000) {
-            runCatching { compose.onNodeWithTag(list).performScrollToNode(hasTestTag(tag)) }.isSuccess
+        // Idling the main looper between tries, as [waitFor] does: waitUntil alone does not run it, so a list still
+        // loading (its rows arrive there) would never come in, and on a slow machine the scroll timed out.
+        val end = System.currentTimeMillis() + 10_000
+        while (runCatching { compose.onNodeWithTag(list).performScrollToNode(hasTestTag(tag)) }.isFailure) {
+            check(System.currentTimeMillis() < end) { "\"$tag\" never came into \"$list\"; route ${route()}" }
+            compose.waitForIdle()
+            Thread.sleep(20)
         }
         settle()
     }
@@ -249,6 +254,52 @@ class JourneyTest {
         compose.waitUntil(10_000) { runBlocking { c.repository.snapshot() }.liveItems.isEmpty() }
         record("quick shopping", c)
         assertTrue(runBlocking { c.repository.snapshot() }.liveItems.isEmpty())
+    }
+
+    /** Two finished trips on which toothpaste and kitchen roll were bought by hand: they are regulars now. */
+    private fun AppContainer.twoTripsOfRegulars() =
+        runBlocking {
+            awaitReady()
+            repeat(2) {
+                for (name in listOf("toothpaste", "kitchen roll")) {
+                    val id = repository.manualAdd(name, com.robert4lyf.hypershop.core.model.QtyBase.PRESENCE, null)
+                    repository.tick(id)
+                }
+                repository.finish()
+            }
+        }
+
+    /**
+     * Step AB: adding by hand to a list that already has items. Bin bags typed in full, then two things added often
+     * (toothpaste and kitchen roll, regulars from two finished trips), the fastest way the app offers.
+     */
+    @Test
+    fun addingByHand() {
+        val c = TestContainer.create()
+        c.twoTripsOfRegulars()
+        runBlocking {
+            for (name in listOf("milk", "bread", "eggs")) {
+                c.repository.manualAdd(name, com.robert4lyf.hypershop.core.model.QtyBase.PRESENCE, null)
+            }
+        }
+        show(c)
+        waitFor("tick-${c.itemId("cat:milk")}")
+        type("add-item", "bin bags")
+        compose.waitUntil(10_000) { runBlocking { c.repository.snapshot() }.itemByKey("cat:bin_bags") != null }
+        addTwoRegulars(c)
+        compose.waitUntil(10_000) {
+            val l = runBlocking { c.repository.snapshot() }
+            listOf("toothpaste", "kitchen roll").all { l.itemByKey(c.repository.target(it).mergeKey) != null }
+        }
+        record("adding by hand", c)
+    }
+
+    /** Toothpaste and kitchen roll, the owner's regulars, onto the list. */
+    private fun addTwoRegulars(c: AppContainer) {
+        // AB.0 went through Buy again (list ⋮ › Buy again › each chip › Done: 5 taps, a sheet). AB.1: the field is still
+        // focused after Enter, and empty, so the usual items are chips under it: one tap each.
+        tap("usual-${c.repository.target("toothpaste").mergeKey}")
+        tap("usual-${c.repository.target("kitchen roll").mergeKey}")
     }
 
     /** Meal-based shopping: three saved recipes put on the list, one served to 5, rice partly at home. */
