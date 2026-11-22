@@ -258,7 +258,8 @@ private fun TopBar(
             TextButton(onClick = onLater, modifier = Modifier.testTag("later")) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(6.dp))
-                Text("Later")
+                // Step AC: says what happens (the recipe waits on the "ready to review" card), not only "Later".
+                Text("Review later")
             }
         } else {
             // An edit: Cancel leaves the saved recipe as it was, so it says so in words.

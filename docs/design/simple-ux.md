@@ -30,6 +30,7 @@ fewer modes and one word per idea. The data model is unchanged; every action cal
 | Something is already at home | **At home** (an unticked review row; staples in Settings start unticked) | Have it, Have some, I have some |
 | Can't get it on this trip | **Can't find it** → *Set aside for this trip*; **Found it** takes it back | Unavailable, Not available today |
 | End the trip | **Finish shopping** | Done |
+| Leave a review for now (it waits on the "N recipes ready to review" card) | **Review later** | Later |
 | Keep a reviewed recipe without adding it | **Save recipe only** (review ⋮ menu) | Save recipe, Save for later |
 | Correct the words a recipe line was read from | **Fix the recipe's text** (review row sheet) | Edit the line |
 | Say the app read something wrong | **Report a wrong reading** (review row sheet, item sheet) | This is wrong |
@@ -70,7 +71,8 @@ On the review, lines still to go on the list are counted as **N to add** ("4 to 
   bought" at the end), the progress bar under it, the gear and ⋮; "1 set aside" and the watch's state in small text when
   there are any. The **Add item** field is pinned under that row.
 - Every screen's top is one plain bar (Step AC): back arrow where there is one, the title, an optional one-line
-  subtitle, actions on the right. No mosaic, gradient or hero card anywhere. The review's top: **Later**, the recipe's
+  subtitle, actions on the right. No mosaic, gradient or hero card anywhere. The review's top: **Review later** (the
+  recipe waits on the "ready to review" card), the recipe's
   title with its pencil, "4 to add · 1 at home", the servings; when Claude failed or was skipped, one line with the
   reason, **Retry** and ✕. "N recipes ready to review" is a plain card. A recipe without a photo shows its art as a
   small square beside its title; a real photo stays a band.

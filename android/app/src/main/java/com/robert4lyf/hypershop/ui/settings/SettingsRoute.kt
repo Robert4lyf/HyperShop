@@ -517,7 +517,7 @@ private fun AislesRow(actions: SettingsActions) {
         Column(Modifier.weight(1f)) {
             Text("Walking order", style = MaterialTheme.typography.bodyLarge)
             Text(
-                "The order you walk the store; the list and the watch follow it.",
+                "The aisles, and the groups in them, in the order you walk the store.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

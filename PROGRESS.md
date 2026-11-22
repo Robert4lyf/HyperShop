@@ -589,5 +589,9 @@ words.
   move controls); the group order applies either way. Rows' minimum height 64 → 56 dp (touch targets stay ≥ 48 dp).
   `CompactHeaderTest` at 360×640 now needs five items on screen under the top row and the Add field (it shows five;
   screenshot `list-360x640.png`).
-- [ ] AC.9 Small words
+- [x] AC.9 Small words. The review's back button reads "Review later" (was "Later"; an edit's still reads
+  "Cancel"). Checked the two tabs, Settings and the review for labels whose meaning moved in Steps Z to AB: Settings ›
+  Walking order's line now names the groups ("The aisles, and the groups in them, in the order you walk the store");
+  the rest still fit (the review aisle menu's "Mark this aisle as at home" matches the AA.2 checkbox, "Always at home"
+  in Settings and the ingredient library is the same staples, "Arrange items", "Clear shopping history").
 - [ ] AC.10 Verify and report
