@@ -6,6 +6,7 @@ import com.robert4lyf.hypershop.core.catalog.CatalogLoader
 import com.robert4lyf.hypershop.core.merge.ApplyResult
 import com.robert4lyf.hypershop.core.merge.Display
 import com.robert4lyf.hypershop.core.merge.LineStatus
+import com.robert4lyf.hypershop.core.merge.ListItem
 import com.robert4lyf.hypershop.core.merge.Merger
 import com.robert4lyf.hypershop.core.merge.NewItem
 import com.robert4lyf.hypershop.core.merge.Preview
@@ -261,6 +262,20 @@ class ListRepository(
             shelfCache ?: dao.shelfRanks().groupBy { it.storeId }
                 .mapValues { (_, rows) -> ShelfOrder(rows.associate { it.key to it.rank }) }.also { shelfCache = it }
         return orders[storeId] ?: ShelfOrder(emptyMap())
+    }
+
+    /** Step AC: [items] in the store's walking order, groups and arranged items included (the list's own order). */
+    suspend fun inWalkingOrder(
+        items: List<ListItem>,
+        storeId: Long = 1,
+    ): List<ListItem> {
+        val aisles = aisleOrder(storeId)
+        return shelfOrder(storeId).walking(
+            items,
+            aisles,
+            { ShelfOrder.Slot(it.aisle, it.catalogId?.let { id -> catalog.byId[id] }?.group, it.mergeKey, it.position) },
+            catalog::groupRank,
+        )
     }
 
     /** The walking order and the order within aisles together, re-read whenever listRev changes. */

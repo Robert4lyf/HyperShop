@@ -293,10 +293,15 @@ class ListViewModelTest {
         assertEquals(listOf("2", "200g"), sheet.totals)
         assertEquals(listOf("Weeknight chilli" to "2 + 200g"), sheet.sources.map { it.title to it.amount })
         assertEquals(AisleCode.PRODUCE, sheet.aisle)
-        assertEquals("", sheet.amount)
+        // Step AC: two kinds of amount: the field opens on the one bought by (the count), the other said in words.
+        assertEquals("2", sheet.amount)
+        assertEquals("200g", sheet.amountRest)
         assertTrue(!vm.saveItem(sheet.id, ItemChanges(amount = "lots")))
         assertTrue(vm.saveItem(sheet.id, ItemChanges(amount = "5")))
-        await(vm.ui) { it.row("onion").main.startsWith("5 onions") }
+        // The 200 g is kept as it was: the form edited the count only ("5 + 200g", shown as about 7 onions).
+        await(vm.ui) { it.row("onion").sub?.startsWith("5 + 200g") == true }
+        val onion = runBlocking { c.repository.snapshot() }.let { l -> l.total(l.itemByKey("cat:onion")!!.id) }
+        assertEquals(2, onion.parts.size)
         vm.saveItem(sheet.id, ItemChanges(aisle = AisleCode.TINS_JARS, alwaysAisle = false))
         await(vm.ui) { it.row("onion").aisle == AisleCode.TINS_JARS }
     }

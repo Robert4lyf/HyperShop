@@ -516,3 +516,85 @@ setting or help text.
   recomposition ran on a worker because `RecipesViewModel` and `LibraryViewModel` read Compose state through
   `snapshotFlow` on `Dispatchers.Default`, and a snapshot taken there can advance the global one; those reads now run
   on the main thread (the rest of each flow stays on Default).
+
+## Step AC — clear screens, walking order (`claude/step-z-fewer-concepts-rvynea`, from b42be93)
+
+No tabs, modes, settings or help text: plain compact tops, sub-group order in Walking order, smaller forms, plainer
+words.
+
+- [x] AC.0 Baseline. JourneyTest on b42be93: adding by hand 4 · 1 · 0 · 0, core 6 · 0 · 0 · 2, meal-based
+  9 · 1 · 3 · 3, quick 7 · 2 · 0 · 0. Where the low-poly mosaic (or another hero gradient) is drawn:
+  `ScreenHeader` (mosaic + dark shade) on the empty list, empty Recipes, Settings and its sub-screens
+  (`SettingsRoute`), Aisles (`AislesRoute`); the review's `Hero` (`RecipeBackdrop`: the recipe's photo, or its
+  mosaic, under a shade, behind title, servings and Claude's note); each Recipes card's full-width band
+  (`RecipeBackdrop`); the list's recipe card (`RecipeArt`, already a 56 dp square); the "N recipes ready to review"
+  card (`Brand.WarmCall` gradient + `heroGlow`). `heroBrush` has no user. Claims checked: `EmptyHero` draws no
+  mosaic (plain text, it is the empty states' headline); the cooking view and the recipe sheet draw none (the sheet
+  and the list's recipe sheet show a real photo when there is one).
+- [x] AC.1 No large geometric header anywhere. `ScreenHeader` is one plain bar (back arrow at the start where there
+  is one, title, one-line subtitle, actions at the end, an optional line below): the empty list, empty Recipes,
+  Settings, Aisles and the ingredient library use it (Settings' and Aisles' back arrows moved from the right to the
+  start). The review's `Hero` is plain: title + pencil, "N to add · N at home", the servings stepper (secondary
+  container colours, was white on the mosaic), the site; Claude's note is one line with Retry and ✕. A
+  `w360dp-h640dp` test shows the first ingredient row above the Add bar without scrolling. "N recipes ready to
+  review" is a card in `secondaryContainer`. Recipes cards: a real photo keeps its band; without one, the art is a
+  56 dp square beside the title. Deleted: the mosaic `ScreenHeader`, `Brand.WarmCall`, `heroGlow`, `heroBrush`,
+  `RecipeBackdrop`'s mosaic branch and shade, `HERO_INK`, `ScreenHeader`'s `seed`/`overline`, `HeroTextTest` and its
+  `hero-large-font-light.png` (replaced by `ScreenHeaderTest`), `HeroContrastTest` (white text on every mosaic
+  palette: no text sits on a mosaic now), `Brand.OnHeroSoft` and two unused composables (`Meta`, `Fact`). `lowPoly` stays: it draws `RecipeArt`'s squares.
+  Found on the way: `EntryNavigationTest` depended on test order. Robolectric's window never enters touch mode, so
+  Android re-focused it whenever a focused node went, and which control won depended on layout; the test now puts
+  the window in touch mode, as a phone's is (on a phone, in touch mode, Android 9+ does not re-focus).
+- [x] AC.2 Reorder sub-groups in Walking order. Found: the group order is already stored, per store, as `ShelfRank`
+  rows keyed by aisle and group (`ShelfOrder.groupKey`), written by the list's Arrange items through
+  `ListRepository.arrangeWith`, which bumps listRev in the same transaction. Settings › Aisles now opens an aisle
+  (⌄) to show every group it can have (`Catalog.groupsIn`, whether or not on the list) plus "Everything else" (things
+  in no group: last until moved), each with the aisles' arrows and ⋮ Move to top / bottom; `SettingsViewModel.
+  moveGroup` writes with the same `movedGroup` through `arrangeWith` for the store being edited. No schema or
+  protocol change. Already following the order: the list and the watch snapshot (`WatchSyncCoordinator` sorts by
+  `groupSort`; a listRev bump re-sends, as an aisle reorder does). Not following it before, now fixed through
+  `ShelfOrder.walking` / `ListRepository.inWalkingOrder`: "Share shopping list" (`shoppingText`, sorted by add order
+  within an aisle) and the widget (its first four by storage order, not even by aisle). Tests:
+  `WalkingOrderGroupsTest` (Salad above Vegetables on the list, the shared text and the widget's order; through
+  finish shopping, a restart and a backup restore; the watch snapshot) and `WalkingOrderScreenTest`.
+- [x] AC.3 Item editor is one small form. Change amount draws only the name, the amount (its unit chips kept: they
+  are how the amount changes unit) and the aisle (one "Aisle: …" button with a menu, was 17 chips behind a toggle),
+  with Save; the second title, Mark bought, totals, sources, pack note, swaps, Remove and "This is wrong" it used to
+  repeat below the form are only on the summary and More details. Category and usual pack (the form's old hidden part)
+  are a second small form from More details. The amount opens filled: for "2 + 200 g", `ItemEdit.buyBy` picks the
+  part bought by (a count, else weight, else volume), the field says "Also 200g on the list, kept as it is", and
+  `saveItem` keeps that part (before, the field opened empty). Tests updated; seven `ItemSheetHostTest` cases went:
+  they asked "Discard edits and mark bought / remove / swap" with the form and the item's actions on screen together,
+  which cannot happen now (the confirmation code stays, harmless; Back on a dirty form still asks).
+- [x] AC.4 A recipe on the list says so. Its Recipes card shows a ticked "On your list" (one merged TalkBack node)
+  in the card's text, beside the "− Serves N +" stepper; the sheet shows the same beside its stepper. Off the list:
+  "Add to list" and "Serves N" as plain text in the card line (unchanged). "On the shopping list" (shown only when
+  the servings were unknown) is gone. `RecipesScreenTest` checks both states.
+- [x] AC.5 Review warnings in plain words. "Check: …" is gone: every reason the rule parser, `Uncertainty`, Claude's
+  post-processing, `Meaning`, `ClaudeAlignment` and `LineIdentity` can raise (19, listed in simple-ux.md with its
+  sentence) has one plain sentence in `ReviewViewModel.plainReason`, in the normal grey; the warning icon alone marks
+  the row (the name is no longer tinted). A backwards range reads "3 cloves · recipe says 3–2" with a button per
+  reading (the existing `setAmount`; the two numbers come from the recipe's text, as the parser keeps only the
+  first). An unreadable or zero amount reads "No amount found" with **Set amount** (the row's sheet, amount field
+  first). The recipe's text is quoted only where it helps choose (`quoteHelps`). The sheet's banner drops "Check:".
+- [x] AC.6 Always at home chips. Each staple is one chip with its name only (the cart and × icons inside it went);
+  a tap opens a menu: "Add to list once" (the existing `ranOut`) and "Remove" (`removeStaple`). 48 dp targets kept.
+- [x] AC.7 "Don't suggest" can be undone. Claim checked and wrong: Step AB.1 already shows "Won't suggest shampoo"
+  with Undo after Don't suggest (`ListViewModel.dontSuggest`; Undo puts back a pin or the plain rules), placed by the
+  AB.3 rule, and `AddByHandTest.dontSuggestHidesItAndUndoBringsItBack` tests it. Nothing to change; Settings › Clear
+  shopping history was already not the only way back.
+- [x] AC.8 Denser list. Aisle headings are one 48 dp row in the card's colour (24 dp icon, name, "N to buy" as plain
+  text, collapse arrow; was a tall tinted block with a 36 dp badge and a count pill). Group labels show only when the
+  aisle has six or more items on the list (`GROUP_LABELS_FROM`), and always while arranging (they carry the group
+  move controls); the group order applies either way. Rows' minimum height 64 → 56 dp (touch targets stay ≥ 48 dp).
+  `CompactHeaderTest` at 360×640 now needs five items on screen under the top row and the Add field (it shows five;
+  screenshot `list-360x640.png`).
+- [x] AC.9 Small words. The review's back button reads "Review later" (was "Later"; an edit's still reads
+  "Cancel"). Checked the two tabs, Settings and the review for labels whose meaning moved in Steps Z to AB: Settings ›
+  Walking order's line now names the groups ("The aisles, and the groups in them, in the order you walk the store");
+  the rest still fit (the review aisle menu's "Mark this aisle as at home" matches the AA.2 checkbox, "Always at home"
+  in Settings and the ingredient library is the same staples, "Arrange items", "Clear shopping history").
+- [x] AC.10 Verify and report. Screenshots re-recorded, `tools/contact-sheet` run. Journeys: adding by hand
+  4 · 1 · 0 · 0, core 6 · 0 · 0 · 2, quick 7 · 2 · 0 · 0, meal-based 9 · 1 · 3 · 3 (none longer than step-ab.md);
+  new `saladBeforeVegetables` (Settings › Walking order › Produce › Salad ↑, back to the list) 6 · 0 · 1 · 4. Report:
+  `docs/reports/step-ac.md`.

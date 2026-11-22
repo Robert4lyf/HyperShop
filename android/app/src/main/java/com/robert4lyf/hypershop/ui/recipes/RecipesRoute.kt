@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -65,8 +66,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -435,19 +434,36 @@ private fun LibraryCard(
         color = MaterialTheme.colorScheme.card,
     ) {
         Column {
-            // The recipe's band, as on its card on the list: its photo, else its own mosaic, the same height either way.
-            Box(Modifier.fillMaxWidth().heightIn(min = LIBRARY_BAND).clipToBounds().testTag("lib-band-${row.key}")) {
-                RecipeBackdrop(row.title, row.photo, Modifier.matchParentSize())
-                Text(
-                    row.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Brand.OnHero,
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(start = 20.dp, end = 16.dp, top = 14.dp, bottom = 12.dp)
-                            .testTag("hero-text"),
-                )
+            // A real photo heads the card as a band, the title on it. Step AC: without one, the recipe's own art is a
+            // small square beside the title, not a full-width banner.
+            val photo = row.photo
+            if (photo != null) {
+                Box(Modifier.fillMaxWidth().heightIn(min = LIBRARY_BAND).clipToBounds().testTag("lib-band-${row.key}")) {
+                    RecipeBackdrop(photo, Modifier.matchParentSize())
+                    Text(
+                        row.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Brand.OnHero,
+                        modifier =
+                            Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(start = 20.dp, end = 16.dp, top = 14.dp, bottom = 12.dp)
+                                .testTag("hero-text"),
+                    )
+                }
+            } else {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RecipeArt(row.title, null, Modifier.size(56.dp).clip(RoundedCornerShape(14.dp)).testTag("lib-thumb-${row.key}"))
+                    Spacer(Modifier.size(12.dp))
+                    Text(
+                        row.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.weight(1f).testTag("lib-title-${row.key}"),
+                    )
+                }
             }
             Row(
                 Modifier.padding(start = 20.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
@@ -474,13 +490,8 @@ private fun LibraryCard(
                     row.uses?.let {
                         Text("Uses $it", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
                     }
-                    if (row.onList && row.servings == null) {
-                        Text(
-                            "On the shopping list",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
+                    // Step AC: on the list, said with a tick beside the servings; off it, "Add to list" instead.
+                    if (row.onList) OnYourList(Modifier.padding(top = 4.dp).testTag("lib-on-list-${row.key}"))
                 }
                 // Step AA: on the list, the card shows how many it is for, changed in place; "Add to list" only when it
                 // is not on the list (it no longer sits beside "On the shopping list").
@@ -521,37 +532,6 @@ private fun LibraryCard(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun Meta(
-    icon: ImageVector,
-    text: String,
-    modifier: Modifier = Modifier,
-) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Icon(icon, contentDescription = null, tint = Brand.OnHeroSoft, modifier = Modifier.size(16.dp))
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = Brand.OnHeroSoft)
-    }
-}
-
-@Composable
-private fun Fact(
-    icon: ImageVector,
-    text: String,
-    bg: Color,
-    fg: Color,
-) {
-    Surface(shape = PillShape, color = bg, contentColor = fg) {
-        Row(
-            Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
-            Text(text, style = MaterialTheme.typography.labelLarge)
         }
     }
 }
@@ -660,6 +640,19 @@ fun RecipeDetailContent(
     }
 }
 
+/** Step AC: "✓ On your list", one TalkBack node, so a recipe on the list reads differently from one with "Add to list". */
+@Composable
+private fun OnYourList(modifier: Modifier = Modifier) {
+    Row(
+        modifier.semantics(mergeDescendants = true) {},
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        Text("On your list", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DetailButtons(
@@ -680,8 +673,11 @@ private fun DetailButtons(
                     Spacer(Modifier.size(8.dp))
                     Text("Add to list")
                 }
-            row.servings != null -> com.robert4lyf.hypershop.ui.common.ServingsStepper(row.servings, onServings, tag = "detail-serves")
-            else -> Text("On the shopping list", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            else ->
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OnYourList(Modifier.testTag("detail-on-list"))
+                    row.servings?.let { com.robert4lyf.hypershop.ui.common.ServingsStepper(it, onServings, tag = "detail-serves") }
+                }
         }
         onOpen?.let {
             OutlinedButton(onClick = it) {

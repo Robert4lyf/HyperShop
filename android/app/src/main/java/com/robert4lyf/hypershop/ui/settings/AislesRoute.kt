@@ -6,11 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
@@ -32,7 +28,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
 import com.robert4lyf.hypershop.ui.common.basilSegmentedColors
-import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.util.factoryFor
 
 /** Settings › Aisles › Walking order, as its own screen (UX review 22): the aisles with arrows, ends and Reset. */
@@ -48,6 +43,8 @@ fun AislesRoute(
         SettingsActions(
             onMoveAisle = { a, d -> vm.moveAisle(a, d) },
             onMoveAisleTo = { a, i -> vm.moveAisleTo(a, i) },
+            onMoveGroup = { a, g, by -> vm.moveGroup(a, g, by) },
+            onMoveGroupTo = { a, g, i -> vm.moveGroupTo(a, g, i) },
             onResetAisles = { vm.resetAisleOrder() },
             onEditStore = { vm.editStore(it) },
             onRenameStore = vm::renameStore,
@@ -66,15 +63,7 @@ fun AislesScreen(
 ) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag("aisles")) {
-            ScreenHeader(
-                title = "Aisles",
-                subtitle = "The order you walk the store",
-                actions = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = Brand.OnHero)
-                    }
-                },
-            )
+            ScreenHeader(title = "Aisles", subtitle = "The order you walk the store", onBack = onBack, backTag = "aisles-back")
             Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 // Missing 4 of the review: a second store's order, picked when a shop starts.
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {

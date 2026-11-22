@@ -15,6 +15,28 @@ import com.robert4lyf.hypershop.core.model.AisleCode
 data class ShelfOrder(
     val ranks: Map<String, Int> = emptyMap(),
 ) {
+    /**
+     * Step AC: [items] in walking order, as the list shows them: the aisles in [aisles] order (others after), then each
+     * aisle's groups as arranged (else the catalogue's order, ungrouped things last), then what was arranged within a
+     * group, then the order they were added. The widget and the shared text use it.
+     */
+    fun <T> walking(
+        items: List<T>,
+        aisles: List<AisleCode>,
+        slot: (T) -> Slot,
+        groupRank: (AisleCode, String?) -> Int,
+    ): List<T> {
+        val at = aisles.withIndex().associate { it.value to it.index }
+        return items.sortedWith(
+            compareBy(
+                { at[slot(it).aisle] ?: Int.MAX_VALUE },
+                { slot(it).let { s -> groupSort(s.aisle, s.group, groupRank(s.aisle, s.group)) } },
+                { itemSort(slot(it)) },
+                { slot(it).position },
+            ),
+        )
+    }
+
     /** A row's place in its aisle: compare these, then the item's position. */
     data class Slot(
         val aisle: AisleCode,

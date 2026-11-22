@@ -54,7 +54,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -71,9 +70,7 @@ import com.robert4lyf.hypershop.ui.common.PillShape
 import com.robert4lyf.hypershop.ui.common.cardLift
 import com.robert4lyf.hypershop.ui.common.fieldLift
 import com.robert4lyf.hypershop.ui.common.pillFieldColors
-import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.card
-import com.robert4lyf.hypershop.ui.theme.heroGlow
 
 /** Callbacks of the list header (Step 5.6b). */
 data class HeaderActions(
@@ -374,19 +371,20 @@ fun ReadyCard(
             .clickable(onClickLabel = if (n == 1) "Review" else "Review the first", role = Role.Button) { onReview(jobs.first()) }
             .testTag("ready-card"),
         shape = MaterialTheme.shapes.large,
-        color = Color.Transparent,
-        contentColor = Brand.OnHero,
+        // Step AC: a card in the theme's own container colours, no gradient.
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
     ) {
         Row(
-            Modifier.background(Brand.WarmCall).heroGlow().padding(16.dp),
+            Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Box(
-                Modifier.size(44.dp).clip(CircleShape).background(Color.White),
+                Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surface),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.AutoMirrored.Rounded.MenuBook, contentDescription = null, tint = Color(0xFFB4471F))
+                Icon(Icons.AutoMirrored.Rounded.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             }
             Column(Modifier.weight(1f)) {
                 Text(

@@ -35,9 +35,26 @@ class EntryNavigationTest {
 
     private lateinit var nav: NavHostController
 
+    /**
+     * The window in touch mode, as a phone is when tapped. Robolectric's taps reach the view without passing its root, so
+     * it never leaves the mode it started in (not touch): there Android re-focuses the window whenever a focused node
+     * goes, and which control it lands on depends on the order tests ran in. On a phone, in touch mode, it does not.
+     */
+    private fun touchMode(v: android.view.View) {
+        val root = v.rootView.parent ?: return
+        runCatching {
+            root.javaClass.getDeclaredMethod(
+                "ensureTouchMode",
+                Boolean::class.javaPrimitiveType,
+            ).apply { isAccessible = true }.invoke(root, true)
+        }
+    }
+
     private fun show(c: AppContainer) =
         compose.setContent {
             nav = rememberNavController()
+            val v = androidx.compose.ui.platform.LocalView.current
+            androidx.compose.runtime.SideEffect { touchMode(v) }
             HyperShopTheme(dynamicColor = false) { HyperShopApp(c, nav) }
         }
 

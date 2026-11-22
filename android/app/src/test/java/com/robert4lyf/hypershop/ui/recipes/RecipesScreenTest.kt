@@ -128,7 +128,7 @@ class RecipesScreenTest {
 
     @Test
     fun onTheListTheCardShowsServingsInPlaceOfAddToListAndItsMenuRemovesIt() {
-        // Step AA: "Add to list" no longer sits beside "On the shopping list".
+        // Step AA: "Add to list" only off the list. Step AC: on it, a ticked "On your list" beside the servings.
         val got = mutableListOf<String>()
         compose.setContent {
             HyperShopTheme(dynamicColor = false) {
@@ -148,8 +148,10 @@ class RecipesScreenTest {
         list.performScrollToNode(hasTestTag("lib-add-r:9"))
         compose.onNodeWithTag("lib-add-r:9").performClick()
         compose.onNodeWithTag("lib-serves-r:9").assertDoesNotExist()
-        // On the list: "− Serves 4 +", no Add to list; each press counts from the last.
+        compose.onNodeWithTag("lib-on-list-r:9", useUnmergedTree = true).assertDoesNotExist()
+        // On the list: "✓ On your list" (one node, read as such) and "− Serves 4 +", no Add to list.
         list.performScrollToNode(hasTestTag("lib-serves-r:1"))
+        compose.onNodeWithTag("lib-on-list-r:1").assertTextEquals("On your list")
         compose.onNodeWithTag("lib-add-r:1").assertDoesNotExist()
         compose.onNodeWithTag("lib-serves-r:1").assertTextEquals("Serves 4")
         compose.onNodeWithTag("lib-serves-r:1-more").performClick()
@@ -325,13 +327,18 @@ class RecipesScreenTest {
     }
 
     @Test
-    fun aRecipeWithoutAPhotoHasABandAsTallAsOneWith() {
+    fun aRecipeWithoutAPhotoHasASmallSquareOfArtNotABand() {
+        // Step AC: the chilli's real photo stays a band (compact, UX review 14); the dal, with no photo, has its art as a
+        // 56 dp square beside its title, and no band.
         show()
 
-        // The chilli's photo and the dal's mosaic make bands of one (compact, UX review 14) height.
-        fun height(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot().let { it.bottom - it.top }
-        assertEquals(height("lib-band-r:1").value, height("lib-band-r:9").value, 1f)
-        assertEquals(96f, height("lib-band-r:9").value, 1f)
+        fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertEquals(96f, bounds("lib-band-r:1").let { it.bottom - it.top }.value, 1f)
+        compose.onNodeWithTag("lib-band-r:9", useUnmergedTree = true).assertDoesNotExist()
+        val thumb = bounds("lib-thumb-r:9")
+        assertEquals(56f, (thumb.right - thumb.left).value, 1f)
+        assertEquals(56f, (thumb.bottom - thumb.top).value, 1f)
+        compose.onNodeWithTag("lib-title-r:9", useUnmergedTree = true).assertExists()
     }
 
     @Test

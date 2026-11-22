@@ -32,14 +32,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.AddShoppingCart
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Error
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.LocalDining
@@ -139,6 +138,9 @@ data class SettingsActions(
     val onMoveAisle: (AisleCode, Int) -> Unit = { _, _ -> },
     /** "Move to top" (0) / "Move to bottom" (last). */
     val onMoveAisleTo: (AisleCode, Int) -> Unit = { _, _ -> },
+    /** Step AC: a group within an aisle, by places, and to a place (the same controls as the aisles'). */
+    val onMoveGroup: (AisleCode, String?, Int) -> Unit = { _, _, _ -> },
+    val onMoveGroupTo: (AisleCode, String?, Int) -> Unit = { _, _, _ -> },
     val onResetAisles: () -> Unit = {},
     /** "Try again" under the watch status, offered while the link is down. */
     val onWatchRetry: () -> Unit = {},
@@ -205,6 +207,8 @@ fun SettingsRoute(
             onRanOut = { vm.ranOut(it) },
             onMoveAisle = { a, d -> vm.moveAisle(a, d) },
             onMoveAisleTo = { a, i -> vm.moveAisleTo(a, i) },
+            onMoveGroup = { a, g, by -> vm.moveGroup(a, g, by) },
+            onMoveGroupTo = { a, g, i -> vm.moveGroupTo(a, g, i) },
             onResetAisles = { vm.resetAisleOrder() },
             onWatchRetry = { vm.retryWatch() },
             onSaveKey = { vm.saveKey(it) },
@@ -256,16 +260,7 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 item(key = "top") {
-                    ScreenHeader(
-                        title = "Settings",
-                        actions = {
-                            onBack?.let { back ->
-                                IconButton(onClick = back, modifier = Modifier.testTag("settings-back")) {
-                                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
-                                }
-                            }
-                        },
-                    )
+                    ScreenHeader(title = "Settings", onBack = onBack, backTag = "settings-back")
                 }
                 // Nothing below the header until the saved settings are in, so no control jumps.
                 if (!ui.loaded) {
@@ -459,32 +454,51 @@ private fun ListGroup(
     }
 }
 
-/** A staple: its name, and an × that is the only way to remove it (a full 48 dp target). */
+/**
+ * Step AC: a staple is one chip, its name only (no icons in it). A tap opens its two actions: "Add to list once"
+ * (ran out this time, still a staple) and "Remove" (no longer always at home).
+ */
 @Composable
 private fun StapleChip(
     name: String,
     onRanOut: () -> Unit = {},
     onRemove: () -> Unit,
 ) {
-    // A soft green, not grey: these are live settings, not disabled chips.
-    Surface(
-        shape = PillShape,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 14.dp)) {
-            Text(name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelLarge)
-            // Missing 5 of the review: out of it this once, without un-stapling it.
-            IconButton(onClick = onRanOut, modifier = Modifier.testTag("ran-out-$name")) {
-                Icon(
-                    Icons.Rounded.AddShoppingCart,
-                    contentDescription = "Ran out of $name: add to the list",
-                    modifier = Modifier.size(18.dp),
-                )
+    var menu by remember { mutableStateOf(false) }
+    Box {
+        // A soft green, not grey: these are live settings, not disabled chips.
+        Surface(
+            shape = PillShape,
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier =
+                Modifier
+                    .heightIn(min = 48.dp)
+                    .clip(PillShape)
+                    .clickable(onClickLabel = "Show actions", role = Role.Button) { menu = true }
+                    .testTag("staple-$name"),
+        ) {
+            Box(Modifier.heightIn(min = 48.dp).padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+                Text(name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelLarge)
             }
-            IconButton(onClick = onRemove) {
-                Icon(Icons.Rounded.Close, contentDescription = "Remove $name", modifier = Modifier.size(18.dp))
-            }
+        }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(
+                text = { Text("Add to list once") },
+                onClick = {
+                    menu = false
+                    onRanOut()
+                },
+                modifier = Modifier.testTag("ran-out-$name"),
+            )
+            DropdownMenuItem(
+                text = { Text("Remove") },
+                onClick = {
+                    menu = false
+                    onRemove()
+                },
+                modifier = Modifier.testTag("remove-staple-$name"),
+            )
         }
     }
 }
@@ -503,7 +517,7 @@ private fun AislesRow(actions: SettingsActions) {
         Column(Modifier.weight(1f)) {
             Text("Walking order", style = MaterialTheme.typography.bodyLarge)
             Text(
-                "The order you walk the store; the list and the watch follow it.",
+                "The aisles, and the groups in them, in the order you walk the store.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -519,12 +533,27 @@ internal fun AislesGroup(
     actions: SettingsActions,
 ) {
     var confirmReset by rememberSaveable { mutableStateOf(false) }
+    // Step AC: the aisles opened to show their groups.
+    var open by rememberSaveable { mutableStateOf(emptyList<String>()) }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         ui.aisles.forEachIndexed { i, a ->
+            val groups = ui.groups[a].orEmpty()
+            val opened = a.name in open
             // One badge size and one column, so the names line up down the card.
             Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
                 AisleBadge(a, size = 48.dp)
                 Text(a.displayName, Modifier.weight(1f).padding(start = 14.dp), style = MaterialTheme.typography.bodyLarge)
+                if (groups.isNotEmpty()) {
+                    IconButton(
+                        onClick = { open = if (opened) open - a.name else open + a.name },
+                        modifier = Modifier.testTag("groups-${a.name}"),
+                    ) {
+                        Icon(
+                            if (opened) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                            contentDescription = (if (opened) "Hide the groups in " else "Show the groups in ") + a.displayName,
+                        )
+                    }
+                }
                 IconButton(onClick = { actions.onMoveAisle(a, -1) }, enabled = i > 0) {
                     Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "Move ${a.displayName} up")
                 }
@@ -546,6 +575,9 @@ internal fun AislesGroup(
                     }
                 }
             }
+            if (opened) {
+                groups.forEachIndexed { j, g -> GroupOrderRow(a, g, j, groups.lastIndex, actions) }
+            }
         }
     }
     TextButton(onClick = { confirmReset = true }, modifier = Modifier.testTag("reset-aisles")) { Text("Reset order") }
@@ -561,6 +593,52 @@ internal fun AislesGroup(
             },
             dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Keep") } },
         )
+    }
+}
+
+/**
+ * Step AC: one group of an opened aisle, moved with the aisles' own controls (arrows, then Move to top or bottom).
+ * Things in no group are one more row, "Everything else", last until it is moved.
+ */
+@Composable
+private fun GroupOrderRow(
+    aisle: AisleCode,
+    group: String?,
+    index: Int,
+    last: Int,
+    actions: SettingsActions,
+) {
+    val name = group ?: "Everything else"
+    val tag = "${aisle.name}-${group ?: "none"}"
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = 62.dp).testTag("group-$tag"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        IconButton(onClick = { actions.onMoveGroup(aisle, group, -1) }, enabled = index > 0, modifier = Modifier.testTag("group-up-$tag")) {
+            Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "Move $name up")
+        }
+        IconButton(
+            onClick = { actions.onMoveGroup(aisle, group, 1) },
+            enabled = index < last,
+            modifier = Modifier.testTag("group-down-$tag"),
+        ) {
+            Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Move $name down")
+        }
+        var menu by remember { mutableStateOf(false) }
+        Box {
+            IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More for $name") }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(text = { Text("Move to top") }, enabled = index > 0, onClick = {
+                    menu = false
+                    actions.onMoveGroupTo(aisle, group, 0)
+                })
+                DropdownMenuItem(text = { Text("Move to bottom") }, enabled = index < last, onClick = {
+                    menu = false
+                    actions.onMoveGroupTo(aisle, group, last)
+                })
+            }
+        }
     }
 }
 

@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
@@ -58,6 +59,7 @@ internal val SAMPLE_REVIEW =
                             AisleCode.PRODUCE,
                             checkReason = "a range that goes down",
                             raw = "3-2 cloves garlic",
+                            range = RangeChoice(5, "3–2", listOf("3 cloves", "2 cloves")),
                         ),
                     ),
                 AisleCode.MEAT_FISH to
@@ -117,7 +119,7 @@ class ReviewScreenTest {
                 onClearInStock = { events += "clear" },
                 onSaveForLater = { events += "save only" },
                 onLater = { events += "later" },
-                edits = ReviewEdits(onChoose = { events += "choose $it" }),
+                edits = ReviewEdits(onChoose = { events += "choose $it" }, onSetAmount = { id, t -> events += "amount $id $t" }),
             )
         }
     }
@@ -160,7 +162,7 @@ class ReviewScreenTest {
         compose.onNodeWithTag("claude-note").assertExists()
         compose.onNodeWithText("Waiting for Claude").assertDoesNotExist()
         compose.onNodeWithText("Read offline").assertDoesNotExist()
-        compose.onNodeWithText("Retry with Claude").performClick()
+        compose.onNodeWithContentDescription("Retry with Claude").performClick()
         compose.onNodeWithText("Serves 4").fetchSemanticsNode()
         // No help paragraphs.
         compose.onNodeWithTag("edit-hint").assertDoesNotExist()
@@ -189,8 +191,10 @@ class ReviewScreenTest {
         compose.onNodeWithContentDescription("More servings").performClick()
         assertEquals(listOf("servings 1"), events)
         compose.onNodeWithTag("summary").assertTextEquals("4 to add · 1 at home")
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Check: the range reads backwards; check the amount"))
-        compose.onNodeWithText("Check: the range reads backwards; check the amount").fetchSemanticsNode()
+        // Step AC: what was taken and what the recipe says, with a button for each reading; no "Check:" line.
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("3 cloves · recipe says 3–2"))
+        compose.onNodeWithTag("reading-cat:garlic-2 cloves", useUnmergedTree = true).performClick()
+        assertTrue(events.last() == "amount 5 2 cloves")
     }
 
     @Test
@@ -202,8 +206,28 @@ class ReviewScreenTest {
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("Chipotle sauce"))
         compose.onNodeWithTag("chosen-9").assertIsSelected().performClick()
         compose.onNodeWithTag("other-9").assertIsNotSelected().performClick()
-        compose.onAllNodesWithText("Check:", substring = true, useUnmergedTree = true).assertCountEquals(1) // the garlic's
+        compose.onAllNodesWithText("Check:", substring = true, useUnmergedTree = true).assertCountEquals(0)
         assertEquals(listOf("choose 9"), events)
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h640dp-xhdpi")
+    fun onASmallPhoneTheIngredientsStartOnTheFirstScreen() {
+        // Step AC: a plain, compact header (no picture behind it), so the first rows show without scrolling.
+        show()
+        val root = compose.onRoot().getUnclippedBoundsInRoot()
+        val bar = compose.onNodeWithTag("add").getUnclippedBoundsInRoot()
+        val first = compose.onNodeWithTag("row-cat:onion").getUnclippedBoundsInRoot()
+        assertTrue("first row $first above the bar $bar in $root", first.bottom <= bar.top)
+        compose.onRoot().captureRoboImage(Shots.path("review-360x640.png"))
+    }
+
+    @Test
+    fun claudesNoteCanBePutAway() {
+        show()
+        compose.onNodeWithTag("claude-note").assertExists()
+        compose.onNodeWithTag("claude-note-close").performClick()
+        compose.onNodeWithTag("claude-note").assertDoesNotExist()
     }
 
     @Test

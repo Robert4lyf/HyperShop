@@ -174,7 +174,7 @@ class ReviewViewModelTest {
         assertEquals("1 large egg plus 1 egg yolk", egg.raw)
         assertEquals("2", egg.quantity)
         assertTrue(ReviewViewModel.plainReason(Meaning.PART).contains("yolk"))
-        assertTrue(ReviewViewModel.plainReason(Meaning.HEAPED).contains("Tap to set the amount"))
+        assertTrue(ReviewViewModel.plainReason(Meaning.HEAPED).contains("level amount"))
         val pb = rows.first { it.name.contains("peanut") }
         assertEquals(Meaning.HEAPED, pb.checkReason)
         // The same line written twice: correcting the first occurrence leaves the second asking.
