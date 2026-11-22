@@ -19,11 +19,13 @@ import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.testutil.Shots
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
+import kotlinx.coroutines.cancel
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -41,6 +43,9 @@ private val SHEET =
         AisleCode.PRODUCE,
         swaps = listOf("shallot", "red onion"),
         canAlways = true,
+        // Step AD.8: as the app builds it (ListViewModel.openItem): the amount bought by, the other in words.
+        amount = "2",
+        amountRest = "200g",
     )
 
 @RunWith(AndroidJUnit4::class)
@@ -296,6 +301,35 @@ class ItemSheetTest {
         compose.onNodeWithTag("edit-qty").performTextReplacement("500 g")
         compose.onNodeWithTag("save-item").performClick()
         assertEquals(listOf("save ${ItemChanges(amount = "")}", "save ${ItemChanges(amount = "500 g")}"), events)
+    }
+
+    /**
+     * Step AD.8: the amount form opens filled, from the sheet the app itself builds: "2 onions" and "200 g onions" open
+     * on the 2 they are bought by, and say the 200 g in words. Fails if the field opens empty for an item with an amount.
+     */
+    @Test
+    fun theAmountFieldOpensFilledForAnItemWithAnAmount() {
+        val c = com.robert4lyf.hypershop.testutil.TestContainer.create()
+        c.add("2 onions", "200g onions")
+        val vm = ListViewModel(c)
+        try {
+            val ui = com.robert4lyf.hypershop.testutil.await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
+            vm.openItem(ui.aisles.flatMap { it.second }.first { it.name == "onion" }.id)
+            val sheet = com.robert4lyf.hypershop.testutil.await(vm.sheet) { it != null }!!
+            compose.setContent {
+                HyperShopTheme(
+                    dynamicColor = false,
+                ) { ItemSheetContent(sheet, ItemSheetActions(onSave = { true }), initiallyEditing = true) }
+            }
+            val field =
+                compose.onNodeWithTag(
+                    "edit-qty",
+                ).fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.EditableText]
+            assertEquals("2", field.text)
+            compose.onNodeWithText("Also 200g on the list, kept as it is").assertExists()
+        } finally {
+            vm.viewModelScope.cancel()
+        }
     }
 
     @Test

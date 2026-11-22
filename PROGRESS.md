@@ -671,7 +671,12 @@ loop. No tabs, modes, settings or help text; no schema, protocol, golden-data or
   the subtitle; the subtitle held "1 set aside" and the watch's word. That word is now only "Watch not connected"
   (the watch app installed but out of reach); "Watch updating…" and "Watch synced" are no longer shown there.
   Settings › Watch keeps the full status. Test: `ListScreenTest.theWatchIsMentionedOnlyWhenItNeedsAttention`.
-- [ ] AD.8 The amount form opens filled.
+- [x] AD.8 The amount form opens filled. Found: the app is right, the screenshot was wrong. `ListViewModel.openItem`
+  builds the sheet with `amount = "2"` and `amountRest = "200g"` for "2 onions" + "200 g onions" (Step AC), so Change
+  amount opens on "2" and says "Also 200g on the list, kept as it is". `ItemSheetTest`'s fixture predates that and
+  left both out, so `item-sheet-light.png` showed an empty field. The fixture now carries them (re-recorded), and
+  `ItemSheetTest.theAmountFieldOpensFilledForAnItemWithAnAmount` renders the form from the sheet the view model itself
+  builds and fails if the field opens empty.
 - [ ] AD.9 A link in Add item starts an import.
 - [ ] AD.10 Swipe to remove is obvious and safe.
 - [ ] AD.11 After a shop, the next step.
