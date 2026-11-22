@@ -301,14 +301,17 @@ class ListScreenTest {
 
     @Test
     fun categorisedShowsGroupLabelsAndTheToggle() {
-        val rows =
+        val two =
             listOf(
                 ListRow(1, "onion", "2 onions", null, TickState.OPEN, AisleCode.PRODUCE, "Vegetables"),
                 ListRow(2, "basil", "basil", null, TickState.OPEN, AisleCode.PRODUCE, "Herbs"),
             )
-        // Cut 5 of the review: the store order labels an aisle's groups whenever it has more than one; no third view.
-        val ui = SAMPLE_LIST.copy(aisles = listOf(AisleCode.PRODUCE to rows), view = ListView.STORE)
+        // Step AC: a short aisle shows no group labels (its groups keep their order); six or more items show them.
+        var ui by mutableStateOf(SAMPLE_LIST.copy(aisles = listOf(AisleCode.PRODUCE to two), view = ListView.STORE))
         compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions.copy(onView = { events += "view $it" })) } }
+        compose.onNodeWithText("Vegetables").assertDoesNotExist()
+        val six = two + (3L..6L).map { ListRow(it, "herb $it", "herb $it", null, TickState.OPEN, AisleCode.PRODUCE, "Herbs") }
+        ui = ui.copy(aisles = listOf(AisleCode.PRODUCE to six))
         compose.onNodeWithText("Vegetables").assertExists()
         compose.onNodeWithText("Herbs").assertExists()
         // The layouts live in the menu, as a radio group with "Store order" chosen.

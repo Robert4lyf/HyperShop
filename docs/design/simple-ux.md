@@ -74,6 +74,9 @@ On the review, lines still to go on the list are counted as **N to add** ("4 to 
   title with its pencil, "4 to add · 1 at home", the servings; when Claude failed or was skipped, one line with the
   reason, **Retry** and ✕. "N recipes ready to review" is a plain card. A recipe without a photo shows its art as a
   small square beside its title; a real photo stays a band.
+- An aisle's heading is one slim row (Step AC): its small icon, its name, "N to buy" and the collapse arrow, in the
+  card's own colour. Group labels (Vegetables, Salad…) show only in an aisle with six or more items, and always while
+  arranging; the group order from Walking order applies either way.
 - No instructions on screens: a control that needed a paragraph was relabelled or removed.
 
 ## Review warnings (Step AC)

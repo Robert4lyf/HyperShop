@@ -312,7 +312,9 @@ private fun ListBody(
             // Categorised: a label above each group, when the aisle has more than one.
             val groups = rows.map { it.group }.distinct()
             // Group labels whenever an aisle has more than one group (cut 5 of the review: the "Group by type" view went).
-            val labelled = groups.size > 1
+            // Step AC: labels only for a long aisle (six or more items), and always while arranging (they move the groups);
+            // the groups keep their order either way.
+            val labelled = groups.size > 1 && (ui.arranging || rows.size >= GROUP_LABELS_FROM)
             val cells =
                 (if (labelled) withLabels(toBuy) else toBuy.map { Cell.Item(it) }) +
                     (if (showBought) bought.map { Cell.Item(it) } else emptyList()) +
@@ -324,7 +326,8 @@ private fun ListBody(
                     rows,
                     open,
                     onToggle = { collapsed = if (open) collapsed + aisle.name else collapsed - aisle.name },
-                    modifier = Modifier.padding(top = 12.dp).sectionItem(sectionPosition(0, count), aisle.style.container),
+                    // Step AC: one slim row in the card's own colour, not a tall coloured block.
+                    modifier = Modifier.padding(top = 8.dp).sectionItem(sectionPosition(0, count), card),
                 )
             }
             if (open) {
@@ -389,6 +392,9 @@ private sealed interface Cell {
 
 /** How long a ticked row stays in place before it folds into "N bought". */
 internal const val LINGER_MS = 2_500L
+
+/** Step AC: an aisle with this many items or more on the list shows its group labels. */
+internal const val GROUP_LABELS_FROM = 6
 
 @Composable
 private fun BoughtRow(
@@ -689,8 +695,9 @@ private fun AisleTitle(
     Row(
         modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .clickable(onClickLabel = if (open) "Collapse" else "Expand", role = Role.Button, onClick = onToggle)
-            .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
+            .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp)
             .semantics(mergeDescendants = true) {
                 heading()
                 stateDescription = if (open) "Expanded" else "Collapsed"
@@ -699,13 +706,12 @@ private fun AisleTitle(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        AisleBadge(aisle, size = 36.dp)
-        Text(aisle.displayName, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        AisleBadge(aisle, size = 24.dp)
+        Text(aisle.displayName, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
         if (left == 0) {
             Text("Bought ✓", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         } else {
-            // A white pill on the tint, in the aisle's own colour: the count reads at a glance.
-            CountPill("$left to buy", tint.content)
+            Text("$left to buy", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Icon(
             if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
@@ -772,7 +778,7 @@ private fun ListRowItem(
         tile
             .fillMaxWidth()
             .background(background)
-            .heightIn(min = 64.dp)
+            .heightIn(min = 56.dp)
             .padding(start = 4.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -802,7 +808,7 @@ private fun ListRowItem(
         Row(
             Modifier
                 .weight(1f)
-                .heightIn(min = 64.dp)
+                .heightIn(min = 56.dp)
                 .clickable(onClickLabel = "Details") { actions.onOpenItem(row) }
                 .semantics(mergeDescendants = true) {
                     testTag = "item-${row.id}"

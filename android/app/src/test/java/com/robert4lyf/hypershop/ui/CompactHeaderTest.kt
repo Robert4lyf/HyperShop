@@ -59,7 +59,16 @@ class CompactHeaderTest {
     @Test
     fun theFirstAisleAndThreeItemsAreOnScreenAt360By640() {
         val c = TestContainer.create()
-        c.onTheList("Weeknight chilli", "2 onions", "3 carrots", "1 red pepper", "500g beef mince", "400g tin chopped tomatoes")
+        c.onTheList(
+            "Weeknight chilli",
+            "2 onions",
+            "3 carrots",
+            "1 red pepper",
+            "1 courgette",
+            "500g beef mince",
+            "4 sausages",
+            "400g tin chopped tomatoes",
+        )
         compose.setContent { HyperShopTheme(dynamicColor = false) { HyperShopApp(c, rememberNavController()) } }
         waitForTag("tick-")
         compose.waitForIdle()
@@ -73,7 +82,8 @@ class CompactHeaderTest {
                 compose.onAllNodes(hasTestTag("tick-${item.id}"), useUnmergedTree = true).fetchSemanticsNodes().firstOrNull()?.boundsInRoot
             }
         val shown = items.count { it.top >= 0f && it.bottom <= visibleBottom }
-        assertTrue("$shown items on screen above $visibleBottom: $items", shown >= 3)
+        // Step AC: slim aisle rows and denser items: at least five under the top row and the Add field.
+        assertTrue("$shown items on screen above $visibleBottom: $items", shown >= 5)
         // The Add field is pinned: above the list, not one of its scrolled items.
         val add = compose.onNode(hasTestTag("add-item"), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val list = compose.onNode(hasTestTag("list"), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot

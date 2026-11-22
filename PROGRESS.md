@@ -583,6 +583,11 @@ words.
   with Undo after Don't suggest (`ListViewModel.dontSuggest`; Undo puts back a pin or the plain rules), placed by the
   AB.3 rule, and `AddByHandTest.dontSuggestHidesItAndUndoBringsItBack` tests it. Nothing to change; Settings › Clear
   shopping history was already not the only way back.
-- [ ] AC.8 Denser list
+- [x] AC.8 Denser list. Aisle headings are one 48 dp row in the card's colour (24 dp icon, name, "N to buy" as plain
+  text, collapse arrow; was a tall tinted block with a 36 dp badge and a count pill). Group labels show only when the
+  aisle has six or more items on the list (`GROUP_LABELS_FROM`), and always while arranging (they carry the group
+  move controls); the group order applies either way. Rows' minimum height 64 → 56 dp (touch targets stay ≥ 48 dp).
+  `CompactHeaderTest` at 360×640 now needs five items on screen under the top row and the Add field (it shows five;
+  screenshot `list-360x640.png`).
 - [ ] AC.9 Small words
 - [ ] AC.10 Verify and report
