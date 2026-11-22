@@ -516,3 +516,28 @@ setting or help text.
   recomposition ran on a worker because `RecipesViewModel` and `LibraryViewModel` read Compose state through
   `snapshotFlow` on `Dispatchers.Default`, and a snapshot taken there can advance the global one; those reads now run
   on the main thread (the rest of each flow stays on Default).
+
+## Step AC — clear screens, walking order (`claude/step-z-fewer-concepts-rvynea`, from b42be93)
+
+No tabs, modes, settings or help text: plain compact tops, sub-group order in Walking order, smaller forms, plainer
+words.
+
+- [x] AC.0 Baseline. JourneyTest on b42be93: adding by hand 4 · 1 · 0 · 0, core 6 · 0 · 0 · 2, meal-based
+  9 · 1 · 3 · 3, quick 7 · 2 · 0 · 0. Where the low-poly mosaic (or another hero gradient) is drawn:
+  `ScreenHeader` (mosaic + dark shade) on the empty list, empty Recipes, Settings and its sub-screens
+  (`SettingsRoute`), Aisles (`AislesRoute`); the review's `Hero` (`RecipeBackdrop`: the recipe's photo, or its
+  mosaic, under a shade, behind title, servings and Claude's note); each Recipes card's full-width band
+  (`RecipeBackdrop`); the list's recipe card (`RecipeArt`, already a 56 dp square); the "N recipes ready to review"
+  card (`Brand.WarmCall` gradient + `heroGlow`). `heroBrush` has no user. Claims checked: `EmptyHero` draws no
+  mosaic (plain text, it is the empty states' headline); the cooking view and the recipe sheet draw none (the sheet
+  and the list's recipe sheet show a real photo when there is one).
+- [ ] AC.1 No large geometric header anywhere
+- [ ] AC.2 Reorder sub-groups in Walking order
+- [ ] AC.3 Item editor is one small form
+- [ ] AC.4 A recipe on the list says so
+- [ ] AC.5 Review warnings in plain words
+- [ ] AC.6 Always at home chips
+- [ ] AC.7 "Don't suggest" can be undone
+- [ ] AC.8 Denser list
+- [ ] AC.9 Small words
+- [ ] AC.10 Verify and report
