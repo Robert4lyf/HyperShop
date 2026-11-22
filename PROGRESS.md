@@ -566,7 +566,10 @@ words.
   `saveItem` keeps that part (before, the field opened empty). Tests updated; seven `ItemSheetHostTest` cases went:
   they asked "Discard edits and mark bought / remove / swap" with the form and the item's actions on screen together,
   which cannot happen now (the confirmation code stays, harmless; Back on a dirty form still asks).
-- [ ] AC.4 A recipe on the list says so
+- [x] AC.4 A recipe on the list says so. Its Recipes card shows a ticked "On your list" (one merged TalkBack node)
+  in the card's text, beside the "− Serves N +" stepper; the sheet shows the same beside its stepper. Off the list:
+  "Add to list" and "Serves N" as plain text in the card line (unchanged). "On the shopping list" (shown only when
+  the servings were unknown) is gone. `RecipesScreenTest` checks both states.
 - [ ] AC.5 Review warnings in plain words
 - [ ] AC.6 Always at home chips
 - [ ] AC.7 "Don't suggest" can be undone

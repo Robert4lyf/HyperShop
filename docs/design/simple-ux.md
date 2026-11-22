@@ -48,6 +48,7 @@ On the review, lines still to go on the list are counted as **N to add** ("4 to 
 | **Add to list · N items** | Review | review `apply` (plans itself; an edit relinks) |
 | **Save recipe only** | Review ⋮ | review `saveForLater` |
 | **Checkbox** (ticked = add; unticked rows are greyed and say **At home**) | Review row | the row's decision (in stock); staples from Settings › Always at home start unticked; TalkBack reads the row as one node (name, amount, "Will be added" or "At home, not added") and toggles it with "Mark at home" / "Add to list" |
+| **✓ On your list** | A recipe on the list: its Recipes card (beside the servings) and sheet | says it is on the list (one TalkBack node); a recipe not on it shows **Add to list** and its servings as plain text instead |
 | **− Serves N +** | A recipe on the list: its Recipes card and sheet (in place of Add to list), and its card on the list (Group by recipe, ⋮) | `Planner.setUseServings` on each press (the meal and the use rescaled together; what was bought stays bought). On the list twice, the latest is changed and the card says "on the list twice" |
 | **Remove from list** | A recipe on the list: its Recipes card's ⋮, its card on the list (⋮), its ingredients sheet | `ListRepository.removeFromList` for each time it is on the list (the use goes only when nothing of it is bought; otherwise unbought shares are withdrawn); one Undo |
 | **Can't find it** / **Found it** | The item's sheet | `markUnavailable` / `markAvailable` |

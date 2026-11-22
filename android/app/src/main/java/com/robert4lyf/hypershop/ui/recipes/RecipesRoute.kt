@@ -490,13 +490,8 @@ private fun LibraryCard(
                     row.uses?.let {
                         Text("Uses $it", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
                     }
-                    if (row.onList && row.servings == null) {
-                        Text(
-                            "On the shopping list",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
+                    // Step AC: on the list, said with a tick beside the servings; off it, "Add to list" instead.
+                    if (row.onList) OnYourList(Modifier.padding(top = 4.dp).testTag("lib-on-list-${row.key}"))
                 }
                 // Step AA: on the list, the card shows how many it is for, changed in place; "Add to list" only when it
                 // is not on the list (it no longer sits beside "On the shopping list").
@@ -645,6 +640,19 @@ fun RecipeDetailContent(
     }
 }
 
+/** Step AC: "✓ On your list", one TalkBack node, so a recipe on the list reads differently from one with "Add to list". */
+@Composable
+private fun OnYourList(modifier: Modifier = Modifier) {
+    Row(
+        modifier.semantics(mergeDescendants = true) {},
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        Text("On your list", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DetailButtons(
@@ -665,8 +673,11 @@ private fun DetailButtons(
                     Spacer(Modifier.size(8.dp))
                     Text("Add to list")
                 }
-            row.servings != null -> com.robert4lyf.hypershop.ui.common.ServingsStepper(row.servings, onServings, tag = "detail-serves")
-            else -> Text("On the shopping list", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            else ->
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OnYourList(Modifier.testTag("detail-on-list"))
+                    row.servings?.let { com.robert4lyf.hypershop.ui.common.ServingsStepper(it, onServings, tag = "detail-serves") }
+                }
         }
         onOpen?.let {
             OutlinedButton(onClick = it) {
