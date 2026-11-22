@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -65,12 +64,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -87,7 +86,6 @@ import com.robert4lyf.hypershop.ui.common.siteName
 import com.robert4lyf.hypershop.ui.common.webLink
 import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.review.TitleDialog
-import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.util.factoryFor
 
@@ -197,7 +195,8 @@ fun RecipesScreen(
                 Modifier.fillMaxSize().testTag("recipes"),
                 // Room under the last card's buttons for the + button.
                 contentPadding = PaddingValues(bottom = 112.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                // Step AD.5: compact cards, closer together, so four recipes are in view on a small phone.
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 // The recipe book (cut 1 of the review): what is in this shop is on the Shopping tab's recipe view
                 // and on This week, each with the recipe's own actions.
@@ -409,7 +408,11 @@ data class RecipeNoteActions(
     val onRemovePhoto: (LibraryRow) -> Unit = {},
 )
 
-/** One saved recipe: its name, where it's from, how big, when last added; Add to list. */
+/**
+ * One saved recipe, as one compact card (Step AD.5): a square thumbnail (its photo cropped, or its art), the title, one
+ * status line that never wraps (the site, else "Serves N"; "Uses …" while searching), then "Add to list", or the
+ * "On your list" tick with the servings stepper; ⋮ for the rest. "Last added" is on the recipe's own page.
+ */
 @Composable
 private fun LibraryCard(
     row: LibraryRow,
@@ -421,7 +424,6 @@ private fun LibraryCard(
     onServings: (Int) -> Unit = {},
     onRemoveFromList: () -> Unit = {},
 ) {
-    val now = remember { System.currentTimeMillis() }
     Surface(
         Modifier
             .fillMaxWidth()
@@ -433,89 +435,40 @@ private fun LibraryCard(
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.card,
     ) {
-        Column {
-            // A real photo heads the card as a band, the title on it. Step AC: without one, the recipe's own art is a
-            // small square beside the title, not a full-width banner.
-            val photo = row.photo
-            if (photo != null) {
-                Box(Modifier.fillMaxWidth().heightIn(min = LIBRARY_BAND).clipToBounds().testTag("lib-band-${row.key}")) {
-                    RecipeBackdrop(photo, Modifier.matchParentSize())
+        Column(Modifier.padding(start = 12.dp, top = 8.dp, bottom = 4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val thumb = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).testTag("lib-thumb-${row.key}")
+                RecipeArt(row.title, row.photo, thumb)
+                Column(Modifier.weight(1f).padding(start = 12.dp)) {
                     Text(
                         row.title,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Brand.OnHero,
-                        modifier =
-                            Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(start = 20.dp, end = 16.dp, top = 14.dp, bottom = 12.dp)
-                                .testTag("hero-text"),
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("lib-title-${row.key}"),
                     )
-                }
-            } else {
-                Row(
-                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RecipeArt(row.title, null, Modifier.size(56.dp).clip(RoundedCornerShape(14.dp)).testTag("lib-thumb-${row.key}"))
-                    Spacer(Modifier.size(12.dp))
                     Text(
-                        row.title,
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.weight(1f).testTag("lib-title-${row.key}"),
-                    )
-                }
-            }
-            Row(
-                Modifier.padding(start = 20.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f).padding(end = 12.dp)) {
-                    val bits =
-                        listOfNotNull(
-                            webLink(row.url)?.let { siteName(it) } ?: row.bookRef,
-                            row.rating?.let { "★ $it/5" },
-                            // Step AA: what it serves and when it last went on the list (left out when it never has).
-                            row.writtenFor?.let { "Serves $it" },
-                            row.lastAddedToList?.let {
-                                "last added " + addedWhen(DateUtils.getRelativeTimeSpanString(it, now, DAY).toString())
-                            },
-                            // AA.1: on the list more than once (added again from a share), said rather than hidden.
-                            row.listCount.takeIf { it > 1 }?.let { if (it == 2) "on the list twice" else "on the list $it times" },
-                        )
-                    Text(
-                        bits.joinToString(" · "),
+                        statusLine(row),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("lib-status-${row.key}"),
                     )
-                    row.uses?.let {
-                        Text("Uses $it", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
-                    }
-                    // Step AC: on the list, said with a tick beside the servings; off it, "Add to list" instead.
-                    if (row.onList) OnYourList(Modifier.padding(top = 4.dp).testTag("lib-on-list-${row.key}"))
-                }
-                // Step AA: on the list, the card shows how many it is for, changed in place; "Add to list" only when it
-                // is not on the list (it no longer sits beside "On the shopping list").
-                when {
-                    !row.onList ->
-                        FilledTonalButton(onClick = onAdd, modifier = Modifier.testTag("lib-add-${row.key}")) {
-                            Text("Add to list")
-                        }
-                    row.servings != null ->
-                        com.robert4lyf.hypershop.ui.common.ServingsStepper(row.servings, onServings, tag = "lib-serves-${row.key}")
                 }
                 var menu by remember { mutableStateOf(false) }
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More for ${row.title}") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         if (row.onList) {
-                            DropdownMenuItem(text = {
-                                Text(
-                                    "Remove from list",
-                                )
-                            }, modifier = Modifier.testTag("lib-remove-from-list-${row.key}"), onClick = {
-                                menu = false
-                                onRemoveFromList()
-                            })
+                            DropdownMenuItem(
+                                text = { Text("Remove from list") },
+                                modifier = Modifier.testTag("lib-remove-from-list-${row.key}"),
+                                onClick = {
+                                    menu = false
+                                    onRemoveFromList()
+                                },
+                            )
                         }
                         DropdownMenuItem(text = { Text("Rename") }, modifier = Modifier.testTag("lib-rename-${row.key}"), onClick = {
                             menu = false
@@ -532,9 +485,28 @@ private fun LibraryCard(
                     }
                 }
             }
+            // Step AA/AC: on the list, the tick and how many it is for, changed in place; off it, "Add to list".
+            Row(Modifier.fillMaxWidth().padding(end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (row.onList) {
+                    OnYourList(row.listCount, Modifier.weight(1f).testTag("lib-on-list-${row.key}"))
+                    row.servings?.let {
+                        com.robert4lyf.hypershop.ui.common.ServingsStepper(it, onServings, tag = "lib-serves-${row.key}")
+                    }
+                } else {
+                    FilledTonalButton(onClick = onAdd, modifier = Modifier.testTag("lib-add-${row.key}")) { Text("Add to list") }
+                }
+            }
         }
     }
 }
+
+/** Step AD.5: a card's one status line: what a search matched, else the site (or book), else what it serves. */
+internal fun statusLine(row: LibraryRow): String =
+    row.uses?.let { "Uses $it" }
+        ?: webLink(row.url)?.let { siteName(it) }
+        ?: row.bookRef
+        ?: row.writtenFor?.let { "Serves $it" }
+        ?: if (row.lines == 1) "1 ingredient" else "${row.lines} ingredients"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -578,6 +550,11 @@ fun RecipeDetailContent(
                         url?.let { siteName(it) } ?: detail.row.bookRef,
                         detail.servings?.let { "Serves $it" },
                         if (detail.row.lines == 1) "1 ingredient" else "${detail.row.lines} ingredients",
+                        // Step AD.5: when it last went on the list, moved here from its card.
+                        detail.row.lastAddedToList?.let {
+                            "last added " +
+                                addedWhen(DateUtils.getRelativeTimeSpanString(it, System.currentTimeMillis(), DAY).toString())
+                        },
                     )
                 Text(
                     bits.joinToString(" · "),
@@ -640,16 +617,32 @@ fun RecipeDetailContent(
     }
 }
 
-/** Step AC: "✓ On your list", one TalkBack node, so a recipe on the list reads differently from one with "Add to list". */
+/**
+ * Step AC: "✓ On your list", one TalkBack node, so a recipe on the list reads differently from one with "Add to list".
+ * On it more than once (added again from a share), "On your list twice".
+ */
 @Composable
-private fun OnYourList(modifier: Modifier = Modifier) {
+private fun OnYourList(
+    count: Int = 1,
+    modifier: Modifier = Modifier,
+) {
     Row(
         modifier.semantics(mergeDescendants = true) {},
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-        Text("On your list", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        Text(
+            when {
+                count <= 1 -> "On your list"
+                count == 2 -> "On your list twice"
+                else -> "On your list $count times"
+            },
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -675,7 +668,7 @@ private fun DetailButtons(
                 }
             else ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OnYourList(Modifier.testTag("detail-on-list"))
+                    OnYourList(modifier = Modifier.testTag("detail-on-list"))
                     row.servings?.let { com.robert4lyf.hypershop.ui.common.ServingsStepper(it, onServings, tag = "detail-serves") }
                 }
         }
@@ -789,9 +782,6 @@ fun UseDetailContent(
         }
     }
 }
-
-/** How tall a saved recipe's band is (photo or mosaic): compact, so a library shows four or five to a screen (UX review 14). */
-private val LIBRARY_BAND = 96.dp
 
 /** Saved recipes from which the sort control and the "4★ & up" filter show. */
 internal const val SORT_FROM = 10

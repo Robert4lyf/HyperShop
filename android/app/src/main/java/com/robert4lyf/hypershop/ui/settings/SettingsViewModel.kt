@@ -306,10 +306,13 @@ class SettingsViewModel(
             _ui.update { it.copy(editingStore = id, aisles = order, groups = groups) }
         }
 
-    fun renameStore(name: String) =
-        viewModelScope.launch {
-            c.repository.renameStore(_ui.value.editingStore, name)
-        }
+    /** Step AD.2: the pencil on a store's tab renames that store, whichever is being edited. */
+    fun renameStore(
+        store: Long,
+        name: String,
+    ) = viewModelScope.launch {
+        c.repository.renameStore(store, name)
+    }
 
     /** Settings › Always at home › "Ran out" (missing 5 of the review): on the list once, still always at home. */
     fun ranOut(name: String) =

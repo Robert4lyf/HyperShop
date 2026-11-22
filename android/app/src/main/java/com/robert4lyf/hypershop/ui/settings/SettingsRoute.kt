@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.selection.selectable
@@ -39,11 +40,8 @@ import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.LocalDining
 import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Route
 import androidx.compose.material.icons.rounded.SaveAlt
@@ -84,6 +82,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -109,14 +108,20 @@ import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.settings.ThemeMode
 import com.robert4lyf.hypershop.ui.common.AisleBadge
+import com.robert4lyf.hypershop.ui.common.DragHandle
 import com.robert4lyf.hypershop.ui.common.EdgeDivider
 import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.PillShape
+import com.robert4lyf.hypershop.ui.common.ReorderColumn
+import com.robert4lyf.hypershop.ui.common.ReorderScroll
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
 import com.robert4lyf.hypershop.ui.common.SectionCard
 import com.robert4lyf.hypershop.ui.common.SectionLabel
 import com.robert4lyf.hypershop.ui.common.Tone
 import com.robert4lyf.hypershop.ui.common.basilSegmentedColors
+import com.robert4lyf.hypershop.ui.common.moveActions
+import com.robert4lyf.hypershop.ui.common.rememberReorderState
+import com.robert4lyf.hypershop.ui.common.reorderActions
 import com.robert4lyf.hypershop.ui.common.shareNote
 import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.theme.Brand
@@ -134,7 +139,7 @@ data class SettingsActions(
     val onRanOut: (String) -> Unit = {},
     /** Aisles: which store's order is being edited (missing 4 of the review). */
     val onEditStore: (Long) -> Unit = {},
-    val onRenameStore: (String) -> Unit = {},
+    val onRenameStore: (Long, String) -> Unit = { _, _ -> },
     val onMoveAisle: (AisleCode, Int) -> Unit = { _, _ -> },
     /** "Move to top" (0) / "Move to bottom" (last). */
     val onMoveAisleTo: (AisleCode, Int) -> Unit = { _, _ -> },
@@ -271,9 +276,10 @@ fun SettingsScreen(
                     }
                     return@LazyColumn
                 }
+                // Step AD.1: the walking order first, so it is in reach without scrolling.
+                card("Aisles", Icons.Rounded.Route, hue = 30f) { AislesRow(actions) }
                 card("Appearance", Icons.Rounded.Palette, hue = 300f) { AppearanceGroup(ui, actions) }
                 card("List", Icons.Rounded.Tune, hue = 140f) { ListGroup(ui, actions) }
-                card("Aisles", Icons.Rounded.Route, hue = 30f) { AislesRow(actions) }
                 card("Ingredients", Icons.Rounded.LocalDining, hue = 95f) { IngredientsGroup(actions) }
                 card("Watch", Icons.Rounded.Watch, hue = 205f) { WatchGroup(ui, actions) }
                 card("Claude", Icons.Rounded.AutoAwesome, hue = 265f) {
@@ -526,57 +532,64 @@ private fun AislesRow(actions: SettingsActions) {
     }
 }
 
-/** The aisles in walking order with arrows, "Move to top/bottom" and Reset: the body of [AislesScreen]. */
+/**
+ * The aisles in walking order and Reset: the body of [AislesScreen]. Step AD.1: each row is moved by its drag handle
+ * (TalkBack: Move up / down / to top / to bottom; Ctrl or Alt + arrows on the handle). An aisle's ⌄, at its start,
+ * opens its groups, which move the same way within it.
+ */
 @Composable
 internal fun AislesGroup(
     ui: SettingsUi,
     actions: SettingsActions,
+    scroll: ReorderScroll? = null,
 ) {
     var confirmReset by rememberSaveable { mutableStateOf(false) }
     // Step AC: the aisles opened to show their groups.
     var open by rememberSaveable { mutableStateOf(emptyList<String>()) }
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        ui.aisles.forEachIndexed { i, a ->
-            val groups = ui.groups[a].orEmpty()
-            val opened = a.name in open
-            // One badge size and one column, so the names line up down the card.
-            Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
-                AisleBadge(a, size = 48.dp)
-                Text(a.displayName, Modifier.weight(1f).padding(start = 14.dp), style = MaterialTheme.typography.bodyLarge)
-                if (groups.isNotEmpty()) {
-                    IconButton(
-                        onClick = { open = if (opened) open - a.name else open + a.name },
-                        modifier = Modifier.testTag("groups-${a.name}"),
-                    ) {
-                        Icon(
-                            if (opened) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                            contentDescription = (if (opened) "Hide the groups in " else "Show the groups in ") + a.displayName,
-                        )
+    val aisles = rememberReorderState()
+    ReorderColumn(
+        ui.aisles,
+        key = { it },
+        onMove = { a, i -> actions.onMoveAisleTo(a, i) },
+        state = aisles,
+        scroll = scroll,
+        spacing = 4.dp,
+    ) { a, i, handle, held ->
+        val groups = ui.groups[a].orEmpty()
+        val opened = a.name in open
+        Surface(
+            color = if (held) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+            shape = MaterialTheme.shapes.medium,
+            shadowElevation = if (held) 4.dp else 0.dp,
+        ) {
+            Column {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 56.dp)
+                        .reorderActions(moveActions(a.displayName, i, ui.aisles.size) { actions.onMoveAisleTo(a, it) })
+                        .testTag("aisle-row-${a.name}"),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // The chevron sits beside the name, away from the handle, so it can't be taken for a move.
+                    if (groups.isNotEmpty()) {
+                        IconButton(
+                            onClick = { open = if (opened) open - a.name else open + a.name },
+                            modifier = Modifier.testTag("groups-${a.name}"),
+                        ) {
+                            Icon(
+                                if (opened) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                                contentDescription = (if (opened) "Hide the groups in " else "Show the groups in ") + a.displayName,
+                            )
+                        }
+                    } else {
+                        Spacer(Modifier.width(48.dp))
                     }
+                    AisleBadge(a, size = 40.dp)
+                    Text(a.displayName, Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.bodyLarge)
+                    DragHandle(handle, "drag-${a.name}")
                 }
-                IconButton(onClick = { actions.onMoveAisle(a, -1) }, enabled = i > 0) {
-                    Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "Move ${a.displayName} up")
-                }
-                IconButton(onClick = { actions.onMoveAisle(a, 1) }, enabled = i < ui.aisles.lastIndex) {
-                    Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Move ${a.displayName} down")
-                }
-                var menu by remember { mutableStateOf(false) }
-                Box {
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More for ${a.displayName}") }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(text = { Text("Move to top") }, enabled = i > 0, onClick = {
-                            menu = false
-                            actions.onMoveAisleTo(a, 0)
-                        })
-                        DropdownMenuItem(text = { Text("Move to bottom") }, enabled = i < ui.aisles.lastIndex, onClick = {
-                            menu = false
-                            actions.onMoveAisleTo(a, ui.aisles.lastIndex)
-                        })
-                    }
-                }
-            }
-            if (opened) {
-                groups.forEachIndexed { j, g -> GroupOrderRow(a, g, j, groups.lastIndex, actions) }
+                if (opened) GroupOrder(a, groups, actions, scroll)
             }
         }
     }
@@ -597,50 +610,49 @@ internal fun AislesGroup(
 }
 
 /**
- * Step AC: one group of an opened aisle, moved with the aisles' own controls (arrows, then Move to top or bottom).
- * Things in no group are one more row, "Everything else", last until it is moved.
+ * Step AC: the groups of an opened aisle; Step AD.1: each moved by its handle, within its aisle only. Things in no group
+ * are one more row, "Everything else", last until it is moved.
  */
 @Composable
-private fun GroupOrderRow(
+private fun GroupOrder(
     aisle: AisleCode,
-    group: String?,
-    index: Int,
-    last: Int,
+    groups: List<String?>,
     actions: SettingsActions,
+    scroll: ReorderScroll?,
 ) {
-    val name = group ?: "Everything else"
-    val tag = "${aisle.name}-${group ?: "none"}"
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = 62.dp).testTag("group-$tag"),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        IconButton(onClick = { actions.onMoveGroup(aisle, group, -1) }, enabled = index > 0, modifier = Modifier.testTag("group-up-$tag")) {
-            Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "Move $name up")
-        }
-        IconButton(
-            onClick = { actions.onMoveGroup(aisle, group, 1) },
-            enabled = index < last,
-            modifier = Modifier.testTag("group-down-$tag"),
+    val state = rememberReorderState()
+    ReorderColumn(
+        groups,
+        key = { it ?: NO_GROUP },
+        onMove = { g, i -> actions.onMoveGroupTo(aisle, g, i) },
+        state = state,
+        scroll = scroll,
+    ) { group, j, handle, held ->
+        val name = group ?: "Everything else"
+        val tag = "${aisle.name}-${group ?: "none"}"
+        Surface(
+            color = if (held) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+            shape = MaterialTheme.shapes.small,
+            shadowElevation = if (held) 4.dp else 0.dp,
         ) {
-            Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Move $name down")
-        }
-        var menu by remember { mutableStateOf(false) }
-        Box {
-            IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More for $name") }
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(text = { Text("Move to top") }, enabled = index > 0, onClick = {
-                    menu = false
-                    actions.onMoveGroupTo(aisle, group, 0)
-                })
-                DropdownMenuItem(text = { Text("Move to bottom") }, enabled = index < last, onClick = {
-                    menu = false
-                    actions.onMoveGroupTo(aisle, group, last)
-                })
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .padding(start = 100.dp)
+                    .reorderActions(moveActions(name, j, groups.size) { actions.onMoveGroupTo(aisle, group, it) })
+                    .testTag("group-$tag"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                DragHandle(handle, "drag-group-$tag")
             }
         }
     }
 }
+
+/** The key of the "Everything else" row: the null group, as a reorder key. */
+private const val NO_GROUP = "\u0000none"
 
 /** Back up to a file the user picks, or restore from one; what travels and what never does. */
 @Composable

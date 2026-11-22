@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.ExpandLess
@@ -40,17 +42,22 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,9 +75,11 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -82,7 +91,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.settings.ListView
-import com.robert4lyf.hypershop.ui.common.AisleBadge
+import com.robert4lyf.hypershop.ui.common.AisleHeading
 import com.robert4lyf.hypershop.ui.common.BottomActionBar
 import com.robert4lyf.hypershop.ui.common.CountPill
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
@@ -104,6 +113,8 @@ data class ListActions(
     val onFinish: () -> Unit,
     val onClearAll: () -> Unit,
     val onOpenItem: (ListRow) -> Unit = {},
+    /** Step AD.10: swiped away, or TalkBack's "Remove": its unbought share comes off. */
+    val onRemove: (ListRow) -> Unit = {},
     val onShare: () -> Unit = {},
     /** The menu's choice of layout: store order or by recipe. */
     val onView: (ListView) -> Unit = {},
@@ -298,7 +309,7 @@ private fun ListBody(
                             } else {
                                 Modifier.animateItem()
                             }.sectionItem(sectionPosition(i + 1, count), card)
-                        ListRowItem(r, actions, tile, lit = r.id in flash)
+                        ListRowItem(r, actions, tile, lit = r.id in flash, showFrom = true)
                     }
                 }
             }
@@ -692,27 +703,17 @@ private fun AisleTitle(
 ) {
     val left = rows.count { it.state != TickState.DONE }
     val tint = aisle.style
-    Row(
+    AisleHeading(
+        aisle,
+        if (left == 0) "Bought ✓" else "$left to buy",
         modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
             .clickable(onClickLabel = if (open) "Collapse" else "Expand", role = Role.Button, onClick = onToggle)
-            .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp)
             .semantics(mergeDescendants = true) {
                 heading()
                 stateDescription = if (open) "Expanded" else "Collapsed"
-            }
-            .testTag("aisle-${aisle.name}"),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            }.testTag("aisle-${aisle.name}"),
+        countColor = if (left == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
     ) {
-        AisleBadge(aisle, size = 24.dp)
-        Text(aisle.displayName, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-        if (left == 0) {
-            Text("Bought ✓", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-        } else {
-            Text("$left to buy", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
         Icon(
             if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
             contentDescription = null,
@@ -733,18 +734,71 @@ internal fun displayMain(
 ): String = main.replaceFirstChar { it.uppercaseChar() }
 
 /**
- * The row's sub-lines: "2 already ticked" or the pack note, and the recipe the
- * item came from. The recipe joins the ticked count on one line ("2 already
- * ticked · Weeknight chilli"), but a pack note gets a line of its own.
+ * The row's sub-lines: "2 already bought" or the pack note. Step AD.6: the recipe an item came from is shown only when
+ * the list is grouped by recipe ([showFrom]; the shared card names its recipes); in store order it is in the row's
+ * TalkBack description and on the item's sheet. With both, it joins the bought count on one line ("2 already bought ·
+ * Weeknight chilli"), but a pack note gets a line of its own.
  */
-internal fun subLines(row: ListRow): List<String> {
+internal fun subLines(
+    row: ListRow,
+    showFrom: Boolean = false,
+): List<String> {
     val sub = row.sub
-    val from = row.from
+    val from = row.from?.takeIf { showFrom }
     return when {
         sub == null -> listOfNotNull(from)
         from == null -> listOf(sub)
         row.state == TickState.PARTIAL -> listOf("$sub · $from")
         else -> listOf(sub, from)
+    }
+}
+
+/**
+ * Step AD.10: a row still to buy can be swiped away, either way: while it moves, a labelled "Remove" shows under it.
+ * Only its unbought share comes off ([ListActions.onRemove]); a bought row isn't swiped.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ListRowItem(
+    row: ListRow,
+    actions: ListActions,
+    tile: Modifier,
+    lit: Boolean = false,
+    showFrom: Boolean = false,
+) {
+    if (row.state == TickState.DONE) {
+        ListRowBody(row, actions, tile, lit, showFrom)
+        return
+    }
+    // A new state when the row changes, so a row that stays (partly bought) comes back settled.
+    key(row.main, row.state) {
+        val swipe =
+            rememberSwipeToDismissBoxState(confirmValueChange = { v ->
+                if (v != SwipeToDismissBoxValue.Settled) actions.onRemove(row)
+                true
+            })
+        SwipeToDismissBox(
+            swipe,
+            modifier = tile.testTag("swipe-${row.id}"),
+            backgroundContent = { RemoveBackground(swipe.dismissDirection) },
+        ) { ListRowBody(row, actions, Modifier, lit, showFrom) }
+    }
+}
+
+/** What shows under a row being swiped: "Remove", on the side it is uncovered from. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RemoveBackground(direction: SwipeToDismissBoxValue) {
+    // Only while the row moves: at rest nothing is under it (and TalkBack doesn't find a "Remove" on every row).
+    if (direction == SwipeToDismissBoxValue.Settled) return
+    Row(
+        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.errorContainer).padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = if (direction == SwipeToDismissBoxValue.StartToEnd) Arrangement.Start else Arrangement.End,
+    ) {
+        Icon(Icons.Rounded.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
+        Spacer(Modifier.width(8.dp))
+        Text("Remove", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onErrorContainer)
     }
 }
 
@@ -755,12 +809,14 @@ internal fun subLines(row: ListRow): List<String> {
  * DONE rows are greyed, struck through and carry a tick (not colour alone).
  */
 @Composable
-private fun ListRowItem(
+private fun ListRowBody(
     row: ListRow,
     actions: ListActions,
     tile: Modifier,
     /** Step AB: just added by hand: lit, then back to the card (seen, not announced). */
     lit: Boolean = false,
+    /** Step AD.6: the recipe under the name, in Group by recipe only. */
+    showFrom: Boolean = false,
 ) {
     val background by animateColorAsState(
         if (lit) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.card,
@@ -813,6 +869,13 @@ private fun ListRowItem(
                 .semantics(mergeDescendants = true) {
                     testTag = "item-${row.id}"
                     stateDescription = state
+                    // Step AD.10: the swipe, for TalkBack: what is still to buy comes off.
+                    if (!done) customActions = listOf(CustomAccessibilityAction("Remove") { actions.onRemove(row).let { true } })
+                    // Step AD.6: in store order the recipe is not drawn, but TalkBack still says what it is for.
+                    if (!showFrom && row.from != null) {
+                        contentDescription =
+                            listOfNotNull(displayMain(row.main, row.name), row.sub, "for ${row.from}").joinToString(", ")
+                    }
                 }.padding(start = 6.dp, top = 10.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -832,7 +895,7 @@ private fun ListRowItem(
                         modifier = Modifier.testTag("set-aside-${row.id}"),
                     )
                 }
-                for (line in subLines(row)) {
+                for (line in subLines(row, showFrom)) {
                     Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }

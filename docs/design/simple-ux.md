@@ -10,7 +10,7 @@ fewer modes and one word per idea. The data model is unchanged; every action cal
 | **Shopping list** | What is there to buy, in store order? | Type to add. Tick. **Finish shopping** once something is bought. |
 | **Recipes** | What is saved? | **Add to list** on a recipe. Add a recipe (link, typed, photo). |
 
-- Settings is a gear at the top of each. Its own screens (Ingredient library, Walking order, Debug, Voice test) have
+- Settings is a gear at the top of each; its first row is Walking order (Step AD). Its own screens (Ingredient library, Walking order, Debug, Voice test) have
   a back arrow.
 - A share opens the review; the widget and the launcher shortcut open the list.
 - There is no Meals tab, no shopping mode and no food-at-home check. Planned meals are still written for the current
@@ -26,7 +26,7 @@ fewer modes and one word per idea. The data model is unchanged; every action cal
 | Take a recipe's items off the list | **Remove from list** (only what is unbought goes) | Remove meal, ✕ |
 | Delete a saved recipe | **Delete recipe** | Remove from your recipes |
 | The order of saved recipes | **Most used** (the default: added to the list most often, then most lately, then newest saved); **Recently saved**, **Highest rated**, **A–Z**. The sort control shows from 10 recipes | Your usual, Recently added |
-| A saved recipe's card line | "Serves 4 · last added 3 days ago" ("last added" left out when it never has been) | added today, 12 ingredients, planned 3 times, cooked once |
+| A saved recipe's card (Step AD) | one compact card: a square thumbnail (its photo cropped, or its art), the title, one status line that never wraps (the site, else "Serves 4"), then **Add to list**, or **✓ On your list** ("twice" when it is there twice) with "− Serves 4 +". "last added 3 days ago" and the stars are on the recipe's page | added today, 12 ingredients, planned 3 times, cooked once, a photo band |
 | Something is already at home | **At home** (an unticked review row; staples in Settings start unticked) | Have it, Have some, I have some |
 | Can't get it on this trip | **Can't find it** → *Set aside for this trip*; **Found it** takes it back | Unavailable, Not available today |
 | End the trip | **Finish shopping** | Done |
@@ -34,7 +34,7 @@ fewer modes and one word per idea. The data model is unchanged; every action cal
 | Keep a reviewed recipe without adding it | **Save recipe only** (review ⋮ menu) | Save recipe, Save for later |
 | Correct the words a recipe line was read from | **Fix the recipe's text** (review row sheet) | Edit the line |
 | Say the app read something wrong | **Report a wrong reading** (review row sheet, item sheet) | This is wrong |
-| A line offering "A or B" | its **two options** as buttons, the one it reads now selected | Check: has 'or', Use B instead, swap |
+| A line offering "A or B", or a range written backwards ("3–2 cloves") | its **readings** as chips, the one in use selected with a check (TalkBack: "Selected" / "Not selected"), the same for both | Check: has 'or', Use B instead, swap |
 | How much a review row adds | the amount alone ("200 ml"); with the item on the list already, "200 ml · 700 ml with what's on your list" | +200 ml, → 700 ml on the shopping list |
 | The row sheet's amount field | **Amount in the recipe** (it sets the line's own amount, which servings then scale) | Amount, Amount to buy |
 
@@ -53,11 +53,14 @@ On the review, lines still to go on the list are counted as **N to add** ("4 to 
 | **− Serves N +** | A recipe on the list: its Recipes card and sheet (in place of Add to list), and its card on the list (Group by recipe, ⋮) | `Planner.setUseServings` on each press (the meal and the use rescaled together; what was bought stays bought). On the list twice, the latest is changed and the card says "on the list twice" |
 | **Remove from list** | A recipe on the list: its Recipes card's ⋮, its card on the list (⋮), its ingredients sheet | `ListRepository.removeFromList` for each time it is on the list (the use goes only when nothing of it is bought; otherwise unbought shares are withdrawn); one Undo |
 | **Can't find it** / **Found it** | The item's sheet | `markUnavailable` / `markAvailable` |
+| Swipe a row away (either way; "Remove" shows under it as it moves), or TalkBack's **Remove** | The list, a row still to buy | `removeUnbought`: only its unbought share comes off; "Removed Carrot", or for a partly bought row "Onion: the rest taken off, what's bought stays"; Undo puts the share back. The way to say "I have this already" after Add to list (Step AD) |
 | **Change store** | List ⋮, only with two or more stores | `ShopStart.change` → active store |
+| A store tab's ✎ › **Rename store** › **Save** | Settings › Aisles (Walking order), on each of the two store tabs | `renameStore(store, name)` for that tab's store (Step AD; the "Store name" field and "Save store name" above the aisles went) |
 | **Store order / Group by recipe**, **Arrange items** | List ⋮ | `Settings.listView`; `arrangeWith` |
-| **Walking order** › an aisle's ⌄ › its groups (↑ ↓, ⋮ Move to top / bottom; **Everything else** for things in no group) | Settings › Aisles | `arrangeWith(store)`: the same stored group order as Arrange items, for the store being edited; bumps listRev, so the list, the shared text, the widget and the watch follow |
+| **Walking order** (Settings' first row): drag an aisle by its handle (≡, at the row's end); its ⌄, beside the name, opens its groups, each dragged the same way within its aisle (**Everything else** for things in no group). Held near the screen's edge, the page scrolls. TalkBack: **Move up / down / to top / to bottom** on each row; a keyboard: Ctrl or Alt + ↑ ↓ on a handle | Settings › Aisles | aisles: `moveAisleTo`; groups: `arrangeWith(store)` (the same stored group order as Arrange items), for the store being edited, written once on release; bumps listRev, so the list, the shared text, the widget and the watch follow |
 | **Finish shopping** | List, once something is ticked | `ListRepository.finish` (Undo) |
-| **Add item** (typed, a suggestion, a chip, a paste) | The list, pinned under its top row | `ListRepository.addByHand` (`manualAdd` that says the item, its contribution and aisle). One message per add: **"Added to Dairy & Eggs"**, or **"Added 3 items"** for a paste or last shop's items, with Undo (`takeBackHandAdds`: only what is unbought). The row is lit for a moment where it is; the list is not scrolled. Already on the list: **"Milk is already on your list"** with **Add 1 more** (or the typed amount), then **"Milk: now 2 on your list"** with Undo |
+| **Last shop's N items** / **Add recipes** | The empty list, once you have shopped before (the first run keeps Try a sample list and Paste a link) | `BuyAgain` (last shop's regulars) / the Recipes tab (Step AD) |
+| **Add item** (typed, a suggestion, a chip, a paste) | The list, pinned under its top row | `ListRepository.addByHand` (`manualAdd` that says the item, its contribution and aisle). One message per add: **"Added to Dairy & Eggs"**, or **"Added 3 items"** for a paste or last shop's items, with Undo (`takeBackHandAdds`: only what is unbought). The row is lit for a moment where it is; the list is not scrolled. Already on the list: **"Milk is already on your list"** with **Add 1 more** (or the typed amount), then **"Milk: now 2 on your list"** with Undo. A link (typed or pasted, alone or among other lines) is never an item: it is imported, and its review opens, as **Paste a link** does (Step AD) |
 | **Change amount** (item sheet) | Item sheet | one small form: the name, the amount (with its unit chips) and **Aisle: …** (a menu), then **Save changes**. An item in two kinds of unit opens on the one it is bought by (a count, else a weight, else a volume) and says "Also 200 g on the list, kept as it is"; saving leaves that part as it was. **More details › Category and usual pack** is the second small form |
 | Move an item to another aisle (its sheet) | Item sheet | Added only by hand: remembered without asking (`editItem` with always), **"Moved to Household. HyperShop will remember."**, Undo `undoRememberedMove` (the move and the override, as it was). From a recipe: "Always put X in Y" as before |
 | A staple's chip › **Add to list once** / **Remove** | Settings › List › Always at home | one chip per staple, its name only; a tap opens the two: `ranOut` (on the list this once, still a staple) and `removeStaple` |
@@ -68,16 +71,20 @@ On the review, lines still to go on the list are counted as **N to add** ("4 to 
 - Bought rows fold under one **"N bought"** row per aisle; a row just ticked stays in place for 2.5 s, so a second tap
   undoes it. The screen stays awake while anything is ticked.
 - Once the list has items, its top is one row: **"N to buy · M bought"** ("N to buy" before anything is ticked, "All
-  bought" at the end), the progress bar under it, the gear and ⋮; "1 set aside" and the watch's state in small text when
-  there are any. The **Add item** field is pinned under that row.
+  bought" at the end), the progress bar under it, the gear and ⋮; "1 set aside" and "Watch not connected" in small text when
+  there are any (Step AD: "Watch synced" and "Watch updating…" are only in Settings › Watch). The **Add item** field is pinned under that row.
 - Every screen's top is one plain bar (Step AC): back arrow where there is one, the title, an optional one-line
   subtitle, actions on the right. No mosaic, gradient or hero card anywhere. The review's top: **Review later** (the
   recipe waits on the "ready to review" card), the recipe's
-  title with its pencil, "4 to add · 1 at home", the servings; when Claude failed or was skipped, one line with the
-  reason, **Retry** and ✕. "N recipes ready to review" is a plain card. A recipe without a photo shows its art as a
-  small square beside its title; a real photo stays a band.
+  title with its pencil, then "4 to add · 1 at home" with the servings beside it (Step AD); when Claude failed or was skipped, one line with the
+  reason, **Retry** and ✕. "N recipes ready to review" is a plain card. Every recipe card shows a small square beside its
+  title: its photo cropped, or its art (Step AD; no photo band on cards).
+- In store order a row is its amount and name (Step AD); a second line only when it adds something: the usual pack
+  when it differs from the amount ("700 ml milk" over "4 pint bottle"; "500 g beef mince" has none), "2 already
+  bought", "150 ml needed", "200 g at home". The recipe it is for shows in Group by recipe and on its sheet; TalkBack
+  reads it in store order too ("700 ml milk, for Weeknight chilli").
 - An aisle's heading is one slim row (Step AC): its small icon, its name, "N to buy" and the collapse arrow, in the
-  card's own colour. Group labels (Vegetables, Salad…) show only in an aisle with six or more items, and always while
+  card's own colour. The review uses the same row (Step AD), counting **N to add** ("All at home", "Nothing to add"). Group labels (Vegetables, Salad…) show only in an aisle with six or more items, and always while
   arranging; the group order from Walking order applies either way.
 - No instructions on screens: a control that needed a paragraph was relabelled or removed.
 
@@ -88,7 +95,7 @@ grey, never red, and offers the way to change it. The recipe's own text is quote
 
 | Raised by | Reason (stored) | What the row says | Way to change it |
 |---|---|---|---|
-| Rule parser, Claude post-processing | a range that goes down | "3 cloves · recipe says 3–2" | a button for each reading ("3 cloves", "2 cloves") sets the line's amount |
+| Rule parser, Claude post-processing | a range that goes down | "3 cloves · recipe says 3–2" | a chip for each reading ("3 cloves", "2 cloves"), the one in use selected; the other sets the line's amount |
 | Uncertainty, Claude post-processing, rule parser | an amount it couldn't read / an amount that made no sense / a zero amount | "No amount found" | **Set amount** opens the row's sheet, its amount field first |
 | Rule parser | "A or B": one of two | (no warning: the two options as buttons, Step AA) | the other option |
 | Rule parser | "X and Y": may be two items | "Read as one item; it may be two. Fix the recipe's text to split it" (quoted) | Fix the recipe's text |

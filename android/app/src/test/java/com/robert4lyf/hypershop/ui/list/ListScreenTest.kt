@@ -3,7 +3,9 @@ package com.robert4lyf.hypershop.ui.list
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertCountEquals
@@ -22,6 +24,9 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.robert4lyf.hypershop.core.model.AisleCode
@@ -30,6 +35,7 @@ import com.robert4lyf.hypershop.testutil.Shots
 import com.robert4lyf.hypershop.testutil.TestPhotos
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -70,6 +76,7 @@ class ListScreenTest {
         ListActions(
             onToggle = { events += "toggle ${it.id}" },
             onOpenItem = { events += "open ${it.id}" },
+            onRemove = { events += "remove ${it.id}" },
             onFinish = { events += "finish" },
             onClearAll = { events += "clear" },
             onArrange = { events += "arrange $it" },
@@ -139,7 +146,7 @@ class ListScreenTest {
     }
 
     @Test
-    fun rowsReadAlikeAndShowTheirRecipe() {
+    fun rowsReadAlikeAndSayTheirRecipeOnlyToTalkBackInStoreOrder() {
         val rows =
             listOf(
                 ListRow(1, "milk", "700 ml milk", null, TickState.OPEN, AisleCode.DAIRY_EGGS, from = "Weeknight chilli"),
@@ -150,14 +157,71 @@ class ListScreenTest {
         compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(ui, actions) } }
         compose.onNodeWithText("700 ml milk").assertExists()
         compose.onNodeWithText("1 more onion").assertExists()
-        compose.onNodeWithText("2 already bought · Weeknight chilli").assertExists()
-        compose.onNodeWithText("1 × 250 g block").assertExists()
-        // The pack note keeps its line; the recipe goes under it.
-        assertEquals(listOf("1 × 250 g block", "Weeknight chilli"), subLines(rows[2]))
+        // Step AD.6: in store order the recipe is not drawn; the bought count keeps its line.
+        compose.onNodeWithText("2 already bought", useUnmergedTree = true).assertExists()
+        compose.onAllNodesWithText("Weeknight chilli", substring = true, useUnmergedTree = true).assertCountEquals(0)
+        // TalkBack still says what it is for.
+        val said = compose.onNodeWithTag("item-1").fetchSemanticsNode().config[SemanticsProperties.ContentDescription]
+        assertEquals(listOf("700 ml milk, for Weeknight chilli"), said)
+        assertEquals(listOf("1 × 250 g block"), subLines(rows[2]))
+        // Grouped by recipe (the shared card): the recipe under the name, the pack note on a line of its own.
+        assertEquals(listOf("1 × 250 g block", "Weeknight chilli"), subLines(rows[2], showFrom = true))
+        assertEquals(listOf("2 already bought · Weeknight chilli"), subLines(rows[1], showFrom = true))
         // A capital at the start of the row only (UX review 9): mid-line capitals read as typos.
         assertEquals("Coriander", displayMain("coriander", "coriander"))
         assertEquals("2 leaves", displayMain("2 leaves", "leaf"))
         assertEquals("2 tins chopped tomatoes", displayMain("2 tins chopped tomatoes", "chopped tomatoes"))
+    }
+
+    @Test
+    fun aPackLineOnlyWhenItDiffersFromTheAmount() {
+        // Step AD.6: the usual pack under the amount only when it says something new.
+        assertEquals(null, leanSub("500g beef mince", "500g pack", "1 × 500 g pack", TickState.OPEN))
+        assertEquals(null, leanSub("250g unsalted butter", "250g block", "1 × 250 g block", TickState.OPEN))
+        assertEquals("4 pint bottle", leanSub("700ml milk", "4 pint bottle", "1 × 4 pint bottle", TickState.OPEN))
+        assertEquals("400g tin", leanSub("2 tins chopped tomatoes", "400g tin", "1 × 400 g tin", TickState.OPEN))
+        assertEquals("454g jar", leanSub("honey", "454g jar", "454 g jar", TickState.OPEN))
+        // Not the pack note: kept whatever the numbers.
+        assertEquals("2 already bought", leanSub("2 more onions", "2 already bought", "1 × 1 kg bag", TickState.PARTIAL))
+        assertEquals("150ml needed", leanSub("1 pot double cream", "150ml needed", "1 × 150 ml pot", TickState.OPEN))
+        assertEquals("200g at home", leanSub("200g rice", "200g at home", "1 × 1 kg bag", TickState.OPEN))
+    }
+
+    @Test
+    fun theWatchIsMentionedOnlyWhenItNeedsAttention() {
+        // Step AD.7: synced or updating says nothing on the list; only "Watch not connected" shows, under the count.
+        assertEquals(null, watchWord(com.robert4lyf.hypershop.watch.WatchLinkState.APP_READY))
+        assertEquals(null, watchWord(com.robert4lyf.hypershop.watch.WatchLinkState.NO_SDK))
+        assertEquals(null, watchWord(com.robert4lyf.hypershop.watch.WatchLinkState.NOT_INSTALLED))
+        assertEquals("Watch not connected", watchWord(com.robert4lyf.hypershop.watch.WatchLinkState.DISCONNECTED))
+        assertEquals("Watch not connected", watchWord(com.robert4lyf.hypershop.watch.WatchLinkState.CONNECTED))
+        compose.setContent { HyperShopTheme(dynamicColor = false) { ListScreen(SAMPLE_LIST.copy(watch = "Watch not connected"), actions) } }
+        compose.onNodeWithText("Watch not connected").assertExists()
+    }
+
+    @Test
+    fun aRowSwipedAwayIsRemovedAndShowsRemoveWhileMoving() {
+        // Step AD.10: swiping a row still to buy, either way, takes it off; a labelled "Remove" shows under it as it moves.
+        show()
+        compose.onNodeWithTag("swipe-4").performTouchInput {
+            down(center)
+            repeat(10) {
+                advanceEventTime(16)
+                moveBy(Offset(-12f, 0f))
+            }
+        }
+        compose.onNodeWithText("Remove", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("swipe-4").performTouchInput { up() }
+        compose.onNodeWithTag("swipe-2").performTouchInput { swipeLeft() }
+        compose.onNodeWithTag("swipe-1").performTouchInput { swipeRight() }
+        compose.waitForIdle()
+        assertTrue(events.toString(), "remove 2" in events && "remove 1" in events)
+        // A bought row isn't swiped; TalkBack has the same as an action on a row still to buy.
+        compose.onNodeWithTag("swipe-3").assertDoesNotExist()
+        val action =
+            compose.onNodeWithTag("item-4").fetchSemanticsNode().config[SemanticsActions.CustomActions].single { it.label == "Remove" }
+        compose.runOnIdle { action.action() }
+        assertTrue(events.toString(), "remove 4" in events)
     }
 
     @Test
@@ -400,18 +464,50 @@ class ListScreenTest {
     }
 
     @Test
-    fun aReturningShopperIsOfferedLastShopAndNoPlanning() {
-        // Step Z: no "Plan this week" (Meals went); someone who has shopped before can put last shop back on.
+    fun aReturningShopperIsOfferedLastShopAndRecipes() {
+        // Step Z: no "Plan this week" (Meals went). Step AD.11: after a shop, the next step: last shop's items back on,
+        // or "Add recipes" (the Recipes tab).
         val prep = PlanPrep(loaded = true, lastShop = 4, returning = true)
         compose.setContent {
             HyperShopTheme(dynamicColor = false) {
-                ListScreen(ListUi(loaded = true), actions, empty = { EmptyState({}, {}, prep, onLastShop = { events += "last" }) })
+                ListScreen(
+                    ListUi(loaded = true),
+                    actions,
+                    empty = { EmptyState({}, {}, prep, onLastShop = { events += "last" }, onRecipes = { events += "recipes" }) },
+                )
             }
         }
         compose.onNodeWithText("Nothing on the list").assertExists()
         compose.onNodeWithTag("empty-plan").assertDoesNotExist()
-        compose.onNodeWithTag("empty-last-shop").performClick()
-        assertEquals(listOf("last"), events)
+        compose.onNodeWithText("Last shop's 4 items").performClick()
+        compose.onNodeWithText("Add recipes").performClick()
+        assertEquals(listOf("last", "recipes"), events)
+        compose.onNodeWithTag("paste-link").assertDoesNotExist()
+    }
+
+    @Test
+    fun aReturningShopperWithNoLastShopStillGetsAddRecipes() {
+        val prep = PlanPrep(loaded = true, lastShop = 0, returning = true)
+        compose.setContent {
+            HyperShopTheme(dynamicColor = false) {
+                ListScreen(ListUi(loaded = true), actions, empty = { EmptyState({}, {}, prep, onRecipes = { events += "recipes" }) })
+            }
+        }
+        compose.onNodeWithTag("empty-last-shop").assertDoesNotExist()
+        compose.onNodeWithTag("empty-recipes").performClick()
+        assertEquals(listOf("recipes"), events)
+    }
+
+    @Test
+    fun theFirstRunEmptyListIsUnchanged() {
+        compose.setContent {
+            HyperShopTheme(
+                dynamicColor = false,
+            ) { ListScreen(ListUi(loaded = true), actions, empty = { EmptyState({}, {}, PlanPrep(loaded = true)) }) }
+        }
+        compose.onNodeWithText("Try a sample list").assertExists()
+        compose.onNodeWithTag("paste-link").assertExists()
+        compose.onNodeWithTag("empty-recipes").assertDoesNotExist()
     }
 
     @Test

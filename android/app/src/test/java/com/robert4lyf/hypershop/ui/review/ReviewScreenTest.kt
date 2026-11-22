@@ -198,6 +198,42 @@ class ReviewScreenTest {
     }
 
     @Test
+    fun theReadingInUseLooksAndReadsSelectedInEveryCase() {
+        // Step AD.4: a backwards range's readings and an "A or B" line's options are the same chips: the one in use
+        // selected, with a check, and TalkBack says "Selected" / "Not selected".
+        show()
+        val list = compose.onNode(hasScrollAction())
+        list.performScrollToNode(hasText("3 cloves · recipe says 3–2"))
+
+        fun state(tag: String) =
+            compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().config[SemanticsProperties.StateDescription]
+        compose.onNodeWithTag("reading-cat:garlic-3 cloves", useUnmergedTree = true).assertIsSelected()
+        compose.onNodeWithTag("reading-cat:garlic-2 cloves", useUnmergedTree = true).assertIsNotSelected()
+        assertEquals("Selected", state("reading-cat:garlic-3 cloves"))
+        assertEquals("Not selected", state("reading-cat:garlic-2 cloves"))
+        // The one in use does nothing when chosen again.
+        compose.onNodeWithTag("reading-cat:garlic-3 cloves", useUnmergedTree = true).performClick()
+        assertEquals(emptyList<String>(), events)
+        list.performScrollToNode(hasText("Chipotle sauce"))
+        compose.onNodeWithTag("chosen-9", useUnmergedTree = true).assertIsSelected()
+        assertEquals("Selected", state("chosen-9"))
+        assertEquals("Not selected", state("other-9"))
+    }
+
+    @Test
+    fun theSecondReadingIsSelectedWhenTheLineUsesIt() {
+        val garlic = SAMPLE_REVIEW.aisles[0].second[1]
+        val ui =
+            SAMPLE_REVIEW.copy(
+                aisles =
+                    listOf(AisleCode.PRODUCE to listOf(garlic.copy(quantity = "2 cloves", range = garlic.range!!.copy(chosen = 1)))),
+            )
+        show(ui)
+        compose.onNodeWithTag("reading-cat:garlic-2 cloves", useUnmergedTree = true).assertIsSelected()
+        compose.onNodeWithTag("reading-cat:garlic-3 cloves", useUnmergedTree = true).assertIsNotSelected()
+    }
+
+    @Test
     fun amountsHaveNoPlusAndAChoiceIsTwoButtons() {
         // Step AA: what goes on, then what the list will hold in words; "A or B" as its two options, no "Check".
         show()
@@ -214,12 +250,25 @@ class ReviewScreenTest {
     @Config(qualifiers = "w360dp-h640dp-xhdpi")
     fun onASmallPhoneTheIngredientsStartOnTheFirstScreen() {
         // Step AC: a plain, compact header (no picture behind it), so the first rows show without scrolling.
-        show()
+        // Step AD.3: Claude read it (no note under the title), as most reviews; the range row and three aisles stay.
+        show(SAMPLE_REVIEW.copy(claudeNote = null))
         val root = compose.onRoot().getUnclippedBoundsInRoot()
         val bar = compose.onNodeWithTag("add").getUnclippedBoundsInRoot()
         val first = compose.onNodeWithTag("row-cat:onion").getUnclippedBoundsInRoot()
         assertTrue("first row $first above the bar $bar in $root", first.bottom <= bar.top)
+        // Step AD.3: the list's slim aisle rows, so at least four ingredients show under the header.
+        val shown =
+            listOf("cat:onion", "cat:garlic", "cat:beef_mince", "cat:salt", "name:chipotle paste or sauce").count { key ->
+                compose.onAllNodesWithTag("row-$key").fetchSemanticsNodes().firstOrNull()?.let {
+                    compose.onNodeWithTag("row-$key").getUnclippedBoundsInRoot().bottom <= bar.top
+                } == true
+            }
         compose.onRoot().captureRoboImage(Shots.path("review-360x640.png"))
+        assertTrue("$shown ingredients above the bar", shown >= 4)
+        // Each aisle heading is one 48 dp row, as on the list.
+        val heading = compose.onNodeWithTag("review-aisle-PRODUCE").getUnclippedBoundsInRoot()
+        assertTrue("a slim aisle row: $heading", heading.bottom - heading.top <= 56.dp)
+        compose.onNodeWithText("2 to add", useUnmergedTree = true).assertExists()
     }
 
     @Test

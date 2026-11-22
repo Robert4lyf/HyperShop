@@ -3,13 +3,10 @@ package com.robert4lyf.hypershop.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * The brand's colour beyond Material's roles (docs/design/ui-overhaul.md, "Colour pass"): white on a recipe's photo,
- * and a hue per recipe from its art's palette ([lowPoly]). Step AC: no hero gradients.
+ * The brand's colour beyond Material's roles (docs/design/ui-overhaul.md, "Colour pass"): a hue per recipe from its art's
+ * palette ([lowPoly]). Step AC: no hero gradients; Step AD: no photo bands, so no white-on-photo text.
  */
 object Brand {
-    /** Text on a recipe's photo band: white (the photo is shaded where it sits). */
-    val OnHero = Color.White
-
     /** A recipe's hue for its chips and icons, from its header's palette and picked by its title, so it stays the same. */
     fun recipeHue(seed: String): Float = lowPolyPalette(seed).hue
 

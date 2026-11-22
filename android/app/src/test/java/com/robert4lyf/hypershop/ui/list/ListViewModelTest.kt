@@ -151,6 +151,33 @@ class ListViewModelTest {
     }
 
     @Test
+    fun swipingARowTakesOffOnlyWhatIsUnboughtWithUndo() {
+        // Step AD.10: a recipe's onions, 2 bought and 1 more since: removing the row takes off the 1, the 2 stay bought.
+        val c = TestContainer.create()
+        c.add("2 onions", "3 carrots")
+        val vm = tracked(ListViewModel(c))
+        var ui = await(vm.ui) { it.loaded && it.aisles.isNotEmpty() }
+        vm.toggle(ui.row("onion"))
+        await(vm.ui) { it.row("onion").state == TickState.DONE }
+        c.add("1 onion")
+        ui = await(vm.ui) { it.row("onion").state == TickState.PARTIAL }
+        val rev = runBlocking { c.repository.snapshot() }.listRev
+        vm.removeRow(ui.row("onion").id, "onion")
+        ui = await(vm.ui) { it.row("onion").state == TickState.DONE }
+        assertEquals("2 onions", ui.row("onion").main)
+        val l = runBlocking { c.repository.snapshot() }
+        assertEquals(com.robert4lyf.hypershop.core.model.Rational.of(2), l.purchased(l.itemByKey("cat:onion")!!.id).parts.values.single())
+        assertTrue("the watch hears of it", l.listRev > rev)
+        val msg = nextMessage(vm)
+        assertEquals("Onion: the rest taken off, what's bought stays", msg.text)
+        runBlocking { msg.undo!!() }
+        await(vm.ui) { it.row("onion").state == TickState.PARTIAL }
+        // Nothing of the carrots bought: the row goes, and Undo brings it back.
+        vm.removeRow(ui.row("carrot").id, "carrot")
+        await(vm.ui) { u -> u.aisles.flatMap { it.second }.none { it.name == "carrot" } }
+    }
+
+    @Test
     fun tickUndoAndPartial() {
         val c = TestContainer.create()
         c.add("2 onions")
@@ -279,6 +306,24 @@ class ListViewModelTest {
         assertTrue(text, text.startsWith("Shopping list\n\nProduce\n- 2 onions"))
         assertTrue(text, !text.contains("egg"))
         assertEquals("onion", vm.suggestions("on").first())
+    }
+
+    @Test
+    fun aLinkInAddItemIsImportedNeverAddedAsAnItem() {
+        // Step AD.9: a single https link typed or pasted is queued as an import and its review opens, as "Paste a link"
+        // does (tracking stripped); text with a link among other lines adds the others and queues the link.
+        val c = TestContainer.create()
+        val vm = tracked(ListViewModel(c))
+        await(vm.ui) { it.loaded }
+        vm.addTyped("https://recipes.example/soup?utm_source=ig")
+        val first = await(c.pendingReviews) { it.size == 1 }.single()
+        assertEquals("https://recipes.example/soup", runBlocking { c.importJobs.get(first) }!!.input.url)
+        vm.addTyped("milk\nhttps://recipes.example/stew\nbread")
+        val both = await(c.pendingReviews) { it.size == 2 }
+        assertEquals("https://recipes.example/stew", runBlocking { c.importJobs.get(both.last()) }!!.input.url)
+        val names = await(vm.ui) { it.aisles.flatMap { a -> a.second }.size == 2 }.aisles.flatMap { it.second }.map { it.name }
+        assertEquals(setOf("milk", "bread"), names.toSet())
+        assertTrue(names.none { "http" in it || "example" in it })
     }
 
     @Test

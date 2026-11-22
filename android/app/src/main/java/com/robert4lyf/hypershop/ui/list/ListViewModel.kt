@@ -21,6 +21,7 @@ import com.robert4lyf.hypershop.data.MANUAL_TITLE
 import com.robert4lyf.hypershop.data.Regular
 import com.robert4lyf.hypershop.data.UseSummary
 import com.robert4lyf.hypershop.di.AppContainer
+import com.robert4lyf.hypershop.importing.SharedText
 import com.robert4lyf.hypershop.settings.ListView
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.common.webLink
@@ -299,7 +300,7 @@ class ListViewModel(
                     readyJobs = ready.map { it.id },
                     arranging = v.arranging && v.layout != ListView.RECIPE,
                     recipes = ui.recipes.map { r -> r.libraryKey?.let { r.copy(photo = photos[it]) } ?: r },
-                    watch = watchWord(watch.first, watch.second, list.listRev),
+                    watch = watchWord(watch.first),
                     activeStore = store.first,
                     secondStore = store.second.size > 1,
                     storeName = store.second.firstOrNull { it.id == store.first }?.name ?: "My store",
@@ -480,7 +481,7 @@ class ListViewModel(
                     item.id,
                     item.displayName,
                     text.main,
-                    text.sub,
+                    leanSub(text.main, text.sub, entry?.packNote, state),
                     state,
                     item.aisle,
                     entry?.group,
@@ -509,18 +510,6 @@ class ListViewModel(
 
     /** The menu's choice of layout. */
     fun setView(v: ListView) = viewModelScope.launch { c.settings.setListView(v) }
-
-    /** Whether the watch has this list, in a word for the shop header; null when there is no watch to speak of. */
-    private fun watchWord(
-        state: WatchLinkState,
-        sentRev: Int,
-        listRev: Long,
-    ): String? =
-        when (state) {
-            WatchLinkState.NO_SDK, WatchLinkState.NOT_INSTALLED -> null
-            WatchLinkState.DISCONNECTED, WatchLinkState.CONNECTED -> "Watch not connected"
-            WatchLinkState.APP_READY -> if (sentRev.toLong() == listRev) "Watch synced" else "Watch updating…"
-        }
 
     /** After Finish with rows unbought: how many, while the "keep or drop?" prompt is up; null otherwise. */
     val carryOver = MutableStateFlow<Int?>(null)
@@ -607,6 +596,25 @@ class ListViewModel(
             closeSheetOf(id)
             c.repository.markAvailable(id)
         }
+
+    /**
+     * Step AD.10: a row swiped away (or TalkBack's "Remove"): what is still to buy comes off, with Undo; what was
+     * bought stays bought.
+     */
+    fun removeRow(
+        id: Long,
+        name: String,
+    ) = viewModelScope.launch {
+        val w = c.repository.removeUnbought(id) ?: return@launch
+        val stays = w.items.none { it.id == id }
+        val label = name.replaceFirstChar { it.uppercase() }
+        messages.send(
+            UiMessage(
+                if (stays) "$label: the rest taken off, what's bought stays" else "Removed $label",
+                undo = { c.repository.undoRemoveUnbought(w) },
+            ),
+        )
+    }
 
     /** "Delete" on the item card: closes it, with Undo on the list. */
     fun delete(
@@ -949,7 +957,13 @@ class ListViewModel(
 
     private suspend fun addTypedNow(text: String) {
         run {
-            val lines = text.split('\n').map { it.trim() }.filter { it.isNotEmpty() }
+            // Step AD.9: a line that is a link (the share's own rule: https, tracking stripped) is a recipe to import,
+            // never an item named after a URL. It is queued and its review opens, as "Paste a link" does; Claude is
+            // called only once that review is on screen. The other lines are added as before.
+            val (links, lines) =
+                text.split('\n').map { it.trim() }.filter { it.isNotEmpty() }.partition { SharedText.parse(it) != null }
+            for (link in links) c.applicationScope.launch { c.importShared(link, null) }
+            if (lines.isEmpty()) return@run
             if (lines.size == 1) {
                 val p = typed(lines.single())
                 val existing = c.repository.snapshot().itemByKey(c.repository.target(p.name).mergeKey)
@@ -1062,3 +1076,35 @@ private class Sources(
 
 private const val SHARED = "shared"
 private const val BY_HAND = "by-hand"
+
+/**
+ * Step AD.6: the row's second line, only when it adds something. The usual pack is left out when it is the amount
+ * already shown ("500g beef mince" over "500g pack"); it stays when it differs ("700ml milk" over "4 pint bottle"). What
+ * is partly bought, what a pack count stands for ("150ml needed") and what is at home always stay.
+ */
+internal fun leanSub(
+    main: String,
+    sub: String?,
+    packNote: String?,
+    state: TickState,
+): String? {
+    if (sub == null || packNote == null || state == TickState.PARTIAL) return sub
+    val pack = Display.compactUnits(packNote.removePrefix("1 × "))
+    if (sub != pack) return sub
+    val shown = LEADING_AMOUNT.find(Display.compactUnits(main))?.value ?: return sub
+    val packAmount = LEADING_AMOUNT.find(pack)?.value ?: return sub
+    return if (shown == packAmount) null else sub
+}
+
+private val LEADING_AMOUNT = Regex("""^(\d+(?:[.,/]\d+)?|[½¼¾⅓⅔⅛])(kg|g|ml|l|cl|oz|lb)?(?=\s|$)""")
+
+/**
+ * The watch, in a word for the list's header, only when it needs attention (Step AD.7): "Watch not connected" when the
+ * watch app is there but out of reach. Updating and synced say nothing here; Settings › Watch keeps the full state.
+ * Null with no watch to speak of.
+ */
+internal fun watchWord(state: WatchLinkState): String? =
+    when (state) {
+        WatchLinkState.NO_SDK, WatchLinkState.NOT_INSTALLED, WatchLinkState.APP_READY -> null
+        WatchLinkState.DISCONNECTED, WatchLinkState.CONNECTED -> "Watch not connected"
+    }

@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.progressSemantics
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -48,7 +49,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -75,6 +75,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.invisibleToUser
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
@@ -89,7 +90,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.data.bookRef
-import com.robert4lyf.hypershop.ui.common.AisleBadge
+import com.robert4lyf.hypershop.ui.common.AisleHeading
 import com.robert4lyf.hypershop.ui.common.BottomActionBar
 import com.robert4lyf.hypershop.ui.common.InfoBanner
 import com.robert4lyf.hypershop.ui.common.SectionPosition
@@ -114,26 +115,57 @@ data class ReviewEdits(
 )
 
 /**
+ * Step AD.4: the readings of one line as one row of chips, the one in use selected and the same way in every case: a
+ * check mark and the selected colour, and TalkBack reads "Selected" or "Not selected" on each. Choosing the selected
+ * one does nothing.
+ */
+@Composable
+internal fun Readings(
+    options: List<String>,
+    chosen: Int,
+    onPick: (Int) -> Unit,
+    tag: (Int) -> String,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEachIndexed { i, label ->
+            val selected = i == chosen
+            FilterChip(
+                selected = selected,
+                onClick = { if (!selected) onPick(i) },
+                label = { Text(label.replaceFirstChar { it.uppercase() }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                leadingIcon =
+                    if (selected) {
+                        { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    } else {
+                        null
+                    },
+                modifier =
+                    Modifier.heightIn(min = 48.dp).semantics {
+                        role = Role.RadioButton
+                        stateDescription = if (selected) "Selected" else "Not selected"
+                    }.testTag(tag(i)),
+            )
+        }
+    }
+}
+
+/**
  * Step AA: an "A or B" line as its two options, the one the line reads now selected. Choosing the other is the swap; a
- * second swap goes back. Each is its own button, apart from the row it sits in.
+ * second swap goes back.
  */
 @Composable
 internal fun ChoiceButtons(
     choice: Choice,
     onChoose: (Long) -> Unit,
     modifier: Modifier = Modifier,
-) {
-    Row(modifier.testTag("choice-${choice.lineId}"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        for ((label, chosen) in listOf(choice.chosen to true, choice.other to false)) {
-            FilterChip(
-                selected = chosen,
-                onClick = { if (!chosen) onChoose(choice.lineId) },
-                label = { Text(label.replaceFirstChar { it.uppercase() }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                modifier = Modifier.testTag(if (chosen) "chosen-${choice.lineId}" else "other-${choice.lineId}"),
-            )
-        }
-    }
-}
+) = Readings(
+    listOf(choice.chosen, choice.other),
+    chosen = 0,
+    onPick = { onChoose(choice.lineId) },
+    tag = { if (it == 0) "chosen-${choice.lineId}" else "other-${choice.lineId}" },
+    modifier = modifier.testTag("choice-${choice.lineId}"),
+)
 
 /** The review screen's default view (PLAN §3.1), stateless. */
 @Composable
@@ -192,9 +224,8 @@ fun ReviewScreen(
                         AisleHeader(
                             aisle,
                             rows,
-                            // Y.20: no "all at home" for an aisle; the cupboard check on This week does that.
-                            null,
-                            Modifier.padding(top = 12.dp).sectionItem(sectionPosition(0, count), aisle.style.container),
+                            ui.savedOnly,
+                            Modifier.padding(top = 4.dp).sectionItem(sectionPosition(0, count), card),
                         )
                     }
                     itemsIndexed(rows, key = { _, r -> r.key }) { i, r ->
@@ -341,20 +372,22 @@ private fun Hero(
                             contentDescription = ui.title
                         },
                 )
-                if (ui.summary.isNotEmpty()) {
-                    Text(
-                        ui.summary,
-                        Modifier.testTag("summary"),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
             if (!ui.byHand) {
                 IconButton(onClick = { renaming = true }, modifier = Modifier.testTag("edit-title")) {
                     Icon(Icons.Rounded.Edit, contentDescription = "Rename recipe")
                 }
             }
+        }
+        // Step AD.3: what it adds and the servings on one line, so the ingredients start higher.
+        Row(Modifier.padding(end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                ui.summary,
+                Modifier.weight(1f).testTag("summary"),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (!ui.byHand && !ui.savedOnly) Servings(ui.servings, ui.originalServings, onServings)
         }
         if (ui.cookbook) {
             TextButton(
@@ -371,9 +404,6 @@ private fun Hero(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            if (!ui.byHand && !ui.savedOnly) {
-                Servings(ui.servings, ui.originalServings, onServings, Modifier.align(Alignment.CenterVertically))
-            }
             ui.url?.let { url ->
                 TextButton(onClick = { open(url) }, modifier = Modifier.align(Alignment.CenterVertically).testTag("open-recipe")) {
                     Text(
@@ -622,57 +652,31 @@ private fun ServingsDialog(
     )
 }
 
+/**
+ * Step AD.3: the list's own slim aisle row (icon, name, count), in the card's colour, not a tall coloured block. The
+ * count is what the aisle adds ("2 to add"); a saved recipe being edited adds nothing, so it counts its lines.
+ */
 @Composable
 private fun AisleHeader(
     aisle: AisleCode,
     rows: List<ReviewRow>,
-    /** Null for a saved recipe being edited: a count, and no in-stock menu. */
-    onAisleInStock: ((AisleCode) -> Unit)?,
+    savedOnly: Boolean,
     modifier: Modifier,
 ) {
-    var menu by rememberSaveable { mutableStateOf(false) }
     // The same rule as the Add button: a row already covered by the list adds nothing.
     val adding = rows.count { !it.inStock && it.adds }
-    Row(
-        modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        AisleBadge(aisle, size = 36.dp)
-        Text(
-            aisle.displayName,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f).semantics { heading() },
-        )
-        Surface(
-            shape = RoundedCornerShape(50),
-            color = MaterialTheme.colorScheme.surfaceContainerLowest,
-            contentColor = aisle.style.content,
-        ) {
-            Text(
-                when {
-                    onAisleInStock == null -> "${rows.size}"
-                    adding > 0 -> "$adding to add"
-                    rows.all { it.inStock } -> "All at home"
-                    else -> "Nothing to add"
-                },
-                Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                style = MaterialTheme.typography.labelMedium,
-            )
-        }
-        if (onAisleInStock != null) {
-            Box {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "${aisle.displayName} options") }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text("Mark this aisle as at home") }, onClick = {
-                        menu = false
-                        onAisleInStock(aisle)
-                    })
-                }
-            }
-        }
-    }
+    AisleHeading(
+        aisle,
+        when {
+            savedOnly -> if (rows.size == 1) "1 item" else "${rows.size} items"
+            adding > 0 -> "$adding to add"
+            rows.all { it.inStock } -> "All at home"
+            else -> "Nothing to add"
+        },
+        modifier.semantics(mergeDescendants = true) { heading() }.testTag("review-aisle-${aisle.name}"),
+        // Not tapped here (nothing collapses on the review), so no 48 dp target to keep.
+        minHeight = 40.dp,
+    )
 }
 
 /**
@@ -700,7 +704,7 @@ private fun ReviewRowItem(
         Modifier
             .sectionItem(position, card)
             .fillMaxWidth()
-            .heightIn(min = 64.dp)
+            .heightIn(min = 56.dp)
             .padding(start = 4.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -719,7 +723,7 @@ private fun ReviewRowItem(
         Row(
             Modifier
                 .weight(1f)
-                .heightIn(min = 64.dp)
+                .heightIn(min = 56.dp)
                 .clickable(role = Role.Button, onClickLabel = "Edit") { onRow(row.key) }
                 .semantics(mergeDescendants = true) {
                     if (onInStock != null) {
@@ -733,7 +737,7 @@ private fun ReviewRowItem(
                             )
                     }
                 }.testTag("row-${row.key}")
-                .padding(start = if (onInStock != null) 4.dp else 12.dp, top = 8.dp, bottom = 8.dp),
+                .padding(start = if (onInStock != null) 4.dp else 12.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
@@ -773,14 +777,13 @@ private fun ReviewRowItem(
                     when {
                         // Step AC: what was assumed, and a way to change it on the row; no "Check:", no red text.
                         row.range != null ->
-                            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                for (reading in row.range.readings) {
-                                    OutlinedButton(
-                                        onClick = { onAmount(row.range.lineId, reading) },
-                                        modifier = Modifier.heightIn(min = 48.dp).testTag("reading-${row.key}-$reading"),
-                                    ) { Text(reading) }
-                                }
-                            }
+                            Readings(
+                                row.range.readings,
+                                chosen = row.range.chosen,
+                                onPick = { onAmount(row.range.lineId, row.range.readings[it]) },
+                                tag = { "reading-${row.key}-${row.range.readings[it]}" },
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
                         ReviewViewModel.noAmount(reason) ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(

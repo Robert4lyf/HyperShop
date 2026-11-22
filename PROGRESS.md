@@ -598,3 +598,108 @@ words.
   4 · 1 · 0 · 0, core 6 · 0 · 0 · 2, quick 7 · 2 · 0 · 0, meal-based 9 · 1 · 3 · 3 (none longer than step-ab.md);
   new `saladBeforeVegetables` (Settings › Walking order › Produce › Salad ↑, back to the list) 6 · 0 · 1 · 4. Report:
   `docs/reports/step-ac.md`.
+
+## Step AD — consistency and the weekly loop (`claude/step-z-fewer-concepts-rvynea`, from 8b125ab)
+
+The last structural pass before real use: one style across screens, leaner rows, and three small gaps in the weekly
+loop. No tabs, modes, settings or help text; no schema, protocol, golden-data or dependency change.
+
+- [x] AD.0 Baseline. JourneyTest on 8b125ab: adding by hand 4 · 1 · 0 · 0, core 6 · 0 · 0 · 2, meal-based
+  9 · 1 · 3 · 3, quick 7 · 2 · 0 · 0, salad before vegetables 6 · 0 · 1 · 4 (taps · typed · scrolls · screens).
+- [x] AD.1 Walking order: drag to reorder. Settings › Aisles: every aisle row and every group row has a drag handle
+  (≡) at its end; holding it moves the row within its own level (a group stays in its aisle), its neighbours making
+  room as it passes, and the move is written once on release (`moveAisleTo`; groups `moveGroupTo` → `arrangeWith`,
+  listRev bumped as before; `ShelfRank` per store unchanged). Held within 56 dp of the screen's top or bottom, the page
+  scrolls and the row stays under the finger. The ↑ ↓ buttons and ⋮ Move to top / bottom went from the rows; each row
+  carries them as TalkBack actions (Move up / down / to top / to bottom, only those that move it). Keyboard: before,
+  only by tabbing to the arrow buttons; now Ctrl or Alt + ↑ / ↓ on a focused handle. The ⌄ that opens an aisle's
+  groups moved to the row's start, beside the badge and name. Built on Compose foundation alone
+  (`ui/common/DragReorder.kt`: `detectDragGestures` on the handle, `graphicsLayer` offset, `scrollBy`); no new
+  dependency. Walking order is now Settings' first card (it was third, below a scroll at 411×891), so Salad goes above
+  Vegetables in 4 gestures from the list: the gear, Walking order, ⌄ Produce, drag Salad (the journey counts to the
+  stored change). The list's Arrange items keeps its arrows: it is a `LazyColumn`, where the same handle is not a
+  small change (a dragged row can leave composition when scrolled). Tests: `WalkingOrderScreenTest` (drag a group up,
+  a group dragged far stays in its aisle, drag an aisle down, held at the bottom edge the screen scrolls, TalkBack's
+  moves and which are offered), `SettingsScreenTest` (moves through TalkBack's actions), `JourneyTest`.
+- [x] AD.2 Store name: a pencil on each store tab. The "Store name" field and "Save store name" at the top of Aisles
+  went; each of the two store tabs ("My store", "Second store", or their names) has a ✎ ("Rename <name>") that opens a
+  small dialog (Store name, Save / Cancel; Save off while blank). It renames that tab's store, not the one being
+  edited (`renameStore(store, name)`, was the edited store only). Claim checked: there is no adding or removing of
+  stores (two fixed profiles); nothing to keep. Test: `StoreRenameTest` (at Robolectric's default size: with the
+  `w411dp-h891dp-xxhdpi` qualifiers any dialog holding a text field never lets Compose go idle, a bare `AlertDialog`
+  too; noted in the report), `WalkingOrderScreenTest` (no field, a pencil per tab).
+- [x] AD.3 Review matches the list. The review's aisle headings are the list's slim row, one shared composable
+  (`ui/common/AisleHeading.kt`: 24 dp icon, name, count in words; the list adds its collapse arrow), in the card's own
+  colour, not the tall coloured block (36 dp badge, a count pill); 40 dp on the review, where it is not tapped. The
+  count is what the aisle adds ("2 to add", "All at home", "Nothing to add"; a saved recipe being edited: "3 items"),
+  was a bare number. Found: the heading's "Mark this aisle as at home" menu could not be reached (its callback was
+  always null since Y.20) and went with the block. To fit four ingredients at 360×640 dp the header also lost a line
+  (the servings stepper sits beside "4 to add · 1 at home") and review rows are 56 dp like the list's (were 64). The
+  test's sample (three aisles, a range row with its two readings) shows four rows wholly above the Add bar when
+  Claude read the recipe; with Claude's failure note under the title it shows three and the top of the fourth.
+  `ReviewScreenTest.onASmallPhoneTheIngredientsStartOnTheFirstScreen` checks four, and a heading ≤ 56 dp. Found on
+  the way: the gate failed once in `StoreRenameTest` with "uncaught exceptions before the test started" (Room's
+  refresh of the previous test's database, "Illegal connection pointer"). `TestContainer` only wound the last
+  container down when the next test built one. A test that builds none (`StoreRenameTest`) now calls
+  `TestContainer.windDown()` (the scope stopped and the database closed) from a rule ordered before its compose rule.
+- [x] AD.4 A chosen reading looks chosen. One composable (`Readings`) draws every choice of reading on the review:
+  a backwards range's readings ("3 cloves" / "2 cloves", were two outlined buttons with neither marked) and an
+  "A or B" line's two options (were filter chips). The one in use is a selected chip with a check, the same in both;
+  TalkBack reads each as a radio button, "Selected" or "Not selected"; choosing the selected one does nothing. For a
+  range, the one in use is the line's own amount (`RangeChoice.chosen`, matched against the recipe's two numbers; the
+  parser takes the first). Tests: `ReviewScreenTest` (both kinds look and read alike; the second reading selected when
+  the line uses it).
+- [x] AD.5 One recipe card shape. Every card on Recipes is the same compact card: a 48 dp square thumbnail (its
+  photo cropped, else its art), the title on one line, one status line that never wraps (the site, else the book,
+  else "Serves N"; "Uses …" while a search is on, as before), then "Add to list", or "✓ On your list" (and "twice"
+  when it is on the list twice, which the status line used to say) with the "− Serves N +" stepper; ⋮ beside the
+  title. No photo band on cards: the photo stays on the recipe's page. "last added …" moved to the page's top line;
+  the "★ 4/5" on the card went (the stars are on the page). Tests: `RecipesScreenTest` (status line, the page's "last
+  added", same shape and thumbnail for photo and no photo, no rating on the card), `RecipesCompactTest` (through the
+  app shell at 360×640: at least four recipes' titles on screen above the tab bar, the fourth card's button just
+  above it; cards 8 dp apart, were 12; screenshot `recipes-360x640.png`). Deleted with the band: `RecipeBackdrop`, its shade,
+  `LIBRARY_BAND` and `Brand.OnHero`.
+- [x] AD.6 Leaner list rows. In store order a row is its amount and name, with a second line only when it adds
+  something: the usual pack when it differs from the amount (`leanSub`: "500g beef mince" over "500g pack" loses
+  the pack line; "700ml milk" over "4 pint bottle" keeps it), the partly-bought state, what a pack count stands for
+  ("150ml needed") and an amount at home. The recipe's name is not drawn in store order (it was a line of its own, or
+  joined the bought count); it stays in Group by recipe (and the shared card's titles) and on the item's sheet, and
+  TalkBack reads it in store order too ("700 ml milk, for Weeknight chilli"). The watch's rows are unchanged
+  (`Display.row` is shared; only the phone's list drops the line). Tests: `ListScreenTest` (store order hides the
+  recipe but says it to TalkBack; `subLines` with and without it; `leanSub`'s cases).
+- [x] AD.7 Quiet watch status. Claim checked: the header's "N bought" is in its title ("3 to buy · 2 bought"), not
+  the subtitle; the subtitle held "1 set aside" and the watch's word. That word is now only "Watch not connected"
+  (the watch app installed but out of reach); "Watch updating…" and "Watch synced" are no longer shown there.
+  Settings › Watch keeps the full status. Test: `ListScreenTest.theWatchIsMentionedOnlyWhenItNeedsAttention`.
+- [x] AD.8 The amount form opens filled. Found: the app is right, the screenshot was wrong. `ListViewModel.openItem`
+  builds the sheet with `amount = "2"` and `amountRest = "200g"` for "2 onions" + "200 g onions" (Step AC), so Change
+  amount opens on "2" and says "Also 200g on the list, kept as it is". `ItemSheetTest`'s fixture predates that and
+  left both out, so `item-sheet-light.png` showed an empty field. The fixture now carries them (re-recorded), and
+  `ItemSheetTest.theAmountFieldOpensFilledForAnItemWithAnAmount` renders the form from the sheet the view model itself
+  builds and fails if the field opens empty.
+- [x] AD.9 A link in Add item starts an import. A line typed or pasted into Add item that `SharedText.parse` reads
+  as a link (the share's rule: https, http tried as https, tracking parameters stripped) is queued with
+  `importShared` and its review opens, as "Paste a link" does; no item is named after a URL. Pasted text with a link
+  among other lines adds the other lines as before and queues the link. Claude is called only once that review is on
+  screen (the import path is unchanged). Test: `ListViewModelTest.aLinkInAddItemIsImportedNeverAddedAsAnItem`.
+- [x] AD.10 Swipe to remove is obvious and safe. Claims checked: list rows could not be swiped at all, and had no
+  "Delete"/"Remove" accessibility action (Delete is on the item's sheet, which soft-deletes the whole row). Now a row
+  still to buy can be swiped either way (Material 3 `SwipeToDismissBox`, already in the build); while it moves (and only
+  then, so TalkBack finds no hidden label at rest), a "Remove" label with a bin shows under it in the error-container
+  colour. A swipe, or TalkBack's new "Remove" action on
+  the row, calls `ListRepository.removeUnbought`: only the row's unbought shares come off (`withdrawKeeping`, in one
+  write that bumps the row and the list's revision); a row with nothing bought goes, "Removed Carrot"; a partly bought
+  row stays as what was bought, "Onion: the rest taken off, what's bought stays". Undo puts the shares back
+  (`reinstate`). A bought row isn't swiped. The sheet's Delete is unchanged. Tests: `ListViewModelTest` (partly
+  bought keeps the bought, listRev bumped, Undo; unbought goes), `ListScreenTest` (swipe left and right, "Remove"
+  while moving, none on a bought row, TalkBack's action).
+- [x] AD.11 After a shop, the next step. The empty list for someone who has shopped before shows "Last shop's N
+  items" (when there are any) and "Add recipes", which opens the Recipes tab. The first-run empty list (Try a sample
+  list, Paste a link) is unchanged. Tests: `ListScreenTest` (both buttons; Add recipes alone with no last shop; the
+  first run unchanged), `AfterAShopTest` (after a finished trip, through the app shell, Add recipes opens the Recipes
+  tab).
+- [x] AD.12 Verify and report. Screenshots re-recorded by the gate (all unchanged since their sub-steps),
+  `tools/contact-sheet` run (45). Journeys: adding by hand 4 · 1 · 0 · 0, core 6 · 0 · 0 · 2, quick 7 · 2 · 0 · 0,
+  meal-based 9 · 1 · 3 · 3 (none longer than step-ac.md), salad before vegetables 4 · 0 · 0 · 2 (AD.1's target: at
+  most 4; counted to the stored change, the two backs uncounted). Report, with what to try on a phone (dragging,
+  swiping, a pasted link): `docs/reports/step-ad.md`.
