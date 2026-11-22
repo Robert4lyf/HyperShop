@@ -606,7 +606,21 @@ loop. No tabs, modes, settings or help text; no schema, protocol, golden-data or
 
 - [x] AD.0 Baseline. JourneyTest on 8b125ab: adding by hand 4 · 1 · 0 · 0, core 6 · 0 · 0 · 2, meal-based
   9 · 1 · 3 · 3, quick 7 · 2 · 0 · 0, salad before vegetables 6 · 0 · 1 · 4 (taps · typed · scrolls · screens).
-- [ ] AD.1 Walking order: drag to reorder.
+- [x] AD.1 Walking order: drag to reorder. Settings › Aisles: every aisle row and every group row has a drag handle
+  (≡) at its end; holding it moves the row within its own level (a group stays in its aisle), its neighbours making
+  room as it passes, and the move is written once on release (`moveAisleTo`; groups `moveGroupTo` → `arrangeWith`,
+  listRev bumped as before; `ShelfRank` per store unchanged). Held within 56 dp of the screen's top or bottom, the page
+  scrolls and the row stays under the finger. The ↑ ↓ buttons and ⋮ Move to top / bottom went from the rows; each row
+  carries them as TalkBack actions (Move up / down / to top / to bottom, only those that move it). Keyboard: before,
+  only by tabbing to the arrow buttons; now Ctrl or Alt + ↑ / ↓ on a focused handle. The ⌄ that opens an aisle's
+  groups moved to the row's start, beside the badge and name. Built on Compose foundation alone
+  (`ui/common/DragReorder.kt`: `detectDragGestures` on the handle, `graphicsLayer` offset, `scrollBy`); no new
+  dependency. Walking order is now Settings' first card (it was third, below a scroll at 411×891), so Salad goes above
+  Vegetables in 4 gestures from the list: the gear, Walking order, ⌄ Produce, drag Salad (the journey counts to the
+  stored change). The list's Arrange items keeps its arrows: it is a `LazyColumn`, where the same handle is not a
+  small change (a dragged row can leave composition when scrolled). Tests: `WalkingOrderScreenTest` (drag a group up,
+  a group dragged far stays in its aisle, drag an aisle down, held at the bottom edge the screen scrolls, TalkBack's
+  moves and which are offered), `SettingsScreenTest` (moves through TalkBack's actions), `JourneyTest`.
 - [ ] AD.2 Store name: a pencil on each store tab.
 - [ ] AD.3 Review matches the list.
 - [ ] AD.4 A chosen reading looks chosen.

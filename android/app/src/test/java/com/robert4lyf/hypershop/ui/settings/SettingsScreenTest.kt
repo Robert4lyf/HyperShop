@@ -1,5 +1,6 @@
 package com.robert4lyf.hypershop.ui.settings
 
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.hasTestTag
@@ -112,19 +113,23 @@ class SettingsScreenTest {
 
     @Test
     fun aislesMoveToTheEndsAndResetAfterAsking() {
-        // The walking order is its own screen (UX review 22).
+        // The walking order is its own screen (UX review 22). Step AD.1: rows move by their handles, or TalkBack's
+        // Move up / to top / to bottom.
         compose.setContent { HyperShopTheme(dynamicColor = false) { AislesScreen(UI, actions) } }
-        val second = AisleCode.entries[1]
-        compose.onNodeWithContentDescription("Move ${second.displayName} up").performClick()
-        compose.onNodeWithContentDescription("More for ${second.displayName}").performClick()
-        compose.onNodeWithText("Move to bottom").performClick()
-        compose.onNodeWithContentDescription("More for ${second.displayName}").performClick()
-        compose.onNodeWithText("Move to top").performClick()
+        val second = UI.aisles[1]
+
+        fun move(label: String) {
+            val all = compose.onNodeWithTag("aisle-row-${second.name}").fetchSemanticsNode().config[SemanticsActions.CustomActions]
+            compose.runOnIdle { all.single { it.label == label }.action() }
+        }
+        move("Move ${second.displayName} up")
+        move("Move ${second.displayName} to bottom")
+        move("Move ${second.displayName} to top")
         compose.onNodeWithTag("reset-aisles").performScrollTo().performClick()
         compose.onNodeWithText("Keep").performClick()
         compose.onNodeWithTag("reset-aisles").performClick()
         compose.onNodeWithText("Reset").performClick()
-        assertEquals(listOf("aisle $second -1", "aisle $second to 3", "aisle $second to 0", "reset aisles"), events)
+        assertEquals(listOf("aisle $second to 0", "aisle $second to ${UI.aisles.lastIndex}", "aisle $second to 0", "reset aisles"), events)
     }
 
     @Test

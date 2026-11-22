@@ -111,6 +111,24 @@ class JourneyTest {
         settle()
     }
 
+    /** Holds the handle [tag] and drags it [dy] px: one gesture, counted with the taps. */
+    private fun drag(
+        tag: String,
+        dy: Float,
+    ) {
+        node(tag).performTouchInput {
+            down(center)
+            repeat(20) {
+                advanceEventTime(16)
+                moveBy(androidx.compose.ui.geometry.Offset(0f, dy / 20))
+            }
+            advanceEventTime(16)
+            up()
+        }
+        taps++
+        settle()
+    }
+
     /** Types [text] into a field: a tap to focus it, the entry, and Done on the keyboard when [done]. */
     private fun type(
         tag: String,
@@ -318,22 +336,24 @@ class JourneyTest {
         val onion = c.itemId("cat:onion")
         val lettuce = c.itemId("cat:lettuce")
         waitFor("tick-$onion")
+        // Step AD.1: Walking order is Settings' first row, and Salad is dragged by its handle above Vegetables.
         tap("open-settings")
-        scrollTo("settings", "open-aisles")
         tap("open-aisles")
         waitFor("groups-PRODUCE")
         tap("groups-PRODUCE")
-        tap("group-up-PRODUCE-Salad")
+        drag("drag-group-PRODUCE-Salad", -compose.onNodeWithTag("group-PRODUCE-Vegetables").fetchSemanticsNode().boundsInRoot.height)
         compose.waitUntil(10_000) {
             runBlocking { c.repository.shelfOrder(1) }.groupSort(AisleCode.PRODUCE, "Salad", 0) <
                 runBlocking { c.repository.shelfOrder(1) }.groupSort(AisleCode.PRODUCE, "Vegetables", 0)
         }
+        // Counted to the change: the order is stored for the list, the shared text, the widget and the watch. The two
+        // backs to see it on the list are not counted (a person carries on in Settings or goes back, as they like).
+        record("salad before vegetables", c)
         tap("aisles-back")
         tap("settings-back")
         waitFor("tick-$lettuce")
         val top = { id: Long -> compose.onNodeWithTag("tick-$id", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.top }
         compose.waitUntil(10_000) { top(lettuce) < top(onion) }
-        record("salad before vegetables", c)
     }
 
     /** Meal-based shopping: three saved recipes put on the list, one served to 5, rice partly at home. */

@@ -28,6 +28,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.ScreenHeader
 import com.robert4lyf.hypershop.ui.common.basilSegmentedColors
+import com.robert4lyf.hypershop.ui.common.rememberReorderScroll
+import com.robert4lyf.hypershop.ui.common.reorderViewport
 import com.robert4lyf.hypershop.ui.util.factoryFor
 
 /** Settings › Aisles › Walking order, as its own screen (UX review 22): the aisles with arrows, ends and Reset. */
@@ -62,7 +64,9 @@ fun AislesScreen(
     onBack: () -> Unit = {},
 ) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag("aisles")) {
+        val scroll = rememberScrollState()
+        val reorder = rememberReorderScroll(scroll)
+        Column(Modifier.fillMaxSize().reorderViewport(reorder).verticalScroll(scroll).testTag("aisles")) {
             ScreenHeader(title = "Aisles", subtitle = "The order you walk the store", onBack = onBack, backTag = "aisles-back")
             Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 // Missing 4 of the review: a second store's order, picked when a shop starts.
@@ -89,7 +93,7 @@ fun AislesScreen(
                     storeName = it.take(80)
                 }, label = { Text("Store name") }, modifier = Modifier.fillMaxWidth())
                 TextButton(enabled = storeName.isNotBlank(), onClick = { actions.onRenameStore(storeName) }) { Text("Save store name") }
-                if (ui.loaded) AislesGroup(ui, actions)
+                if (ui.loaded) AislesGroup(ui, actions, reorder)
             }
         }
     }

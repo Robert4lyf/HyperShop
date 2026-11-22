@@ -10,7 +10,7 @@ fewer modes and one word per idea. The data model is unchanged; every action cal
 | **Shopping list** | What is there to buy, in store order? | Type to add. Tick. **Finish shopping** once something is bought. |
 | **Recipes** | What is saved? | **Add to list** on a recipe. Add a recipe (link, typed, photo). |
 
-- Settings is a gear at the top of each. Its own screens (Ingredient library, Walking order, Debug, Voice test) have
+- Settings is a gear at the top of each; its first row is Walking order (Step AD). Its own screens (Ingredient library, Walking order, Debug, Voice test) have
   a back arrow.
 - A share opens the review; the widget and the launcher shortcut open the list.
 - There is no Meals tab, no shopping mode and no food-at-home check. Planned meals are still written for the current
@@ -55,7 +55,7 @@ On the review, lines still to go on the list are counted as **N to add** ("4 to 
 | **Can't find it** / **Found it** | The item's sheet | `markUnavailable` / `markAvailable` |
 | **Change store** | List ⋮, only with two or more stores | `ShopStart.change` → active store |
 | **Store order / Group by recipe**, **Arrange items** | List ⋮ | `Settings.listView`; `arrangeWith` |
-| **Walking order** › an aisle's ⌄ › its groups (↑ ↓, ⋮ Move to top / bottom; **Everything else** for things in no group) | Settings › Aisles | `arrangeWith(store)`: the same stored group order as Arrange items, for the store being edited; bumps listRev, so the list, the shared text, the widget and the watch follow |
+| **Walking order** (Settings' first row): drag an aisle by its handle (≡, at the row's end); its ⌄, beside the name, opens its groups, each dragged the same way within its aisle (**Everything else** for things in no group). Held near the screen's edge, the page scrolls. TalkBack: **Move up / down / to top / to bottom** on each row; a keyboard: Ctrl or Alt + ↑ ↓ on a handle | Settings › Aisles | aisles: `moveAisleTo`; groups: `arrangeWith(store)` (the same stored group order as Arrange items), for the store being edited, written once on release; bumps listRev, so the list, the shared text, the widget and the watch follow |
 | **Finish shopping** | List, once something is ticked | `ListRepository.finish` (Undo) |
 | **Add item** (typed, a suggestion, a chip, a paste) | The list, pinned under its top row | `ListRepository.addByHand` (`manualAdd` that says the item, its contribution and aisle). One message per add: **"Added to Dairy & Eggs"**, or **"Added 3 items"** for a paste or last shop's items, with Undo (`takeBackHandAdds`: only what is unbought). The row is lit for a moment where it is; the list is not scrolled. Already on the list: **"Milk is already on your list"** with **Add 1 more** (or the typed amount), then **"Milk: now 2 on your list"** with Undo |
 | **Change amount** (item sheet) | Item sheet | one small form: the name, the amount (with its unit chips) and **Aisle: …** (a menu), then **Save changes**. An item in two kinds of unit opens on the one it is bought by (a count, else a weight, else a volume) and says "Also 200 g on the list, kept as it is"; saving leaves that part as it was. **More details › Category and usual pack** is the second small form |
