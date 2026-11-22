@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -51,30 +52,33 @@ class WalkingOrderScreenTest {
         compose.setContent {
             HyperShopTheme(dynamicColor = false) {
                 AislesScreen(
-                    state,
-                    SettingsActions(
-                        onMoveAisleTo = { a, i ->
-                            events += "aisle $a to $i"
-                            state =
-                                state.copy(
-                                    aisles =
-                                        state.aisles.toMutableList().apply {
-                                            remove(a)
-                                            add(i, a)
-                                        },
-                                )
-                        },
-                        onMoveGroup = { a, g, by -> events += "move $a $g $by" },
-                        onMoveGroupTo = { a, g, i ->
-                            events += "to $a $g $i"
-                            val gs =
-                                state.groups.getValue(a).toMutableList().apply {
-                                    remove(g)
-                                    add(i, g)
-                                }
-                            state = state.copy(groups = state.groups + (a to gs))
-                        },
-                    ),
+                    ui = state,
+                    actions =
+                        SettingsActions(
+                            onMoveAisleTo = { a, i ->
+                                events += "aisle $a to $i"
+                                state =
+                                    state.copy(
+                                        aisles =
+                                            state.aisles.toMutableList().apply {
+                                                remove(a)
+                                                add(i, a)
+                                            },
+                                    )
+                            },
+                            onMoveGroup = { a, g, by -> events += "move $a $g $by" },
+                            onEditStore = { events += "edit $it" },
+                            onRenameStore = { store, name -> events += "rename $store $name" },
+                            onMoveGroupTo = { a, g, i ->
+                                events += "to $a $g $i"
+                                val gs =
+                                    state.groups.getValue(a).toMutableList().apply {
+                                        remove(g)
+                                        add(i, g)
+                                    }
+                                state = state.copy(groups = state.groups + (a to gs))
+                            },
+                        ),
                 )
             }
         }
@@ -194,5 +198,16 @@ class WalkingOrderScreenTest {
             listOf("Move ${AisleCode.entries[0].displayName} down", "Move ${AisleCode.entries[0].displayName} to bottom"),
             labels("aisle-row-${AisleCode.entries[0].name}"),
         )
+    }
+
+    @Test
+    fun eachStoreTabHasAPencilAndNoNameFieldAboveTheAisles() {
+        // Step AD.2: no name field or "Save store name" above the aisles; each tab's pencil names its store.
+        show(ui.copy(storeNames = mapOf(1L to "Tesco", 2L to "Second store")))
+        compose.onNodeWithText("Store name").assertDoesNotExist()
+        compose.onNodeWithText("Save store name").assertDoesNotExist()
+        compose.onNodeWithTag("rename-store-1").assertContentDescriptionEquals("Rename Tesco")
+        compose.onNodeWithTag("rename-store-2").assertContentDescriptionEquals("Rename Second store")
+        compose.onRoot().captureRoboImage(Shots.path("aisles-stores-light.png"))
     }
 }

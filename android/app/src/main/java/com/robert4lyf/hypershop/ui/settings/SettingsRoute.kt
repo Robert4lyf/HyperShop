@@ -139,7 +139,7 @@ data class SettingsActions(
     val onRanOut: (String) -> Unit = {},
     /** Aisles: which store's order is being edited (missing 4 of the review). */
     val onEditStore: (Long) -> Unit = {},
-    val onRenameStore: (String) -> Unit = {},
+    val onRenameStore: (Long, String) -> Unit = { _, _ -> },
     val onMoveAisle: (AisleCode, Int) -> Unit = { _, _ -> },
     /** "Move to top" (0) / "Move to bottom" (last). */
     val onMoveAisleTo: (AisleCode, Int) -> Unit = { _, _ -> },

@@ -621,7 +621,13 @@ loop. No tabs, modes, settings or help text; no schema, protocol, golden-data or
   small change (a dragged row can leave composition when scrolled). Tests: `WalkingOrderScreenTest` (drag a group up,
   a group dragged far stays in its aisle, drag an aisle down, held at the bottom edge the screen scrolls, TalkBack's
   moves and which are offered), `SettingsScreenTest` (moves through TalkBack's actions), `JourneyTest`.
-- [ ] AD.2 Store name: a pencil on each store tab.
+- [x] AD.2 Store name: a pencil on each store tab. The "Store name" field and "Save store name" at the top of Aisles
+  went; each of the two store tabs ("My store", "Second store", or their names) has a ✎ ("Rename <name>") that opens a
+  small dialog (Store name, Save / Cancel; Save off while blank). It renames that tab's store, not the one being
+  edited (`renameStore(store, name)`, was the edited store only). Claim checked: there is no adding or removing of
+  stores (two fixed profiles); nothing to keep. Test: `StoreRenameTest` (at Robolectric's default size: with the
+  `w411dp-h891dp-xxhdpi` qualifiers any dialog holding a text field never lets Compose go idle, a bare `AlertDialog`
+  too; noted in the report), `WalkingOrderScreenTest` (no field, a pencil per tab).
 - [ ] AD.3 Review matches the list.
 - [ ] AD.4 A chosen reading looks chosen.
 - [ ] AD.5 One recipe card shape.
