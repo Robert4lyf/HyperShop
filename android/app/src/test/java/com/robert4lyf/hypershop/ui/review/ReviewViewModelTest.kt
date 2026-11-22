@@ -439,6 +439,9 @@ class ReviewViewModelTest {
         val ui = ready(vm)
         val flagged = ui.aisles.flatMap { it.second }.single { it.check }
         assertEquals("a range that goes down", flagged.checkReason)
+        // Step AD.4: its two readings, the one in use (the parser takes the first number) chosen.
+        assertEquals(listOf("3", "2"), flagged.range!!.readings)
+        assertEquals(0, flagged.range!!.chosen)
         assertTrue(ui.row("cat:onion").adds)
         assertTrue("a staple, pre-ticked", ui.row("cat:salt").inStock)
         assertEquals("3 to add · 1 at home", ui.summary)

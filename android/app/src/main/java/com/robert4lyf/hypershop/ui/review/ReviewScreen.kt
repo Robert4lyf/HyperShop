@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.progressSemantics
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -48,7 +49,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -75,6 +75,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.invisibleToUser
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
@@ -114,26 +115,57 @@ data class ReviewEdits(
 )
 
 /**
+ * Step AD.4: the readings of one line as one row of chips, the one in use selected and the same way in every case: a
+ * check mark and the selected colour, and TalkBack reads "Selected" or "Not selected" on each. Choosing the selected
+ * one does nothing.
+ */
+@Composable
+internal fun Readings(
+    options: List<String>,
+    chosen: Int,
+    onPick: (Int) -> Unit,
+    tag: (Int) -> String,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEachIndexed { i, label ->
+            val selected = i == chosen
+            FilterChip(
+                selected = selected,
+                onClick = { if (!selected) onPick(i) },
+                label = { Text(label.replaceFirstChar { it.uppercase() }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                leadingIcon =
+                    if (selected) {
+                        { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    } else {
+                        null
+                    },
+                modifier =
+                    Modifier.heightIn(min = 48.dp).semantics {
+                        role = Role.RadioButton
+                        stateDescription = if (selected) "Selected" else "Not selected"
+                    }.testTag(tag(i)),
+            )
+        }
+    }
+}
+
+/**
  * Step AA: an "A or B" line as its two options, the one the line reads now selected. Choosing the other is the swap; a
- * second swap goes back. Each is its own button, apart from the row it sits in.
+ * second swap goes back.
  */
 @Composable
 internal fun ChoiceButtons(
     choice: Choice,
     onChoose: (Long) -> Unit,
     modifier: Modifier = Modifier,
-) {
-    Row(modifier.testTag("choice-${choice.lineId}"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        for ((label, chosen) in listOf(choice.chosen to true, choice.other to false)) {
-            FilterChip(
-                selected = chosen,
-                onClick = { if (!chosen) onChoose(choice.lineId) },
-                label = { Text(label.replaceFirstChar { it.uppercase() }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                modifier = Modifier.testTag(if (chosen) "chosen-${choice.lineId}" else "other-${choice.lineId}"),
-            )
-        }
-    }
-}
+) = Readings(
+    listOf(choice.chosen, choice.other),
+    chosen = 0,
+    onPick = { onChoose(choice.lineId) },
+    tag = { if (it == 0) "chosen-${choice.lineId}" else "other-${choice.lineId}" },
+    modifier = modifier.testTag("choice-${choice.lineId}"),
+)
 
 /** The review screen's default view (PLAN §3.1), stateless. */
 @Composable
@@ -745,14 +777,13 @@ private fun ReviewRowItem(
                     when {
                         // Step AC: what was assumed, and a way to change it on the row; no "Check:", no red text.
                         row.range != null ->
-                            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                for (reading in row.range.readings) {
-                                    OutlinedButton(
-                                        onClick = { onAmount(row.range.lineId, reading) },
-                                        modifier = Modifier.heightIn(min = 48.dp).testTag("reading-${row.key}-$reading"),
-                                    ) { Text(reading) }
-                                }
-                            }
+                            Readings(
+                                row.range.readings,
+                                chosen = row.range.chosen,
+                                onPick = { onAmount(row.range.lineId, row.range.readings[it]) },
+                                tag = { "reading-${row.key}-${row.range.readings[it]}" },
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
                         ReviewViewModel.noAmount(reason) ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(

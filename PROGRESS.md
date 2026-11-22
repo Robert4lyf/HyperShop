@@ -642,7 +642,13 @@ loop. No tabs, modes, settings or help text; no schema, protocol, golden-data or
   refresh of the previous test's database, "Illegal connection pointer"). `TestContainer` only wound the last
   container down when the next test built one. A test that builds none (`StoreRenameTest`) now calls
   `TestContainer.windDown()` (the scope stopped and the database closed) from a rule ordered before its compose rule.
-- [ ] AD.4 A chosen reading looks chosen.
+- [x] AD.4 A chosen reading looks chosen. One composable (`Readings`) draws every choice of reading on the review:
+  a backwards range's readings ("3 cloves" / "2 cloves", were two outlined buttons with neither marked) and an
+  "A or B" line's two options (were filter chips). The one in use is a selected chip with a check, the same in both;
+  TalkBack reads each as a radio button, "Selected" or "Not selected"; choosing the selected one does nothing. For a
+  range, the one in use is the line's own amount (`RangeChoice.chosen`, matched against the recipe's two numbers; the
+  parser takes the first). Tests: `ReviewScreenTest` (both kinds look and read alike; the second reading selected when
+  the line uses it).
 - [ ] AD.5 One recipe card shape.
 - [ ] AD.6 Leaner list rows.
 - [ ] AD.7 Quiet watch status.

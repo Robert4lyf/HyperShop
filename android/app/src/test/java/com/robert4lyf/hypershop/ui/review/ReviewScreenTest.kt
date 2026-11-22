@@ -198,6 +198,42 @@ class ReviewScreenTest {
     }
 
     @Test
+    fun theReadingInUseLooksAndReadsSelectedInEveryCase() {
+        // Step AD.4: a backwards range's readings and an "A or B" line's options are the same chips: the one in use
+        // selected, with a check, and TalkBack says "Selected" / "Not selected".
+        show()
+        val list = compose.onNode(hasScrollAction())
+        list.performScrollToNode(hasText("3 cloves · recipe says 3–2"))
+
+        fun state(tag: String) =
+            compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().config[SemanticsProperties.StateDescription]
+        compose.onNodeWithTag("reading-cat:garlic-3 cloves", useUnmergedTree = true).assertIsSelected()
+        compose.onNodeWithTag("reading-cat:garlic-2 cloves", useUnmergedTree = true).assertIsNotSelected()
+        assertEquals("Selected", state("reading-cat:garlic-3 cloves"))
+        assertEquals("Not selected", state("reading-cat:garlic-2 cloves"))
+        // The one in use does nothing when chosen again.
+        compose.onNodeWithTag("reading-cat:garlic-3 cloves", useUnmergedTree = true).performClick()
+        assertEquals(emptyList<String>(), events)
+        list.performScrollToNode(hasText("Chipotle sauce"))
+        compose.onNodeWithTag("chosen-9", useUnmergedTree = true).assertIsSelected()
+        assertEquals("Selected", state("chosen-9"))
+        assertEquals("Not selected", state("other-9"))
+    }
+
+    @Test
+    fun theSecondReadingIsSelectedWhenTheLineUsesIt() {
+        val garlic = SAMPLE_REVIEW.aisles[0].second[1]
+        val ui =
+            SAMPLE_REVIEW.copy(
+                aisles =
+                    listOf(AisleCode.PRODUCE to listOf(garlic.copy(quantity = "2 cloves", range = garlic.range!!.copy(chosen = 1)))),
+            )
+        show(ui)
+        compose.onNodeWithTag("reading-cat:garlic-2 cloves", useUnmergedTree = true).assertIsSelected()
+        compose.onNodeWithTag("reading-cat:garlic-3 cloves", useUnmergedTree = true).assertIsNotSelected()
+    }
+
+    @Test
     fun amountsHaveNoPlusAndAChoiceIsTwoButtons() {
         // Step AA: what goes on, then what the list will hold in words; "A or B" as its two options, no "Check".
         show()

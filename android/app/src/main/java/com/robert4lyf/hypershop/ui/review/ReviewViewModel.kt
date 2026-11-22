@@ -85,6 +85,8 @@ data class RangeChoice(
     val lineId: Long,
     val said: String,
     val readings: List<String>,
+    /** Step AD.4: the reading the line uses now (the parser takes the first number of a backwards range). */
+    val chosen: Int = 0,
 )
 
 /** The two sides of an "A or B" line: [chosen] is what the line reads now. */
@@ -614,7 +616,9 @@ class ReviewViewModel(
                 val (lo, hi) = m.destructured
                 val unit = l.parsed.unit?.serial?.replace('_', ' ')
                 val readings = listOf(lo, hi).map { q -> listOfNotNull(q, unit).joinToString(" ") }.distinct()
-                RangeChoice(l.recipeLineId, "$lo–$hi", readings)
+                // The one in use: the line's own amount, whichever number that is now.
+                val chosen = listOf(lo, hi).indexOfFirst { q -> c.ruleParser.parse("$q x").quantity == l.parsed.quantity }
+                RangeChoice(l.recipeLineId, "$lo–$hi", readings, chosen.coerceIn(0, readings.lastIndex))
             }
         return ReviewRow(
             key = r.target.mergeKey,

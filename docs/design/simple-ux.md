@@ -34,7 +34,7 @@ fewer modes and one word per idea. The data model is unchanged; every action cal
 | Keep a reviewed recipe without adding it | **Save recipe only** (review ⋮ menu) | Save recipe, Save for later |
 | Correct the words a recipe line was read from | **Fix the recipe's text** (review row sheet) | Edit the line |
 | Say the app read something wrong | **Report a wrong reading** (review row sheet, item sheet) | This is wrong |
-| A line offering "A or B" | its **two options** as buttons, the one it reads now selected | Check: has 'or', Use B instead, swap |
+| A line offering "A or B", or a range written backwards ("3–2 cloves") | its **readings** as chips, the one in use selected with a check (TalkBack: "Selected" / "Not selected"), the same for both | Check: has 'or', Use B instead, swap |
 | How much a review row adds | the amount alone ("200 ml"); with the item on the list already, "200 ml · 700 ml with what's on your list" | +200 ml, → 700 ml on the shopping list |
 | The row sheet's amount field | **Amount in the recipe** (it sets the line's own amount, which servings then scale) | Amount, Amount to buy |
 
@@ -89,7 +89,7 @@ grey, never red, and offers the way to change it. The recipe's own text is quote
 
 | Raised by | Reason (stored) | What the row says | Way to change it |
 |---|---|---|---|
-| Rule parser, Claude post-processing | a range that goes down | "3 cloves · recipe says 3–2" | a button for each reading ("3 cloves", "2 cloves") sets the line's amount |
+| Rule parser, Claude post-processing | a range that goes down | "3 cloves · recipe says 3–2" | a chip for each reading ("3 cloves", "2 cloves"), the one in use selected; the other sets the line's amount |
 | Uncertainty, Claude post-processing, rule parser | an amount it couldn't read / an amount that made no sense / a zero amount | "No amount found" | **Set amount** opens the row's sheet, its amount field first |
 | Rule parser | "A or B": one of two | (no warning: the two options as buttons, Step AA) | the other option |
 | Rule parser | "X and Y": may be two items | "Read as one item; it may be two. Fix the recipe's text to split it" (quoted) | Fix the recipe's text |
