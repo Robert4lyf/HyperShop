@@ -698,4 +698,8 @@ loop. No tabs, modes, settings or help text; no schema, protocol, golden-data or
   list, Paste a link) is unchanged. Tests: `ListScreenTest` (both buttons; Add recipes alone with no last shop; the
   first run unchanged), `AfterAShopTest` (after a finished trip, through the app shell, Add recipes opens the Recipes
   tab).
-- [ ] AD.12 Verify and report.
+- [x] AD.12 Verify and report. Screenshots re-recorded by the gate (all unchanged since their sub-steps),
+  `tools/contact-sheet` run (45). Journeys: adding by hand 4 · 1 · 0 · 0, core 6 · 0 · 0 · 2, quick 7 · 2 · 0 · 0,
+  meal-based 9 · 1 · 3 · 3 (none longer than step-ac.md), salad before vegetables 4 · 0 · 0 · 2 (AD.1's target: at
+  most 4; counted to the stored change, the two backs uncounted). Report, with what to try on a phone (dragging,
+  swiping, a pasted link): `docs/reports/step-ad.md`.
