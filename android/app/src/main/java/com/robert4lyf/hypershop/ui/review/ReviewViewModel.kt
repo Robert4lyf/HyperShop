@@ -17,6 +17,7 @@ import com.robert4lyf.hypershop.core.model.ParsedBy
 import com.robert4lyf.hypershop.core.model.ParsedIngredient
 import com.robert4lyf.hypershop.core.model.QtyBase
 import com.robert4lyf.hypershop.core.model.QtyUnit
+import com.robert4lyf.hypershop.core.parse.ClaudeAlignment
 import com.robert4lyf.hypershop.core.parse.Meaning
 import com.robert4lyf.hypershop.core.report.WrongReport
 import com.robert4lyf.hypershop.data.ListRepository
@@ -70,11 +71,20 @@ data class ReviewRow(
     val optional: Boolean = false,
     /** Step AA: an "A or B" line, shown as two buttons; choosing the other is [ReviewViewModel.swap]. */
     val choice: Choice? = null,
+    /** Step AC: a range that reads backwards ("3–2"): a button for each reading, each the line's amount. */
+    val range: RangeChoice? = null,
     /**
      * Step AA: for an item on the list already, what this adds and what the list will then hold, in words ("200ml ·
      * 700ml with what's on your list"); null otherwise, when the row shows [quantity].
      */
     val withList: String? = null,
+)
+
+/** Step AC: a backwards range's readings ("3 cloves", "2 cloves") for the line [lineId], and the recipe's own "3–2". */
+data class RangeChoice(
+    val lineId: Long,
+    val said: String,
+    val readings: List<String>,
 )
 
 /** The two sides of an "A or B" line: [chosen] is what the line reads now. */
@@ -597,6 +607,15 @@ class ReviewViewModel(
                 alternativeOf(l.parsed)?.let { Choice(l.recipeLineId, l.parsed.name, it) }
             }
         val name = entry?.name ?: r.target.displayName
+        val range =
+            check?.takeIf { it.parsed.checkReason == "a range that goes down" }?.let { l ->
+                // The two numbers as the recipe wrote them ("3-2"): the parser keeps only the first of a backwards range.
+                val m = BACKWARDS.find(l.parsed.raw) ?: return@let null
+                val (lo, hi) = m.destructured
+                val unit = l.parsed.unit?.serial?.replace('_', ' ')
+                val readings = listOf(lo, hi).map { q -> listOfNotNull(q, unit).joinToString(" ") }.distinct()
+                RangeChoice(l.recipeLineId, "$lo–$hi", readings)
+            }
         return ReviewRow(
             key = r.target.mergeKey,
             name = entry?.name ?: r.target.displayName,
@@ -610,6 +629,7 @@ class ReviewViewModel(
             raw = check?.parsed?.raw,
             optional = lines.isNotEmpty() && lines.all { it.parsed.optional || it.parsed.garnish },
             choice = choice,
+            range = range,
             withList = r.existing?.let { withList(r.adding, r.onListAfter, entry, produce) },
         )
     }
@@ -1248,26 +1268,52 @@ class ReviewViewModel(
         private fun isChoice(p: ParsedIngredient): Boolean = p.checkReason?.startsWith("\"A or B\"") == true && alternativeOf(p) != null
 
         /**
-         * The parser's reason in plain words, with what to do about it. Reasons it
-         * doesn't know (Claude's, or a new one) are shown as they are.
+         * Step AC: every reason a line is flagged ([com.robert4lyf.hypershop.core.parse.RuleParser],
+         * [com.robert4lyf.hypershop.core.parse.Uncertainty], Claude's post-processing, [Meaning],
+         * [com.robert4lyf.hypershop.core.parse.ClaudeAlignment], [com.robert4lyf.hypershop.importing.LineIdentity]) as
+         * one plain sentence: what was assumed, and where to change it. Reasons it doesn't know (a new one) are shown
+         * as they are. The table is in docs/design/simple-ux.md.
          */
         fun plainReason(reason: String): String =
             when {
-                reason.startsWith("\"X and Y\"") -> "this may be two ingredients; edit the line to split them"
-                reason == "an unknown unit" -> "a measure the app doesn't know, so the amount may be off; the Amount field sets it"
-                reason == "an amount left in the name" -> "a number stayed in the name; check the amount"
-                reason == "a count times a count" -> "two counts multiplied (like 2 x 400 g); check the total"
-                reason == "a range that goes down" -> "the range reads backwards; check the amount"
-                reason == "several items on one line" -> "several items on one line; add each as its own line"
-                reason == "no ingredient name" -> "no ingredient name was found; edit the line"
-                reason == "an amount it couldn't read" -> "an amount it couldn't read; the Amount field sets it"
-                reason == "a name that reads like a sentence" -> "the name reads like a sentence; edit the line"
-                reason == Meaning.PART ->
-                    "part of an ingredient (like a yolk) is asked for too, counted here as one more to buy. " +
-                        "Tap to set how many"
-                reason == Meaning.HEAPED -> "a heaped measure holds more than the level amount shown. Tap to set the amount"
+                reason.startsWith("\"X and Y\"") -> "Read as one item; it may be two. Fix the recipe's text to split it"
+                reason.startsWith("\"A or B\"") -> "The recipe offers a choice"
+                reason.contains(" of\": the fruit is listed") -> "The whole fruit is listed for its ${reason.substringAfterLast("the ")}"
+                reason == "an unknown unit" -> "A measure the app doesn't know: the amount may be off"
+                reason == "a number after a name the catalogue does not know" -> "A number after the name was read as the amount"
+                reason == "a zero amount" -> "No amount found"
+                reason == "made from another recipe" -> "Made from another recipe: buy what that recipe needs"
+                reason == "a count times a count" -> "Two amounts multiplied (like 2 × 400 g) into one total"
+                reason.startsWith("Extra amount uses a different measure") -> "A second amount in another measure was left out"
+                reason == "several items on one line" -> "Several items on one line, read as one"
+                reason == "a range that goes down" -> "The recipe's range reads backwards"
+                reason == "an amount left in the name" -> "A number stayed in the name"
+                reason == "\"plus\" an amount of something else" -> "\"Plus\" another amount, added in"
+                reason == "no ingredient name" -> "No ingredient name found"
+                reason == "an amount it couldn't read" || reason == "an amount that made no sense" -> "No amount found"
+                reason == "a name that reads like a sentence" -> "The name reads like a sentence"
+                reason == Meaning.PART -> "Counted as one more to buy for the part asked for (like a yolk)"
+                reason == Meaning.HEAPED -> "A heaped measure: the level amount is shown"
+                reason == ClaudeAlignment.DISAGREE -> "The amount was read two ways; the one shown is a guess"
+                reason == LineIdentity.CHECK_ALIGN -> "Your correction is kept; Claude read the line differently"
                 else -> reason
             }
+
+        /** "3-2", "3 – 2", "3 to 2": a range's two numbers as written. */
+        private val BACKWARDS = Regex("""(\d+(?:[.,/]\d+)?)\s*(?:-|–|—|to|or)\s*(\d+(?:[.,/]\d+)?)""")
+
+        /** No amount could be read: the row says so and offers the amount field (its sheet) one tap away. */
+        fun noAmount(reason: String?): Boolean =
+            reason == "an amount it couldn't read" || reason == "an amount that made no sense" || reason == "a zero amount"
+
+        /** The recipe's own words help choose: quoted on the row only for these. */
+        fun quoteHelps(reason: String?): Boolean =
+            reason != null &&
+                (
+                    reason.startsWith("\"X and Y\"") || reason == "several items on one line" || reason == "an amount left in the name" ||
+                        reason == "a number after a name the catalogue does not know" || reason == "a count times a count" ||
+                        reason == "\"plus\" an amount of something else" || reason.startsWith("Extra amount uses")
+                )
 
         const val STAGE_OPENING = "Opening…"
 

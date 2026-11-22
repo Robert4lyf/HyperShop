@@ -248,7 +248,9 @@ class ReviewCorrectionsTest {
         val row = (vm.state.value as ReviewState.Ready).ui.aisles.flatMap { it.second }.single()
         assertTrue(row.check)
         assertEquals("3-2 eggs", row.raw)
-        assertEquals("the range reads backwards; check the amount", ReviewViewModel.plainReason(row.checkReason!!))
+        assertEquals("The recipe's range reads backwards", ReviewViewModel.plainReason(row.checkReason!!))
+        // Step AC: a button for each reading, each setting the line's amount.
+        assertEquals("3–2" to listOf("3", "2"), row.range!!.said to row.range!!.readings)
         assertEquals("Claude's own words", ReviewViewModel.plainReason("Claude's own words"))
     }
 }

@@ -48,6 +48,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -108,6 +109,8 @@ data class ReviewEdits(
     val onAddLine: (String) -> Unit = {},
     /** Step AA: the other side of an "A or B" line (the sheet's swap). */
     val onChoose: (Long) -> Unit = {},
+    /** Step AC: one reading of a line's amount chosen on its row (a backwards range). */
+    val onSetAmount: (Long, String) -> Unit = { _, _ -> },
 )
 
 /**
@@ -200,6 +203,7 @@ fun ReviewScreen(
                             onInStock.takeUnless { ui.savedOnly },
                             onRow,
                             edits.onChoose,
+                            edits.onSetAmount,
                             sectionPosition(i + 1, count),
                             card,
                         )
@@ -684,6 +688,8 @@ private fun ReviewRowItem(
     onInStock: ((String, Boolean) -> Unit)?,
     onRow: (String) -> Unit,
     onChoose: (Long) -> Unit,
+    /** Step AC: a reading chosen for a line ("2 cloves"): its amount, as the sheet's field sets it. */
+    onAmount: (Long, String) -> Unit,
     position: SectionPosition,
     card: Color,
 ) {
@@ -732,7 +738,7 @@ private fun ReviewRowItem(
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (row.check) {
-                        // Decorative: the "Check: …" line below says it, so the row is not read twice.
+                        // Step AC: the icon alone marks the row (decorative: the line below says what was assumed).
                         Icon(
                             Icons.Rounded.ReportProblem,
                             contentDescription = null,
@@ -743,7 +749,7 @@ private fun ReviewRowItem(
                     Text(
                         name,
                         style = MaterialTheme.typography.titleMedium,
-                        color = if (row.check && !row.inStock) MaterialTheme.colorScheme.tertiary else faded,
+                        color = faded,
                     )
                 }
                 // What this row does: the amount that goes on (and what the list will hold with it), "At home", or the
@@ -751,6 +757,8 @@ private fun ReviewRowItem(
                 val sub =
                     when {
                         row.inStock -> listOfNotNull("At home", row.quantity?.let { "needs $it" }).joinToString(" · ")
+                        // Step AC: a backwards range says what was taken and what the recipe says; buttons below.
+                        row.check && row.range != null -> listOfNotNull(row.quantity, "recipe says ${row.range.said}").joinToString(" · ")
                         !row.adds -> "Already on your shopping list"
                         row.withList != null -> row.withList
                         else -> row.quantity
@@ -760,13 +768,40 @@ private fun ReviewRowItem(
                 }
                 row.choice?.takeIf { !row.inStock }?.let { ChoiceButtons(it, onChoose, Modifier.padding(top = 4.dp)) }
                 if (row.check && !row.inStock) {
-                    Text(
-                        row.checkReason?.let { "Check: ${ReviewViewModel.plainReason(it)}" } ?: "Check this line",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.tertiary,
-                    )
-                    // The line as the recipe wrote it, so the reading can be judged without opening the sheet.
-                    row.raw?.let {
+                    val reason = row.checkReason
+                    when {
+                        // Step AC: what was assumed, and a way to change it on the row; no "Check:", no red text.
+                        row.range != null ->
+                            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                for (reading in row.range.readings) {
+                                    OutlinedButton(
+                                        onClick = { onAmount(row.range.lineId, reading) },
+                                        modifier = Modifier.heightIn(min = 48.dp).testTag("reading-${row.key}-$reading"),
+                                    ) { Text(reading) }
+                                }
+                            }
+                        ReviewViewModel.noAmount(reason) ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    "No amount found",
+                                    Modifier.weight(1f, fill = false),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                TextButton(
+                                    onClick = { onRow(row.key) },
+                                    modifier = Modifier.testTag("set-amount-${row.key}"),
+                                ) { Text("Set amount") }
+                            }
+                        else ->
+                            Text(
+                                reason?.let { ReviewViewModel.plainReason(it) } ?: "Read with a guess; tap to check it",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                    }
+                    // The line as the recipe wrote it, only where it helps choose.
+                    row.raw?.takeIf { ReviewViewModel.quoteHelps(reason) }?.let {
                         Text(
                             "“$it”",
                             style = MaterialTheme.typography.bodySmall,

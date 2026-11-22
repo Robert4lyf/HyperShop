@@ -74,3 +74,31 @@ On the review, lines still to go on the list are counted as **N to add** ("4 to 
   reason, **Retry** and ✕. "N recipes ready to review" is a plain card. A recipe without a photo shows its art as a
   small square beside its title; a real photo stays a band.
 - No instructions on screens: a control that needed a paragraph was relabelled or removed.
+
+## Review warnings (Step AC)
+
+A flagged line is marked by the warning icon alone; the row says in plain words what was assumed, in the normal
+grey, never red, and offers the way to change it. The recipe's own text is quoted only where it helps choose.
+
+| Raised by | Reason (stored) | What the row says | Way to change it |
+|---|---|---|---|
+| Rule parser, Claude post-processing | a range that goes down | "3 cloves · recipe says 3–2" | a button for each reading ("3 cloves", "2 cloves") sets the line's amount |
+| Uncertainty, Claude post-processing, rule parser | an amount it couldn't read / an amount that made no sense / a zero amount | "No amount found" | **Set amount** opens the row's sheet, its amount field first |
+| Rule parser | "A or B": one of two | (no warning: the two options as buttons, Step AA) | the other option |
+| Rule parser | "X and Y": may be two items | "Read as one item; it may be two. Fix the recipe's text to split it" (quoted) | Fix the recipe's text |
+| Rule parser, Claude post-processing | an unknown unit | "A measure the app doesn't know: the amount may be off" | Amount in the recipe |
+| Rule parser | a number after a name the catalogue does not know | "A number after the name was read as the amount" (quoted) | Amount in the recipe / Fix the recipe's text |
+| Rule parser | made from another recipe | "Made from another recipe: buy what that recipe needs" | Remove from recipe, or Fix the recipe's text |
+| Rule parser | a count times a count | "Two amounts multiplied (like 2 × 400 g) into one total" (quoted) | Amount in the recipe |
+| Rule parser | Extra amount uses a different measure | "A second amount in another measure was left out" (quoted) | Amount in the recipe |
+| Rule parser | several items on one line | "Several items on one line, read as one" (quoted) | Fix the recipe's text |
+| Rule parser | an amount left in the name | "A number stayed in the name" (quoted) | Fix the recipe's text |
+| Rule parser | "zest of" / "juice of": the fruit is listed | "The whole fruit is listed for its zest" | Amount in the recipe |
+| Rule parser | "plus" an amount of something else | "\"Plus\" another amount, added in" (quoted) | Amount in the recipe |
+| Rule parser, Uncertainty | no ingredient name | "No ingredient name found" | Fix the recipe's text |
+| Uncertainty | a name that reads like a sentence | "The name reads like a sentence" | Fix the recipe's text |
+| Meaning | an ingredient part beside the whole amount | "Counted as one more to buy for the part asked for (like a yolk)" | Amount in the recipe |
+| Meaning | a heaped measure | "A heaped measure: the level amount is shown" | Amount in the recipe |
+| Claude alignment | the amount was read two ways | "The amount was read two ways; the one shown is a guess" | Amount in the recipe |
+| Your edits (LineIdentity) | Claude's reading didn't line up with your edits | "Your correction is kept; Claude read the line differently" | the row's sheet |
+

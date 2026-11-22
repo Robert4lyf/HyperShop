@@ -570,7 +570,13 @@ words.
   in the card's text, beside the "− Serves N +" stepper; the sheet shows the same beside its stepper. Off the list:
   "Add to list" and "Serves N" as plain text in the card line (unchanged). "On the shopping list" (shown only when
   the servings were unknown) is gone. `RecipesScreenTest` checks both states.
-- [ ] AC.5 Review warnings in plain words
+- [x] AC.5 Review warnings in plain words. "Check: …" is gone: every reason the rule parser, `Uncertainty`, Claude's
+  post-processing, `Meaning`, `ClaudeAlignment` and `LineIdentity` can raise (19, listed in simple-ux.md with its
+  sentence) has one plain sentence in `ReviewViewModel.plainReason`, in the normal grey; the warning icon alone marks
+  the row (the name is no longer tinted). A backwards range reads "3 cloves · recipe says 3–2" with a button per
+  reading (the existing `setAmount`; the two numbers come from the recipe's text, as the parser keeps only the
+  first). An unreadable or zero amount reads "No amount found" with **Set amount** (the row's sheet, amount field
+  first). The recipe's text is quoted only where it helps choose (`quoteHelps`). The sheet's banner drops "Check:".
 - [ ] AC.6 Always at home chips
 - [ ] AC.7 "Don't suggest" can be undone
 - [ ] AC.8 Denser list

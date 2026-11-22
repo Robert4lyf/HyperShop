@@ -156,7 +156,7 @@ fun ReviewRowSheet(
             InfoBanner(sheet.effect, Icons.AutoMirrored.Rounded.TrendingFlat, Modifier.testTag("effect"), Tone.PRIMARY)
             sheet.packNote?.let { InfoBanner("Usually sold as $it", Icons.Rounded.LocalMall) }
             for (reason in sheet.lines.mapNotNull { it.checkReason }.distinct()) {
-                InfoBanner("Check: ${ReviewViewModel.plainReason(reason)}", Icons.Rounded.ReportProblem, tone = Tone.WARNING)
+                InfoBanner(ReviewViewModel.plainReason(reason), Icons.Rounded.ReportProblem, tone = Tone.WARNING)
             }
             // UX review 6: in the order corrections are made. The amount first (the commonest), then a swap, the line's
             // words behind "Fix the recipe's text" (one place for the text and the name: cut 6), the aisle, the rest.
