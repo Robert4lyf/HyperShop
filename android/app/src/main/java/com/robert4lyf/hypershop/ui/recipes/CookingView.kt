@@ -77,6 +77,7 @@ internal fun CookingView(
                         heading?.let { item(key = "h-$index") { Text(it, style = MaterialTheme.typography.titleMedium) } }
                         items(lines) { Text(it, style = MaterialTheme.typography.bodyLarge) }
                     }
+                    methodSteps(detail.row.method, large = true)
                     item {
                         Text("Your cooking notes", style = MaterialTheme.typography.titleLarge)
                         Text(

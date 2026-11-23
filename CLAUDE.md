@@ -71,9 +71,10 @@ and retry; `verify.sh` already does.
   (source text + occurrence) and laid over Claude by `LineIdentity.reconcile`,
   which never moves a correction it cannot line up. `rawLines` is what Claude
   reads and stays as the recipe wrote it.
-- **A saved recipe's rating, notes and photo belong to its library entry**
+- **A saved recipe's rating, notes, photo and method belong to its library entry**
   (`RecipeNote`, by `LibraryRecipe.key`), not to a copy: Edit and Add again
-  make new copies. A photo is a bare file name in `RecipePhotos`' folder,
+  make new copies. The method is the page's own text as imported (a step a
+  line), shown as plain text only and never sent to Claude. A photo is a bare file name in `RecipePhotos`' folder,
   re-encoded by the app, never a path and never the bytes as fetched.
 - **Room enums are stored by name**, never ordinal.
 - **An item's amount is the sum of its contributions.** Never store a total.

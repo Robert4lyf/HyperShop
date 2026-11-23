@@ -21,6 +21,8 @@ data class ExtractedRecipe(
     /** Ingredient lines; section headers appear as "Header:" lines (spec R8). */
     val lines: List<String>,
     val method: Method,
+    /** The method's steps as the page's own data gives them (JSON-LD `recipeInstructions`); see [Extraction.steps]. */
+    val steps: List<String> = emptyList(),
 )
 
 data class Extraction(
@@ -31,6 +33,12 @@ data class Extraction(
     val method: Method,
     /** The recipe's own photo, absolute https (or http) URL: JSON-LD `image`, microdata, then `og:image`. */
     val image: String? = null,
+    /**
+     * How the recipe is made, a step a line, section headings as "Heading:" lines: the page's own text, cleaned, for
+     * the app to keep and show. From JSON-LD, else the recipe plugin's or microdata's markup; empty when the page
+     * has none of those. At most [Extractor.MAX_STEPS] steps of [Extractor.MAX_STEP] characters.
+     */
+    val steps: List<String> = emptyList(),
 )
 
 /**
@@ -53,6 +61,8 @@ object Extractor {
     const val MAX_LINE = 500
     const val MAX_PAGE_TEXT = 30_000
     const val MAX_IMAGE_URL = 2_000
+    const val MAX_STEPS = 100
+    const val MAX_STEP = 2_000
 
     private val json =
         Json {
@@ -92,7 +102,10 @@ object Extractor {
         baseUrl: String,
     ): Extraction {
         val doc = Jsoup.parse(html, baseUrl)
-        return extractFrom(doc).copy(image = pageImage(doc))
+        val found = extractFrom(doc)
+        // Only for a page a recipe was found on: page text alone has no steps to tell from the rest.
+        val steps = if (found.recipes.isEmpty()) emptyList() else found.recipes.first().steps.ifEmpty { markupSteps(doc) }
+        return found.copy(image = pageImage(doc), steps = steps)
     }
 
     private fun extractFrom(doc: Document): Extraction {
@@ -103,7 +116,10 @@ object Extractor {
         for (plugin in listOf(::wprm, ::tasty)) {
             plugin(
                 doc,
-            )?.let { return Extraction(pageTitle, listOf(it.copy(title = ldTitle ?: pageTitle, servings = ldServings)), null, it.method) }
+            )?.let {
+                val recipe = it.copy(title = ldTitle ?: pageTitle, servings = ldServings, steps = ld.firstOrNull()?.steps.orEmpty())
+                return Extraction(pageTitle, listOf(recipe), null, it.method)
+            }
         }
         if (ld.isNotEmpty()) return Extraction(pageTitle, ld, null, Method.JSON_LD)
         microdata(doc)?.let { return Extraction(pageTitle, listOf(it.copy(title = it.title ?: pageTitle)), null, Method.MICRODATA) }
@@ -242,6 +258,7 @@ object Extractor {
                         servings = servings(r["recipeYield"] ?: r["yield"]),
                         lines = lines.take(MAX_LINES),
                         method = Method.JSON_LD,
+                        steps = ArrayList<String>().also { stepsOf(r["recipeInstructions"], 0, it) },
                     )
             }
         }
@@ -474,8 +491,78 @@ object Extractor {
             ExtractedRecipe(null, null, it, method)
         }
 
+    // ---- the method ----------------------------------------------------------------------
+
+    /**
+     * JSON-LD `recipeInstructions` in the shapes sites use: one string (steps on lines), a list of strings, a list of
+     * `HowToStep` (`text`, else `name`), and `HowToSection` (`name`, with its steps in `itemListElement`).
+     */
+    private fun stepsOf(
+        e: JsonElement?,
+        d: Int,
+        out: MutableList<String>,
+    ) {
+        if (e == null || d > 4 || out.size >= MAX_STEPS) return
+        when (e) {
+            is JsonPrimitive -> e.contentOrNull?.let { text -> addSteps(text, out) }
+            is JsonArray -> for (x in e) stepsOf(x, d + 1, out)
+            is JsonObject -> {
+                val inner = e["itemListElement"]
+                if (inner != null) {
+                    val name = str(e["name"])?.let { cleanStep(it) }.orEmpty()
+                    if (name.isNotEmpty() && out.size < MAX_STEPS) out += "${name.trimEnd(':')}:"
+                    stepsOf(inner, d + 1, out)
+                } else {
+                    (str(e["text"]) ?: str(e["name"]))?.let { addSteps(it, out) }
+                }
+            }
+        }
+    }
+
+    /** One string may hold several steps: on lines, or as paragraphs or list items of HTML. */
+    private fun addSteps(
+        text: String,
+        out: MutableList<String>,
+    ) {
+        val parts =
+            if (text.contains('<')) {
+                Jsoup.parseBodyFragment(text).select("li, p").map { it.text() }.ifEmpty { listOf(text) }
+            } else {
+                text.split('\n')
+            }
+        for (p in parts) {
+            if (out.size >= MAX_STEPS) return
+            cleanStep(p).takeIf { it.isNotEmpty() }?.let { out += it }
+        }
+    }
+
+    /** Steps from the recipe plugins' own markup, then microdata, when the page's JSON-LD gave none. */
+    private fun markupSteps(doc: Document): List<String> {
+        val out = ArrayList<String>()
+        val found =
+            listOf(
+                ".wprm-recipe-instruction-group-name, .wprm-recipe-instruction-text",
+                ".tasty-recipes-instructions h3, .tasty-recipes-instructions h4, .tasty-recipes-instructions li",
+                "[itemprop=recipeInstructions] li, [itemprop=recipeInstructions] p",
+                "[itemprop=recipeInstructions]",
+            ).firstNotNullOfOrNull { css -> doc.select(css).takeIf { it.isNotEmpty() } } ?: return out
+        for (el in found) {
+            if (out.size >= MAX_STEPS) break
+            val t = cleanStep(el.text())
+            if (t.isEmpty()) continue
+            val heading = el.tagName() in setOf("h3", "h4") || el.hasClass("wprm-recipe-instruction-group-name")
+            out += if (heading) "${t.trimEnd(':')}:" else t
+        }
+        return out
+    }
+
+    /** As [clean], with a step's length: at most [MAX_STEP] characters. */
+    private fun cleanStep(s: String): String = tidy(s).take(MAX_STEP)
+
     /** HTML tags and entities (double-encoded too) out; whitespace collapsed; at most 500 characters. */
-    fun clean(s: String): String {
+    fun clean(s: String): String = tidy(s).take(MAX_LINE)
+
+    private fun tidy(s: String): String {
         var t = s
         repeat(2) {
             if (t.contains('<') || t.contains('&')) t = Jsoup.parseBodyFragment(t).text()
@@ -492,6 +579,6 @@ object Extractor {
                 sb.append(c)
             }
         }
-        return sb.toString().take(MAX_LINE)
+        return sb.toString()
     }
 }

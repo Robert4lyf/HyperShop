@@ -66,6 +66,19 @@ class RecipeNotesViewModelTest {
             collectors.launch { vm.ui.collect {} }
         }
 
+    @Test
+    fun aPagesMethodIsKeptWithTheRecipeWhenItIsAdded() {
+        val job = runBlocking { c.readyJob("2 onions", title = "Soup", url = "https://example.com/soup") }
+        runBlocking { c.importJobs.update(job, c.importJobs.get(job)!!.result!!.copy(steps = listOf("Chop.", "Simmer."))) }
+        val review = ReviewViewModel(c, job).also { models += it }
+        await(review.state) { it is ReviewState.Ready }
+        review.confirm()
+        await(review.state) { it is ReviewState.Added }
+        val vm = recipes()
+        val row = await(vm.ui) { ui -> ui.library.any { it.method.isNotEmpty() } }.library.single()
+        assertEquals(listOf("Chop.", "Simmer."), row.method)
+    }
+
     /** A recipe added from [url] through the review, as a share would leave it; its photo at [image]. */
     private fun addFromPage(
         url: String,

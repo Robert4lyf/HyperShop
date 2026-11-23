@@ -92,6 +92,8 @@ data class LibraryRow(
     val rating: Int? = null,
     /** Your cooking notes ("10 min longer, half the chilli"), or null. */
     val notes: String? = null,
+    /** How it is made, as its page gave it: a step a line, a section heading ending in a colon. Empty when not kept. */
+    val method: List<String> = emptyList(),
     /** The recipe's photo on this phone, or null. */
     val photo: String? = null,
     /** Step AA: how many times it has gone on the list, and when it last did (null: never). */
@@ -184,6 +186,7 @@ class RecipesViewModel(
                         bookRef = bookRef(it.book, it.page),
                         rating = notes[it.key]?.rating,
                         notes = notes[it.key]?.notes,
+                        method = notes[it.key]?.method?.split('\n')?.filter { m -> m.isNotBlank() }.orEmpty(),
                         photo = photos[it.key],
                         timesAdded = added[it.key]?.times ?: 0,
                         lastAddedToList = added[it.key]?.lastAt,

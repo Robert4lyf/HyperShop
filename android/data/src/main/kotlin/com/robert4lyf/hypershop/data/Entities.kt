@@ -424,6 +424,11 @@ data class RecipeNoteEntity(
     /** "Cooked it" on a meal (missing 2 of the review of 2026-10-27): how often, and when last. What "your usual" counts. */
     @ColumnInfo(defaultValue = "0") val timesCooked: Int = 0,
     val lastCookedAt: Long? = null,
+    /**
+     * How the recipe is made, as its page gave it: a step a line, section headings as "Heading:" lines (v17). Kept
+     * with the library entry so the recipe outlives its page; set from an import of the page, never typed here.
+     */
+    val method: String? = null,
 )
 
 /**
