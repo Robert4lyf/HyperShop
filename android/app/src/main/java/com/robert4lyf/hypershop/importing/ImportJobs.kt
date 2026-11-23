@@ -125,10 +125,29 @@ class ImportJobs(
     suspend fun done(id: Long) = setState(id, JobState.DONE)
 
     /** Cancelled on review, Undo still showing: off the ready card until Undo has passed or been tapped. */
-    suspend fun discarding(id: Long) = setState(id, JobState.DISCARDING)
+    suspend fun discarding(id: Long) {
+        val state = dao.job(id)?.state
+        if (state == JobState.QUEUED.name || state == JobState.RUNNING.name) cutShort += id
+        setState(id, JobState.DISCARDING)
+    }
 
-    /** Undo: back on the ready card. */
-    suspend fun restore(id: Long) = setState(id, JobState.READY)
+    /**
+     * Undo: back on the ready card. A job cancelled while its page was still being fetched has nothing to show
+     * (the worker's result is refused once the job is being discarded), and came back as "No ingredient list
+     * found" (KNOWN_ISSUES #50): it is fetched again instead.
+     */
+    suspend fun restore(id: Long) {
+        if (cutShort.remove(id) && dao.job(id)?.resultJson == null) {
+            setState(id, JobState.QUEUED)
+            val req = OneTimeWorkRequestBuilder<ImportWorker>().setInputData(ImportWorker.input(id)).build()
+            workManager().enqueueUniqueWork("import-$id", ExistingWorkPolicy.REPLACE, req)
+        } else {
+            setState(id, JobState.READY)
+        }
+    }
+
+    /** Jobs cancelled before the worker had finished, while their Undo shows (this process only). */
+    private val cutShort = java.util.concurrent.ConcurrentHashMap.newKeySet<Long>()
 
     /** At start-up: a discard whose Undo window the process did not live to see out is done with. */
     suspend fun finishDiscards() {

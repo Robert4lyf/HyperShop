@@ -510,7 +510,11 @@ data class ShoppingList(
         val cs =
             r.contributions.map { c ->
                 val moved = redirect[c.itemId]?.let { c.copy(itemId = it) } ?: c
-                if (moved.coveredBy != null && moved.coveredBy !in tickIds) moved.copy(coveredBy = null, homeUsed = null) else moved
+                val gone = moved.coveredBy != null && moved.coveredBy !in tickIds
+                val open = if (gone) moved.copy(coveredBy = null, homeUsed = null) else moved
+                // Back onto another row that is live now: new to that row, so a watch tick made before this covers
+                // none of it (as a share added by an edit; KNOWN_ISSUES #50).
+                if (c.itemId in redirect && open.coveredBy == null) open.copy(createdListRev = listRev + 1) else open
             }
         val ts = r.ticks.map { t -> redirect[t.itemId]?.let { t.copy(itemId = it) } ?: t }
         return copy(
@@ -816,7 +820,11 @@ data class ShoppingList(
         val back =
             w.contributions
                 .filter { it.id !in have && it.useId in l.uses }
-                .map { c -> (redirect[c.itemId]?.let { c.copy(itemId = it) } ?: c).copy(coveredBy = null, homeUsed = null) }
+                .map { c ->
+                    val moved = (redirect[c.itemId]?.let { c.copy(itemId = it) } ?: c).copy(coveredBy = null, homeUsed = null)
+                    // Onto another row that is live now: new to that row for a watch tick made before this.
+                    if (c.itemId in redirect) moved.copy(createdListRev = l.listRev + 1) else moved
+                }
                 .filter { it.itemId in l.items }
         if (back.isEmpty()) return null
         return l.copy(contributions = l.contributions + back).bumped(back.map { it.itemId }.toSet())
@@ -967,6 +975,12 @@ data class ShoppingList(
     fun catalogueChanged(): ShoppingList = bumped(liveItems.map { it.id }.toSet())
 
     // ---- helpers ----------------------------------------------------------------
+
+    /** [typed] as [editQuantity] will read it for this item: a bare "3" for "2 cloves garlic" is 3 cloves. */
+    fun typedTotal(
+        itemId: Long,
+        typed: QtyBase,
+    ): QtyBase = sameCountUnit(total(itemId), typed)
 
     /**
      * A bare number typed for an item counted in one unit means that unit:

@@ -176,6 +176,17 @@ class PlannerTest {
         }
 
     @Test
+    fun undoOfAddToListTakesBackARecipeThatPutNothingOnTheList() =
+        runBlocking {
+            // KNOWN_ISSUES #50: every line at home, so nothing to buy; Undo left it "On your list".
+            val added = add(r.save("Seasoning", "Salt, to taste"))
+            assertEquals(1, r.repo.usesOnList().size)
+            planner.takeBack(added.useId)
+            assertTrue(r.repo.usesOnList().isEmpty())
+            assertTrue(meals().isEmpty())
+        }
+
+    @Test
     fun undoOfAddToListKeepsSomethingBoughtSince() =
         runBlocking {
             val added = add(r.save("Chilli", "2 onions", "1 courgette"))

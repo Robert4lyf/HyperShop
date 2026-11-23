@@ -132,6 +132,8 @@ data class UseRemoval(
 data class Finished(
     val stamp: Long,
     val removed: Int,
+    /** The items set aside ("Can't find it") that Finish put back to buy, with when each was set aside: for Undo. */
+    val setAside: Map<Long, Long> = emptyMap(),
 )
 
 data class WatchReply(
@@ -1186,7 +1188,10 @@ class ListRepository(
             if (total != null) {
                 require(!total.isPresence && total.parts.values.all { it > Rational.ZERO }) { "Enter a positive amount" }
                 val bought = before.contributionsOf(itemId).filter { it.coveredBy != null }.fold(QtyBase.PRESENCE) { q, c -> q + c.qty }
-                require(bought.parts.all { (key, value) -> (total.parts[key] ?: Rational.ZERO) >= value }) {
+                // Compared as the edit will read it (KNOWN_ISSUES #50): "3" for a bought "2 cloves" is 3 cloves, not
+                // 3 of something else and no cloves.
+                val asRead = before.typedTotal(itemId, total)
+                require(bought.parts.all { (key, value) -> (asRead.parts[key] ?: Rational.ZERO) >= value }) {
                     "The total cannot be less than what is already bought. Correct the purchase first."
                 }
             }
@@ -1263,9 +1268,10 @@ class ListRepository(
         return db.withTransaction {
             val old = load()
             val done = old.liveItems.filter { old.isDone(it.id) }
+            val setAside = old.liveItems.filter { it.unavailableAt != null && !old.isDone(it.id) }.associate { it.id to it.unavailableAt!! }
             persist(old, old.finishShopping(stamp))
             recordTrip(old, done, stamp)
-            Finished(stamp, done.size)
+            Finished(stamp, done.size, setAside)
         }
     }
 
@@ -1308,6 +1314,20 @@ class ListRepository(
         write { it.clearAll(stamp) to Unit }
         return stamp
     }
+
+    /**
+     * Undo of [finish]: as [undoDelete], and the items it had set aside are set aside again (KNOWN_ISSUES #50: they
+     * came back as plain items to buy). Only those still on the list, not bought and not set aside since.
+     */
+    suspend fun undoFinish(finished: Finished) =
+        db.withTransaction {
+            undoDelete(finished.stamp)
+            write { l ->
+                var next = l
+                for ((id, at) in finished.setAside) next = next.markUnavailable(id, at) ?: next
+                next to Unit
+            }
+        }
 
     suspend fun undoDelete(stamp: Long) =
         db.withTransaction {
@@ -1391,6 +1411,7 @@ class ListRepository(
                 dao.undelete(ids)
             }
             dao.deleteForgottenRecipes(before, Week.of(now).startEpochDay)
+            dao.deleteUnconfirmedRecipes(before)
             // Rows older versions left pointing at items gone for good (review A.2).
             dao.deleteDanglingAliases()
             dao.deleteDanglingDeleted()

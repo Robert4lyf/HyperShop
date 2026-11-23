@@ -645,13 +645,14 @@ class ListViewModel(
 
     private suspend fun finishOnce() {
         // Counted inside the write: a tick still on its way to the screen is included.
-        val (stamp, n) = c.repository.finish()
+        val finished = c.repository.finish()
+        val n = finished.removed
         // Nothing was ticked: nothing finished, and no message to take the place of one that can still be undone.
         if (n == 0) return
         val left = c.repository.snapshot().liveItems.size
         // Step Q: what Finish did, in plain words: the bought things recorded, the rest still on the list.
         val text = if (left > 0) "Shopping finished: $n bought · $left to buy" else "Shopping finished: $n bought"
-        messages.send(UiMessage(text, undo = { c.repository.undoDelete(stamp) }))
+        messages.send(UiMessage(text, undo = { c.repository.undoFinish(finished) }))
         // Missing 3: what was not bought is asked about once, rather than carried over unnoticed.
         if (left > 0) carryOver.value = left
     }
@@ -977,9 +978,12 @@ class ListViewModel(
             // Step AD.9: a line that is a link (the share's own rule: https, tracking stripped) is a recipe to import,
             // never an item named after a URL. It is queued and its review opens, as "Paste a link" does; Claude is
             // called only once that review is on screen. The other lines are added as before.
-            val (links, lines) =
-                text.split('\n').map { it.trim() }.filter { it.isNotEmpty() }.partition { SharedText.parse(it) != null }
+            // A line that is only a link, that is (KNOWN_ISSUES #50): "Olive oil https://shop.example/oil" is the item
+            // "Olive oil", where it used to open a recipe import and add nothing.
+            val (links, items) =
+                text.split('\n').map { it.trim() }.filter { it.isNotEmpty() }.partition { SharedText.isOnlyALink(it) }
             for (link in links) c.applicationScope.launch { c.importShared(link, null) }
+            val lines = items.map { SharedText.withoutLinks(it) }.filter { it.isNotEmpty() }
             if (lines.isEmpty()) return@run
             if (lines.size == 1) {
                 val p = typed(lines.single())
@@ -1000,7 +1004,12 @@ class ListViewModel(
             }
             // Step AB: one message per add (one for a whole paste), naming where it went, with Undo.
             val added = lines.mapNotNull { addLine(it) }
-            if (added.isEmpty()) return@run
+            if (added.isEmpty()) {
+                // Nothing in it could be read as an item: said, not dropped (the field is already empty).
+                val what = if (lines.size == 1) "“${lines.single().take(40)}”" else "those lines"
+                messages.send(UiMessage("Couldn't read $what as something to buy"))
+                return@run
+            }
             flash(added.map { it.itemId }.toSet())
             val undo: suspend () -> Unit = { c.repository.takeBackHandAdds(added.map { it.contributionId }.toSet()) }
             messages.send(UiMessage(if (lines.size == 1) addedTo(added.single().aisle) else addedItems(added.size), undo = undo))
