@@ -158,6 +158,13 @@ class Planner(
             val meals = dao.mealsOfUse(useId)
             if (meals.isEmpty()) repo.removeFromList(useId)
             for (m in meals) unplan(m.id)
+            // A recipe that put nothing on the list (every line at home): [unplan] leaves a use with nothing to buy
+            // alone, as it should for a meal already shopped for, so this one stayed "On your list" after Undo
+            // (KNOWN_ISSUES #50). Nothing of it was bought, so Undo takes the whole use back.
+            val l = repo.load()
+            if (useId in l.uses && l.contributionsOfUse(useId).none { it.coveredBy != null } && dao.mealsOfUse(useId).isEmpty()) {
+                repo.removeUse(useId)
+            }
         }
     }
 

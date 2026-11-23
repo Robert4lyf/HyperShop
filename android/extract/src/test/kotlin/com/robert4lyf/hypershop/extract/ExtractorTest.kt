@@ -15,6 +15,21 @@ class ExtractorTest {
 
     private fun page(name: String) = Extractor.extract(File(dir, name).readText())
 
+    @org.junit.jupiter.api.Test
+    fun nestedRecipePluginGroupsGiveEachLineOnceAndNoMoreThanARecipeHolds() {
+        // KNOWN_ISSUES #50: every nested group selected every line below it again, without a limit.
+        val items =
+            (1..400).joinToString("") {
+                "<li class=\"wprm-recipe-ingredient\"><span class=\"wprm-recipe-ingredient-name\">thing $it</span></li>"
+            }
+        val nested = "<div class=\"wprm-recipe-ingredient-group\">".repeat(20) + "<ul>$items</ul>" + "</div>".repeat(20)
+        val page = "<html><body><div class=\"wprm-recipe-ingredients-container\">$nested</div></body></html>"
+        val lines = Extractor.extract(page).recipes.single().lines
+        assertEquals(lines.size, lines.toSet().size)
+        assertTrue(lines.size <= Extractor.MAX_LINES)
+        assertEquals("thing 1", lines.first())
+    }
+
     private fun ld(json: String) = Extractor.extract("<html><head><script type=\"application/ld+json\">$json</script></head></html>")
 
     @Test

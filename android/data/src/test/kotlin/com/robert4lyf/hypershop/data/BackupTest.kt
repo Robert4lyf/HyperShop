@@ -121,6 +121,21 @@ class BackupTest {
         }
 
     @Test
+    fun amountsTheAppCouldNotShowAndTooManyStoresAreRefused() =
+        runBlocking {
+            // KNOWN_ISSUES #50: an unknown slot or a number that overflows in a sum passed, restored, then crashed the list.
+            val b = populate()
+            val c = b.contributions.first()
+            val unknownSlot = b.copy(contributions = listOf(c.copy(qtyBase = """{"parts":{"x":"1"}}""")) + b.contributions.drop(1))
+            assertTrue(BackupValidator.validate(unknownSlot).any { "unreadable amount" in it })
+            val huge = b.copy(contributions = listOf(c.copy(qtyBase = """{"parts":{"mass":"1/4294967296"}}""")) + b.contributions.drop(1))
+            assertTrue(BackupValidator.validate(huge).any { "unreadable amount" in it })
+            val stores = b.copy(stores = (1L..500L).map { b.stores.first().copy(id = it) })
+            assertTrue(BackupValidator.validate(stores).any { it.startsWith("stores:") })
+            assertEquals(emptyList<String>(), BackupValidator.validate(b))
+        }
+
+    @Test
     fun aRestoreReplacesWhatWasThere() =
         runBlocking {
             val b = populate()

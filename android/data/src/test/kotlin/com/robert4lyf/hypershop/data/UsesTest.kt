@@ -223,6 +223,40 @@ class UsesTest {
         }
 
     @Test
+    fun undoOfFinishSetsAsideAgainWhatWasSetAside() =
+        runBlocking {
+            // KNOWN_ISSUES #50: Finish puts "Can't find it" items back to buy; its Undo left them so.
+            r.import("2 onions", "1 carrot")
+            val l = r.repo.snapshot()
+            val onion = l.itemByKey("cat:onion")!!.id
+            val carrot = l.itemByKey("cat:carrot")!!.id
+            r.repo.tick(carrot)
+            assertTrue(r.repo.markUnavailable(onion))
+            val finished = r.repo.finish()
+            assertNull(r.repo.snapshot().items.getValue(onion).unavailableAt)
+            r.repo.undoFinish(finished)
+            val back = r.repo.snapshot()
+            assertTrue(back.items.getValue(onion).unavailableAt != null)
+            assertTrue(back.isDone(carrot))
+        }
+
+    @Test
+    fun anImportNeverConfirmedIsPurgedAfterAWeek() =
+        runBlocking {
+            // KNOWN_ISSUES #50: a review open when the process died left its stored copy for good.
+            val stored =
+                r.repo.storeRecipe(
+                    "https://example.com/orphan", "Orphan", 4, UnitLocale.METRIC, "WEB", ParsedBy.RULES, null, false,
+                    listOf(RuleParser().parse("2 onions")),
+                )
+            val kept = r.import("1 carrot")
+            r.now += com.robert4lyf.hypershop.core.merge.ShoppingList.SEVEN_DAYS + 1
+            r.repo.purgeDeleted()
+            assertNull(r.db.dao().recipe(stored.recipe.id))
+            assertTrue(r.repo.usesOnList().any { it.useId == kept.useId })
+        }
+
+    @Test
     fun anEditKeepsWhatWasBoughtAndItsMeal() =
         runBlocking {
             // KNOWN_ISSUES #20: the recipe is edited after the onions were bought.

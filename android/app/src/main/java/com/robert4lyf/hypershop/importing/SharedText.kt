@@ -14,6 +14,12 @@ object SharedText {
     private const val MAX_LINES = 300
     private const val MAX_LINE = 500
 
+    /** True when [line] is a link and nothing else: the list's Add item field imports only those. */
+    fun isOnlyALink(line: String): Boolean = URL.matchEntire(line.trim()) != null
+
+    /** [line] without any link in it: "Olive oil https://shop.example/oil" is the item "Olive oil". */
+    fun withoutLinks(line: String): String = URL.replace(line, " ").trim().replace(Regex("\\s+"), " ")
+
     fun parse(
         text: String?,
         subject: String? = null,

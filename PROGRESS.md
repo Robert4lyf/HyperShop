@@ -806,3 +806,33 @@ the owner asked for the seven most likely to be met. The rest are KNOWN_ISSUES #
   (`android/build.gradle.kts`). After a Robolectric bump the names there must follow — check: with
   `~/.m2/repository/org/robolectric/android-all-instrumented` moved aside, `:data:testDebugUnitTest` and
   `:app:testDebugUnitTest` pass and the folder is not downloaded again
+
+## Fix — the rest of the code review of 2026-11-23, KNOWN_ISSUES #50 (`ccr-3554796e-4mfgym`, from b249bd3)
+
+- [x] [fix] Behaviour, in `:core`, `:data` and `:app`:
+  - Undo of Add to list takes back a recipe that put nothing on the list (every line at home): `Planner.takeBack`
+    removes a use left with nothing bought and no meal — check: `PlannerTest.undoOfAddToListTakesBackARecipeThat…`
+  - Cancel while a page is being fetched, then Undo, fetches it again (`ImportJobs.discarding` remembers the job was
+    cut short; `restore` queues it again) where it reopened as "No ingredient list found". No test of its own.
+  - Add item: only a line that is nothing but a link is a recipe to import; a link inside a line is dropped and the
+    rest is the item; a line that reads as nothing says so — check: `AddByHandTest.aLineWithALinkInIt…`
+  - An import never confirmed (its review open when the process died) is purged after a week
+    (`deleteUnconfirmedRecipes`) — check: `UsesTest.anImportNeverConfirmedIsPurgedAfterAWeek`
+  - Undo of Finish shopping sets aside again what "Can't find it" had set aside (`ListRepository.undoFinish`) —
+    check: `UsesTest.undoOfFinishSetsAsideAgainWhatWasSetAside`
+  - A bare number for a bought item counted in one unit ("3" for "2 cloves") is read as that unit before it is
+    compared with what was bought (`ShoppingList.typedTotal`) — check: `RegressionTest.aBareNumberForAnItem…`
+  - A share that comes back onto another live row (Undo of Remove from list, Undo of a withdrawal) is stamped with
+    the new list revision, so a watch tick made before it came back does not cover it. Two rows becoming one (a
+    swap, a re-key) is left as the protocol has it: stamping there was tried and failed sync vector
+    `ids-alias-redirect`, which expects a tick through the old id to answer ok.
+- [x] [fix] Hardening:
+  - `BackupValidator`: every amount (a contribution's, its home part, a trip item's, an item's amount at home) must
+    use slots the app knows and numbers within bounds, and an item's amounts must add up; at most 100 stores —
+    check: `BackupTest.amountsTheAppCouldNotShowAndTooManyStoresAreRefused`
+  - The page title goes to Claude inside `<untrusted_content>` with the page's text; a photo's title is said to be
+    data — check: `ClaudeRequestTest.thePageTitleIsInsideTheUntrustedBlock`. Not checked against the live model
+    (no key here): the eval in `tools/eval-claude` was not re-run.
+  - The WPRM extractor takes each line once and stops at `MAX_LINES` — check:
+    `ExtractorTest.nestedRecipePluginGroupsGiveEachLineOnce…`
+- Nothing here was run on a phone, the emulator or a watch.

@@ -240,6 +240,18 @@ class AddByHandTest {
     }
 
     @Test
+    fun aLineWithALinkInItIsStillAnItemAndALineThatIsNothingIsSaidSo() {
+        // KNOWN_ISSUES #50: "Olive oil https://…" opened a recipe import and added nothing.
+        val c = TestContainer.create()
+        val vm = list(c)
+        vm.addTyped("Olive oil https://shop.example/oil?id=3")
+        assertTrue(nextMessage(vm).text.startsWith("Added to"))
+        val l = runBlocking { c.repository.snapshot() }
+        assertEquals(listOf("cat:olive_oil"), l.liveItems.map { it.mergeKey })
+        assertTrue(runBlocking { c.importJobs.ready.first() }.isEmpty())
+    }
+
+    @Test
     fun withNoHistoryThereAreNoChips() {
         val c = TestContainer.create()
         runBlocking { c.repository.manualAdd("milk", one, null) }

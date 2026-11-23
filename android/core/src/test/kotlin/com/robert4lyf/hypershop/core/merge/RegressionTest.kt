@@ -132,6 +132,16 @@ class RegressionTest {
     }
 
     @Test
+    fun aBareNumberForAnItemCountedInOneUnitIsThatUnit() {
+        // KNOWN_ISSUES #50: "3" for a bought "2 cloves" was compared as 3 of something else and refused.
+        val (l, _) = add(ShoppingList(), listOf("2 cloves garlic"))
+        val garlic = l.liveItems.single().id
+        val typed = QtyBase.of(Rational.of(3), null, UnitLocale.METRIC)
+        assertEquals(l.total(garlic).parts.keys, l.typedTotal(garlic, typed).parts.keys)
+        assertEquals(Rational.of(3), l.typedTotal(garlic, typed).parts.values.single())
+    }
+
+    @Test
     fun servingsDownAndBackUpAskForNothingAlreadyBought() {
         // Review 2026-11-23, C: 4 onions bought for 4; down to 2 and back to 4 asked for 2 more.
         var (l, useId) = add(ShoppingList(), listOf("4 onions"))

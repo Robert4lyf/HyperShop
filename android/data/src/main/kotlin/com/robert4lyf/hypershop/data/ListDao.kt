@@ -186,6 +186,17 @@ interface ListDao {
         keepWeek: Long,
     )
 
+    /**
+     * Imports never confirmed: a review stores its copy with no key and discards it on leaving, but a process killed
+     * with the review open left the copy for good, in every backup too (KNOWN_ISSUES #50). Never added, never saved
+     * (both set the key), on no list, and older than [before].
+     */
+    @Query(
+        "DELETE FROM Recipe WHERE lastAddedAt IS NULL AND libraryKey IS NULL AND importedAt < :before " +
+            "AND id NOT IN (SELECT recipeId FROM RecipeUse WHERE recipeId IS NOT NULL)",
+    )
+    suspend fun deleteUnconfirmedRecipes(before: Long)
+
     @Query("SELECT COUNT(*) FROM RecipeUse WHERE recipeId = :id")
     suspend fun usesOfRecipe(id: Long): Int
 

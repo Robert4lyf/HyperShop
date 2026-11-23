@@ -70,6 +70,27 @@ object BackupValidator {
     /** The names RecipePhotos gives its files. */
     val PHOTO_NAME = Regex("[a-f0-9]{8,64}\\.jpg")
     private const val MAX_JSON = 20_000
+
+    /** More stores than anyone walks: the checks below and the restore do work per store. */
+    private const val MAX_STORES = 100
+
+    /** The bounds of a number in an amount: far past any recipe, far short of where adding two up overflows. */
+    private const val MAX_NUM = 1_000_000_000_000L
+    private const val MAX_DEN = 1_000_000_000L
+
+    /**
+     * An amount the app can show and add up (KNOWN_ISSUES #50): each slot a key it knows, each number positive or
+     * zero and within [MAX_NUM]/[MAX_DEN]. A file with an unknown slot, or a denominator that overflowed in a sum,
+     * passed, restored, and then crashed the list every time it was drawn.
+     */
+    private fun sound(q: QtyBase): Boolean =
+        q.parts.size <= 8 &&
+            runCatching { q.keys }.isSuccess &&
+            q.parts.values.all { it >= Rational.ZERO && it.num <= MAX_NUM && it.den in 1..MAX_DEN }
+
+    private fun soundAmount(text: String): Boolean =
+        text.length <= MAX_JSON && runCatching { json.decodeFromString(QtyBase.serializer(), text) }.getOrNull()?.let(::sound) == true
+
     private val json = Json { ignoreUnknownKeys = true }
 
     /** What a page or Claude may say a recipe serves (the extractors keep 1..100). */
@@ -138,13 +159,26 @@ object BackupValidator {
                 "item ${i.id}: text too long",
             )
             check(i.rev >= 1, "item ${i.id}: rev below 1")
+            check(i.onHand == null || soundAmount(i.onHand), "item ${i.id}: unreadable amount at home")
+        }
+        // What the list does with them on every draw: add an item's amounts up. Sound one by one, they must also add.
+        for ((itemId, cs) in b.contributions.groupBy { it.itemId }) {
+            val adds =
+                runCatching {
+                    cs.mapNotNull { runCatching { json.decodeFromString(QtyBase.serializer(), it.qtyBase) }.getOrNull() }
+                        .fold(QtyBase.PRESENCE) { a, q -> a + q }
+                        .let(::sound)
+                }.getOrDefault(false)
+            check(adds, "item $itemId: its amounts do not add up")
         }
         val liveKeys = b.items.filter { it.deletedAt == null }.map { it.mergeKey }
         check(liveKeys.size == liveKeys.toSet().size, "two live items share a key")
         for (a in b.aliases) check(a.newId in items, "alias ${a.oldId}: points at a missing item ${a.newId}")
         check(b.aliases.map { it.oldId }.toSet().size == b.aliases.size, "duplicate aliases")
         check(b.deleted.map { it.id }.toSet().size == b.deleted.size, "duplicate deleted items")
-        check(b.stores.map { it.id }.toSet().size == b.stores.size, "duplicate stores")
+        check(b.stores.size <= MAX_STORES, "stores: ${b.stores.size} is more than a backup can hold")
+        val storeIds = b.stores.map { it.id }.toSet()
+        check(storeIds.size == b.stores.size, "duplicate stores")
         val orderKeys = b.aisleOrder.map { it.storeId to it.aisleCode }
         check(orderKeys.size == orderKeys.toSet().size, "duplicate aisle order rows")
         val usageKeys = b.usage.map { it.date to it.model }
@@ -192,13 +226,8 @@ object BackupValidator {
                 "contribution ${c.id}: invalid home allocation",
             )
             check(c.createdListRev <= b.listRev, "contribution ${c.id}: made after the list's own revision")
-            check(
-                c.qtyBase.length <= MAX_JSON &&
-                    runCatching {
-                        json.decodeFromString(QtyBase.serializer(), c.qtyBase)
-                    }.isSuccess,
-                "contribution ${c.id}: unreadable amount",
-            )
+            check(soundAmount(c.qtyBase), "contribution ${c.id}: unreadable amount")
+            check(c.homeUsed == null || soundAmount(c.homeUsed), "contribution ${c.id}: unreadable home amount")
         }
         for (d in b.decisions) {
             check(d.useId in uses && d.recipeLineId in lines, "decision ${d.useId}/${d.recipeLineId}: missing use or line")
@@ -208,7 +237,6 @@ object BackupValidator {
         check(decisionKeys.size == decisionKeys.toSet().size, "duplicate decisions")
         for (a in b.aisles) check(a.code in aisleNames && a.name.length <= MAX_TEXT, "aisle ${a.code}: unknown or too long")
         check(b.aisles.map { it.code }.toSet().size == b.aisles.size, "duplicate aisles")
-        val storeIds = b.stores.map { it.id }.toSet()
         // The restore fills in the walking order for store 1; without that store the rows would have no parent.
         check(b.stores.isEmpty() || 1L in storeIds, "stores: store 1 is missing")
         for (o in b.aisleOrder) check(
@@ -263,10 +291,7 @@ object BackupValidator {
             check(t.tripId in trips, "trip item ${t.mergeKey.take(40)}: trip ${t.tripId} is missing")
             check(t.aisleCode in aisleNames, "trip item ${t.mergeKey.take(40)}: unknown aisle")
             check(t.mergeKey.length in 1..MAX_TEXT && t.displayName.length <= MAX_TEXT, "trip item: text too long")
-            check(
-                t.qty == null || (t.qty.length <= MAX_JSON && runCatching { json.decodeFromString(QtyBase.serializer(), t.qty) }.isSuccess),
-                "trip item ${t.mergeKey.take(40)}: unreadable amount",
-            )
+            check(t.qty == null || soundAmount(t.qty), "trip item ${t.mergeKey.take(40)}: unreadable amount")
             check(t.unitHint == null || t.unitHint.length <= 20, "trip item ${t.mergeKey.take(40)}: bad unit")
         }
         val tripKeys = b.tripItems.map { it.tripId to it.mergeKey }
@@ -281,7 +306,7 @@ object BackupValidator {
         check(b.storePacks.map { it.storeId to it.key }.distinct().size == b.storePacks.size, "duplicate store packs")
         for (p in b.storePacks) {
             val q = runCatching { json.decodeFromString(QtyBase.serializer(), p.qty) }.getOrNull()
-            check(p.storeId in b.stores.map { it.id } && p.key.length in 1..MAX_TEXT, "invalid store pack key")
+            check(p.storeId in storeIds && p.key.length in 1..MAX_TEXT, "invalid store pack key")
             check(
                 q != null && runCatching { q.keys }.isSuccess && q.parts.size == 1 &&
                     q.parts.values.all { it > Rational.ZERO },
@@ -290,7 +315,7 @@ object BackupValidator {
         }
         check(b.shelfRanks.map { it.storeId to it.key }.toSet().size == b.shelfRanks.size, "duplicate shelf ranks")
         check(
-            b.shelfRanks.all { it.key.length in 1..MAX_TEXT && it.rank >= 0 && it.storeId in b.stores.map { s -> s.id } },
+            b.shelfRanks.all { it.key.length in 1..MAX_TEXT && it.rank >= 0 && it.storeId in storeIds },
             "shelf rank: bad key or rank",
         )
         for (n in b.recipeNotes) {

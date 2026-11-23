@@ -124,11 +124,18 @@ object Extractor {
         val metric = wprmMetric(doc)
         var index = 0
         val groups = container.select(".wprm-recipe-ingredient-group")
+        // Each line once, and no more than a recipe can have (KNOWN_ISSUES #50): groups nested in groups each
+        // selected every line below them again, so a page built for it cost groups × lines, without limit.
+        val seen = java.util.Collections.newSetFromMap(java.util.IdentityHashMap<org.jsoup.nodes.Element, Boolean>())
         for (g in groups.ifEmpty { listOf(container) }) {
+            if (lines.size >= MAX_LINES) break
             g.selectFirst(
                 ".wprm-recipe-group-name",
             )?.text()?.let { clean(it) }?.takeIf { it.isNotEmpty() }?.let { lines += "${it.trimEnd(':')}:" }
             for (li in g.select("li.wprm-recipe-ingredient")) {
+                if (lines.size >= MAX_LINES) break
+                if (!seen.add(li)) continue
+
                 fun part(cls: String) = li.selectFirst(".wprm-recipe-ingredient-$cls")?.text()?.trim()?.ifEmpty { null }
                 // V.4: the recipe's own metric figure, from the site's unit switch, when the line has none: written
                 // after the amount ("2 (560g) tomatoes"), where the parser reads it as the amount's alternative.
