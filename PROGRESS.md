@@ -703,3 +703,37 @@ loop. No tabs, modes, settings or help text; no schema, protocol, golden-data or
   meal-based 9 · 1 · 3 · 3 (none longer than step-ac.md), salad before vegetables 4 · 0 · 0 · 2 (AD.1's target: at
   most 4; counted to the stored change, the two backs uncounted). Report, with what to try on a phone (dragging,
   swiping, a pasted link): `docs/reports/step-ad.md`.
+
+## Fix — device tests off the main thread (`claude/step-z-fewer-concepts-rvynea`, from 8bfd1e4)
+
+No release since build-371 (Step AB): `release.yml` promotes only a main commit whose Android run passed both jobs, and
+the emulator job failed on main after the AC and AD merges (and once on PR #97), each time differently:
+`CalledFromWrongThreadException` from `UiApplier.insertBottomUp`, "performMeasureAndLayout called during measure
+layout", "No compose hierarchies found", and a `PerformanceProbeTest` timeout.
+
+- [x] The UI collects on the main thread. The two thread traces show a frame run on a `DefaultDispatcher` worker: a
+  view model's `combine(...).flowOn(Dispatchers.Default).stateIn(viewModelScope)` fuses, so `stateIn` sets its value
+  on that worker (the container's own flows are set from `applicationScope`, on `Default`, too), and Compose's test
+  clock resumes the waiting collector there and runs the frame on it. On a phone the composition's dispatcher brings
+  it back to the main thread, so the app was not affected; the tests were. `ui/util/OnMain.kt`: every
+  `collectAsState`/`collectAsStateWithLifecycle` is now `collectAlwaysOnMain()` / `collectOnMain()` (the same,
+  collected with `Dispatchers.Main.immediate`); effects that wait on background work (`vm.events`, the container's
+  share, notice and review queue, settings reads, a photo's decode in `produceState`) run their body in `onMain { }`;
+  coroutine scopes that call the repository are `rememberMainScope()`. The list's linger timer keeps the
+  composition's own scope (its `delay` must follow the test clock). `tools/verify.sh` refuses a plain
+  `collectAsState` in the app. Not proven on the emulator from here: CI shows it.
+- [x] Found on the way: `SnackbarReplaceTest` failed locally with the Room leak AD.3 met in `StoreRenameTest`
+  ("Illegal connection pointer" from the previous test's database). The rule that winds the last container down is
+  now `testutil/quietStart()`, used by both.
+- **Gate not green (the owner chose to commit and let CI judge).** Since this container restarted, the local
+  Robolectric suite loses one test per full run to the same leak (or a timeout), on plain main (8bfd1e4) too: two runs
+  of main without this change each failed one test (`SnackbarReplaceTest`, `StartupTest`). With the change, the gate
+  failed only on that (`AfterAShopTest`, "uncaught exceptions before the test started", "Illegal connection
+  pointer"); every other check passed. GitHub's Build and test job has passed on main each time. Tried and dropped:
+  winding containers down from `TestApplication.onTerminate` (cancelling a container's imports then writes
+  WorkManager's database after the reset, which made `StartupTest` fail every run); closing their databases (fails a
+  transaction still running); `kotlinx.coroutines.test.catchNonTestRelatedExceptions=false` (Compose's test runner
+  still reports them). Fixing the leak at its sources (work a test leaves running in WorkManager, Room and view
+  models) is still to do.
+- Not explained: the `PerformanceProbeTest` timeout (a tick whose "· N bought" did not appear in 10 s); it passed on
+  both PR re-runs. If it comes back after this fix, it needs its own look.

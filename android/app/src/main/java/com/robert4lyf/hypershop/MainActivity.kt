@@ -9,12 +9,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.robert4lyf.hypershop.debug.DebugTools
 import com.robert4lyf.hypershop.settings.ThemeMode
 import com.robert4lyf.hypershop.ui.HyperShopApp
 import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
+import com.robert4lyf.hypershop.ui.util.collectAlwaysOnMain
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -32,7 +32,7 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) handle(intent)
         setContent {
             // Null for the first frame or so while the setting is read; drawing nothing avoids a flash of the wrong theme.
-            val mode by container.settings.theme.collectAsState(initial = null)
+            val mode by container.settings.theme.collectAlwaysOnMain(initial = null)
             val system = isSystemInDarkTheme()
             mode?.let { m ->
                 val dark =

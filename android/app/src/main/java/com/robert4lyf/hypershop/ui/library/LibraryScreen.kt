@@ -54,7 +54,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -72,7 +71,6 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.core.catalog.DisplayPolicy
 import com.robert4lyf.hypershop.core.model.AisleCode
@@ -88,7 +86,10 @@ import com.robert4lyf.hypershop.ui.common.pillFieldColors
 import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.theme.card
 import com.robert4lyf.hypershop.ui.theme.icon
+import com.robert4lyf.hypershop.ui.util.collectOnMain
 import com.robert4lyf.hypershop.ui.util.factoryFor
+import com.robert4lyf.hypershop.ui.util.onMain
+import com.robert4lyf.hypershop.ui.util.rememberMainScope
 import kotlinx.coroutines.launch
 
 @Composable
@@ -98,12 +99,12 @@ fun LibraryRoute(
     onBack: () -> Unit,
 ) {
     val vm: LibraryViewModel = viewModel(factory = factoryFor { LibraryViewModel(container) })
-    val ui by vm.ui.collectAsStateWithLifecycle()
-    LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
+    val ui by vm.ui.collectOnMain()
+    LaunchedEffect(vm) { onMain { vm.events.collect { show(container, snackbar, it) } } }
     // Which ingredient's sheet is open: an id, "" for a new one, null for none.
     var editing by rememberSaveable { mutableStateOf<String?>(null) }
     var form by remember { mutableStateOf<EntryForm?>(null) }
-    LaunchedEffect(editing) { form = editing?.let { vm.form(it.ifEmpty { null }) } }
+    LaunchedEffect(editing) { onMain { form = editing?.let { vm.form(it.ifEmpty { null }) } } }
     LibraryScreen(
         ui,
         vm.query,
@@ -348,7 +349,7 @@ fun EntryEditor(
     var saving by remember { mutableStateOf(false) }
     var advanced by rememberSaveable(start) { mutableStateOf(start.hasAdvanced) }
     // Only awaits [onSave]'s answer and closes the sheet; the save itself runs in the view model.
-    val scope = rememberCoroutineScope()
+    val scope = rememberMainScope()
     // Any edit clears the last save's complaint: it was about the form as it was.
     val edit = { next: EntryForm ->
         f = next

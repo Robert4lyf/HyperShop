@@ -41,12 +41,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -77,6 +75,9 @@ import com.robert4lyf.hypershop.ui.recipes.RecipesRoute
 import com.robert4lyf.hypershop.ui.review.ReviewRoute
 import com.robert4lyf.hypershop.ui.settings.AislesRoute
 import com.robert4lyf.hypershop.ui.settings.SettingsRoute
+import com.robert4lyf.hypershop.ui.util.collectAlwaysOnMain
+import com.robert4lyf.hypershop.ui.util.onMain
+import com.robert4lyf.hypershop.ui.util.rememberMainScope
 import com.robert4lyf.hypershop.ui.voicetest.VoiceTestRoute
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -120,7 +121,7 @@ fun HyperShopApp(
     debugScreen: (@Composable (AppContainer) -> Unit)? = null,
 ) {
     // Nothing that can read or write the list is composed until start-up has finished.
-    val startup by container.startup.collectAsState()
+    val startup by container.startup.collectAlwaysOnMain()
     if (startup != Startup.Ready) {
         StartupScreen(
             startup,
@@ -134,8 +135,10 @@ fun HyperShopApp(
     // request is waiting (it says where to go itself).
     var start by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
-        val last = container.settings.lastTab.first()?.takeIf { it in TABS }
-        start = if (container.entryRequests.replayCache.isNotEmpty()) Routes.LIST else last ?: Routes.LIST
+        onMain {
+            val last = container.settings.lastTab.first()?.takeIf { it in TABS }
+            start = if (container.entryRequests.replayCache.isNotEmpty()) Routes.LIST else last ?: Routes.LIST
+        }
     }
     // A frame or two while the setting is read.
     val first = start ?: return
@@ -156,17 +159,19 @@ private fun AppShell(
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route
     val tabsShown = route == null || route in TABS
-    val share by container.shares.collectAsState()
+    val share by container.shares.collectAlwaysOnMain()
     LaunchedEffect(share) {
-        val s = share ?: return@LaunchedEffect
-        when (s) {
-            is ShareOutcome.Review -> container.queueReview(s.jobId)
-            is ShareOutcome.NoLink -> show(container, snackbar, UiMessage("There was no link or ingredient list in what you shared"))
+        onMain {
+            val s = share ?: return@onMain
+            when (s) {
+                is ShareOutcome.Review -> container.queueReview(s.jobId)
+                is ShareOutcome.NoLink -> show(container, snackbar, UiMessage("There was no link or ingredient list in what you shared"))
+            }
+            container.shareHandled(s)
         }
-        container.shareHandled(s)
     }
-    val storeChoices by container.shopStart.choices.collectAsState()
-    val shopScope = rememberCoroutineScope()
+    val storeChoices by container.shopStart.choices.collectAlwaysOnMain()
+    val shopScope = rememberMainScope()
     if (storeChoices.isNotEmpty()) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { container.shopStart.choices.value = emptyList() },
@@ -188,20 +193,24 @@ private fun AppShell(
             },
         )
     }
-    val notice by container.notice.collectAsState()
+    val notice by container.notice.collectAlwaysOnMain()
     LaunchedEffect(notice) {
-        val n = notice ?: return@LaunchedEffect
-        container.notice.value = null
-        show(container, snackbar, UiMessage(n))
+        onMain {
+            val n = notice ?: return@onMain
+            container.notice.value = null
+            show(container, snackbar, UiMessage(n))
+        }
     }
     // One review at a time: the next share opens once this review closes (its job waits on the ready card meanwhile).
     // The queue lives in the container, so a rotation loses nothing; an id leaves it only once its review is opened.
-    val pending by container.pendingReviews.collectAsState()
+    val pending by container.pendingReviews.collectAlwaysOnMain()
     LaunchedEffect(route, pending) {
-        val next = pending.firstOrNull() ?: return@LaunchedEffect
-        if (nav.currentBackStackEntry?.destination?.route == Routes.REVIEW) return@LaunchedEffect
-        nav.navigate(Routes.review(next)) { launchSingleTop = true }
-        container.reviewOpened(next)
+        onMain {
+            val next = pending.firstOrNull() ?: return@onMain
+            if (nav.currentBackStackEntry?.destination?.route == Routes.REVIEW) return@onMain
+            nav.navigate(Routes.review(next)) { launchSingleTop = true }
+            container.reviewOpened(next)
+        }
     }
     // The review pins its main action to the bottom edge (BottomActionBar pads for the navigation bar itself).
     val reviewing = route == Routes.REVIEW
@@ -218,20 +227,22 @@ private fun AppShell(
     // A focus request waits (above zero) until the field takes it, then is gone: it never comes back later.
     var addFocus by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
-        container.entryRequests.collect { request ->
-            // Navigation's state belongs to the main thread, wherever the setting was written. A request waiting
-            // from a cold start arrives before NavHost has set its graph, and navigating then throws: wait for it.
-            withContext(Dispatchers.Main) {
-                nav.currentBackStackEntryFlow.first()
-                selectTab(Routes.LIST)
-                // Add focuses the field once; the list on its own drops any focus still waiting, so it never comes later.
-                addFocus = if (request == com.robert4lyf.hypershop.EntryRequest.ADD) addFocus + 1 else 0
+        onMain {
+            container.entryRequests.collect { request ->
+                // Navigation's state belongs to the main thread, wherever the setting was written. A request waiting
+                // from a cold start arrives before NavHost has set its graph, and navigating then throws: wait for it.
+                withContext(Dispatchers.Main) {
+                    nav.currentBackStackEntryFlow.first()
+                    selectTab(Routes.LIST)
+                    // Add focuses the field once; the list on its own drops any focus still waiting, so it never comes later.
+                    addFocus = if (request == com.robert4lyf.hypershop.EntryRequest.ADD) addFocus + 1 else 0
+                }
+                container.entryRequestHandled()
             }
-            container.entryRequestHandled()
         }
     }
     // Where to open next time: the main destination last shown.
-    LaunchedEffect(route) { route?.takeIf { it in TABS }?.let { container.settings.setLastTab(it) } }
+    LaunchedEffect(route) { onMain { route?.takeIf { it in TABS }?.let { container.settings.setLastTab(it) } } }
     val openSettings: () -> Unit = { nav.navigate(Routes.SETTINGS) { launchSingleTop = true } }
     CompositionLocalProvider(com.robert4lyf.hypershop.ui.common.LocalSnackbarLift provides lift) {
         Scaffold(

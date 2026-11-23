@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.importing.ImportError
@@ -41,7 +40,9 @@ import com.robert4lyf.hypershop.ui.common.cardLift
 import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.list.showTimed
 import com.robert4lyf.hypershop.ui.theme.card
+import com.robert4lyf.hypershop.ui.util.collectOnMain
 import com.robert4lyf.hypershop.ui.util.factoryFor
+import com.robert4lyf.hypershop.ui.util.onMain
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -83,19 +84,21 @@ fun ReviewRoute(
         }
     }
     val vm: ReviewViewModel = viewModel(key = "review-$jobId", factory = factoryFor { ReviewViewModel(container, jobId) })
-    val state by vm.state.collectAsStateWithLifecycle()
-    LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
+    val state by vm.state.collectOnMain()
+    LaunchedEffect(vm) { onMain { vm.events.collect { show(container, snackbar, it) } } }
     // Missing 8 of the review: the first recipe read offline with no key says, once, what a key would do.
-    val hasKey by container.apiKeyStore.hasKey.collectAsStateWithLifecycle()
+    val hasKey by container.apiKeyStore.hasKey.collectOnMain()
     val readOffline = (state as? ReviewState.Ready)?.ui?.let { it.badge == Badge.RULES && !it.byHand && !it.retrying } == true
     LaunchedEffect(readOffline, hasKey) {
-        if (!readOffline || hasKey || container.settings.keyNudged.first()) return@LaunchedEffect
-        container.settings.setKeyNudged()
-        show(
-            container,
-            snackbar,
-            UiMessage("Read offline. A Claude key in Settings reads recipes better.", undo = { onSettings() }, action = "Settings"),
-        )
+        onMain {
+            if (!readOffline || hasKey || container.settings.keyNudged.first()) return@onMain
+            container.settings.setKeyNudged()
+            show(
+                container,
+                snackbar,
+                UiMessage("Read offline. A Claude key in Settings reads recipes better.", undo = { onSettings() }, action = "Settings"),
+            )
+        }
     }
     var sheetKey by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmDiscard by rememberSaveable { mutableStateOf(false) }
@@ -183,37 +186,41 @@ fun ReviewRoute(
             )
         is ReviewState.Added ->
             LaunchedEffect(s) {
-                onDone()
-                if (s.edited != null) {
-                    show(container, snackbar, UiMessage("Saved changes to ${s.edited}"))
-                    return@LaunchedEffect
-                }
-                if (s.savedForLater != null) {
-                    show(container, snackbar, UiMessage("Saved ${s.savedForLater} to your recipes"))
-                    return@LaunchedEffect
-                }
-                // Outlives this screen: the snackbar and its Undo belong to the list.
-                container.applicationScope.launch(Dispatchers.Main) {
-                    val r = snackbar.showTimed("Added ${s.count} items", "Undo", 6)
-                    if (r == SnackbarResult.ActionPerformed) container.repository.undoImport(s.useId)
+                onMain {
+                    onDone()
+                    if (s.edited != null) {
+                        show(container, snackbar, UiMessage("Saved changes to ${s.edited}"))
+                        return@onMain
+                    }
+                    if (s.savedForLater != null) {
+                        show(container, snackbar, UiMessage("Saved ${s.savedForLater} to your recipes"))
+                        return@onMain
+                    }
+                    // Outlives this screen: the snackbar and its Undo belong to the list.
+                    container.applicationScope.launch(Dispatchers.Main) {
+                        val r = snackbar.showTimed("Added ${s.count} items", "Undo", 6)
+                        if (r == SnackbarResult.ActionPerformed) container.repository.undoImport(s.useId)
+                    }
                 }
             }
         ReviewState.Cancelled ->
             LaunchedEffect(Unit) {
-                onDone()
-                if (vm.isThrowaway) {
-                    // Nothing was changed on the list, so "Import discarded" and its Undo would be noise.
-                    container.applicationScope.launch(Dispatchers.Main) { vm.discardForGood() }
-                    return@LaunchedEffect
-                }
-                // The job is only done for good once Undo has had its chance; Undo puts it back and opens it again.
-                container.applicationScope.launch(Dispatchers.Main) {
-                    val r = snackbar.showTimed("Import discarded", "Undo", 6)
-                    if (r == SnackbarResult.ActionPerformed) {
-                        container.importJobs.restore(jobId)
-                        onUndo(jobId)
-                    } else {
-                        vm.discardForGood()
+                onMain {
+                    onDone()
+                    if (vm.isThrowaway) {
+                        // Nothing was changed on the list, so "Import discarded" and its Undo would be noise.
+                        container.applicationScope.launch(Dispatchers.Main) { vm.discardForGood() }
+                        return@onMain
+                    }
+                    // The job is only done for good once Undo has had its chance; Undo puts it back and opens it again.
+                    container.applicationScope.launch(Dispatchers.Main) {
+                        val r = snackbar.showTimed("Import discarded", "Undo", 6)
+                        if (r == SnackbarResult.ActionPerformed) {
+                            container.importJobs.restore(jobId)
+                            onUndo(jobId)
+                        } else {
+                            vm.discardForGood()
+                        }
                     }
                 }
             }
