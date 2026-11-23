@@ -2,6 +2,7 @@ package com.robert4lyf.hypershop.ui.settings
 
 import android.net.Uri
 import android.os.Looper
+import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.robert4lyf.hypershop.claude.ClaudeModel
 import com.robert4lyf.hypershop.core.model.AisleCode
@@ -13,6 +14,7 @@ import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.list.add
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -258,6 +260,49 @@ class SettingsViewModelTest {
         runBlocking { got[1].undo!!.invoke() }
         assertTrue(runBlocking { c.repository.snapshot() }.liveItems.isEmpty())
         assertEquals(com.robert4lyf.hypershop.core.merge.UnitsSetting.METRIC, runBlocking { c.settings.units.first() })
+        watching.cancel()
+    }
+
+    @Test
+    fun leavingSettingsDuringARestoreLetsItFinish() {
+        // Review 2026-11-23, D: Back during a restore cancelled it between its stages: the backup's database with the
+        // old settings, and the next start applied the backup again over whatever had been ticked since.
+        val c = TestContainer.create()
+        c.add("2 onions", "1 carrot")
+        runBlocking { c.settings.setUnits(com.robert4lyf.hypershop.core.merge.UnitsSetting.IMPERIAL) }
+        val vm = SettingsViewModel(c)
+        val got = mutableListOf<UiMessage>()
+        val watching = CoroutineScope(Dispatchers.Main).launch { vm.events.collect { got += it } }
+        await(vm.ui) { it.loaded }
+        val file = File(c.context.cacheDir, "backup-${System.nanoTime()}.json")
+        vm.backupTo(Uri.fromFile(file))
+        await(vm.ui) { got.size == 1 }
+        runBlocking {
+            c.repository.clearAll()
+            c.settings.setUnits(com.robert4lyf.hypershop.core.merge.UnitsSetting.METRIC)
+        }
+        shadowOf(c.context.contentResolver).registerInputStreamSupplier(Uri.fromFile(file)) { file.inputStream() }
+        vm.inspectRestore(Uri.fromFile(file))
+        await(vm.ui) { it.restorePrompt != null }
+        // The restore stops between the database and the settings; Settings is left while it waits there.
+        val reached = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val carryOn = kotlinx.coroutines.CompletableDeferred<Unit>()
+        c.backups.beforeStage = {
+            if (it == com.robert4lyf.hypershop.backup.BackupManager.Stage.SETTINGS) {
+                reached.complete(Unit)
+                carryOn.await()
+            }
+        }
+        vm.confirmRestore()
+        runBlocking { kotlinx.coroutines.withTimeout(10_000) { reached.await() } }
+        vm.viewModelScope.cancel()
+        carryOn.complete(Unit)
+        await(c.notice) { it != null }
+        assertEquals("Restored from the backup", c.notice.value)
+        assertEquals(2, runBlocking { c.repository.snapshot() }.liveItems.size)
+        assertEquals(com.robert4lyf.hypershop.core.merge.UnitsSetting.IMPERIAL, runBlocking { c.settings.units.first() })
+        // Nothing is left for the next start to finish.
+        assertEquals(null, runBlocking { com.robert4lyf.hypershop.backup.BackupManager(c, "t").recover() })
         watching.cancel()
     }
 

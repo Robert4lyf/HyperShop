@@ -766,3 +766,31 @@ that had been cancelled but not waited for. KNOWN_ISSUES #49.
     (this container's Maven Central answered 429 for hours); nothing of it is committed. For the same reason the
     gate's Gradle steps were run by hand with that script (`tools/verify.sh` itself cannot take it); its other
     steps ran as written.
+
+## Fix — the code review of 2026-11-23, A to G (`ccr-3554796e-4mfgym`, from 56ec18f)
+
+Three read-only reviews (data and merge rules; screens and view models; untrusted input) found about twenty issues;
+the owner asked for the seven most likely to be met. The rest are KNOWN_ISSUES #50.
+
+- [x] [fix] B and C, in `:core` and `:data`. **B:** the hand-added group is never archived (`removeFromList`,
+  `finishShopping`), and one archived by an older version comes back on the next hand add (`manualUse`). **C:**
+  servings down past what was bought and back up asked for the difference again; the part of a purchase a smaller
+  servings count no longer needs is now kept beside its line as a covered share that does not scale, and more
+  servings draw on it first (ADR 002). Two `UseProgressTest` expectations that pinned "the bought amount shrinks"
+  now expect the purchase whole — check: `RegressionTest.servingsDownAndBackUp…`,
+  `UsesTest.theHandAddedGroupIsNeverArchived`, `UseProgressTest`
+- [x] [fix] D and E, backups. **D:** a backup or restore runs in the app's own scope, so leaving Settings cannot
+  stop it between stages; what it has to say is shown by the app if the screen has gone. **E:** a recipe's title is
+  cut, and a link dropped, at the 2,000 characters a backup accepts, on the way in and in the export — check:
+  `SettingsViewModelTest.leavingSettingsDuringARestoreLetsItFinish`,
+  `BackupTest.aPageWithAnEndlessTitleStillBacksUpAndRestores`
+- [x] [fix] A and F, the review. **A:** the Claude call no longer holds the review's lock, so rows and servings
+  answer while it reads; the answer is laid over the review as it is when it lands. **F:** a page that arrived
+  with the review not in front is read by Claude when the review is next in front — check:
+  `ReviewViewModelTest.theReviewAnswersTapsWhileClaudeIsStillReading`, `…aPageThatArrivedInTheBackground…`
+- [x] [fix] G, double taps. Add to list holds a recipe's key while its add is under way and a moment after; Finish
+  shopping runs once at a time and says nothing when nothing was ticked; an Undo runs in a job of its own, so the
+  next message cannot cut it off — check: `RecipesViewModelTest.aDoubleTapOnAddToListAddsTheRecipeOnce`. The Finish
+  and Undo guards have no test of their own: both need two taps inside one frame.
+- Nothing here was run on a phone or the emulator. Local Gradle runs used the mirror script described under the
+  leak fix; the gate's steps were run by hand for the same reason.

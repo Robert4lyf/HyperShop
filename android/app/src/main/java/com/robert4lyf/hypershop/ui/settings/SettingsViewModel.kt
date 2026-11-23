@@ -20,6 +20,7 @@ import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.recipes.PhotoCache
 import com.robert4lyf.hypershop.watch.WatchLinkState
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -328,20 +329,50 @@ class SettingsViewModel(
     fun backupTo(uri: Uri) =
         viewModelScope.launch {
             _ui.update { it.copy(dataBusy = true) }
-            val r = backups.writeTo(c.context, uri)
+            val words =
+                outliving("Couldn't write the backup file", said = { it }) {
+                    backups.writeTo(c.context, uri).fold(
+                        onSuccess = { s ->
+                            val photos = if (s.photos > 0) ", ${plural(s.photos, "photo")}" else ""
+                            val missing =
+                                when (s.missingPhotos) {
+                                    0 -> ""
+                                    1 -> ". 1 photo wasn't on this phone, so it isn't in the backup"
+                                    else -> ". ${s.missingPhotos} photos weren't on this phone, so they aren't in the backup"
+                                }
+                            "Backed up ${plural(s.recipes, "recipe")}$photos and ${plural(s.itemsOnList, "item")}$missing"
+                        },
+                        onFailure = { "Couldn't write the backup file" },
+                    )
+                }
             _ui.update { it.copy(dataBusy = false) }
-            r.onSuccess { s ->
-                val photos = if (s.photos > 0) ", ${plural(s.photos, "photo")}" else ""
-                val missing =
-                    when (s.missingPhotos) {
-                        0 -> ""
-                        1 -> ". 1 photo wasn't on this phone, so it isn't in the backup"
-                        else -> ". ${s.missingPhotos} photos weren't on this phone, so they aren't in the backup"
-                    }
-                messages.send(UiMessage("Backed up ${plural(s.recipes, "recipe")}$photos and ${plural(s.itemsOnList, "item")}$missing"))
-            }
-                .onFailure { messages.send(UiMessage("Couldn't write the backup file")) }
+            messages.send(UiMessage(words))
         }
+
+    /**
+     * Work that must not stop half-way because Settings was left (review 2026-11-23, D): a restore cancelled between
+     * its stages left the backup's database with the old settings, and the next start applied the backup again over
+     * whatever had been ticked since. It runs in the app's own scope. If this screen has gone by the time it ends,
+     * what it has to say ([said], or [failed] if it threw) is shown by the app instead of being lost.
+     */
+    private suspend fun <T> outliving(
+        failed: String,
+        said: (T) -> String?,
+        work: suspend () -> T,
+    ): T {
+        val running = c.applicationScope.async { work() }
+        try {
+            return running.await()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            if (!running.isCancelled) {
+                c.applicationScope.launch {
+                    val words = runCatching { said(running.await()) }.getOrElse { failed }
+                    if (words != null) c.notice.value = words
+                }
+            }
+            throw e
+        }
+    }
 
     /** "Restore from a file": read and check it, then ask. Nothing changes until [confirmRestore]. */
     fun inspectRestore(uri: Uri) =
@@ -401,34 +432,38 @@ class SettingsViewModel(
         file: BackupFile,
         photos: StagedPhotos? = null,
     ): RestoreOutcome {
+        val unread = "Couldn't read that backup, so nothing was changed"
         val outcome =
             try {
-                backups.restore(file, photos)
+                outliving(unread, said = { restoreWords(it) ?: "Restored from the backup" }) {
+                    backups.restore(file, photos).also {
+                        // A restore can put a whole file back under the name of a damaged one: nothing decoded before stands.
+                        if (it is RestoreOutcome.Restored) PhotoCache.clear()
+                    }
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 // Thrown before the first write (the journal couldn't be saved): nothing changed.
-                messages.send(UiMessage("Couldn't read that backup, so nothing was changed"))
+                messages.send(UiMessage(unread))
                 return RestoreOutcome.Failed(rolledBack = true)
             }
-        when (outcome) {
-            // A restore can put a whole file back under the name of a damaged one: nothing decoded before stands.
-            is RestoreOutcome.Restored -> PhotoCache.clear()
-            is RestoreOutcome.Refused ->
-                messages.send(
-                    UiMessage("That backup file is damaged, so nothing was changed"),
-                )
-            is RestoreOutcome.Failed ->
-                messages.send(
-                    UiMessage(
-                        if (outcome.rolledBack) {
-                            "The restore couldn't be finished, so your data is as it was"
-                        } else {
-                            "The restore stopped part-way. HyperShop will finish it the next time it starts."
-                        },
-                    ),
-                )
-        }
+        restoreWords(outcome)?.let { messages.send(UiMessage(it)) }
         return outcome
     }
+
+    /** What a restore that did not succeed has to say; null when it did. */
+    private fun restoreWords(outcome: RestoreOutcome): String? =
+        when (outcome) {
+            is RestoreOutcome.Restored -> null
+            is RestoreOutcome.Refused -> "That backup file is damaged, so nothing was changed"
+            is RestoreOutcome.Failed ->
+                if (outcome.rolledBack) {
+                    "The restore couldn't be finished, so your data is as it was"
+                } else {
+                    "The restore stopped part-way. HyperShop will finish it the next time it starts."
+                }
+        }
 
     private fun plural(
         n: Int,

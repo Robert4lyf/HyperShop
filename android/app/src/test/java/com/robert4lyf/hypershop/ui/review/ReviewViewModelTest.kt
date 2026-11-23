@@ -335,6 +335,58 @@ class ReviewViewModelTest {
     }
 
     @Test
+    fun theReviewAnswersTapsWhileClaudeIsStillReading() {
+        // Review 2026-11-23, A: the Claude call held the review's lock, so servings (and every row) waited unseen
+        // until it answered.
+        val claude = MockWebServer().apply { start() }
+        try {
+            claude.enqueue(
+                MockResponse()
+                    .setHeadersDelay(2, TimeUnit.SECONDS)
+                    .setBody(File("../../testdata/claude/synthetic-ok-cake.json").readText()),
+            )
+            val c = TestContainer.create(claude = claude, key = "sk-ant-test")
+            c.reviewGate.acquire()
+            val job = runBlocking { c.readyJob("200g golden caster sugar", claudePending = true) }
+            runBlocking { c.importJobs.update(job, c.importJobs.get(job)!!.result!!.copy(claudeTried = true)) }
+            val vm = ReviewViewModel(c, job)
+            ready(vm)
+            vm.retryWithClaude()
+            await(vm.state) { it is ReviewState.Ready && it.ui.retrying }
+            vm.setServings(7)
+            // Shown while the call is still in flight, and still there once Claude has answered.
+            val during = (await(vm.state) { it is ReviewState.Ready && it.ui.servings == 7 } as ReviewState.Ready).ui
+            assertTrue(during.retrying)
+            val after = (await(vm.state) { it is ReviewState.Ready && !it.ui.retrying } as ReviewState.Ready).ui
+            assertEquals(7, after.servings)
+            assertEquals(Badge.CLAUDE, after.badge)
+        } finally {
+            claude.shutdown()
+        }
+    }
+
+    @Test
+    fun aPageThatArrivedInTheBackgroundIsReadByClaudeOnceTheReviewIsInFront() {
+        // Review 2026-11-23, F: with the review not in front when the page arrived, Claude was never asked, and no
+        // button offered it.
+        val claude = MockWebServer().apply { start() }
+        try {
+            claude.enqueue(MockResponse().setBody(File("../../testdata/claude/synthetic-ok-cake.json").readText()))
+            val c = TestContainer.create(claude = claude, key = "sk-ant-test")
+            val job = runBlocking { c.readyJob("200g golden caster sugar", claudePending = true) }
+            val vm = ReviewViewModel(c, job)
+            assertEquals(Badge.RULES, ready(vm).badge)
+            assertEquals(0, claude.requestCount)
+            c.reviewGate.acquire()
+            val ui = (await(vm.state) { it is ReviewState.Ready && it.ui.badge == Badge.CLAUDE } as ReviewState.Ready).ui
+            assertFalse(ui.retrying)
+            assertEquals(1, claude.requestCount)
+        } finally {
+            claude.shutdown()
+        }
+    }
+
+    @Test
     fun anAnswerThatLandsAfterStopIsLaidOverAndNotPaidForAgain() {
         val claude = MockWebServer().apply { start() }
         try {

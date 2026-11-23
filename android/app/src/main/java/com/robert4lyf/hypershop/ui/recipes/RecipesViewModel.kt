@@ -287,7 +287,18 @@ class RecipesViewModel(
      */
     fun addToList(row: LibraryRow) =
         viewModelScope.launch {
-            val added = c.putRecipeOnList(row.key) ?: return@launch messages.send(UiMessage("Couldn't add ${row.title} to the list"))
+            // Review 2026-11-23, G: a double tap added the recipe twice, every ingredient doubled. The card only
+            // changes once the list has told it so, a moment after the add itself, so the key is held a little longer.
+            if (!addingToList.add(row.key)) return@launch
+            val added =
+                try {
+                    c.putRecipeOnList(row.key)
+                } finally {
+                    viewModelScope.launch {
+                        kotlinx.coroutines.delay(ADD_GUARD_MS)
+                        addingToList.remove(row.key)
+                    }
+                } ?: return@launch messages.send(UiMessage("Couldn't add ${row.title} to the list"))
             val now = android.os.SystemClock.uptimeMillis()
             val joined = adds?.takeIf { it.message === lastShown && now - it.at < it.message.seconds * 1000L }
             val uses = joined?.uses.orEmpty() + added.useId
@@ -310,6 +321,9 @@ class RecipesViewModel(
     )
 
     private var adds: AddBatch? = null
+
+    /** Recipes whose Add to list is under way (main thread). */
+    private val addingToList = HashSet<String>()
 
     /**
      * Step AA "Serves N" on a recipe that is on the list: the latest time it went on is rescaled (the meal and its items
@@ -495,3 +509,6 @@ class RecipesViewModel(
         ingredients: String,
     ) = viewModelScope.launch { newRecipe.manual(title, servings, ingredients)?.let { reviews.send(it) } }
 }
+
+/** How long after an add its card may still show "Add to list": taps in that time are the same tap. */
+private const val ADD_GUARD_MS = 800L

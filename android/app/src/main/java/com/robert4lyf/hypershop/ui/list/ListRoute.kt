@@ -191,7 +191,9 @@ fun show(
         scope.launch(kotlinx.coroutines.Dispatchers.Main) {
             previous?.cancel()
             val r = snackbar.showTimed(m.text, m.undo?.let { m.action }, m.seconds)
-            if (r == SnackbarResult.ActionPerformed) m.undo?.invoke()
+            // A job of its own (review 2026-11-23, G): the next message cancels this one, and an Undo still at work
+            // (three recipes taken back one by one) must not be cut off half-way by it.
+            if (r == SnackbarResult.ActionPerformed) m.undo?.let { undo -> scope.launch { undo() } }
         }
     showing[snackbar] = job
 }
