@@ -794,3 +794,15 @@ the owner asked for the seven most likely to be met. The rest are KNOWN_ISSUES #
   and Undo guards have no test of their own: both need two taps inside one frame.
 - Nothing here was run on a phone or the emulator. Local Gradle runs used the mirror script described under the
   leak fix; the gate's steps were run by hand for the same reason.
+
+## Fix — Robolectric's runtimes come through Gradle (`ccr-3554796e-4mfgym`)
+
+- [x] [fix] CI's "Build and test" failed on #100, twice, before any test ran: all 17 classes of
+  `:data:testDebugUnitTest` with `AssertionError at MavenArtifactFetcher` (the same as the 61-second failure on the
+  Step AD PR). Robolectric downloads its Android runtime jars itself at test time, outside Gradle, so nothing in CI
+  caches them and a run fails whenever Maven Central does not answer. The owner chose: Gradle resolves the two
+  runtimes (SDK 34 and 36, the names that belong to Robolectric 4.16.1) as dependencies, each in a configuration of
+  its own, copies them to `build/robolectric-runtime`, and the tests run with `robolectric.offline=true`
+  (`android/build.gradle.kts`). After a Robolectric bump the names there must follow — check: with
+  `~/.m2/repository/org/robolectric/android-all-instrumented` moved aside, `:data:testDebugUnitTest` and
+  `:app:testDebugUnitTest` pass and the folder is not downloaded again
