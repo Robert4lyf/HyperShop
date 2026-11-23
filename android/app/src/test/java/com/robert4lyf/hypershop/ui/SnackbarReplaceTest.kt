@@ -19,10 +19,6 @@ import org.robolectric.shadows.ShadowLooper
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34])
 class SnackbarReplaceTest {
-    /** No container here: the last test's is wound down first (see [quietStart]). */
-    @get:Rule(order = 0)
-    val quiet = com.robert4lyf.hypershop.testutil.quietStart()
-
     @get:Rule(order = 1)
     val compose = createComposeRule()
 
