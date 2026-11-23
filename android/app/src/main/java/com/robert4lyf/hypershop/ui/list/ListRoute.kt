@@ -15,20 +15,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.UiMessage
 import com.robert4lyf.hypershop.ui.common.shareNote
 import com.robert4lyf.hypershop.ui.recipes.UseDetailContent
+import com.robert4lyf.hypershop.ui.util.collectOnMain
 import com.robert4lyf.hypershop.ui.util.factoryFor
+import com.robert4lyf.hypershop.ui.util.onMain
+import com.robert4lyf.hypershop.ui.util.rememberMainScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -48,13 +49,13 @@ fun ListRoute(
     onRecipes: () -> Unit = {},
 ) {
     val vm: ListViewModel = viewModel(factory = factoryFor { ListViewModel(container, it.createSavedStateHandle()) })
-    val ui by vm.ui.collectAsStateWithLifecycle()
-    val prep by vm.prep.collectAsStateWithLifecycle()
-    val flash by vm.flash.collectAsStateWithLifecycle()
-    LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
-    LaunchedEffect(vm) { vm.reviews.collect(onReview) }
+    val ui by vm.ui.collectOnMain()
+    val prep by vm.prep.collectOnMain()
+    val flash by vm.flash.collectOnMain()
+    LaunchedEffect(vm) { onMain { vm.events.collect { show(container, snackbar, it) } } }
+    LaunchedEffect(vm) { onMain { vm.reviews.collect(onReview) } }
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val scope = rememberMainScope()
     // Built once per view model: a new object on every recomposition would recompose the whole header.
     val header =
         remember(vm, context, onReview) {
@@ -115,7 +116,7 @@ fun ListRoute(
         focusAdd = focusAdd,
         flash = flash,
     )
-    val carry by vm.carryOver.collectAsStateWithLifecycle()
+    val carry by vm.carryOver.collectOnMain()
     carry?.let { n ->
         AlertDialog(
             onDismissRequest = vm::keepLeftovers,
@@ -125,7 +126,7 @@ fun ListRoute(
             dismissButton = { TextButton(onClick = vm::dropLeftovers, modifier = Modifier.testTag("carry-drop")) { Text("Remove") } },
         )
     }
-    val useDetail by vm.useDetail.collectAsStateWithLifecycle()
+    val useDetail by vm.useDetail.collectOnMain()
     useDetail?.let { d ->
         ModalBottomSheet(onDismissRequest = vm::closeUse) {
             UseDetailContent(
@@ -142,7 +143,7 @@ fun ListRoute(
             )
         }
     }
-    val sheet by vm.sheet.collectAsStateWithLifecycle()
+    val sheet by vm.sheet.collectOnMain()
     sheet?.let { s ->
         ItemSheetHost(
             s,

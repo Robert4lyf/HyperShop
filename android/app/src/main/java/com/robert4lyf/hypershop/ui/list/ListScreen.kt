@@ -216,6 +216,7 @@ private fun ListBody(
     // it folds into its aisle's "N bought" row. Only the latest tick's timer lets the row fold.
     var stamps by remember { mutableStateOf(emptyMap<Long, Int>()) }
     val lingering = stamps.keys
+    // Only the linger timer: on the composition's own clock (the test clock in tests), not the main dispatcher.
     val scope = rememberCoroutineScope()
     val actions =
         remember(actions) {

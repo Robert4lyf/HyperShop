@@ -68,22 +68,27 @@ object TestContainer {
         // Tests that do not go through startUp start ready; StartupTest covers the barrier itself.
         if (ready) container.startup.value = com.robert4lyf.hypershop.di.Startup.Ready
         last = container
+        synchronized(made) { made += container }
         return container
     }
 
     /**
-     * Winds the container [create] made last right down, its database closed too: for a test that builds no container
-     * of its own (from a rule ordered before its compose rule), so the last one's work can't fail it. [create] only
-     * stops the last one's scope: a test may still use two containers at once (a backup and its restore).
+     * Winds every container built since the last call down (their scopes stopped), for a test that builds none
+     * ([quietStart], before its compose rule). Not at each test's end: stopping a container's scope cancels its
+     * imports, which writes WorkManager's database after Robolectric has reset it, and fails the next test.
      */
     fun windDown() {
-        last?.let { previous ->
-            runBlocking { withTimeoutOrNull(5_000) { previous.applicationScope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin() } }
-            // Room's own refresh of the last database runs on its own; let it finish before the next test starts.
-            runCatching { previous.db.close() }
+        val all = synchronized(made) { made.toList().also { made.clear() } }
+        for (c in all) {
+            // Its scope stopped (the shared list with it, so no view model reads on); the database is left open:
+            // closing it under a transaction still running failed that instead.
+            runBlocking { withTimeoutOrNull(5_000) { c.applicationScope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin() } }
         }
         last = null
     }
+
+    /** Every container built since the last [windDown]: a test may use two at once (a backup and its restore). */
+    private val made = mutableListOf<AppContainer>()
 
     /** The container [create] made last: wound down before the next one is built. */
     @Volatile private var last: AppContainer? = null

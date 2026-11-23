@@ -43,6 +43,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import com.robert4lyf.hypershop.ui.util.onMain
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.max
@@ -63,25 +64,27 @@ fun RecipePhoto(
 ) {
     val key = PhotoCache.key(path, maxPx)
     val image by produceState(PhotoCache.get(key), path, maxPx) {
-        // Asked again for this file and size, not for whatever was showing before the size changed.
-        PhotoCache.get(key)?.let {
-            value = it
-            return@produceState
-        }
-        value =
-            withContext(Dispatchers.IO) {
-                runCatching {
-                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    BitmapFactory.decodeFile(path, bounds)
-                    var sample = 1
-                    while (max(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxPx) sample *= 2
-                    BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })?.let {
-                        PhotoDecodes.count.incrementAndGet()
-                        PhotoDecodes.bytes.addAndGet(it.allocationByteCount.toLong())
-                        PhotoCache.put(key, it.asImageBitmap(), it.allocationByteCount)
-                    }
-                }.getOrNull()
+        onMain {
+            // Asked again for this file and size, not for whatever was showing before the size changed.
+            PhotoCache.get(key)?.let {
+                value = it
+                return@onMain
             }
+            value =
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        BitmapFactory.decodeFile(path, bounds)
+                        var sample = 1
+                        while (max(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxPx) sample *= 2
+                        BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })?.let {
+                            PhotoDecodes.count.incrementAndGet()
+                            PhotoDecodes.bytes.addAndGet(it.allocationByteCount.toLong())
+                            PhotoCache.put(key, it.asImageBitmap(), it.allocationByteCount)
+                        }
+                    }.getOrNull()
+                }
+        }
     }
     val img = image
     if (img != null) {

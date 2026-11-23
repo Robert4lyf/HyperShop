@@ -58,6 +58,15 @@ if git ls-files -z --cached --others --exclude-standard \
 fi
 echo "no keys found"
 
+step "UI collects on the main thread"
+# Compose's test clock runs a frame on whatever thread wakes a collector, which crashed the device tests
+# (ui/util/OnMain.kt). The UI collects flows through collectOnMain / collectAlwaysOnMain only.
+if grep -rnE '\.collectAsState(WithLifecycle)?\(' android/app/src/main --include='*.kt' | grep -v 'ui/util/OnMain.kt'; then
+  echo "FAIL: collect UI state with collectOnMain() / collectAlwaysOnMain() (ui/util/OnMain.kt)" >&2
+  exit 1
+fi
+echo "every collector is on the main thread"
+
 step "Golden checksum"
 if [ -f testdata/ingredients/CHECKSUM ]; then
   (cd testdata/ingredients && sha256sum --quiet -c CHECKSUM)

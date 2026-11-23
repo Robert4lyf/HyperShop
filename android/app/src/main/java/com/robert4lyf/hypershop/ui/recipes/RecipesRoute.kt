@@ -71,7 +71,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.di.AppContainer
 import com.robert4lyf.hypershop.ui.common.EmptyHero
@@ -87,7 +86,9 @@ import com.robert4lyf.hypershop.ui.common.webLink
 import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.review.TitleDialog
 import com.robert4lyf.hypershop.ui.theme.card
+import com.robert4lyf.hypershop.ui.util.collectOnMain
 import com.robert4lyf.hypershop.ui.util.factoryFor
+import com.robert4lyf.hypershop.ui.util.onMain
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,11 +98,11 @@ fun RecipesRoute(
     onReview: (Long) -> Unit,
 ) {
     val vm: RecipesViewModel = viewModel(factory = factoryFor { RecipesViewModel(container) })
-    val ui by vm.ui.collectAsStateWithLifecycle()
-    LaunchedEffect(vm) { vm.events.collect { show(container, snackbar, it) } }
-    LaunchedEffect(vm) { vm.openReview.collect(onReview) }
-    val chips by vm.searchChips.collectAsStateWithLifecycle()
-    val hasKey by container.apiKeyStore.hasKey.collectAsStateWithLifecycle()
+    val ui by vm.ui.collectOnMain()
+    LaunchedEffect(vm) { onMain { vm.events.collect { show(container, snackbar, it) } } }
+    LaunchedEffect(vm) { onMain { vm.openReview.collect(onReview) } }
+    val chips by vm.searchChips.collectOnMain()
+    val hasKey by container.apiKeyStore.hasKey.collectOnMain()
     RecipesScreen(
         ui,
         library =
@@ -133,7 +134,7 @@ fun RecipesRoute(
             ),
         hasKey = hasKey,
     )
-    val detail by vm.detail.collectAsStateWithLifecycle()
+    val detail by vm.detail.collectOnMain()
     // The photo picker: the system's, so no permission; the recipe it is for is kept across the trip there.
     var photoFor by rememberSaveable { mutableStateOf<String?>(null) }
     val picker =

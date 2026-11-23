@@ -76,7 +76,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -99,7 +98,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.robert4lyf.hypershop.backup.BackupManager
 import com.robert4lyf.hypershop.claude.ClaudeModel
@@ -127,7 +125,10 @@ import com.robert4lyf.hypershop.ui.list.show
 import com.robert4lyf.hypershop.ui.theme.Brand
 import com.robert4lyf.hypershop.ui.theme.LocalDarkTheme
 import com.robert4lyf.hypershop.ui.theme.cardEdge
+import com.robert4lyf.hypershop.ui.util.collectOnMain
 import com.robert4lyf.hypershop.ui.util.factoryFor
+import com.robert4lyf.hypershop.ui.util.onMain
+import com.robert4lyf.hypershop.ui.util.rememberMainScope
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -191,16 +192,16 @@ fun SettingsRoute(
     onBack: (() -> Unit)? = null,
 ) {
     val vm: SettingsViewModel = viewModel(factory = factoryFor { SettingsViewModel(container) })
-    val ui by vm.ui.collectAsStateWithLifecycle()
+    val ui by vm.ui.collectOnMain()
     val own = remember { SnackbarHostState() }
     val host = snackbar ?: own
-    LaunchedEffect(vm, host) { vm.events.collect { show(container, host, it) } }
+    LaunchedEffect(vm, host) { onMain { vm.events.collect { show(container, host, it) } } }
     // The user picks where the backup goes and which file to restore; the app never sees any other file.
     val createBackup =
         rememberLauncherForActivityResult(
             ActivityResultContracts.CreateDocument("application/zip"),
         ) { uri: Uri? -> uri?.let(vm::backupTo) }
-    val scope = rememberCoroutineScope()
+    val scope = rememberMainScope()
     val context = LocalContext.current
     val openBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? -> uri?.let(vm::inspectRestore) }
     SettingsScreen(

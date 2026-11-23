@@ -49,7 +49,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -60,7 +59,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.robert4lyf.hypershop.core.model.AisleCode
 import com.robert4lyf.hypershop.ui.common.AmountField
 import com.robert4lyf.hypershop.ui.common.InfoBanner
@@ -70,6 +68,8 @@ import com.robert4lyf.hypershop.ui.common.Tone
 import com.robert4lyf.hypershop.ui.common.WrongNote
 import com.robert4lyf.hypershop.ui.common.shareNote
 import com.robert4lyf.hypershop.ui.theme.icon
+import com.robert4lyf.hypershop.ui.util.collectOnMain
+import com.robert4lyf.hypershop.ui.util.rememberMainScope
 import kotlinx.coroutines.launch
 
 /** Callbacks of the row sheet. */
@@ -105,14 +105,14 @@ internal fun ReviewRowSheetHost(
     onKey: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val state by vm.state.collectAsStateWithLifecycle()
+    val state by vm.state.collectOnMain()
     val sheet = remember(state, key) { vm.sheet(key) }
     if (sheet == null) {
         // The row is gone: closed from an effect, not by writing state during composition.
         LaunchedEffect(key) { onDismiss() }
         return
     }
-    val scope = rememberCoroutineScope()
+    val scope = rememberMainScope()
     val context = LocalContext.current
     ModalBottomSheet(onDismissRequest = onDismiss) {
         ReviewRowSheet(
