@@ -627,17 +627,34 @@ class ListViewModel(
         messages.send(UiMessage("Deleted $name", undo = { c.repository.undoDelete(stamp) }))
     }
 
+    /** A Finish under way (main thread): a second tap before the button has gone does nothing. */
+    private var finishing = false
+
     fun finishShopping() =
         viewModelScope.launch {
-            // Counted inside the write: a tick still on its way to the screen is included.
-            val (stamp, n) = c.repository.finish()
-            val left = c.repository.snapshot().liveItems.size
-            // Step Q: what Finish did, in plain words: the bought things recorded, the rest still on the list.
-            val text = if (left > 0) "Shopping finished: $n bought · $left to buy" else "Shopping finished: $n bought"
-            messages.send(UiMessage(text, undo = { c.repository.undoDelete(stamp) }))
-            // Missing 3: what was not bought is asked about once, rather than carried over unnoticed.
-            if (left > 0 && n > 0) carryOver.value = left
+            // Review 2026-11-23, G: a double tap finished twice; the second found nothing ticked and its message
+            // took the place of the first, whose Undo was the one that could bring the trip back.
+            if (finishing) return@launch
+            finishing = true
+            try {
+                finishOnce()
+            } finally {
+                finishing = false
+            }
         }
+
+    private suspend fun finishOnce() {
+        // Counted inside the write: a tick still on its way to the screen is included.
+        val (stamp, n) = c.repository.finish()
+        // Nothing was ticked: nothing finished, and no message to take the place of one that can still be undone.
+        if (n == 0) return
+        val left = c.repository.snapshot().liveItems.size
+        // Step Q: what Finish did, in plain words: the bought things recorded, the rest still on the list.
+        val text = if (left > 0) "Shopping finished: $n bought · $left to buy" else "Shopping finished: $n bought"
+        messages.send(UiMessage(text, undo = { c.repository.undoDelete(stamp) }))
+        // Missing 3: what was not bought is asked about once, rather than carried over unnoticed.
+        if (left > 0) carryOver.value = left
+    }
 
     /** Plain text contains only outstanding shopping, grouped in the selected store's aisle order. */
     suspend fun shoppingText(): String {

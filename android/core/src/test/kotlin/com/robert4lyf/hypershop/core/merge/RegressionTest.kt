@@ -132,6 +132,32 @@ class RegressionTest {
     }
 
     @Test
+    fun servingsDownAndBackUpAskForNothingAlreadyBought() {
+        // Review 2026-11-23, C: 4 onions bought for 4; down to 2 and back to 4 asked for 2 more.
+        var (l, useId) = add(ShoppingList(), listOf("4 onions"))
+        val onion = l.itemByKey("cat:onion")!!.id
+        l = l.tick(onion, 5)!!
+        val fewer = l.rescaleUse(useId, 2)
+        // Nothing to buy, and the purchase is whole: all 4 are still bought.
+        assertTrue(fewer.isDone(onion))
+        assertEquals(Rational.of(4), fewer.covered(onion)[BaseKey.ITEMS])
+        val back = fewer.rescaleUse(useId, 4)
+        assertTrue(back.isDone(onion))
+        assertEquals(Rational.of(4), back.covered(onion)[BaseKey.ITEMS])
+        assertEquals(0, back.progress(useId).toBuy)
+        // Past what was bought, only the difference is asked for.
+        val more = fewer.rescaleUse(useId, 6)
+        assertEquals(Rational.of(4), more.covered(onion)[BaseKey.ITEMS])
+        assertEquals(Rational.of(2), more.uncovered(onion)[BaseKey.ITEMS])
+        // Twice down keeps one spare share, not two.
+        val least = fewer.rescaleUse(useId, 1)
+        assertEquals(Rational.of(4), least.covered(onion)[BaseKey.ITEMS])
+        assertEquals(2, least.contributionsOf(onion).size)
+        assertEquals(Rational.of(4), least.rescaleUse(useId, 4).covered(onion)[BaseKey.ITEMS])
+        assertEquals(1, least.rescaleUse(useId, 4).contributionsOf(onion).size)
+    }
+
+    @Test
     fun anEditOverAPurchaseOnTwoRowsCountsBothRowsOnce() {
         // Review finding A.1: 2 bought and finished, 1 extra bought on a live row; the edit keeps "3 onions".
         var (l, useId) = add(ShoppingList(), listOf("2 onions"))

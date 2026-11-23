@@ -462,8 +462,10 @@ class ListRepository(
             val r =
                 RecipeEntity(
                     0,
-                    url,
-                    title,
+                    // As long as a backup accepts (review 2026-11-23, E): a page's own title has no limit, and one
+                    // over it made every later backup unrestorable. A link too long to keep is not kept in part.
+                    url?.takeIf { it.length <= MAX_TEXT },
+                    title?.take(MAX_TEXT),
                     servings,
                     locale.name,
                     clock(),
@@ -1040,9 +1042,12 @@ class ListRepository(
             if (cs.none { it.coveredBy != null }) return@withTransaction removeUse(useId)?.let { ListRemoval(use = it) }
             val w = l.withdrawKeeping(cs.filter { it.coveredBy == null }.map { it.id }.toSet())
             val kept = w?.first ?: l
-            val next = kept.copy(uses = kept.uses + (useId to use.copy(archivedAt = clock())), listRev = kept.listRev + 1)
+            // The hand-added group is never archived: later hand adds go into it, and it would stay hidden.
+            val archive = use.kind == com.robert4lyf.hypershop.core.merge.UseKind.RECIPE
+            val after = if (archive) use.copy(archivedAt = clock()) else use
+            val next = kept.copy(uses = kept.uses + (useId to after), listRev = kept.listRev + 1)
             persist(l, next)
-            ListRemoval(withdrawn = w?.second, archived = if (use.archivedAt == null) useId else null)
+            ListRemoval(withdrawn = w?.second, archived = if (archive && use.archivedAt == null) useId else null)
         }
 
     /** Undo of [removeFromList]. False when nothing could come back (see [restoreUse]). */
@@ -1603,6 +1608,10 @@ class ListRepository(
 
     // ---- backup and restore (Backup.kt) ----------------------------------------------------
 
+    /** A recipe as a backup accepts it: a title stored before the limit was applied on the way in is cut to it. */
+    private fun withinBackupLimits(r: RecipeEntity): RecipeEntity =
+        r.title?.takeIf { it.length > MAX_TEXT }?.let { r.copy(title = it.take(MAX_TEXT)) } ?: r
+
     /** Every user-data table, read in one transaction. */
     suspend fun exportBackup(): BackupData =
         db.withTransaction {
@@ -1616,7 +1625,7 @@ class ListRepository(
                 manualTitle = meta.manualTitle,
                 items = dao.items(),
                 aliases = dao.aliases().filter { a -> itemIds.contains(a.newId) && !itemIds.contains(a.oldId) },
-                recipes = dao.allRecipes(),
+                recipes = dao.allRecipes().map(::withinBackupLimits),
                 lines = dao.allLines(),
                 uses = dao.uses(),
                 ticks = dao.ticks(),
@@ -1748,6 +1757,10 @@ class ListRepository(
         const val NOTE_KEEP_MS = 30L * 24 * 60 * 60 * 1000
 
         const val RESULT_HISTORY = 64
+
+        /** The longest title or link a backup accepts (`BackupValidator`). */
+        const val MAX_TEXT = 2_000
+
         const val MAX_BOOK = 120
         const val MAX_PAGE = 20
 

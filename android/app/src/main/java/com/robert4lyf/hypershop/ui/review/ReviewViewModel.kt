@@ -394,6 +394,18 @@ class ReviewViewModel(
         // UX review 1: the rules' reading is on screen at once, with "Asking Claude…" and Stop in the hero; Claude's
         // is laid over when it lands (as "Ask Claude" does), and Stop keeps the import as read offline.
         if (pending && r.lines.isNotEmpty()) askClaude({ it.copy(askClaude = true) }) { true }
+        // The page arrived while the app was in the background (review 2026-11-23, F): Claude is asked only with
+        // the review in front, so it was not asked then, and nothing asked it later. It is asked when the review
+        // is next in front.
+        if (!pending && r.claudePending && !r.claudeTried && r.lines.isNotEmpty()) {
+            viewModelScope.launch {
+                c.reviewGate.visible.first { it }
+                val now = result ?: return@launch
+                if (now.claudePending && !now.claudeTried && now.parsedBy != ParsedBy.CLAUDE) {
+                    askClaude({ it.copy(askClaude = true) }) { true }
+                }
+            }
+        }
     }
 
     /** "Add again" on [ReviewState.AlreadyOnList]. */
@@ -720,26 +732,53 @@ class ReviewViewModel(
         // A second tap while the first is still queued behind the lock would ask twice.
         if (retryJob?.isActive == true) return
         retryJob =
-            act {
-                val r = result ?: return@act
-                if (busy) return@act
-                // Set under the lock: a Stop while this waited for it then has nothing to undo.
-                busy = true
-                retrying = true
-                (state.value as? ReviewState.Ready)?.let { _state.value = it.copy(ui = it.ui.copy(busy = true, retrying = true)) }
-                try {
-                    val again = parseWithClaude(ask(r), keep)
-                    // Laid over the review as it is now, not as it was when the call started: a second Ask
-                    // Claude after Stop and an edit joins the first call (AppContainer.claudeParse).
-                    val kept = keepCorrections(again, result ?: r, corrections.toMap())
-                    store(kept)
-                    result = kept
-                } finally {
-                    busy = false
-                    retrying = false
+            viewModelScope.launch {
+                // The lock is held to start and to lay the answer over the review, never across the call itself
+                // (review 2026-11-23, A): held for the whole call, every tap on a row or the servings waited
+                // unseen until Claude answered, then all landed at once.
+                var request: ImportResult? = null
+                ops.withLock {
+                    if (finished()) return@withLock
+                    val r = result ?: return@withLock
+                    if (busy) return@withLock
+                    // Set under the lock: a Stop while this waited for it then has nothing to undo.
+                    busy = true
+                    retrying = true
+                    (state.value as? ReviewState.Ready)?.let { _state.value = it.copy(ui = it.ui.copy(busy = true, retrying = true)) }
+                    request = ask(r)
                 }
-                // Why it didn't work shows under the badge (ReviewUi.claudeNote).
-                recompute()
+                val asked = request ?: return@launch
+                val again =
+                    try {
+                        parseWithClaude(asked, keep)
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        // Stop ([stopRetry]) or the screen gone: Stop puts the flags back itself.
+                        throw e
+                    } catch (e: Exception) {
+                        ops.withLock {
+                            busy = false
+                            retrying = false
+                            if (!finished()) recompute()
+                        }
+                        throw e
+                    }
+                ops.withLock {
+                    try {
+                        if (!finished()) {
+                            // Laid over the review as it is now, not as it was when the call started: rows ticked
+                            // and lines corrected meanwhile stand, and a second Ask Claude after Stop and an edit
+                            // joins the first call (AppContainer.claudeParse).
+                            val kept = keepCorrections(again, result ?: asked, corrections.toMap())
+                            store(kept)
+                            result = kept
+                        }
+                    } finally {
+                        busy = false
+                        retrying = false
+                    }
+                    // Why it didn't work shows under the badge (ReviewUi.claudeNote).
+                    if (!finished()) recompute()
+                }
             }
     }
 

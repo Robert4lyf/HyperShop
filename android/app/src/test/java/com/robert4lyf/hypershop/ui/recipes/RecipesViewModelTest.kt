@@ -237,6 +237,24 @@ class RecipesViewModelTest {
     }
 
     @Test
+    fun aDoubleTapOnAddToListAddsTheRecipeOnce() {
+        // Review 2026-11-23, G: nothing held a second tap, so two uses went on and every ingredient doubled.
+        val c = TestContainer.create()
+        val key = c.saved("Dal", "200g red lentils")
+        val vm = RecipesViewModel(c).shown()
+        val got = java.util.concurrent.CopyOnWriteArrayList<UiMessage>()
+        val watching = CoroutineScope(Dispatchers.Main).launch { vm.events.collect { got += it } }
+        val row = await(vm.ui) { it.library.size == 1 }.library.single { it.key == key }
+        vm.addToList(row)
+        vm.addToList(row)
+        com.robert4lyf.hypershop.testutil.awaitTrue { got.size == 1 }
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2))
+        assertEquals("Added Dal · 1 to buy", got.single().text)
+        assertEquals(1, runBlocking { c.repository.usesOnList() }.size)
+        watching.cancel()
+    }
+
+    @Test
     fun removingFromTheListOrTheLibraryCanBeUndone() {
         val c = TestContainer.create()
         c.add(*CHILLI)
