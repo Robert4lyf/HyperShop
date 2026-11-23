@@ -737,3 +737,32 @@ layout", "No compose hierarchies found", and a `PerformanceProbeTest` timeout.
   models) is still to do.
 - Not explained: the `PerformanceProbeTest` timeout (a tick whose "· N bought" did not appear in 10 s); it passed on
   both PR re-runs. If it comes back after this fix, it needs its own look.
+
+## Fix — the test suite's database leak (`ccr-3554796e-4mfgym`, from fa1edb3)
+
+Asked to check for flakiness, then to fix the leak found. Measured first on plain main: 8 full runs of the app's 472
+JVM tests, 1 failed (`EntryNavigationTest`, "uncaught exceptions before the test started … Illegal connection
+pointer"). The trace named two reads still inside the app's database when Robolectric reset SQLite at the end of the
+test before: `ListRepository.snapshot` from the shared list flow, and `observeRecipeNotes` in a view model's coroutine
+that had been cancelled but not waited for. KNOWN_ISSUES #49.
+
+- [x] [fix] Every test's containers are wound down after it, before the reset, with nobody having to ask:
+  `TestApplication` is Robolectric's `TestLifecycleApplication` and calls `TestContainer.windDown()` in `afterTest`.
+  Scopes are cancelled and waited for with the main looper kept turning; then each test database's executor
+  (`GatedExecutor`, in place of `{ it.run() }`) waits for whatever is inside on any thread and turns away what comes
+  later. `quietStart()` (opt-in, two tests) is gone, and so is `StartupTest`'s own `db.close()`, which left readers
+  parked on a closed pool and cost 5 to 10 s. `-Phs.stress=3` delays each background database step by 3 ms to make
+  the race likely — check: `tools/gradle.sh :app:testDebugUnitTest -Phs.stress=3`
+  - Under stress, a UI subset (EntryNavigation, AfterAShop, SnackbarReplace, StoreRename, Journey, ListScreen):
+    without the fix 2 of 3 runs failed on the leak; with it 6 of 6 passed.
+  - Full app suite with the final code: 3 of 3 stressed and 2 of 2 plain runs passed; 4 of 4 stressed runs passed on
+    the version before the `StartupTest` change. No "still busy" message in the final five. A plain run takes about
+    2 m 50 s against 3 m 35 s before.
+  - Still open: WorkManager's own database is not behind the gate. `ImportWorkerTest` (and once `ImportSharedTest`)
+    still log the same exception from `androidx.work.impl.Schedulers.schedule` after a worker outlives its test; no
+    test failed from it in these runs. The emulator suite could not be run (no Actions minutes): whether #98 cured
+    its failures is still unknown.
+  - Local runs used a Gradle init script outside the repository that points at Google's mirror of Maven Central
+    (this container's Maven Central answered 429 for hours); nothing of it is committed. For the same reason the
+    gate's Gradle steps were run by hand with that script (`tools/verify.sh` itself cannot take it); its other
+    steps ran as written.

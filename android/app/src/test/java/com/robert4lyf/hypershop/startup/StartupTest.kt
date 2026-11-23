@@ -22,11 +22,9 @@ import com.robert4lyf.hypershop.ui.theme.HyperShopTheme
 import com.robert4lyf.hypershop.watch.FakeWatchLink
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -55,28 +53,15 @@ class StartupTest {
 
     private fun AppContainer.items() = runBlocking { repository.snapshot() }.liveItems.map { it.mergeKey }.toSet()
 
-    private val made = ArrayList<AppContainer>()
-
     private fun fresh(): AppContainer {
         val ctx = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
         File(ctx.filesDir, "library").deleteRecursively()
         File(ctx.noBackupFilesDir, "restore").deleteRecursively()
-        return TestContainer.create(ready = false).also { made += it }
+        // startUp() starts the watch coordinator's collectors, which run for the life of the process: the test
+        // application winds every container down after each test (TestContainer.windDown), so nothing is closed here.
+        return TestContainer.create(ready = false)
     }
 
-    /**
-     * startUp() starts the watch coordinator's collectors, which run for the life of the
-     * process; left running, they query a database the next test has torn down.
-     */
-    @After
-    fun stop() {
-        for (c in made) {
-            c.applicationScope.cancel()
-            c.db.close()
-        }
-    }
-
-    /** A backup of "bananas", then the phone moves on to "milk", then a restore of it dies after the database. */
     private fun interruptedRestore(c: AppContainer) {
         runBlocking {
             c.repository.manualAdd("bananas", QtyBase.of(Rational.of(3), null, UnitLocale.METRIC), null)

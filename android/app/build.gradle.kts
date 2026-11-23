@@ -120,6 +120,8 @@ android {
             all {
                 it.maxHeapSize = "2g"
                 it.maxParallelForks = 1
+                // The leak check (docs/KNOWN_ISSUES.md): `-Phs.stress=3` slows the tests' background database work.
+                (project.findProperty("hs.stress") as String?)?.let { ms -> it.systemProperty("hs.stress", ms) }
             }
         }
     }
