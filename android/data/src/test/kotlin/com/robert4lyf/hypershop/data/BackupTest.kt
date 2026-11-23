@@ -106,6 +106,21 @@ class BackupTest {
         }
 
     @Test
+    fun aPageWithAnEndlessTitleStillBacksUpAndRestores() =
+        runBlocking {
+            // Review 2026-11-23, E: titles and links were stored as the page gave them, but a backup refuses a recipe
+            // whose title or link is over 2,000 characters, so one such page made every later backup unrestorable.
+            val stored =
+                r.repo.storeRecipe(
+                    "https://example.com/" + "a".repeat(3_000), "T".repeat(5_000), 4, UnitLocale.METRIC, "WEB",
+                    com.robert4lyf.hypershop.core.model.ParsedBy.RULES, null, false,
+                    listOf(com.robert4lyf.hypershop.core.parse.RuleParser().parse("2 onions")),
+                )
+            r.repo.apply(r.repo.preview(stored, 4, null))
+            assertEquals(emptyList<String>(), r.repo.restoreBackup(r.repo.exportBackup(), marker()))
+        }
+
+    @Test
     fun aRestoreReplacesWhatWasThere() =
         runBlocking {
             val b = populate()

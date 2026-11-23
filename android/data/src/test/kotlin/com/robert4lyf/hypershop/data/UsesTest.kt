@@ -205,6 +205,24 @@ class UsesTest {
         }
 
     @Test
+    fun theHandAddedGroupIsNeverArchived() =
+        runBlocking {
+            // Review 2026-11-23, B: Remove from list on the hand-added group, with one of its items bought, archived
+            // it; later hand adds went into the archived group and it never showed again.
+            val one = QtyBase.of(Rational.ONE, null, UnitLocale.METRIC)
+            val milk = r.repo.manualAdd("milk", one, null)
+            r.repo.manualAdd("bread", one, null)
+            r.repo.tick(milk)
+            val group = r.repo.usesOnList().single().useId
+            val removed = r.repo.removeFromList(group)!!
+            assertNull(removed.archived)
+            assertTrue(r.repo.snapshot().liveItems.none { "bread" in it.mergeKey })
+            r.repo.manualAdd("eggs", one, null)
+            assertEquals(group, r.repo.usesOnList().single().useId)
+            assertNull(r.repo.snapshot().uses.getValue(group).archivedAt)
+        }
+
+    @Test
     fun anEditKeepsWhatWasBoughtAndItsMeal() =
         runBlocking {
             // KNOWN_ISSUES #20: the recipe is edited after the onions were bought.

@@ -103,10 +103,14 @@ class UseProgressTest {
             assertTrue(back.isDone(onion))
             assertEquals(Rational.of(2), back.total(onion)[BaseKey.ITEMS])
             assertEquals(UseProgress(1, 0, 1, 0), back.progress(a.useId))
-            // Fewer than were bought for: still bought, the amount shrinks.
+            // Fewer than were bought for: still bought, and the purchase stays whole (the one the recipe no longer
+            // needs is kept as spare, so going back up asks for nothing).
             r.repo.rescaleUse(a.useId, 2)
             assertTrue(r.repo.snapshot().isDone(onion))
-            assertEquals(Rational.ONE, r.repo.snapshot().total(onion)[BaseKey.ITEMS])
+            assertEquals(Rational.of(2), r.repo.snapshot().total(onion)[BaseKey.ITEMS])
+            r.repo.rescaleUse(a.useId, 4)
+            assertTrue(r.repo.snapshot().isDone(onion))
+            assertEquals(Rational.of(2), r.repo.snapshot().total(onion)[BaseKey.ITEMS])
         }
 
     @Test
@@ -131,19 +135,19 @@ class UseProgressTest {
             assertTrue(l.liveItems.isEmpty())
             assertEquals(UseState.ALL_BOUGHT, l.progress(a.useId).state)
             assertEquals(1, l.ticks.size)
-            // Up again and down past what was bought: still nothing on the list, the bought amount shrinks.
+            // Up again and down past what was bought: still nothing on the list.
             r.repo.rescaleUse(a.useId, 8)
             assertEquals(Rational.of(2), r.repo.snapshot().let { it.total(it.itemByKey("cat:onion")!!.id)[BaseKey.ITEMS] })
             r.repo.rescaleUse(a.useId, 2)
             l = r.repo.snapshot()
             assertTrue(l.liveItems.isEmpty())
             assertEquals(UseState.ALL_BOUGHT, l.progress(a.useId).state)
-            // Undo of the finish brings the trip's row back, bought, at the amount it scaled to.
+            // Undo of the finish brings the trip's row back, bought, with all that was bought on it.
             r.repo.undoDelete(stamp)
             l = r.repo.snapshot()
             val onion = l.itemByKey("cat:onion")!!
             assertTrue(l.isDone(onion.id))
-            assertEquals(Rational.ONE, l.total(onion.id)[BaseKey.ITEMS])
+            assertEquals(Rational.of(2), l.total(onion.id)[BaseKey.ITEMS])
         }
 
     @Test

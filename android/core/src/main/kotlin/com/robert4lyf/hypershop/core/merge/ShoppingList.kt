@@ -356,7 +356,8 @@ data class ShoppingList(
                 val coveredFor7Days =
                     cs.isNotEmpty() &&
                         cs.all { c -> c.coveredBy != null && (tickAt[c.coveredBy] ?: now) <= now - SEVEN_DAYS }
-                if (u.archivedAt == null && coveredFor7Days) u.copy(archivedAt = now) else u
+                // Only a recipe is ever spent: what is added by hand is one standing group, never archived.
+                if (u.kind == UseKind.RECIPE && u.archivedAt == null && coveredFor7Days) u.copy(archivedAt = now) else u
             }
         val setAside = liveItems.filter { it.unavailableAt != null && it.id !in done }.map { it.id }.toSet()
         return copy(
@@ -657,13 +658,34 @@ data class ShoppingList(
             val open = group.filter { it.coveredBy == null }
             val target = group.fold(QtyBase.PRESENCE) { acc, c -> acc + c.qty }.times(f)
             val bought = covered.fold(QtyBase.PRESENCE) { acc, c -> acc + c.qty }
+            // What a smaller servings count no longer needs of a purchase is not thrown away: it is kept beside
+            // the line as a bought share that does not scale, and is the first thing more servings draw on. So
+            // 4 servings bought, down to 2 and back to 4 asks for nothing more.
+            val line = group.first().recipeLineId
+            val spare =
+                if (line == null) {
+                    emptyList()
+                } else {
+                    contributions.filter { it.useId == useId && it.noScale && it.coveredBy != null && it.recipeLineId == line }
+                }
             when {
                 covered.isEmpty() || target.isPresence -> group.forEach { resized(it, it.qty.times(f)) }
                 // What was bought stays bought, and only the difference is still needed: a
                 // tick covers the amount there was when it was made, never an amount added later.
                 bought.parts.all { (k, v) -> (target.parts[k] ?: Rational.ZERO) >= v } -> {
-                    val rest = target.minusClamped(bought)
+                    var rest = target.minusClamped(bought)
                     open.forEach { replaced[it.id] = null }
+                    for (sp in spare) {
+                        if (rest.isPresence) break
+                        // The lesser of what is still needed and what is spare, slot by slot.
+                        val take = rest.minusClamped(rest.minusClamped(sp.qty))
+                        if (take.isPresence) continue
+                        val left = sp.qty.minusClamped(take)
+                        replaced[sp.id] = if (left.isPresence) null else sp.copy(qty = left)
+                        val back = covered.firstOrNull { it.itemId == sp.itemId && it.coveredBy == sp.coveredBy } ?: covered.first()
+                        replaced[back.id] = (replaced[back.id] ?: back).let { it.copy(qty = it.qty + take) }
+                        rest = rest.minusClamped(take)
+                    }
                     if (!rest.isPresence) {
                         val first = open.firstOrNull()
                         if (first != null) {
@@ -691,11 +713,27 @@ data class ShoppingList(
                         }
                     }
                 }
-                // Fewer servings than were bought for: nothing left to buy, the bought amount shrinks with it.
+                // Fewer servings than were bought for: nothing left to buy. The line's own bought share shrinks with
+                // it, and the rest of the purchase is kept as spare (above), on the same row under the same tick.
                 else -> {
                     val k = bought.parts.keys.first()
                     val r = (target.parts[k] ?: Rational.ZERO) / bought.parts.getValue(k)
-                    covered.forEach { replaced[it.id] = it.copy(qty = it.qty.times(r)) }
+                    for (c in covered) {
+                        val smaller = c.qty.times(r)
+                        replaced[c.id] = c.copy(qty = smaller)
+                        val over = c.qty.minusClamped(smaller)
+                        if (line == null || over.isPresence) continue
+                        val sp = spare.firstOrNull { it.itemId == c.itemId && it.coveredBy == c.coveredBy }
+                        if (sp != null) {
+                            replaced[sp.id] = (replaced[sp.id] ?: sp).let { it.copy(qty = it.qty + over) }
+                        } else {
+                            added +=
+                                Contribution(
+                                    nextId++, useId, line, c.itemId, over,
+                                    noScale = true, createdListRev = c.createdListRev, coveredBy = c.coveredBy, unitHint = c.unitHint,
+                                )
+                        }
+                    }
                     open.forEach { replaced[it.id] = null }
                 }
             }
@@ -788,7 +826,11 @@ data class ShoppingList(
 
     /** The single MANUAL use, created on first need. */
     fun manualUse(now: Long): Pair<ShoppingList, Long> {
-        uses.values.firstOrNull { it.kind == UseKind.MANUAL }?.let { return this to it.id }
+        val mine = uses.values.filter { it.kind == UseKind.MANUAL }
+        mine.firstOrNull { it.archivedAt == null }?.let { return this to it.id }
+        // One archived by an older version (Remove from list, or a Finish a week after its ticks): hand adds went
+        // into it unseen. It comes back, so the hand-added group shows again.
+        mine.firstOrNull()?.let { return copy(uses = uses + (it.id to it.copy(archivedAt = null))) to it.id }
         val u = RecipeUse(nextId, null, UseKind.MANUAL, 1, now)
         return copy(uses = uses + (u.id to u), nextId = nextId + 1) to u.id
     }

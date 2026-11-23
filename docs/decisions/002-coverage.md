@@ -20,6 +20,10 @@ curry, but the soup added since needs one more".
   `Tick`.
 - Removing or rescaling a use deletes or rescales its contributions, covered or
   not.
+  Since 2026-11-23 a servings change that needs less than was bought keeps the
+  rest of the purchase beside the line as a covered share that does not scale
+  (`noScale`, same row, same tick), and more servings draw on it first: a
+  purchase stays whole, and down-then-up asks for nothing already bought.
 - **Ticks never create stock** and rounding is display-only, so a tick always
   fully covers.
 - A watch tick carries `seenListRev`; it covers only contributions with
