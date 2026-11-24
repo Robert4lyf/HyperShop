@@ -97,6 +97,7 @@ class Importer(
                 rawLines = raw,
                 pageText = e.pageText,
                 imageUrl = e.image,
+                steps = e.steps,
             )
         return parse(base, allowClaude(), model)
     }

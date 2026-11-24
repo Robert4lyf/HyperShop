@@ -682,6 +682,18 @@ class ListRepository(
         url: String,
     ) = changeNote(key) { if (it.photo == null && it.photoUrl == null) it.copy(photoUrl = url.take(MAX_URL)) else it }
 
+    /**
+     * The method a page gave for the recipe, kept with its library entry: the latest import of the page wins (a site
+     * corrects its recipes), and an import that found none leaves what is kept alone.
+     */
+    suspend fun offerRecipeMethod(
+        key: String,
+        steps: List<String>,
+    ) {
+        val text = steps.map { it.trim().take(MAX_STEP) }.filter { it.isNotEmpty() }.take(MAX_STEPS).joinToString("\n")
+        if (text.isNotEmpty()) changeNote(key) { it.copy(method = text) }
+    }
+
     private suspend fun changeNote(
         key: String,
         f: (RecipeNoteEntity) -> RecipeNoteEntity,
@@ -1781,6 +1793,10 @@ class ListRepository(
 
         /** The longest title or link a backup accepts (`BackupValidator`). */
         const val MAX_TEXT = 2_000
+
+        /** A kept method: as many steps, of such a length, as the extractor gives. */
+        const val MAX_STEPS = 100
+        const val MAX_STEP = 2_000
 
         const val MAX_BOOK = 120
         const val MAX_PAGE = 20

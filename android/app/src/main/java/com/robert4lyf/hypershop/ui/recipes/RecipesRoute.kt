@@ -583,6 +583,8 @@ fun RecipeDetailContent(
                 TextButton(onClick = { cooking = true }, modifier = Modifier.testTag("cook-recipe")) { Text("Cooking view") }
             }
         }
+        // The method, kept from the page when it was imported: there even if the page has gone.
+        methodSteps(row.method)
         item(key = "yours") {
             // What you keep about it: stars, notes for next time, its photo.
             Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {

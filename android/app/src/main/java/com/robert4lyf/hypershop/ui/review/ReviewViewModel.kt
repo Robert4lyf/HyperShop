@@ -890,9 +890,16 @@ class ReviewViewModel(
      * app's scope: leaving the screen straight after Add must not stop it. Never replaces a photo chosen.
      */
     private fun offerPhoto(recipeId: Long?) {
-        val url = result?.imageUrl ?: return
         val id = recipeId ?: return
-        c.applicationScope.launch { c.repository.libraryKeyOf(id)?.let { c.recipePhotos.offer(it, url) } }
+        val url = result?.imageUrl
+        // The page's method goes the same way: kept with the library entry, so the recipe outlives its page.
+        val steps = result?.steps.orEmpty()
+        if (url == null && steps.isEmpty()) return
+        c.applicationScope.launch {
+            val key = c.repository.libraryKeyOf(id) ?: return@launch
+            if (steps.isNotEmpty()) c.repository.offerRecipeMethod(key, steps)
+            if (url != null) c.recipePhotos.offer(key, url)
+        }
     }
 
     /**

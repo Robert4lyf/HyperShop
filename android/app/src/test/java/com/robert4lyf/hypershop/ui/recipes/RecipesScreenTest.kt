@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -223,6 +224,20 @@ class RecipesScreenTest {
         compose.onNodeWithTag("recipes").performScrollToNode(hasTestTag("lib-r:9"))
         compose.onNodeWithTag("lib-r:9").performClick()
         assertEquals(listOf("r:9"), opened)
+    }
+
+    @Test
+    fun recipeDetailShowsTheKeptMethodNumberedUnderItsHeadings() {
+        val kept = DETAIL.copy(row = DETAIL.row.copy(method = listOf("Rinse the lentils.", "For the tarka:", "Fry the cumin.")))
+        compose.setContent { HyperShopTheme(dynamicColor = false) { RecipeDetailContent(kept, onAdd = {}, onRemove = {}) } }
+        compose.onNodeWithTag("recipe-detail").performScrollToNode(hasTestTag("method"))
+        compose.onNodeWithText("Method").assertExists()
+        compose.onNodeWithTag("recipe-detail").performScrollToNode(hasContentDescription("Step 2. Fry the cumin."))
+        compose.onNodeWithText("For the tarka").assertExists()
+        compose.onNodeWithContentDescription("Step 1. Rinse the lentils.").assertExists()
+        compose.onRoot().captureRoboImage(Shots.path("recipe-method-light.png"))
+        // Steps are numbered through; a heading takes no number.
+        assertEquals(listOf(1, null, 2), methodLines(kept.row.method).map { it.number })
     }
 
     @Test

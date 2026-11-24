@@ -35,12 +35,13 @@ class MigrationTest {
         val db =
             helper.runMigrationsAndValidate(
                 name,
-                16,
+                17,
                 true,
                 HyperShopDatabase.MIGRATION_12_13,
                 HyperShopDatabase.MIGRATION_13_14,
                 HyperShopDatabase.MIGRATION_14_15,
                 HyperShopDatabase.MIGRATION_15_16,
+                HyperShopDatabase.MIGRATION_16_17,
             )
         val rows = db.query("SELECT storeId,rank FROM ShelfRank ORDER BY storeId")
         assertTrue(rows.moveToFirst())
@@ -95,6 +96,7 @@ class MigrationTest {
                     HyperShopDatabase.MIGRATION_13_14,
                     HyperShopDatabase.MIGRATION_14_15,
                     HyperShopDatabase.MIGRATION_15_16,
+                    HyperShopDatabase.MIGRATION_16_17,
                 )
                 .allowMainThreadQueries()
                 .build()
@@ -135,6 +137,7 @@ class MigrationTest {
                     HyperShopDatabase.MIGRATION_13_14,
                     HyperShopDatabase.MIGRATION_14_15,
                     HyperShopDatabase.MIGRATION_15_16,
+                    HyperShopDatabase.MIGRATION_16_17,
                 )
                 .allowMainThreadQueries()
                 .build()

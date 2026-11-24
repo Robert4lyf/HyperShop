@@ -30,6 +30,46 @@ class ExtractorTest {
         assertEquals("thing 1", lines.first())
     }
 
+    @org.junit.jupiter.api.Test
+    fun theMethodIsReadFromJsonLdInTheShapesSitesUse() {
+        val base = """"@type":"Recipe","name":"Soup","recipeIngredient":["2 onions"]"""
+        // One string, steps on lines.
+        assertEquals(
+            listOf("Chop the onions.", "Fry them."),
+            ld("""{$base,"recipeInstructions":"Chop the onions.\n\nFry them."}""").steps,
+        )
+        // Steps, with HTML in one, and a section.
+        val shaped =
+            ld(
+                """{$base,"recipeInstructions":[
+                  {"@type":"HowToStep","text":"<p>Chop the <b>onions</b>.</p>"},
+                  {"@type":"HowToSection","name":"For the sauce","itemListElement":[{"@type":"HowToStep","text":"Simmer."}]},
+                  "Serve."]}""",
+            )
+        assertEquals(listOf("Chop the onions.", "For the sauce:", "Simmer.", "Serve."), shaped.steps)
+        // No more steps, and none longer, than is kept.
+        val many = (1..150).joinToString(",") { "\"Step $it ${"x".repeat(3000)}\"" }
+        val capped = ld("""{$base,"recipeInstructions":[$many]}""").steps
+        assertEquals(Extractor.MAX_STEPS, capped.size)
+        assertTrue(capped.all { it.length <= Extractor.MAX_STEP })
+    }
+
+    @org.junit.jupiter.api.Test
+    fun theMethodIsReadFromARecipePluginsMarkupAndNeverFromPageTextAlone() {
+        val plugin =
+            Extractor.extract(
+                """<html><body><div class="wprm-recipe-ingredients-container"><ul>
+                   <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-name">onion</span></li></ul></div>
+                   <div class="wprm-recipe-instruction-group-name">Day one</div>
+                   <div class="wprm-recipe-instruction-text">Slice &amp; salt the onion.</div>
+                   <div class="wprm-recipe-instruction-text"><span>Leave overnight.</span></div></body></html>""",
+            )
+        assertEquals(listOf("Day one:", "Slice & salt the onion.", "Leave overnight."), plugin.steps)
+        val words = "Some words about onions. ".repeat(20)
+        val text = Extractor.extract("<html><body><p>$words</p><ol><li>Do this.</li></ol></body></html>")
+        assertTrue(text.steps.isEmpty())
+    }
+
     private fun ld(json: String) = Extractor.extract("<html><head><script type=\"application/ld+json\">$json</script></head></html>")
 
     @Test

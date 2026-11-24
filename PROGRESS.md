@@ -836,3 +836,21 @@ the owner asked for the seven most likely to be met. The rest are KNOWN_ISSUES #
   - The WPRM extractor takes each line once and stops at `MAX_LINES` — check:
     `ExtractorTest.nestedRecipePluginGroupsGiveEachLineOnce…`
 - Nothing here was run on a phone, the emulator or a watch.
+
+## Feature — a saved recipe keeps its method (`ccr-3554796e-4mfgym`, from 8953af2)
+
+The owner's pick from a list of possible improvements: the app kept a recipe's ingredients and linked out for the
+steps, so a recipe was half gone when its page changed or went.
+
+- [x] [method] The method is read at import, kept with the recipe's library entry, and shown on the recipe's page
+  and in the cooking view — check: `ExtractorTest.theMethodIsRead…` (two), `RecipeNotesTest.theMethodIsKept…`,
+  `RecipeNotesViewModelTest.aPagesMethodIsKept…`, `RecipesScreenTest.recipeDetailShowsTheKeptMethod…`, `MigrationTest`
+  - `:extract`: `Extraction.steps`, from JSON-LD `recipeInstructions` (a string, a list, `HowToStep`,
+    `HowToSection`), else the WPRM or Tasty plugin's markup, else microdata; at most 100 steps of 2,000 characters;
+    never from page text alone.
+  - `:data`: schema v17, `RecipeNote.method` (`MIGRATION_16_17`, one added column); `offerRecipeMethod` (the latest
+    import that found one wins; one that found none leaves what is kept); in backups, with a length check.
+  - `:app`: `ImportResult.steps` goes to the library entry when the recipe is saved, beside its photo; "Method" with
+    numbered steps under its headings (`MethodSteps.kt`), one TalkBack item a step.
+  - The text is the page's own: shown as plain text, never sent to Claude.
+  - Limits and what was not checked: KNOWN_ISSUES #51.

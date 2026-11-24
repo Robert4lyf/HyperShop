@@ -75,6 +75,32 @@ class RecipeNotesTest {
         }
 
     @Test
+    fun theMethodIsKeptWithTheLibraryEntryAndTravelsInABackup() =
+        runBlocking {
+            val key = r.save("Dal", "200 g red lentils")
+            r.repo.offerRecipeMethod(key, listOf("Rinse the lentils.", "For the tarka:", "Fry the cumin."))
+            assertEquals("Rinse the lentils.\nFor the tarka:\nFry the cumin.", note(key)!!.method)
+            // An import that found no method leaves what is kept; a later one that did replaces it.
+            r.repo.offerRecipeMethod(key, emptyList())
+            assertEquals(3, note(key)!!.method!!.lines().size)
+            r.repo.offerRecipeMethod(key, listOf("Rinse and simmer."))
+            assertEquals("Rinse and simmer.", note(key)!!.method)
+            // Rating it does not lose it.
+            r.repo.setRating(key, 4)
+            assertEquals("Rinse and simmer.", note(key)!!.method)
+            val b = r.repo.exportBackup()
+            val fresh = DbRule().also { it.open() }
+            try {
+                assertEquals(emptyList<String>(), fresh.repo.restoreBackup(b, marker()))
+                assertEquals("Rinse and simmer.", fresh.repo.recipeNote(key)!!.method)
+                val tooLong = b.copy(recipeNotes = b.recipeNotes.map { it.copy(method = "x".repeat(300_000)) })
+                assertTrue(BackupValidator.validate(tooLong).any { "method too long" in it })
+            } finally {
+                fresh.close()
+            }
+        }
+
+    @Test
     fun aBackupCarriesThemAndAnOlderFileRestoresWithout() =
         runBlocking {
             val key = r.save("Dal", "200 g red lentils")
